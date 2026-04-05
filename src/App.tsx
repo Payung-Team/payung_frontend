@@ -10,10 +10,13 @@ import NotFound from './pages/error/NotFound';
 function App() {
   return (
     <Routes>
+      {/* Auth pages — full-page layouts */}
+      <Route path="/register" element={<Register />} />
+
+      {/* App pages — wrapped in AppShell (header + sidebar) */}
       <Route element={<AppShell />}>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
         <Route path="/kyc" element={<KYC />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<NotFound />} />
