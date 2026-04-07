@@ -1,5 +1,6 @@
 import { useMutation } from '@apollo/client/react';
 import { REGISTER_USER } from '../graphql/queries';
+import { supabase } from '../lib/supabase';
 
 export interface RegisterData {
   email: string;
@@ -7,14 +8,42 @@ export interface RegisterData {
   role: string;
 }
 
+export interface RegisterResponse {
+  register: {
+    accessToken: string;
+    refreshToken: string;
+    user: {
+      id: string;
+      email: string;
+      role: string;
+    };
+  };
+}
+
 export function useRegister() {
-  const [registerUserMutation, { loading, error: mutationError }] = useMutation(REGISTER_USER);
+  // ระบุให้ useMutation รู้ชัดเจนว่าข้อมูลที่จะได้กลับคืนมาคือ RegisterResponse 
+  // และข้อมูลที่จะส่งเข้าไปคือ RegisterData
+  const [registerUserMutation, { loading, error: mutationError }] = useMutation<RegisterResponse, RegisterData>(REGISTER_USER);
 
   const registerUser = async (data: RegisterData) => {
     try {
       const response = await registerUserMutation({
         variables: data
       });
+
+      // ดึง tokens จาก response และเซ็ต session ใน supabase เพื่อให้ user ล็อกอินทันที
+      const registerData = response.data?.register;
+      if (registerData) {
+        const { accessToken, refreshToken } = registerData;
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+        }
+      }
+      console.log('Registration Mutation Response:', response);
+
       return { data: response.data, error: null };
     } catch (err: any) {
       console.error('Registration Mutation Error:', err);
