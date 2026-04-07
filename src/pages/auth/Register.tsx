@@ -4,6 +4,7 @@ import AuthLayout from '../../components/layout/AuthLayout';
 import AuthInput from '../../components/ui/AuthInput';
 import Alert from '../../components/ui/AlertInvalid';
 import SuccessModal from '../../components/ui/SuccessModal';
+import { useRegister } from '../../hooks/useRegister';
 
 // Icons
 const EmailIcon = (
@@ -180,23 +181,8 @@ export default function Register() {
   const [errorCount, setErrorCount] = useState(0);
 
   const navigate = useNavigate();
-  // const { register } = useAuth();
 
-  // Mock register for UI testing
-  interface RegisterData {
-  email: string;
-  password: string;
-  options: { data: { role: Role } };
-  }
-
-  const register = async (data: RegisterData) => {
-    return new Promise<{ error: any }>((resolve) => {
-      setTimeout(() => {
-        console.log('Mock register with:', data);
-        resolve({ error: null }); 
-      }, 1000);
-    });
-  };
+  const { registerUser } = useRegister();
 
   const validate = useCallback((): FormErrors => {
     const errs: FormErrors = {};
@@ -233,19 +219,15 @@ export default function Register() {
 
     if (Object.keys(errs).length === 0) {
       setIsSubmitting(true);
-      const result = await register({
+      const result = await registerUser({
         email,
         password,
-        options: { data: { role: selectedRole } }
+        role: selectedRole
       });
       setIsSubmitting(false);
 
       if (result.error) {
-        if (result.error.message?.includes('already registered')) {
-          setFormError('อีเมลนี้ถูกใช้แล้ว');
-        } else {
-          setFormError(result.error.message);
-        }
+        setFormError(result.error);
         setErrorCount(prev => prev + 1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
