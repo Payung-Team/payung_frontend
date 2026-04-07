@@ -5,6 +5,7 @@ import AuthInput from '../../components/ui/AuthInput';
 import Alert from '../../components/ui/AlertInvalid';
 import SuccessModal from '../../components/ui/SuccessModal';
 import { useRegister } from '../../hooks/useRegister';
+import { useAuth } from '../../context/AuthContext';
 
 // Icons
 const EmailIcon = (
@@ -183,6 +184,16 @@ export default function Register() {
   const navigate = useNavigate();
 
   const { registerUser } = useRegister();
+  const { user, loading } = useAuth();
+
+  // อาจจะลบโค้ดนี้หลังทำ ProtectedRoute เสร็จ เพื่อไม่ให้โค้ดทับกัน
+  useEffect(() => {
+    // ถ้าระบบตรวจสอบเสร็จแล้วพบว่า user login อยู่ ให้ redirect ไปที่หน้าหลัก (ซ่อนไว้เพื่อป้องกันคนเข้าผ่าน path)
+    // แต่ถ้ากำลัง submit สมัครสมาชิก หรือกำลังแสดง SuccessModal อยู่ จะยังไม่ redirect (แต่ระบบได้ล็อกอินให้อัตโนมัติแล้วหลังสมัครสำเร็จ)
+    if (!loading && user && !isSubmitting && !showSuccessModal) {
+      navigate('/');
+    }
+  }, [user, loading, navigate, isSubmitting, showSuccessModal]);
 
   const validate = useCallback((): FormErrors => {
     const errs: FormErrors = {};
