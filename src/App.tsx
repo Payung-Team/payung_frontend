@@ -6,12 +6,15 @@ import Register from './pages/auth/Register';
 import KYC from './pages/kyc/KYC';
 import Admin from './pages/admin/Admin';
 import NotFound from './pages/error/NotFound';
+import PayungHome from './pages/home/HomePage';
 
 function App() {
   return (
     <Routes>
       {/* Auth pages — full-page layouts */}
       <Route path="/register" element={<Register />} />
+      <Route path="/home" element={<PayungHome />} />
+      
 
       {/* App pages — wrapped in AppShell (header + sidebar) */}
       <Route element={<AppShell />}>
