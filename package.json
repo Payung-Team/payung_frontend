@@ -13,11 +13,12 @@
     "@apollo/client": "^4.1.6",
     "@hookform/resolvers": "^5.2.2",
     "@supabase/supabase-js": "^2.99.3",
-    "graphql": "^16.13.1",
+    "graphql": "^16.13.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-hook-form": "^7.72.0",
     "react-router-dom": "^7.13.1",
+    "rxjs": "^7.8.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {

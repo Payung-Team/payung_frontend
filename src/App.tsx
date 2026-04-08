@@ -12,11 +12,11 @@ function App() {
     <Routes>
       {/* Auth pages — full-page layouts */}
       <Route path="/register" element={<Register />} />
+      <Route path="/login" element={<Login />} />
 
       {/* App pages — wrapped in AppShell (header + sidebar) */}
       <Route element={<AppShell />}>
         <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
         <Route path="/kyc" element={<KYC />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<NotFound />} />
