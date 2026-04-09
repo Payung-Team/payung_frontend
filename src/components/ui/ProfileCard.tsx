@@ -1,6 +1,7 @@
 import React from 'react';
 import Avatar from './Avatar';
 import Skeleton from './Skeleton';
+import { Icon } from './Icon';
 
 interface ProfileCardProps {
   user?: {
@@ -61,10 +62,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ user, loading }) => {
         <div className="text-xs text-[#8A8C8E] mb-3">{user.email}</div>
 
         <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-xs font-semibold bg-[#E6F5ED] text-[#3A9A7E]">
-          <svg className="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="8" r="4" />
-            <path d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" />
-          </svg>
+          <Icon name="person" size="small" color="currentColor" />
           {getRoleLabel(user.role)}
         </div>
       </div>
@@ -83,10 +81,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ user, loading }) => {
       </div>
 
       <button className="w-full h-10 border border-[#E0E2E5] rounded-lg bg-white text-[13px] font-semibold text-[#575859] flex items-center justify-center gap-1.5 mt-3.5 cursor-pointer transition-all duration-200 hover:border-[#52B69A] hover:text-[#52B69A] hover:bg-[#F0FAF4]">
-        <svg className="w-[15px] h-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-        </svg>
+        <Icon name="edit" size="small" color="currentColor" />
         แก้ไขโปรไฟล์
       </button>
     </aside>

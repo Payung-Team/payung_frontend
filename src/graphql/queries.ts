@@ -18,7 +18,7 @@ export const LOGIN_USER = gql`
 `;
 
 export const REGISTER_USER = gql`
-  mutation Register($email: String!, $password: String!, $role: String!) {
+  mutation Register($email: String!, $password: String!, $role: Int!) {
     register(input: {
       email: $email
       password: $password
@@ -35,12 +35,41 @@ export const REGISTER_USER = gql`
   }
 `;
 
+export const LOGOUT_USER = gql`
+  mutation Logout {
+    logout
+  }
+`;
+
 export const GET_USER = gql`
   query GetUser {
     me {
       id
       email
       displayName
+      phone
+      address
+      bio
+      avatarUrl
+      role
+    }
+  }
+`;
+
+export const UPDATE_PROFILE = gql`
+  mutation UpdateProfile($displayName: String, $phone: String, $address: String, $bio: String) {
+    updateProfile(input: {
+      displayName: $displayName
+      phone: $phone
+      address: $address
+      bio: $bio
+    }) {
+      id
+      email
+      displayName
+      phone
+      address
+      bio
       avatarUrl
       role
     }

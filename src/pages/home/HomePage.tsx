@@ -5,6 +5,7 @@ import { GET_USER } from '../../graphql/queries';
 import Skeleton from '../../components/ui/Skeleton';
 import Avatar from '../../components/ui/Avatar';
 import ProfileCard from '../../components/ui/ProfileCard';
+import { Icon } from '../../components/ui/Icon';
 
 interface UserData {
   me: {
@@ -77,7 +78,7 @@ const HomePage: React.FC = () => {
                     {/* Search */}
                     <a href="#" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
                       <div className="w-12 h-12 rounded-xl bg-[#E6F5ED] text-[#3A9A7E] flex items-center justify-center mx-auto mb-2.5">
-                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                        <Icon name="search" size="large" color="currentColor" />
                       </div>
                       <div className="text-[13px] font-semibold mb-0.5">ค้นหาผู้ดูแล</div>
                       <div className="text-[11px] text-[#8A8C8E] leading-snug">หาผู้ดูแลใกล้ฉัน</div>
@@ -85,7 +86,7 @@ const HomePage: React.FC = () => {
                     {/* Book */}
                     <a href="#" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
                       <div className="w-12 h-12 rounded-xl bg-[#FFF3E0] text-[#FFA92C] flex items-center justify-center mx-auto mb-2.5">
-                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                        <Icon name="calendar_today" size="large" color="currentColor" />
                       </div>
                       <div className="text-[13px] font-semibold mb-0.5">จองนัดหมาย</div>
                       <div className="text-[11px] text-[#8A8C8E] leading-snug">สร้างนัดหมายล่วงหน้า</div>
@@ -93,7 +94,7 @@ const HomePage: React.FC = () => {
                     {/* Chat */}
                     <a href="#" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
                       <div className="w-12 h-12 rounded-xl bg-[#F0F1F3] text-[#575859] flex items-center justify-center mx-auto mb-2.5">
-                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
+                        <Icon name="chat_bubble" size="large" color="currentColor" />
                       </div>
                       <div className="text-[13px] font-semibold mb-0.5">ข้อความ</div>
                       <div className="text-[11px] text-[#8A8C8E] leading-snug">แชทกับผู้ดูแล</div>

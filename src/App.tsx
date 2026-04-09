@@ -1,27 +1,62 @@
-import { Routes, Route } from 'react-router-dom';
-import AppShell from './components/layout/AppShell';
+import { Routes, Route, Outlet } from 'react-router-dom';
+import AppLayout from './components/layout/AppLayout';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import KYC from './pages/kyc/KYC';
 import Admin from './pages/admin/Admin';
 import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
+import SearchPage from './pages/search/SearchPage';
+import BookingsPage from './pages/profile/BookingsPage';
+import ProtectedRoute from './components/ProtectedRoute';
+import RoleRoute from './components/RoleRoute';
+import MessagePage from './pages/profile/MessagePage';
 
 function App() {
   return (
     <Routes>
       {/* Auth pages — full-page layouts */}
-      <Route path="/register" element={<Register />} />
-      <Route path="/" element={<PayungHome />} />
-      
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
-      {/* App pages — wrapped in AppShell (header + sidebar) */}
-      <Route element={<AppShell />}>
-        <Route path="/kyc" element={<KYC />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="*" element={<NotFound />} />
+      {/* Protected pages — wrapped in ProtectedRoute and AppLayout */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <Outlet />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/" element={<PayungHome />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/bookings" element={<BookingsPage />} />
+        <Route path="/messages" element={<MessagePage />} />
+        
+        {/* KYC page — only for caregiver (role 2) */}
+        <Route
+          path="/kyc"
+          element={
+            <RoleRoute requiredRole={2}>
+              <KYC />
+            </RoleRoute>
+          }
+        />
+        
+        {/* Admin page — only for admin (role 3) */}
+        <Route
+          path="/admin"
+          element={
+            <RoleRoute requiredRole={3}>
+              <Admin />
+            </RoleRoute>
+          }
+        />
       </Route>
+
+      {/* 404 - Not Found (must be last) */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

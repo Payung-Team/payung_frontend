@@ -9,12 +9,12 @@ import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthProvider>
-      <ApolloProvider client={apolloClient}>
+    <ApolloProvider client={apolloClient}>
+      <AuthProvider>
         <BrowserRouter>
           <App />
         </BrowserRouter>
-      </ApolloProvider>
-    </AuthProvider>
+      </AuthProvider>
+    </ApolloProvider>
   </StrictMode>,
 )

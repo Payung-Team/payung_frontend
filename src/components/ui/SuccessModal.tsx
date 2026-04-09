@@ -1,4 +1,5 @@
 
+import { Icon } from './Icon';
 
 interface SuccessModalProps {
   isOpen: boolean;
@@ -14,10 +15,7 @@ export default function SuccessModal({ isOpen, onClose }: SuccessModalProps) {
 
         {/* Success Icon */}
         <div className="mx-auto flex h-[64px] w-[64px] items-center justify-center rounded-full bg-[#E6F5ED]">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="10" fill="#52B69A" />
-            <path d="M8 12.5L10.5 15L16 9" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <Icon name="check_circle" size="large" color="#52B69A" />
         </div>
 
         {/* Text */}

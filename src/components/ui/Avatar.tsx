@@ -1,5 +1,6 @@
 import React from 'react';
 import Skeleton from './Skeleton';
+import { Icon } from './Icon';
 
 interface AvatarProps {
   src?: string;
@@ -53,9 +54,7 @@ const Avatar: React.FC<AvatarProps> = ({
 
       {showStatus && (
         <div className="absolute -bottom-0.5 -right-0.5 w-[22px] h-[22px] bg-[#52B69A] rounded-full border-2 border-white flex items-center justify-center shadow-sm">
-          <svg className="w-[11px] h-[11px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
+          <Icon name="check" size="small" color="white" />
         </div>
       )}
     </div>

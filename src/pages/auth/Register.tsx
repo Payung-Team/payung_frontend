@@ -1,27 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import AuthLayout from '../../components/layout/AuthLayout';
 import AuthInput from '../../components/ui/AuthInput';
 import Alert from '../../components/ui/AlertInvalid';
 import SuccessModal from '../../components/ui/SuccessModal';
 import { useRegister } from '../../hooks/useRegister';
 import { useAuth } from '../../context/AuthContext';
+import { Icon } from '../../components/ui/Icon';
 
 // Icons
-const EmailIcon = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="4" width="20" height="16" rx="2" />
-    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-  </svg>
-);
+const EmailIcon = <Icon name="email" size="small" color="currentColor" />;
 
-const PasswordIcon = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    <circle cx="12" cy="16" r="1" />
-  </svg>
-);
+const PasswordIcon = <Icon name="lock" size="small" color="currentColor" />;
 
 
 interface FormErrors {
@@ -186,14 +176,15 @@ export default function Register() {
   const { registerUser } = useRegister();
   const { user, loading } = useAuth();
 
-  // อาจจะลบโค้ดนี้หลังทำ ProtectedRoute เสร็จ เพื่อไม่ให้โค้ดทับกัน
+  // Redirect to home page when registration succeeds and user is logged in
   useEffect(() => {
-    // ถ้าระบบตรวจสอบเสร็จแล้วพบว่า user login อยู่ ให้ redirect ไปที่หน้าหลัก (ซ่อนไว้เพื่อป้องกันคนเข้าผ่าน path)
-    // แต่ถ้ากำลัง submit สมัครสมาชิก หรือกำลังแสดง SuccessModal อยู่ จะยังไม่ redirect (แต่ระบบได้ล็อกอินให้อัตโนมัติแล้วหลังสมัครสำเร็จ)
-    if (!loading && user && !isSubmitting && !showSuccessModal) {
-      navigate('/');
+    if (showSuccessModal && !loading && user) {
+      const timer = setTimeout(() => {
+        navigate('/');
+      }, 3000); // ให้เวลาผู้ใช้มองเห็น success modal 3 วินาที
+      return () => clearTimeout(timer);
     }
-  }, [user, loading, navigate, isSubmitting, showSuccessModal]);
+  }, [showSuccessModal, user, loading, navigate]);
 
   const validate = useCallback((): FormErrors => {
     const errs: FormErrors = {};
@@ -230,10 +221,12 @@ export default function Register() {
 
     if (Object.keys(errs).length === 0) {
       setIsSubmitting(true);
+      // Convert role string to number: 'patient' → 1, 'caregiver' → 2
+      const roleMap: Record<Role, number> = { patient: 1, caregiver: 2 };
       const result = await registerUser({
         email,
         password,
-        role: selectedRole
+        role: roleMap[selectedRole]
       });
       setIsSubmitting(false);
 
@@ -357,9 +350,14 @@ export default function Register() {
 
         <p className="mt-5 text-center text-base font-bold leading-6 text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           มีบัญชีอยู่แล้ว?{' '}
-          <Link to="/login" className="text-lg font-semibold text-[#52B69A] hover:underline" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="text-lg font-semibold text-[#52B69A] hover:underline transition bg-none border-none cursor-pointer p-0"
+            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+          >
             เข้าสู่ระบบ
-          </Link>
+          </button>
         </p>
 
         <p className="mt-2 text-center text-xs leading-6 text-[#C6C8CB]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>

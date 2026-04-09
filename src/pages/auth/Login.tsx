@@ -1,27 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@apollo/client/react';
 import AuthLayout from '../../components/layout/AuthLayout';
 import AuthInput from '../../components/ui/AuthInput';
 import Alert from '../../components/ui/AlertInvalid';
 import { LOGIN_USER } from '../../graphql/queries';
 import { supabase } from '../../lib/supabase';
+import { Icon } from '../../components/ui/Icon';
 
 // Icons
-const EmailIcon = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="4" width="20" height="16" rx="2" />
-    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-  </svg>
-);
+const EmailIcon = <Icon name="email" size="small" color="currentColor" />;
 
-const PasswordIcon = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    <circle cx="12" cy="16" r="1" />
-  </svg>
-);
+const PasswordIcon = <Icon name="lock" size="small" color="currentColor" />;
 
 interface FormErrors {
   email?: string;
@@ -154,13 +144,14 @@ export default function Login() {
 
         {/* Forgot Password Link */}
         <div className="text-right mt-2 mb-6">
-          <Link
-            to="/forgot-password"
+          <button
+            type="button"
+            onClick={() => navigate('/forgot-password')}
             className="text-[#52B69A] text-xs font-semibold hover:underline transition"
             style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
           >
             ลืมรหัสผ่าน?
-          </Link>
+          </button>
         </div>
 
         {/* Login Button */}
@@ -221,9 +212,18 @@ export default function Login() {
         {/* Sign Up Link */}
         <p className="mt-5 text-center text-base font-bold leading-6 text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           ยังไม่มีบัญชี?{' '}
-          <Link to="/register" className="text-lg font-semibold text-[#52B69A] hover:underline" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              navigate('/register');
+            }}
+            className="text-lg font-semibold text-[#52B69A] hover:underline transition bg-none border-none cursor-pointer p-0"
+            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+          >
             สมัครสมาชิก
-          </Link>
+          </button>
         </p>
 
         {/* Terms */}
