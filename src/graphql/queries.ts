@@ -34,3 +34,15 @@ export const REGISTER_USER = gql`
     }
   }
 `;
+
+export const GET_USER = gql`
+  query GetUser {
+    me {
+      id
+      email
+      displayName
+      avatarUrl
+      role
+    }
+  }
+`;
