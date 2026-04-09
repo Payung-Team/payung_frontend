@@ -1,25 +1,40 @@
 import React, { useEffect } from 'react';
 import { useQuery } from '@apollo/client/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { GET_USER } from '../../graphql/queries';
 import Skeleton from '../../components/ui/Skeleton';
 import Avatar from '../../components/ui/Avatar';
 import ProfileCard from '../../components/ui/ProfileCard';
 import { Icon } from '../../components/ui/Icon';
+import EditProfileModal from '../../components/layout/EditProfileModal';
 
 interface UserData {
   me: {
     id: string;
     email: string;
     displayName?: string;
+    phone?: string;
+    address?: string;
+    bio?: string;
     avatarUrl?: string;
-    role: string;
+    role: number;
   };
 }
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { data, loading, error } = useQuery<UserData>(GET_USER);
+  
+
+  const [isEditOpen, setIsEditOpen] = React.useState(false);
+
+
+
+  
+  const handleOpenEdit = () => {
+    setIsEditOpen(true);
+  };
+  const handleCloseEdit = () => setIsEditOpen(false);
 
   // Redirect to login if unauthenticated
   useEffect(() => {
@@ -42,7 +57,11 @@ const HomePage: React.FC = () => {
         <main className="max-w-[1000px] mx-auto px-6 pt-7 pb-[120px] grid grid-cols-1 md:grid-cols-[300px_1fr] gap-7 items-start">
 
           {/* Profile card */}
-          <ProfileCard user={data?.me} loading={loading} />
+          <ProfileCard 
+            user={data?.me} 
+            loading={loading} 
+            onEditProfile={handleOpenEdit}
+          />
 
           {/* Main content column */}
           <div className="flex flex-col gap-6">
@@ -76,29 +95,29 @@ const HomePage: React.FC = () => {
                 ) : (
                   <>
                     {/* Search */}
-                    <a href="#" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
+                    <Link to="/search" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
                       <div className="w-12 h-12 rounded-xl bg-[#E6F5ED] text-[#3A9A7E] flex items-center justify-center mx-auto mb-2.5">
                         <Icon name="search" size="large" color="currentColor" />
                       </div>
                       <div className="text-[13px] font-semibold mb-0.5">ค้นหาผู้ดูแล</div>
                       <div className="text-[11px] text-[#8A8C8E] leading-snug">หาผู้ดูแลใกล้ฉัน</div>
-                    </a>
+                    </Link>
                     {/* Book */}
-                    <a href="#" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
+                    <Link to="/bookings" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
                       <div className="w-12 h-12 rounded-xl bg-[#FFF3E0] text-[#FFA92C] flex items-center justify-center mx-auto mb-2.5">
                         <Icon name="calendar_today" size="large" color="currentColor" />
                       </div>
                       <div className="text-[13px] font-semibold mb-0.5">จองนัดหมาย</div>
                       <div className="text-[11px] text-[#8A8C8E] leading-snug">สร้างนัดหมายล่วงหน้า</div>
-                    </a>
+                    </Link>
                     {/* Chat */}
-                    <a href="#" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
+                    <Link to="/messages" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
                       <div className="w-12 h-12 rounded-xl bg-[#F0F1F3] text-[#575859] flex items-center justify-center mx-auto mb-2.5">
                         <Icon name="chat_bubble" size="large" color="currentColor" />
                       </div>
                       <div className="text-[13px] font-semibold mb-0.5">ข้อความ</div>
                       <div className="text-[11px] text-[#8A8C8E] leading-snug">แชทกับผู้ดูแล</div>
-                    </a>
+                    </Link>
                   </>
                 )}
               </div>
@@ -176,6 +195,18 @@ const HomePage: React.FC = () => {
           </div>
         </main>
       </div>
+
+      {data?.me && (
+        <EditProfileModal
+          isOpen={isEditOpen}
+          onClose={handleCloseEdit}
+          userEmail={data.me.email || ''}
+          currentDisplayName={data.me.displayName || ''}
+          currentPhone={data.me.phone || ''}
+          currentAddress={data.me.address || ''}
+          currentBio={data.me.bio || ''}
+        />
+      )}
     </>
   );
 };
