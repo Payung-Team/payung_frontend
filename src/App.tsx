@@ -10,14 +10,15 @@ import SearchPage from './pages/search/SearchPage';
 import BookingsPage from './pages/profile/BookingsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
+import GuestRoute from './components/GuestRoute';
 import MessagePage from './pages/profile/MessagePage';
 
 function App() {
   return (
     <Routes>
-      {/* Auth pages — full-page layouts */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      {/* Auth pages — redirect to / if already logged in */}
+      <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+      <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
 
       {/* Protected pages — wrapped in ProtectedRoute and AppLayout */}
       <Route
