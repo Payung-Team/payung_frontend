@@ -7,18 +7,23 @@ interface ProfileCardProps {
   user?: {
     displayName?: string;
     email: string;
+    phone?: string;
+    address?: string;
+    bio?: string;
     avatarUrl?: string;
-    role: string;
+    role: number;
   };
   loading?: boolean;
+  onEditProfile?: () => void;
 }
 
-const ProfileCard: React.FC<ProfileCardProps> = ({ user, loading }) => {
-  const getRoleLabel = (role: string) => {
-    const roles: Record<string, string> = {
-      patient: 'ผู้สูงอายุ',
-      caregiver: 'ผู้ดูแล',
-      admin: 'ผู้ดูแลระบบ',
+const ProfileCard: React.FC<ProfileCardProps> = ({ user, loading, onEditProfile }) => {
+
+  const getRoleLabel = (role: number) => {
+    const roles: Record<number, string> = {
+      1: 'ผู้สูงอายุ',
+      2: 'ผู้ดูแล',
+      3: 'ผู้ดูแลระบบ',
     };
     return roles[role] || role;
   };
@@ -47,16 +52,16 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ user, loading }) => {
 
   return (
     <aside className="bg-white rounded-3xl px-6 py-7 shadow-[0_2px_12px_rgba(0,0,0,0.04),0_0_0_1px_rgba(0,0,0,0.02)] md:sticky md:top-24">
-      <div className="text-center mb-5">
+      <div className="text-center mb-5 group">
         <Avatar
           src={user.avatarUrl}
           name={user.displayName || user.email}
           size={76}
-          className="mx-auto mb-3"
+          className="mx-auto mb-3 transition-transform duration-200 cursor-pointer group-hover:scale-105"
           showStatus={true}
           gradient="linear-gradient(135deg,#76C893,#3A9A7E)"
         />
-        <div className="text-[17px] font-bold text-[#1A1A1A] mb-0.5">
+        <div className="text-[17px] font-bold text-[#1A1A1A] mb-0.5 group-hover:text-[#52B69A] transition-colors">
           {user.displayName || 'ผู้ใช้แอป Payung'}
         </div>
         <div className="text-xs text-[#8A8C8E] mb-3">{user.email}</div>
@@ -80,7 +85,10 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ user, loading }) => {
         ))}
       </div>
 
-      <button className="w-full h-10 border border-[#E0E2E5] rounded-lg bg-white text-[13px] font-semibold text-[#575859] flex items-center justify-center gap-1.5 mt-3.5 cursor-pointer transition-all duration-200 hover:border-[#52B69A] hover:text-[#52B69A] hover:bg-[#F0FAF4]">
+      <button 
+        className="w-full h-10 border border-[#E0E2E5] rounded-lg bg-white text-[13px] font-semibold text-[#575859] flex items-center justify-center gap-1.5 mt-3.5 cursor-pointer transition-all duration-200 hover:border-[#52B69A] hover:text-[#52B69A] hover:bg-[#F0FAF4]"
+        onClick={onEditProfile}
+      >
         <Icon name="edit" size="small" color="currentColor" />
         แก้ไขโปรไฟล์
       </button>
