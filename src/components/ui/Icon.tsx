@@ -6,6 +6,7 @@ interface IconProps {
   size?: 'small' | 'medium' | 'large';
   className?: string;
   color?: string;
+  style?: React.CSSProperties;
 }
 
 const sizeMap = {
@@ -26,11 +27,15 @@ export const Icon: React.FC<IconProps> = ({
   size = 'medium',
   className = '',
   color = 'currentColor',
+  style = {},
 }) => {
   return (
     <span
       className={`${variantMap[variant]} ${sizeMap[size]} ${className}`}
-      style={{ color }}
+      style={{ 
+        color,
+        ...style,
+      }}
     >
       {name}
     </span>

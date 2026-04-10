@@ -13,7 +13,6 @@ interface ProfileDropdownProps {
 
 export default function ProfileDropdown({
   onViewProfileClick,
-  onEditProfileClick,
   avatarFallbackColor = '#52B69A',
 }: ProfileDropdownProps) {
   const navigate = useNavigate();
@@ -34,11 +33,6 @@ export default function ProfileDropdown({
     onViewProfileClick?.();
   };
 
-  const handleEditProfile = () => {
-    setIsOpen(false);
-    onEditProfileClick?.();
-  };
-
   return (
     <div className="relative">
       <button
@@ -53,7 +47,7 @@ export default function ProfileDropdown({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-50 animate-fadeIn">
+        <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-50 animate-fadeIn">
           <div className="px-4 py-3 border-b border-gray-200">
             <p className="text-sm font-semibold text-gray-900">
               {user?.email?.split('@')[0] || 'User'}
@@ -65,19 +59,67 @@ export default function ProfileDropdown({
             {onViewProfileClick && (
               <button
                 onClick={handleViewProfile}
-                className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-2 transition-colors"
+                className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors"
               >
-                <Icon name="account_box" size="small" />
-                ดูโปรไฟล์
+                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <Icon name="account_box" size="small" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-medium text-gray-900">ดูโปรไฟล์</p>
+                  <p className="text-xs text-gray-500">โปรไฟล์ส่วนตัวของฉัน</p>
+                </div>
               </button>
             )}
 
             <button
-              onClick={handleLogout}
-              className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 text-left flex items-center gap-2 transition-colors"
+              className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors"
             >
-              <Icon name="logout" size="small" color="currentColor" />
-              ออกจากระบบ
+              <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                <Icon name="shield" size="small"/>
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-medium text-gray-900">ความปลอดภัย</p>
+                <p className="text-xs text-gray-500">เปลี่ยนรหัสผ่าน, ยืนยันตัวตน</p>
+              </div>
+            </button>
+
+            <button
+              className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                <Icon name="payment" size="small"/>
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-medium text-gray-900">การชำระเงิน</p>
+                <p className="text-xs text-gray-500">บัตรเครดิต, ประวัติการชำระ</p>
+              </div>
+            </button>
+
+            <button
+              className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                <Icon name="settings" size="small" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-medium text-gray-900">ตั้งค่า</p>
+                <p className="text-xs text-gray-500">การแจ้งเตือน, ภาษา, ธีม</p>
+              </div>
+            </button>
+
+            <div className="border-t border-gray-200 my-2" />
+
+            <button
+              onClick={handleLogout}
+              className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 text-left flex items-center gap-3 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+                <Icon name="logout" size="small" color="currentColor" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-medium text-red-600">ออกจากระบบ</p>
+                <p className="text-xs text-red-500">ออกจากบัญชีของฉัน</p>
+              </div>
             </button>
           </div>
         </div>
