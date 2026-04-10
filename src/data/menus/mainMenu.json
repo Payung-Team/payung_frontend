@@ -1,0 +1,110 @@
+{
+  "menuId": "main_menu",
+  "menuTitle": "Main Navigation",
+  "description": "Main application navigation menu",
+  "navigation": [
+    {
+      "id": "home",
+      "type": "navigation",
+      "label": "Home",
+      "icon": "home-outline",
+      "route": "/",
+      "allowedRoles": ["patient", "caregiver", "admin"]
+    },
+    {
+      "id": "search",
+      "type": "navigation",
+      "label": "Search",
+      "icon": "search-outline",
+      "route": "/search",
+      "allowedRoles": ["patient", "caregiver"]
+    },
+    {
+      "id": "bookings",
+      "type": "navigation",
+      "label": "My Bookings",
+      "icon": "calendar-outline",
+      "route": "/bookings",
+      "allowedRoles": ["patient"]
+    },
+    {
+      "id": "messages",
+      "type": "navigation",
+      "label": "Messages",
+      "icon": "chatbubble-outline",
+      "route": "/messages",
+      "badge": {
+        "count": 0,
+        "color": "red"
+      },
+      "allowedRoles": ["patient", "caregiver"]
+    },
+    {
+      "id": "kyc",
+      "type": "navigation",
+      "label": "Verification",
+      "icon": "checkmark-circle-outline",
+      "route": "/kyc",
+      "allowedRoles": ["caregiver"]
+    },
+    {
+      "id": "admin_panel",
+      "type": "navigation",
+      "label": "Admin Panel",
+      "icon": "settings-outline",
+      "route": "/admin",
+      "allowedRoles": ["admin"]
+    }
+  ],
+  "sidebarExtras": [
+    {
+      "id": "view_audit_logs",
+      "type": "action",
+      "label": "View Audit Logs",
+      "icon": "document-text-outline",
+      "action": "handleViewAuditLogs",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "id": "system_settings",
+      "type": "action",
+      "label": "System Settings",
+      "icon": "sliders-outline",
+      "action": "handleSystemSettings",
+      "allowedRoles": ["admin"]
+    }
+  ],
+  "avatar": [
+    {
+      "id": "view_profile",
+      "type": "navigation",
+      "label": "View Profile",
+      "icon": "person-outline",
+      "route": "/profile",
+      "allowedRoles": ["patient", "caregiver", "admin"]
+    },
+    {
+      "id": "edit_profile",
+      "type": "action",
+      "label": "Edit Profile",
+      "icon": "create-outline",
+      "action": "handleEditProfile",
+      "allowedRoles": ["patient", "caregiver", "admin"]
+    },
+    {
+      "id": "divider_1",
+      "type": "divider",
+      "label": "",
+      "allowedRoles": ["patient", "caregiver", "admin"]
+    },
+    {
+      "id": "logout",
+      "type": "action",
+      "label": "Logout",
+      "icon": "log-out-outline",
+      "action": "handleLogout",
+      "variant": "danger",
+      "allowedRoles": ["patient", "caregiver", "admin"]
+    }
+  ]
+}
