@@ -24,75 +24,105 @@ export default function Header({
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <header className="h-16 border-b border-gray-200 bg-white px-4 md:px-6 flex items-center sticky top-0 z-40">
-      <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-        <img src={logoImg} alt="Payung Logo" className="h-14 w-auto" />
-      </Link>
+    <header className="h-[63px] border-b border-black/10 bg-white px-4 md:px-6 w-full flex items-center sticky top-0 z-40">
+      <div className="flex items-center w-full max-w-[1440px] mx-auto gap-4 md:gap-8">
+        <Link to="/" className="flex items-center flex-shrink-0 hover:opacity-80 transition-opacity">
+          <img src={logoImg} alt="Payung Logo" className="h-[40px] md:h-[60px] w-auto object-contain" />
+        </Link>
 
-      {/* Desktop Navigation */}
-      {(navItems.length > 0 || isLoading) && (
-        <div className="hidden md:flex items-center gap-6 flex-1 justify-center">
-          <nav className="flex items-center gap-2">
+        {/* Desktop Navigation */}
+        {(navItems.length > 0 || isLoading) && (
+          <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+            <nav className="flex items-center gap-2">
+              {isLoading ? (
+                <>
+                  <Skeleton width={104} height={36} borderRadius="8px" />
+                  <Skeleton width={104} height={36} borderRadius="8px" />
+                  <Skeleton width={104} height={36} borderRadius="8px" />
+                </>
+              ) : (
+                navItems
+                  .filter(item => item.path !== '/messages')
+                  .map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`flex items-center gap-2 h-[36px] px-3 rounded-lg transition-all ${
+                      isActive(item.path)
+                        ? 'bg-gray-100'
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <Icon 
+                      name={item.icon} 
+                      size="small" 
+                      className="text-[#0A0A0A]" 
+                    />
+                    <span 
+                      className="text-[14px] font-medium leading-[24px] whitespace-nowrap text-[#0A0A0A]"
+                      style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+                    >
+                      {item.label}
+                    </span>
+                  </Link>
+                ))
+              )}
+            </nav>
+          </div>
+        )}
+
+        {/* Search Bar */}
+        <div className="hidden md:flex flex-1 justify-center max-w-[600px] mx-auto">
+          <div className="relative w-full h-[36px] bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg flex items-center pl-4 pr-1.5">
+            <Icon name="search" size="small" className="text-[#717182] flex-shrink-0" />
+            <input 
+              type="text" 
+              placeholder="ค้นหา" 
+              className="flex-1 bg-transparent border-none outline-none ml-2 text-[14px] text-[#717182] placeholder:text-[#717182]"
+              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+            />
+            <button className="flex items-center justify-center h-[20px] px-2.5 bg-[#52B69A] border border-black/10 rounded overflow-hidden hover:bg-[#45a086] transition-colors flex-shrink-0 cursor-pointer">
+              <span 
+                className="text-[14px] leading-tight text-[#E8EBEF]"
+                style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+              >
+                ค้นหา
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Right Section - Notifications & Profile */}
+        {(profileDropdown || isLoading) && (
+          <div className="flex items-center gap-2 md:gap-4 ml-auto flex-shrink-0">
             {isLoading ? (
               <>
-                <Skeleton width={80} height={32} borderRadius="12px" />
-                <Skeleton width={80} height={32} borderRadius="12px" />
-                <Skeleton width={80} height={32} borderRadius="12px" />
+                <Skeleton width={32} height={32} borderRadius="50%" circle />
+                <Skeleton width={120} height={32} borderRadius="8px" />
               </>
             ) : (
-              navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`text-sm px-4 py-2 rounded-lg transition-all ${
-                    isActive(item.path)
-                      ? 'font-semibold'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                  style={{
-                    backgroundColor: isActive(item.path) ? '#F0FAF4' : undefined,
-                    color: isActive(item.path) ? brandColor : undefined,
-                  }}
-                >
-                  {item.label}
+              <>
+                {/* Messages Icon */}
+                <Link to="/messages" className="relative w-9 h-9 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:cursor-pointer transition-colors rounded-full hover:bg-gray-100">
+                  <Icon name="chat" size="medium" />
                 </Link>
-              ))
+
+                {/* Notification Icon */}
+                <button className="relative w-9 h-9 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:cursor-pointer transition-colors rounded-full hover:bg-gray-100">
+                  <Icon name="notifications" size="medium" />
+                  {/* Default to showing dot for design preview if notificationCount > 0 or even hardcoded for now, but using prop */}
+                  {(notificationCount > 0 || true) && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#D4183D] rounded-full ring-2 ring-white" />
+                  )}
+                </button>
+
+                {/* Profile Dropdown */}
+                {profileDropdown}
+              </>
             )}
-          </nav>
-        </div>
-      )}
-
-      {/* Right Section - Notifications & Profile */}
-      {(profileDropdown || isLoading) && (
-        <div className="hidden md:flex items-center gap-4 ml-auto">
-          {isLoading ? (
-            <>
-              <Skeleton width={24} height={24} borderRadius="4px" />
-              <Skeleton width={40} height={40} borderRadius="50%" circle />
-            </>
-          ) : (
-            <>
-              {/* Notification Icon */}
-              <button className="relative text-gray-600 hover:text-gray-900 transition-colors">
-                <Icon name="notifications" size="medium" />
-                {notificationCount > 0 && (
-                  <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full" />
-                )}
-              </button>
-
-              {/* Profile Dropdown */}
-              {profileDropdown}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Mobile Profile Only */}
-      {profileDropdown && (
-        <div className="md:hidden ml-auto">
-          {profileDropdown}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </header>
   );
 }
