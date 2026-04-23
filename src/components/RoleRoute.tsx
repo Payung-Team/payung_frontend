@@ -1,6 +1,8 @@
 import React, { type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useQuery } from '@apollo/client/react';
+import { GET_USER } from '../graphql/queries';
 import Spinner from './ui/Spinner';
 
 interface RoleRouteProps {
@@ -24,10 +26,15 @@ const ROLE_NAMES: Record<number, string> = {
  * 4. ถ้าตรง → render children
  */
 const RoleRoute: React.FC<RoleRouteProps> = ({ children, requiredRole }) => {
-  const { session, loading, userRole } = useAuth();
+  const { session, loading: authLoading, userRole } = useAuth();
+  const { data: userData, loading: queryLoading } = useQuery(GET_USER, {
+    skip: !session, // ไม่โหลดถ้ายังไม่มี session
+  });
 
-  // กำลังตรวจสอบ auth status
-  if (loading) {
+  const isLoading = authLoading || (session && queryLoading);
+
+  // กำลังตรวจสอบ auth status หรือ ดึงข้อมูล role
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Spinner size="lg" />
@@ -40,16 +47,18 @@ const RoleRoute: React.FC<RoleRouteProps> = ({ children, requiredRole }) => {
     return <Navigate to="/login" replace />;
   }
 
+  const currentRole = userData?.me?.role || Number(userRole);
+
   // ถ้าไม่มี userRole ก็ redirect ไป /
-  if (!userRole) {
+  if (!currentRole) {
     console.warn('User role not found, redirecting to home');
     return <Navigate to="/" replace />;
   }
 
   // ตรวจสอบ role ว่าตรงกับ requiredRole หรือไม่
-  if (userRole !== requiredRole) {
+  if (currentRole !== requiredRole) {
     console.warn(
-      `User role mismatch: expected ${ROLE_NAMES[requiredRole]} (${requiredRole}), got ${ROLE_NAMES[userRole] || 'unknown'} (${userRole})`
+      `User role mismatch: expected ${ROLE_NAMES[requiredRole]} (${requiredRole}), got ${ROLE_NAMES[currentRole] || 'unknown'} (${currentRole})`
     );
     return <Navigate to="/" replace />;
   }
