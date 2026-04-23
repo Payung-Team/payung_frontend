@@ -23,7 +23,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
   const getNavItems = (): NavItem[] => {
-    if (userRole === 2) {
+    const currentRole = userData?.me?.role || Number(userRole);
+
+    if (currentRole === 2) {
       // ผู้ดูแล (Caregiver)
       return [
         { path: '/', label: 'หน้าแรก', icon: 'home' },
