@@ -15,19 +15,34 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const { toasts, removeToast } = useToast();
   const { data: userData } = useQuery(GET_USER);
   
   const [isViewProfileOpen, setIsViewProfileOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
-  const navItems: NavItem[] = [
-    { path: '/', label: 'หน้าหลัก', icon: 'home' },
-    { path: '/search', label: 'ค้นหาผู้ดูแล', icon: 'search' },
-    { path: '/bookings', label: 'นัดหมาย', icon: 'calendar_today' },
-    { path: '/messages', label: 'ข้อความ', icon: 'chat' },
-  ];
+  const getNavItems = (): NavItem[] => {
+    if (userRole === 2) {
+      // ผู้ดูแล (Caregiver)
+      return [
+        { path: '/', label: 'หน้าแรก', icon: 'home' },
+        { path: '/search-jobs', label: 'ค้นหางาน', icon: 'work' },
+        { path: '/my-jobs', label: 'งานของฉัน', icon: 'calendar_today' },
+        { path: '/profile', label: 'โปรไฟล์', icon: 'person' },
+      ];
+    }
+    
+    // ผู้ใช้ทั่วไป (Patient / Guest)
+    return [
+      { path: '/', label: 'หน้าแรก', icon: 'home' },
+      { path: '/search', label: 'ค้นหาผู้ดูแล', icon: 'search' },
+      { path: '/bookings', label: 'นัดหมาย', icon: 'calendar_today' },
+      { path: '/messages', label: 'ข้อความ', icon: 'chat' },
+    ];
+  };
+
+  const navItems = getNavItems();
 
   return (
     <div className="min-h-screen bg-[#F6FAF9] flex flex-col" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
@@ -39,6 +54,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             onViewProfileClick={() => setIsViewProfileOpen(true)}
             onEditProfileClick={() => setIsEditProfileOpen(true)}
             avatarFallbackColor="#52B69A"
+            displayName={userData?.me?.displayName || ''}
           />
         }
         brandColor="#52B69A"
