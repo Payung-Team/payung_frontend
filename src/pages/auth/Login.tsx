@@ -7,6 +7,7 @@ import Alert from '../../components/ui/AlertInvalid';
 import { LOGIN_USER } from '../../graphql/queries';
 import { supabase } from '../../lib/supabase';
 import { Icon } from '../../components/ui/Icon';
+import { useAuth } from '../../context/AuthContext';
 
 // Icons
 const EmailIcon = <Icon name="email" size="small" color="currentColor" />;
@@ -26,6 +27,7 @@ export default function Login() {
   const [formError, setFormError] = useState('');
   const [errorCount, setErrorCount] = useState(0);
   const navigate = useNavigate();
+  const { setUserRole } = useAuth();
 
   const [loginMutation, { loading: isSubmitting }] = useMutation(LOGIN_USER, {
     onCompleted: async (data) => {
@@ -36,6 +38,11 @@ export default function Login() {
           refresh_token: data.login.refreshToken,
         });
       }
+      
+      if (data?.login?.user?.role) {
+        setUserRole(data.login.user.role);
+      }
+      
       // Redirect to home
       navigate('/');
     },
