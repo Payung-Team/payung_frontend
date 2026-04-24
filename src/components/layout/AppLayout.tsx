@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast, type ToastMessage } from '../../hooks/useToast';
-import { GET_USER } from '../../graphql/queries';
+import { GET_USER, GET_CAREGIVER_PROFILE } from '../../graphql/queries';
 import Header from './Header';
 import ProfileDropdown from './ProfileDropdown';
 import MobileNavigation, { type NavItem } from './Navigation';
@@ -17,13 +18,32 @@ interface AppLayoutProps {
 export default function AppLayout({ children }: AppLayoutProps) {
   const { user, userRole } = useAuth();
   const { toasts, removeToast } = useToast();
-  const { data: userData } = useQuery(GET_USER);
+  const { data: userData } = useQuery<any>(GET_USER);
   
   const [isViewProfileOpen, setIsViewProfileOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
+  const currentRole = userData?.me?.role || Number(userRole);
+
+  const { data: caregiverData } = useQuery<any>(GET_CAREGIVER_PROFILE, {
+    skip: currentRole !== 2,
+  });
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (currentRole === 2 && caregiverData?.myCaregiverProfile) {
+      const kycStatus = caregiverData.myCaregiverProfile.kycStatus;
+      // บังคับ caregiver ที่ยังไม่ verify KYC ให้ไปหน้า /kyc เสมอ
+      if (kycStatus !== 'verified' && location.pathname !== '/kyc') {
+        navigate('/kyc', { replace: true });
+      }
+    }
+  }, [currentRole, caregiverData, location.pathname, navigate]);
+
   const getNavItems = (): NavItem[] => {
-    const currentRole = userData?.me?.role || Number(userRole);
+    // ใช้ currentRole ที่ประกาศไว้ด้านบนได้เลย
 
     if (currentRole === 2) {
       // ผู้ดูแล (Caregiver)

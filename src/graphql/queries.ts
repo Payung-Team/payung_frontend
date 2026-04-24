@@ -56,6 +56,16 @@ export const GET_USER = gql`
   }
 `;
 
+export const GET_CAREGIVER_PROFILE = gql`
+  query GetCaregiverProfile {
+    myCaregiverProfile {
+      id
+      kycStatus
+      isSearchable
+    }
+  }
+`;
+
 export const UPDATE_PROFILE = gql`
   mutation UpdateProfile($displayName: String, $phone: String, $address: String, $bio: String) {
     updateProfile(input: {
