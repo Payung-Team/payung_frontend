@@ -73,6 +73,10 @@ export const SUBMIT_KYC = gql`
       id
       kycStatus
       kycSubmittedAt
+    }
+  }
+`;
+
 export const GET_CAREGIVER_PROFILE = gql`
   query GetCaregiverProfile {
     myCaregiverProfile {
