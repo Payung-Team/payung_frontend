@@ -56,6 +56,23 @@ export const GET_USER = gql`
   }
 `;
 
+export const UPLOAD_KYC_DOCUMENT = gql`
+  mutation UploadKycDocument($input: UploadDocumentInput!) {
+    uploadKycDocument(input: $input) {
+      id
+      docType
+      fileName
+      fileUrl
+    }
+  }
+`;
+
+export const SUBMIT_KYC = gql`
+  mutation SubmitKyc($input: KycInput!) {
+    submitKyc(input: $input) {
+      id
+      kycStatus
+      kycSubmittedAt
 export const GET_CAREGIVER_PROFILE = gql`
   query GetCaregiverProfile {
     myCaregiverProfile {

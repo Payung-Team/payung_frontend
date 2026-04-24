@@ -180,15 +180,15 @@ export default function Register() {
   const { registerUser } = useRegister();
   const { user, loading } = useAuth();
 
-  // Redirect to home page when registration succeeds and user is logged in
+  // Redirect after registration: caregiver → /kyc, patient → /
   useEffect(() => {
     if (showSuccessModal && !loading && user) {
       const timer = setTimeout(() => {
-        navigate('/');
-      }, 3000); // ให้เวลาผู้ใช้มองเห็น success modal 3 วินาที
+        navigate(selectedRole === 'caregiver' ? '/kyc' : '/');
+      }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [showSuccessModal, user, loading, navigate]);
+  }, [showSuccessModal, user, loading, navigate, selectedRole]);
 
   const validate = useCallback((): FormErrors => {
     const errs: FormErrors = {};
@@ -370,9 +370,9 @@ export default function Register() {
           <span className="cursor-pointer underline hover:text-[#8A8C8E]">นโยบายความเป็นส่วนตัว</span>
         </p>
       </form>
-      <SuccessModal 
-        isOpen={showSuccessModal} 
-        onClose={() => navigate('/')} 
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => navigate(selectedRole === 'caregiver' ? '/kyc' : '/')}
       />
     </AuthLayout>
   );
