@@ -157,15 +157,26 @@ export default function KycStep2() {
 
       if (storageError) throw new Error(storageError.message);
 
-      const { data: urlData } = supabase.storage
+      let finalUrl = '';
+      const { data: signedData, error: signedError } = await supabase.storage
         .from('kyc-documents')
-        .getPublicUrl(path);
+        .createSignedUrl(path, 3600); // 1 hour for review
+
+      if (signedError || !signedData) {
+        // Fallback to public URL if signed URL fails
+        const { data: publicData } = supabase.storage
+          .from('kyc-documents')
+          .getPublicUrl(path);
+        finalUrl = publicData.publicUrl;
+      } else {
+        finalUrl = signedData.signedUrl;
+      }
 
       const result = await uploadKycDocument({
         variables: {
           input: {
             docType,
-            fileUrl: urlData.publicUrl,
+            fileUrl: finalUrl,
             fileName: file.name,
             fileSize: file.size,
             mimeType: file.type,
@@ -174,7 +185,7 @@ export default function KycStep2() {
       });
 
       const docId: string = result.data?.uploadKycDocument?.id;
-      saveDoc({ docId, docType, fileName: file.name });
+      saveDoc({ docId, docType, fileName: file.name, fileUrl: finalUrl });
       setDocState(docType, { status: 'success', fileName: file.name });
     } catch (err: any) {
       setDocState(docType, {

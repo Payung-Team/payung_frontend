@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useMutation } from '@apollo/client/react';
 import { useKyc } from '../../../context/KycContext';
 import { useAuth } from '../../../context/AuthContext';
+import { SUBMIT_KYC } from '../../../graphql/queries';
 
 // ── Stepper (shared with Step1 pattern) ──────────────────────────────────
 const STEPS = ['ข้อมูลส่วนตัว', 'เอกสาร', 'ตรวจสอบ'];
@@ -16,9 +19,8 @@ function KycStepper({ current }: { current: number }) {
           <div key={n} className="flex items-center">
             <div className="flex flex-col items-center gap-1.5">
               <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
-                  done || active ? 'bg-[#2D6A58] text-white' : 'bg-[#E2E8F0] text-[#717182]'
-                }`}
+                className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${done || active ? 'bg-[#2D6A58] text-white' : 'bg-[#E2E8F0] text-[#717182]'
+                  }`}
               >
                 {done ? (
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -49,7 +51,9 @@ function KycStepper({ current }: { current: number }) {
 export default function KycStep3() {
   const { goToStep, step1Data, uploadedDocs } = useKyc();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isConsented, setIsConsented] = useState(false);
+  const [submitKyc, { loading }] = useMutation(SUBMIT_KYC);
 
   const handleEditPersonalInfo = () => {
     goToStep(1);
@@ -59,11 +63,31 @@ export default function KycStep3() {
     goToStep(2);
   };
 
-  const handleSubmit = () => {
-    // Final submission logic would go here
-    console.log('Submitting KYC Data:', { step1Data, uploadedDocs });
-    // For now, maybe just go to a success page or back to home
-    // goToStep(4);
+  const handleSubmit = async () => {
+    if (!step1Data) return;
+
+    try {
+      await submitKyc({
+        variables: {
+          input: {
+            fullName: step1Data.fullName,
+            idCardNumber: step1Data.idCardNumber,
+            phone: step1Data.phone,
+            skills: step1Data.skills,
+            experienceYears: Number(step1Data.experienceYears),
+            hourlyRate: Number(step1Data.hourlyRate),
+            bio: step1Data.bio,
+            documentIds: uploadedDocs.map((doc) => doc.docId),
+          },
+        },
+      });
+
+      // Redirect to status page
+      navigate('/kyc/status');
+    } catch (err) {
+      console.error('KYC Submission Error:', err);
+      alert('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง');
+    }
   };
 
   return (
@@ -109,10 +133,34 @@ export default function KycStep3() {
           <div className="px-5 py-2 flex flex-col">
             <InfoRow label="ชื่อ-นามสกุล" value={step1Data?.fullName || '-'} />
             <InfoRow label="เลขบัตรประชาชน" value={step1Data?.idCardNumber || '-'} />
-            <InfoRow label="วันเกิด" value="-" /> {/* Not currently collected */}
-            <InfoRow label="เพศ" value="-" /> {/* Not currently collected */}
             <InfoRow label="เบอร์โทรศัพท์" value={step1Data?.phone || '-'} />
-            <InfoRow label="อีเมล" value={user?.email || '-'} border={false} />
+            <InfoRow label="อีเมล" value={user?.email || '-'} />
+            <InfoRow label="ประสบการณ์" value={`${step1Data?.experienceYears || 0} ปี`} />
+            <InfoRow label="ค่าบริการเริ่มต้น" value={`${step1Data?.hourlyRate || 0} บาท/ชม.`} />
+            <div className="py-2.5 border-b border-[#F1F5F9]">
+              <p className="text-[13px] font-medium text-[#64748B] mb-2" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                ทักษะการดูแล
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {step1Data?.skills && step1Data.skills.length > 0 ? (
+                  step1Data.skills.map((skill, idx) => (
+                    <span key={idx} className="bg-[#F1F5F9] text-[#485569] text-[12px] font-medium px-2.5 py-1 rounded-full" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                      {skill}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-[#94A3B8] text-[13px]">-</span>
+                )}
+              </div>
+            </div>
+            <div className="py-2.5">
+              <p className="text-[13px] font-medium text-[#64748B] mb-1" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                แนะนำตัว
+              </p>
+              <p className="text-[14px] text-[#1E293B] leading-[20px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                {step1Data?.bio || '-'}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -131,33 +179,31 @@ export default function KycStep3() {
             </button>
           </div>
           <div className="px-5 py-2 flex flex-col gap-0">
-             <DocRow 
-                label="รูปบัตรประชาชน" 
-                fileName={uploadedDocs.find(d => d.docType === 'id_card_front')?.fileName} 
-             />
-             <DocRow 
-                label="รูปถ่ายคู่บัตร" 
-                fileName={uploadedDocs.find(d => d.docType === 'id_card_selfie')?.fileName} 
-             />
-             <DocRow 
-                label="ใบประกอบวิชาชีพ (ถ้ามี)" 
-                fileName={uploadedDocs.find(d => d.docType === 'certificate')?.fileName} 
-                border={false}
-             />
+            <DocRow
+              label="รูปบัตรประชาชน"
+              file={uploadedDocs.find(d => d.docType === 'id_card_front')}
+            />
+            <DocRow
+              label="รูปถ่ายคู่บัตร"
+              file={uploadedDocs.find(d => d.docType === 'id_card_selfie')}
+            />
+            <DocRow
+              label="ใบประกอบวิชาชีพ (ถ้ามี)"
+              file={uploadedDocs.find(d => d.docType === 'certificate')}
+              border={false}
+            />
           </div>
         </div>
 
         {/* Consent Box */}
         <button
           onClick={() => setIsConsented(!isConsented)}
-          className={`w-full rounded-xl p-4 flex gap-3 text-left transition-all cursor-pointer ${
-            isConsented ? 'bg-[#E0F6F1]' : 'bg-[#F8FAFC] border border-[#E2E8F0]'
-          }`}
+          className={`w-full rounded-xl p-4 flex gap-3 text-left transition-all cursor-pointer ${isConsented ? 'bg-[#E0F6F1]' : 'bg-[#F8FAFC] border border-[#E2E8F0]'
+            }`}
         >
           <div
-            className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
-              isConsented ? 'bg-[#0F766E]' : 'bg-white border-2 border-[#CBD5E1]'
-            }`}
+            className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${isConsented ? 'bg-[#0F766E]' : 'bg-white border-2 border-[#CBD5E1]'
+              }`}
           >
             {isConsented && (
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -186,16 +232,23 @@ export default function KycStep3() {
           </button>
           <button
             type="button"
-            disabled={!isConsented}
+            disabled={!isConsented || loading}
             onClick={handleSubmit}
-            className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-150 ${
-              isConsented
+            className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-150 flex items-center justify-center gap-2 ${isConsented && !loading
                 ? 'bg-[#2D6A58] text-white hover:bg-[#255a4a] active:scale-[0.98] cursor-pointer'
                 : 'bg-[#CBD5E1] text-white cursor-not-allowed'
-            }`}
+              }`}
             style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
           >
-            ส่งข้อมูล
+            {loading ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                กำลังส่ง...
+              </>
+            ) : 'ส่งข้อมูล'}
           </button>
         </div>
       </div>
@@ -216,28 +269,36 @@ function InfoRow({ label, value, border = true }: { label: string; value: string
   );
 }
 
-function DocRow({ label, fileName, border = true }: { label: string; fileName?: string; border?: boolean }) {
+function DocRow({ label, file, border = true }: { label: string; file?: { fileName: string; fileUrl: string }; border?: boolean }) {
+  const isImage = file?.fileName.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i) || file?.fileUrl.includes('token=') || file?.fileUrl.includes('signedURL=');
+
   return (
     <div className={`flex justify-between items-center py-2.5 ${border ? 'border-b border-[#F1F5F9]' : ''}`}>
       <span className="text-[13px] font-medium text-[#64748B]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
         {label}
       </span>
-      <div className="bg-[#F1F5F9] rounded-lg px-2.5 py-1.5 flex items-center gap-2 min-w-[102px]">
-        {fileName ? (
-          <div className="flex items-center gap-2 overflow-hidden">
-             <div className="w-5 h-5 bg-[#1B6B3A] rounded-sm flex items-center justify-center flex-shrink-0">
+      <div className="flex items-center gap-2">
+        {file ? (
+          <div className="flex items-center gap-2 overflow-hidden bg-[#F1F5F9] rounded-lg px-2.5 py-1.5 min-w-[102px]">
+            {isImage ? (
+              <img src={file.fileUrl} alt={file.fileName} className="w-8 h-8 rounded object-cover border border-white" />
+            ) : (
+              <div className="w-5 h-5 bg-[#1B6B3A] rounded-sm flex items-center justify-center flex-shrink-0">
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                   <path d="M2.5 5L4 6.5L7.5 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-             </div>
-             <span className="text-[13px] font-medium text-[#334055] truncate max-w-[150px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                {fileName}
-             </span>
+              </div>
+            )}
+            <span className="text-[13px] font-medium text-[#334055] truncate max-w-[150px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+              {file.fileName}
+            </span>
           </div>
         ) : (
-          <span className="text-[13px] font-medium text-[#94A3B8]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-             ยังไม่ได้อัปโหลด
-          </span>
+          <div className="bg-[#F1F5F9] rounded-lg px-2.5 py-1.5 min-w-[102px]">
+            <span className="text-[13px] font-medium text-[#94A3B8]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+              ยังไม่ได้อัปโหลด
+            </span>
+          </div>
         )}
       </div>
     </div>

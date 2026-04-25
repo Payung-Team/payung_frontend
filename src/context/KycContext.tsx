@@ -14,6 +14,7 @@ export interface UploadedDoc {
   docId: string;
   docType: string;
   fileName: string;
+  fileUrl: string;
 }
 
 interface KycContextType {
