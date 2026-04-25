@@ -43,7 +43,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }, [currentRole, caregiverData, location.pathname, navigate]);
 
   const getNavItems = (): NavItem[] => {
-    // ใช้ currentRole ที่ประกาศไว้ด้านบนได้เลย
+
 
     if (currentRole === 2) {
       // ผู้ดูแล (Caregiver)

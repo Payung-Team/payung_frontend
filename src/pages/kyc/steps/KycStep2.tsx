@@ -141,7 +141,7 @@ export default function KycStep2() {
       return;
     }
     if (file.size > MAX_SIZE) {
-      setDocState(docType, { status: 'error', error: 'ไฟล์ต้องไม่เกิน 5 MB' });
+      setDocState(docType, { status: 'error', error: 'ไฟล์ใหญ่เกิน 5 MB · ลองย่อขนาดแล้วอัปโหลดอีกครั้ง' });
       return;
     }
 
@@ -190,25 +190,27 @@ export default function KycStep2() {
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#F2F4F6] flex items-center justify-center px-4 py-10">
       <div
-        className="w-full max-w-[780px] bg-white rounded-3xl border border-[#F1F5F9] px-12 py-10"
+        className="w-[720px] bg-white rounded-[20px] border border-[#F1F5F9] px-14 py-12 flex flex-col gap-[28px]"
         style={{
-          boxShadow: '0 12px 28px -6px rgba(15,23,43,0.06), 0 1px 2px 0 rgba(15,23,43,0.04)',
+          boxShadow: '0px 12px 28px -6px rgba(15, 23, 43, 0.06), 0px 1px 2px rgba(15, 23, 43, 0.04)',
         }}
       >
         <KycStepper current={2} />
 
-        <h2
-          className="text-2xl font-bold text-[#0A0A0A] mb-1"
-          style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-        >
-          อัปโหลดเอกสาร
-        </h2>
-        <p
-          className="text-sm text-[#717182] mb-8"
-          style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-        >
-          รองรับไฟล์ JPG, PNG, PDF ขนาดไม่เกิน 5 MB ต่อไฟล์
-        </p>
+        <div className="flex flex-col gap-1.5">
+          <h2
+            className="text-2xl font-bold text-[#0F172A] leading-[30px]"
+            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+          >
+            อัปโหลดเอกสาร
+          </h2>
+          <p
+            className="text-sm text-[#64748B] leading-[20px]"
+            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+          >
+            รองรับไฟล์ JPG, PNG, PDF ขนาดไม่เกิน 5 MB ต่อไฟล์
+          </p>
+        </div>
 
         {/* Document Upload Zones */}
         <div className="flex flex-col gap-3 mb-8">
@@ -216,20 +218,32 @@ export default function KycStep2() {
             const state = docStates[doc.type];
             const isSuccess = state.status === 'success';
             const isUploading = state.status === 'uploading';
+            const isError = state.status === 'error';
 
             return (
               <div key={doc.type}>
                 <div
-                  className={`flex items-center gap-4 px-5 py-4 rounded-2xl border-2 border-dashed transition-colors ${
+                  className={`flex items-center gap-4 px-5 py-4 rounded-[20px] transition-all ${
                     isSuccess
-                      ? 'border-[#2D6A58] bg-[#F0FAF6]'
-                      : state.status === 'error'
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-[#CBD5E1] bg-white hover:border-[#2D6A58]'
+                      ? 'border-2 border-[#0F766E] bg-[#E8F0EB]'
+                      : isError
+                      ? 'border border-[#951E1E] bg-[#F9EAEA]'
+                      : isUploading
+                      ? 'border border-[#F1F5F9] bg-white'
+                      : 'border border-dashed border-[#CBD5E1] bg-[#F8FAFC] hover:border-[#2D6A58]'
                   }`}
+                  style={{ height: '72px' }}
                 >
-                  {/* Doc Icon */}
-                  <div className="w-10 h-10 rounded-xl bg-[#F0FAF6] border border-[#E2E8F0] flex items-center justify-center flex-shrink-0">
+                  {/* Doc Icon Box */}
+                  <div 
+                    className={`w-10 h-10 flex items-center justify-center flex-shrink-0 rounded-[10px] border transition-colors ${
+                      isSuccess 
+                        ? 'bg-[#E0F6F1] border-[#0F766E]' 
+                        : isError 
+                        ? 'bg-white border-[#CBD5E1]' 
+                        : 'bg-white border-[#CBD5E1]'
+                    }`}
+                  >
                     {isSuccess ? (
                       <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                         <circle cx="10" cy="10" r="9" fill="#2D6A58" />
@@ -240,46 +254,80 @@ export default function KycStep2() {
                     )}
                   </div>
 
-                  {/* Text */}
+                  {/* Text Information */}
                   <div className="flex-1 min-w-0">
                     <p
-                      className={`text-sm font-semibold ${isSuccess ? 'text-[#2D6A58]' : 'text-[#0A0A0A]'}`}
+                      className={`text-[15px] font-semibold leading-[19px] ${
+                        isError ? 'text-[#C62828]' : 'text-[#0F172A]'
+                      }`}
                       style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                     >
                       {doc.title}
                     </p>
                     <p
-                      className="text-xs text-[#717182] truncate"
+                      className={`text-[13px] leading-[16px] truncate ${
+                        isError ? 'text-[#DC2626]' : 'text-[#64748B]'
+                      }`}
                       style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                     >
                       {isSuccess
                         ? state.fileName
                         : isUploading
                         ? 'กำลังอัปโหลด...'
+                        : isError
+                        ? state.error
                         : doc.desc}
                     </p>
                   </div>
 
-                  {/* Upload Button */}
-                  <button
-                    type="button"
-                    disabled={isUploading}
-                    onClick={() => fileRefs.current[doc.type]?.click()}
-                    className={`w-9 h-9 rounded-lg border border-[#E2E8F0] flex items-center justify-center flex-shrink-0 transition-colors ${
-                      isUploading
-                        ? 'opacity-40 cursor-not-allowed'
-                        : 'hover:border-[#2D6A58] hover:bg-[#F0FAF6] cursor-pointer'
-                    }`}
-                  >
-                    {isUploading ? (
-                      <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <circle cx="8" cy="8" r="6" stroke="#CBD5E1" strokeWidth="2" />
-                        <path d="M8 2a6 6 0 016 6" stroke="#2D6A58" strokeWidth="2" strokeLinecap="round" />
-                      </svg>
-                    ) : (
-                      <UploadIcon />
+                  {/* Actions */}
+                  <div className="flex items-center gap-2">
+                    {/* Upload/Retry Button */}
+                    <button
+                      type="button"
+                      disabled={isUploading}
+                      onClick={() => fileRefs.current[doc.type]?.click()}
+                      className={`flex items-center justify-center flex-shrink-0 transition-all cursor-pointer ${
+                        isError
+                          ? 'w-[61px] h-9 bg-white border border-[#951E1E] rounded-lg'
+                          : isUploading
+                          ? 'w-9 h-9 opacity-40 cursor-not-allowed'
+                          : isSuccess
+                          ? 'hidden' // Button Hidden on success in some designs, or used as replace
+                          : 'w-9 h-9 bg-white border border-[#E2E8F0] rounded-lg hover:border-[#2D6A58]'
+                      }`}
+                    >
+                      {isUploading ? (
+                        <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <circle cx="8" cy="8" r="6" stroke="#CBD5E1" strokeWidth="2" />
+                          <path d="M8 2a6 6 0 016 6" stroke="#2D6A58" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                      ) : isError ? (
+                        /* icon-upload-danger */
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                          <path d="M3 13v1.5A1.5 1.5 0 004.5 16h9a1.5 1.5 0 001.5-1.5V13" stroke="#C62828" strokeWidth="1.5" strokeLinecap="round" />
+                          <path d="M9 11V3m0 0L6 6m3-3l3 3" stroke="#C62828" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      ) : (
+                        <UploadIcon />
+                      )}
+                    </button>
+
+                    {/* Delete/Trash Button */}
+                    {(isSuccess || isError) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDocState(doc.type, { status: 'idle', fileName: undefined, error: undefined });
+                        }}
+                        className="w-9 h-9 bg-white border border-[#E2E8F0] rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors cursor-pointer"
+                      >
+                         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                          <path d="M3 4.5h12M6.75 4.5V3a1.5 1.5 0 011.5-1.5h1.5a1.5 1.5 0 011.5 1.5v1.5M13.5 4.5v10.5A1.5 1.5 0 0112 16.5H6a1.5 1.5 0 01-1.5-1.5V4.5" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
                     )}
-                  </button>
+                  </div>
 
                   {/* Hidden file input */}
                   <input
@@ -294,16 +342,6 @@ export default function KycStep2() {
                     }}
                   />
                 </div>
-
-                {/* Error message */}
-                {state.status === 'error' && state.error && (
-                  <p
-                    className="mt-1 text-xs text-red-500 pl-1"
-                    style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-                  >
-                    {state.error}
-                  </p>
-                )}
               </div>
             );
           })}
