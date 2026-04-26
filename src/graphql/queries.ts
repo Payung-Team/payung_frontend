@@ -106,3 +106,44 @@ export const UPDATE_PROFILE = gql`
     }
   }
 `;
+
+export const GET_KYC_STATUS = gql`
+  query GetKycStatus {
+    kycStatus {
+      status
+      submittedAt
+      verifiedAt
+      rejectedAt
+      rejectedReason
+      caregiver {
+        id
+        fullName
+        kycStatus
+      }
+      documents {
+        id
+        docType
+        fileName
+        fileUrl
+        signedUrl
+        mimeType
+      }
+    }
+  }
+`;
+
+export const RESUBMIT_KYC = gql`
+  mutation ResubmitKyc($input: KycInput!) {
+    resubmitKyc(input: $input) {
+      id
+      kycStatus
+      kycSubmittedAt
+    }
+  }
+`;
+
+export const DELETE_KYC_DOCUMENT = gql`
+  mutation DeleteKycDocument($documentId: String!) {
+    deleteKycDocument(documentId: $documentId)
+  }
+`;
