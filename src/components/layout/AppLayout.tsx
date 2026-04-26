@@ -35,8 +35,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   useEffect(() => {
     if (currentRole === 2 && caregiverData?.myCaregiverProfile) {
       const kycStatus = caregiverData.myCaregiverProfile.kycStatus;
-      // บังคับ caregiver ที่ยังไม่ verify KYC ให้ไปหน้า /kyc เสมอ
-      if (kycStatus !== 'verified' && location.pathname !== '/kyc') {
+      // บังคับ caregiver ที่ยังเป็น none ให้ไปหน้า /kyc เสมอ
+      if (kycStatus === 'none' && location.pathname !== '/kyc') {
         navigate('/kyc', { replace: true });
       }
     }
