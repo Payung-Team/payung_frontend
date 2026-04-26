@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 
-export default function KycStatus() {
+export default function KycSuccess() {
   const navigate = useNavigate();
 
   // For demonstration, use current date if not available
@@ -34,7 +34,7 @@ export default function KycStatus() {
             ส่งข้อมูลเรียบร้อย
           </h1>
           <p className="text-[16px] text-[#64748B] leading-[24px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-            ทีมงานจะตรวจสอบภายใน 1–2 วันทำการ เราจะแจ้งผลผ่านอีเมลและในแอป Payung
+            ทีมงานจะตรวจสอบภายใน 1–2 วันทำการ <br />เราจะแจ้งผลผ่านอีเมลและในแอป Payung
           </p>
         </div>
 

@@ -83,7 +83,7 @@ export default function KycStep3() {
       });
 
       // Redirect to status page
-      navigate('/kyc/status');
+      navigate('/kyc/success');
     } catch (err) {
       console.error('KYC Submission Error:', err);
       alert('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง');
