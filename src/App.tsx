@@ -3,7 +3,8 @@ import AppLayout from './components/layout/AppLayout';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import KYC from './pages/kyc/KYC';
-import KycStatus from './pages/kyc/status/SuccessSubmit';
+import KycSuccess from './pages/kyc/status/SuccessSubmit';
+import KycStatus from './pages/kyc/status/KycStatusPage';
 import Admin from './pages/admin/Admin';
 import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
@@ -42,6 +43,14 @@ function App() {
           element={
             <RoleRoute requiredRole={2}>
               <KYC />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/kyc/success"
+          element={
+            <RoleRoute requiredRole={2}>
+              <KycSuccess />
             </RoleRoute>
           }
         />
