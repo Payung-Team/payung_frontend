@@ -157,26 +157,24 @@ export default function KycStep2() {
 
       if (storageError) throw new Error(storageError.message);
 
-      let finalUrl = '';
-      const { data: signedData, error: signedError } = await supabase.storage
+      // Get clean public URL for storage in DB
+      const { data: publicData } = supabase.storage
         .from('kyc-documents')
-        .createSignedUrl(path, 3600); // 1 hour for review
+        .getPublicUrl(path);
+      const cleanUrl = publicData.publicUrl;
 
-      if (signedError || !signedData) {
-        // Fallback to public URL if signed URL fails
-        const { data: publicData } = supabase.storage
-          .from('kyc-documents')
-          .getPublicUrl(path);
-        finalUrl = publicData.publicUrl;
-      } else {
-        finalUrl = signedData.signedUrl;
-      }
+      // Get signed URL for immediate preview (expires in 1 hour)
+      const { data: signedData } = await supabase.storage
+        .from('kyc-documents')
+        .createSignedUrl(path, 3600);
+      
+      const previewUrl = signedData?.signedUrl || cleanUrl;
 
       const result = await uploadKycDocument({
         variables: {
           input: {
             docType,
-            fileUrl: finalUrl,
+            fileUrl: cleanUrl, // Save clean URL to DB
             fileName: file.name,
             fileSize: file.size,
             mimeType: file.type,
@@ -185,7 +183,7 @@ export default function KycStep2() {
       });
 
       const docId: string = result.data?.uploadKycDocument?.id;
-      saveDoc({ docId, docType, fileName: file.name, fileUrl: finalUrl });
+      saveDoc({ docId, docType, fileName: file.name, fileUrl: previewUrl });
       setDocState(docType, { status: 'success', fileName: file.name });
     } catch (err: any) {
       setDocState(docType, {
