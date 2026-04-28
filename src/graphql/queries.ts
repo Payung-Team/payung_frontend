@@ -71,6 +71,9 @@ export const SUBMIT_KYC = gql`
   mutation SubmitKyc($input: KycInput!) {
     submitKyc(input: $input) {
       id
+      fullName
+      dateOfBirth
+      gender
       kycStatus
       kycSubmittedAt
     }
@@ -118,6 +121,14 @@ export const GET_KYC_STATUS = gql`
       caregiver {
         id
         fullName
+        dateOfBirth
+        gender
+        idCardNumber
+        phone
+        skills
+        experienceYears
+        hourlyRate
+        bio
         kycStatus
       }
       documents {
@@ -136,6 +147,9 @@ export const RESUBMIT_KYC = gql`
   mutation ResubmitKyc($input: KycInput!) {
     resubmitKyc(input: $input) {
       id
+      fullName
+      dateOfBirth
+      gender
       kycStatus
       kycSubmittedAt
     }

@@ -1,7 +1,10 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 
 export interface KycStep1Data {
-  fullName: string;
+  firstName: string;
+  lastName: string;
+  birthDate: string; // ISO format or YYYY-MM-DD
+  gender: string;
   idCardNumber: string;
   phone: string;
   skills: string[];
@@ -25,6 +28,7 @@ interface KycContextType {
   saveStep1: (data: KycStep1Data) => void;
   saveDoc: (doc: UploadedDoc) => void;
   removeDoc: (docType: string) => void;
+  setInitialData: (data: { step1: KycStep1Data; docs: UploadedDoc[] }) => void;
 }
 
 const KycContext = createContext<KycContextType | undefined>(undefined);
@@ -45,6 +49,11 @@ export function KycProvider({ children }: { children: ReactNode }) {
     setUploadedDocs((prev) => prev.filter((d) => d.docType !== docType));
   }
 
+  function setInitialData(data: { step1: KycStep1Data; docs: UploadedDoc[] }) {
+    setStep1Data(data.step1);
+    setUploadedDocs(data.docs);
+  }
+
   return (
     <KycContext.Provider value={{
       step,
@@ -54,6 +63,7 @@ export function KycProvider({ children }: { children: ReactNode }) {
       saveStep1: setStep1Data,
       saveDoc,
       removeDoc,
+      setInitialData,
     }}>
       {children}
     </KycContext.Provider>
