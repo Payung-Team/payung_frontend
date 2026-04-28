@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@apollo/client/react';
 import { useKyc } from '../../../context/KycContext';
 import { useAuth } from '../../../context/AuthContext';
-import { SUBMIT_KYC } from '../../../graphql/queries';
+import { SUBMIT_KYC, RESUBMIT_KYC } from '../../../graphql/queries';
+import Icon from '../../../components/ui/Icon';
+import { supabase } from '../../../lib/supabase';
+import { useEffect } from 'react';
 
 // ── Stepper (shared with Step1 pattern) ──────────────────────────────────
 const STEPS = ['ข้อมูลส่วนตัว', 'เอกสาร', 'ตรวจสอบ'];
@@ -48,12 +51,45 @@ function KycStepper({ current }: { current: number }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────
-export default function KycStep3() {
+export default function KycStep3({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
   const { goToStep, step1Data, uploadedDocs } = useKyc();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isConsented, setIsConsented] = useState(false);
-  const [submitKyc, { loading }] = useMutation(SUBMIT_KYC);
+  const [submitKyc, { loading: creating }] = useMutation(SUBMIT_KYC);
+  const [resubmitKyc, { loading: updating }] = useMutation(RESUBMIT_KYC);
+  const loading = creating || updating;
+  const [refreshedDocs, setRefreshedDocs] = useState(uploadedDocs);
+
+  // Refresh signed URLs for all documents to ensure thumbnails show up
+  useEffect(() => {
+    const refreshAll = async () => {
+      const updated = await Promise.all(uploadedDocs.map(async (doc) => {
+        if (doc.fileUrl.includes('/kyc-documents/')) {
+          try {
+            const parts = doc.fileUrl.split('/kyc-documents/');
+            const path = parts.length > 1 ? parts[1].split('?')[0] : null;
+            if (path) {
+              const { data } = await supabase.storage
+                .from('kyc-documents')
+                .createSignedUrl(decodeURIComponent(path), 3600);
+              if (data?.signedUrl) {
+                return { ...doc, fileUrl: data.signedUrl };
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to refresh URL in Step 3:', err);
+          }
+        }
+        return doc;
+      }));
+      setRefreshedDocs(updated);
+    };
+    
+    if (uploadedDocs.length > 0) {
+      refreshAll();
+    }
+  }, [uploadedDocs]);
 
   const handleEditPersonalInfo = () => {
     goToStep(1);
@@ -67,23 +103,30 @@ export default function KycStep3() {
     if (!step1Data) return;
 
     try {
-      await submitKyc({
-        variables: {
-          input: {
-            fullName: step1Data.fullName,
-            idCardNumber: step1Data.idCardNumber,
-            phone: step1Data.phone,
-            skills: step1Data.skills,
-            experienceYears: Number(step1Data.experienceYears),
-            hourlyRate: Number(step1Data.hourlyRate),
-            bio: step1Data.bio,
-            documentIds: uploadedDocs.map((doc) => doc.docId),
-          },
-        },
-      });
+      const kycInput = {
+        fullName: `${step1Data.firstName} ${step1Data.lastName}`.trim(),
+        dateOfBirth: step1Data.birthDate ? new Date(step1Data.birthDate) : undefined,
+        gender: step1Data.gender,
+        idCardNumber: step1Data.idCardNumber,
+        phone: step1Data.phone,
+        skills: step1Data.skills,
+        experienceYears: Number(step1Data.experienceYears),
+        hourlyRate: Number(step1Data.hourlyRate),
+        bio: step1Data.bio,
+        documentIds: uploadedDocs.map((doc) => doc.docId),
+      };
 
-      // Redirect to status page
-      navigate('/kyc/success');
+      if (mode === 'resubmit') {
+        await resubmitKyc({
+          variables: { input: kycInput },
+        });
+        navigate('/kyc/status');
+      } else {
+        await submitKyc({
+          variables: { input: kycInput },
+        });
+        navigate('/kyc/success');
+      }
     } catch (err) {
       console.error('KYC Submission Error:', err);
       alert('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง');
@@ -91,29 +134,33 @@ export default function KycStep3() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-[#F8F9FB] flex flex-col items-center py-12 px-4 gap-10">
+    <div className={mode === 'resubmit' ? '' : 'min-h-[calc(100vh-64px)] bg-[#F8F9FB] flex flex-col items-center py-12 px-4 gap-10'}>
 
       <div
-        className="w-full max-w-[720px] bg-white rounded-[20px] border border-[#F1F5F9] p-12 flex flex-col gap-6"
-        style={{
+        className={mode === 'resubmit' ? 'w-full flex flex-col gap-6' : 'w-full max-w-[720px] bg-white rounded-[20px] border border-[#F1F5F9] p-12 flex flex-col gap-6'}
+        style={mode === 'resubmit' ? {} : {
           boxShadow: '0px 12px 28px -6px rgba(15, 23, 43, 0.06), 0px 1px 2px rgba(15, 23, 43, 0.04)',
         }}
       >
         {/* Header */}
         <div className="flex flex-col gap-1.5">
           <KycStepper current={3} />
-          <h2
-            className="text-2xl font-bold text-[#0F172A] leading-[30px]"
-            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-          >
-            ตรวจสอบข้อมูล
-          </h2>
-          <p
-            className="text-sm text-[#64748B] leading-[20px]"
-            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-          >
-            ตรวจสอบข้อมูลให้ถูกต้องก่อนส่งเพื่อยืนยันตัวตน
-          </p>
+          {mode !== 'resubmit' && (
+            <>
+              <h2
+                className="text-2xl font-bold text-[#0F172A] leading-[30px]"
+                style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+              >
+                ตรวจสอบข้อมูล
+              </h2>
+              <p
+                className="text-sm text-[#64748B] leading-[20px]"
+                style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+              >
+                ตรวจสอบข้อมูลให้ถูกต้องก่อนส่งเพื่อยืนยันตัวตน
+              </p>
+            </>
+          )}
         </div>
 
         {/* Personal Info Card */}
@@ -131,8 +178,11 @@ export default function KycStep3() {
             </button>
           </div>
           <div className="px-5 py-2 flex flex-col">
-            <InfoRow label="ชื่อ-นามสกุล" value={step1Data?.fullName || '-'} />
+            <InfoRow label="ชื่อจริง" value={step1Data?.firstName || '-'} />
+            <InfoRow label="นามสกุล" value={step1Data?.lastName || '-'} />
             <InfoRow label="เลขบัตรประชาชน" value={step1Data?.idCardNumber || '-'} />
+            <InfoRow label="วันเกิด" value={step1Data?.birthDate ? new Date(step1Data.birthDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : '-'} />
+            <InfoRow label="เพศ" value={step1Data?.gender === 'male' ? 'ชาย' : step1Data?.gender === 'female' ? 'หญิง' : step1Data?.gender === 'other' ? 'อื่นๆ' : '-'} />
             <InfoRow label="เบอร์โทรศัพท์" value={step1Data?.phone || '-'} />
             <InfoRow label="อีเมล" value={user?.email || '-'} />
             <InfoRow label="ประสบการณ์" value={`${step1Data?.experienceYears || 0} ปี`} />
@@ -181,45 +231,59 @@ export default function KycStep3() {
           <div className="px-5 py-2 flex flex-col gap-0">
             <DocRow
               label="รูปบัตรประชาชน"
-              file={uploadedDocs.find(d => d.docType === 'id_card_front')}
+              file={refreshedDocs.find(d => d.docType === 'id_card_front')}
             />
             <DocRow
               label="รูปถ่ายคู่บัตร"
-              file={uploadedDocs.find(d => d.docType === 'id_card_selfie')}
+              file={refreshedDocs.find(d => d.docType === 'id_card_selfie')}
             />
             <DocRow
               label="ใบประกอบวิชาชีพ (ถ้ามี)"
-              file={uploadedDocs.find(d => d.docType === 'certificate')}
+              file={refreshedDocs.find(d => d.docType === 'certificate')}
               border={false}
             />
           </div>
         </div>
 
         {/* Consent Box */}
-        <button
-          onClick={() => setIsConsented(!isConsented)}
-          className={`w-full rounded-xl p-4 flex gap-3 text-left transition-all cursor-pointer ${isConsented ? 'bg-[#E0F6F1]' : 'bg-[#F8FAFC] border border-[#E2E8F0]'
-            }`}
-        >
-          <div
-            className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${isConsented ? 'bg-[#0F766E]' : 'bg-white border-2 border-[#CBD5E1]'
+        {mode !== 'resubmit' && (
+          <button
+            onClick={() => setIsConsented(!isConsented)}
+            className={`w-full rounded-xl p-4 flex gap-3 text-left transition-all cursor-pointer ${isConsented ? 'bg-[#E0F6F1]' : 'bg-[#F8FAFC] border border-[#E2E8F0]'
               }`}
           >
-            {isConsented && (
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M2.5 6L5 8.5L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <p className={`text-[13px] font-semibold transition-colors ${isConsented ? 'text-[#115E59]' : 'text-[#485569]'}`} style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-              ข้าพเจ้ายินยอมให้ Payung เก็บและใช้ข้อมูลส่วนบุคคล
+            <div
+              className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${isConsented ? 'bg-[#0F766E]' : 'bg-white border-2 border-[#CBD5E1]'
+                }`}
+            >
+              {isConsented && (
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M2.5 6L5 8.5L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <p className={`text-[13px] font-semibold transition-colors ${isConsented ? 'text-[#115E59]' : 'text-[#485569]'}`} style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                ข้าพเจ้ายินยอมให้ Payung เก็บและใช้ข้อมูลส่วนบุคคล
+              </p>
+              <p className="text-[12px] text-[#485569]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                ข้อมูลจะถูกใช้เฉพาะการยืนยันตัวตนตามนโยบายความเป็นส่วนตัว (PDPA)
+              </p>
+            </div>
+          </button>
+        )}
+
+        {/* Warning Info */}
+        {mode === 'resubmit' && (
+          <div className="flex flex-row items-center p-[12px_16px] gap-[10px] bg-[#FEF6E9] border border-[#BB7E1C] rounded-[10px]">
+            <div className="w-[20px] h-[20px] flex items-center justify-center flex-shrink-0">
+              <Icon name="info" color="#F9A825" style={{ fontSize: '20px' }} />
+            </div>
+            <p className="text-[15px] text-[#0F172A] leading-[19px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+              ข้อมูลที่แก้ไขจะถูกบันทึกอัตโนมัติ และส่งให้ทีมตรวจสอบเมื่อกด "ส่งใหม่"
             </p>
-            <p className="text-[12px] text-[#485569]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-              ข้อมูลจะถูกใช้เฉพาะการยืนยันตัวตนตามนโยบายความเป็นส่วนตัว (PDPA)
-            </p>
           </div>
-        </button>
+        )}
 
         {/* Actions */}
         <div className="flex justify-between items-center pt-4 border-t border-[#F1F5F9]">
@@ -232,9 +296,9 @@ export default function KycStep3() {
           </button>
           <button
             type="button"
-            disabled={!isConsented || loading}
+            disabled={(mode !== 'resubmit' && !isConsented) || loading}
             onClick={handleSubmit}
-            className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-150 flex items-center justify-center gap-2 ${isConsented && !loading
+            className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-150 flex items-center justify-center gap-2 ${(mode === 'resubmit' || isConsented) && !loading
                 ? 'bg-[#2D6A58] text-white hover:bg-[#255a4a] active:scale-[0.98] cursor-pointer'
                 : 'bg-[#CBD5E1] text-white cursor-not-allowed'
               }`}
@@ -248,7 +312,7 @@ export default function KycStep3() {
                 </svg>
                 กำลังส่ง...
               </>
-            ) : 'ส่งข้อมูล'}
+            ) : mode === 'resubmit' ? 'ส่งเอกสารอีกครั้ง' : 'ส่งข้อมูล'}
           </button>
         </div>
       </div>

@@ -1,8 +1,11 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useNavigate } from 'react-router-dom';
 import { useKyc } from '../../../context/KycContext';
 import Input from '../../../components/ui/Input';
+import Icon from '../../../components/ui/Icon';
 
 // ── Validation helpers ────────────────────────────────────────────────────
 function isValidThaiId(id: string): boolean {
@@ -20,10 +23,25 @@ function isValidThaiPhone(phone: string): boolean {
 
 // ── Zod schema ────────────────────────────────────────────────────────────
 const step1Schema = z.object({
-  fullName: z
+  firstName: z
     .string()
-    .min(2, 'ชื่อต้องมีอย่างน้อย 2 ตัวอักษร')
-    .max(100, 'ชื่อต้องไม่เกิน 100 ตัวอักษร'),
+    .min(2, 'ชื่อจริงต้องมีอย่างน้อย 2 ตัวอักษร')
+    .max(50, 'ชื่อจริงต้องไม่เกิน 50 ตัวอักษร'),
+  lastName: z
+    .string()
+    .min(2, 'นามสกุลต้องมีอย่างน้อย 2 ตัวอักษร')
+    .max(50, 'นามสกุลต้องไม่เกิน 50 ตัวอักษร'),
+  birthDate: z
+    .string()
+    .min(1, 'กรุณาเลือกวันเกิด')
+    .refine((val) => {
+      const birth = new Date(val);
+      const today = new Date();
+      return birth < today;
+    }, 'วันเกิดต้องไม่เป็นอนาคต'),
+  gender: z.enum(['male', 'female', 'other'], {
+    errorMap: () => ({ message: 'กรุณาเลือกเพศ' }),
+  }),
   idCardNumber: z
     .string()
     .refine(isValidThaiId, 'เลขบัตรประชาชนไม่ถูกต้อง (ต้องเป็นตัวเลข 13 หลักที่ถูกต้อง)'),
@@ -107,7 +125,8 @@ function KycStepper({ current }: { current: number }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────
-export default function KycStep1() {
+export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
+  const navigate = useNavigate();
   const { goToStep, step1Data, saveStep1 } = useKyc();
 
   const {
@@ -116,12 +135,16 @@ export default function KycStep1() {
     watch,
     setValue,
     formState: { errors },
+    reset,
   } = useForm<Step1Form>({
     resolver: zodResolver(step1Schema),
     defaultValues: step1Data
       ? { ...step1Data }
       : {
-          fullName: '',
+          firstName: '',
+          lastName: '',
+          birthDate: '',
+          gender: '' as any,
           idCardNumber: '',
           phone: '',
           skills: [],
@@ -130,6 +153,27 @@ export default function KycStep1() {
           bio: '',
         },
   });
+
+  const birthDate = watch('birthDate');
+  const calculateAge = (dateString: string) => {
+    if (!dateString) return null;
+    const today = new Date();
+    const birth = new Date(dateString);
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
+  };
+  const age = calculateAge(birthDate);
+
+  // Reset form when step1Data is updated (for resubmit pre-fill)
+  useEffect(() => {
+    if (step1Data) {
+      reset(step1Data);
+    }
+  }, [step1Data, reset]);
 
   const selectedSkills = watch('skills') ?? [];
 
@@ -152,10 +196,10 @@ export default function KycStep1() {
   const expReg = register('experienceYears');
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-[#F2F4F6] flex items-center justify-center px-4 py-10">
+    <div className={mode === 'resubmit' ? '' : 'min-h-[calc(100vh-64px)] bg-[#F2F4F6] flex items-center justify-center px-4 py-10'}>
       <div
-        className="w-full max-w-[780px] bg-white rounded-3xl border border-[#F1F5F9] px-12 py-10"
-        style={{
+        className={mode === 'resubmit' ? 'w-full flex flex-col gap-5' : 'w-full max-w-[780px] bg-white rounded-3xl border border-[#F1F5F9] px-12 py-10'}
+        style={mode === 'resubmit' ? {} : {
           boxShadow: '0 12px 28px -6px rgba(15,23,43,0.06), 0 1px 2px 0 rgba(15,23,43,0.04)',
         }}
       >
@@ -172,32 +216,91 @@ export default function KycStep1() {
         </p>
 
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
-          {/* ชื่อ-สกุล */}
-          <Input
-            label="ชื่อ-นามสกุล"
-            placeholder="ชื่อ นามสกุล (ตามบัตรประชาชน)"
-            error={errors.fullName?.message}
-            {...register('fullName')}
-          />
+          {/* ชื่อจริง - นามสกุล */}
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="ชื่อจริง"
+              placeholder="สมชาย"
+              error={errors.firstName?.message}
+              {...register('firstName')}
+            />
+            <Input
+              label="นามสกุล"
+              placeholder="ใจดี"
+              error={errors.lastName?.message}
+              {...register('lastName')}
+            />
+          </div>
 
           {/* เลขบัตรประชาชน — ตัวเลขเท่านั้น 13 หลัก */}
-          <Input
-            label="เลขบัตรประชาชน"
-            placeholder="1234567890123"
-            inputMode="numeric"
-            maxLength={13}
-            error={errors.idCardNumber?.message}
-            {...idCardReg}
-            onChange={(e) => {
-              e.target.value = e.target.value.replace(/\D/g, '').slice(0, 13);
-              idCardReg.onChange(e);
-            }}
-          />
+          <div>
+            <Input
+              label="เลขบัตรประชาชน 13 หลัก"
+              placeholder="1-2345-67890-12-3"
+              inputMode="numeric"
+              maxLength={13}
+              error={errors.idCardNumber?.message}
+              {...idCardReg}
+              onChange={(e) => {
+                e.target.value = e.target.value.replace(/\D/g, '').slice(0, 13);
+                idCardReg.onChange(e);
+              }}
+            />
+            <p className="text-[12px] text-[#717182] mt-1" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+              ใช้สำหรับยืนยันตัวตนเท่านั้น ข้อมูลได้รับการเข้ารหัส
+            </p>
+          </div>
+
+          {/* วันเกิด - เพศ */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>วันเกิด</label>
+                {age !== null && age >= 0 && (
+                  <span className="text-xs font-medium text-[#2D6A58]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>อายุ {age} ปี</span>
+                )}
+              </div>
+              <input
+                type="date"
+                className={`px-3 py-2 border rounded-lg outline-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm bg-white ${
+                  errors.birthDate ? 'border-red-500' : 'border-gray-300'
+                }`}
+                style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+                {...register('birthDate')}
+              />
+              {errors.birthDate && (
+                <span className="text-sm text-red-500" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                  {errors.birthDate.message}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>เพศ</label>
+              <select
+                className={`px-3 py-2 border rounded-lg outline-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm bg-white ${
+                  errors.gender ? 'border-red-500' : 'border-gray-300'
+                }`}
+                style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+                {...register('gender')}
+              >
+                <option value="">เลือกเพศ</option>
+                <option value="male">ชาย</option>
+                <option value="female">หญิง</option>
+                <option value="other">อื่นๆ</option>
+              </select>
+              {errors.gender && (
+                <span className="text-sm text-red-500" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                  {errors.gender.message}
+                </span>
+              )}
+            </div>
+          </div>
 
           {/* เบอร์โทร — ตัวเลขและขีด */}
           <Input
             label="เบอร์โทรศัพท์"
-            placeholder="081-234-5678"
+            placeholder="+66 81-234-5678"
             inputMode="tel"
             maxLength={12}
             error={errors.phone?.message}
@@ -312,15 +415,27 @@ export default function KycStep1() {
             )}
           </div>
 
+          {/* Warning Info */}
+          {mode === 'resubmit' && (
+            <div className="flex flex-row items-center p-[12px_16px] gap-[10px] bg-[#FEF6E9] border border-[#BB7E1C] rounded-[10px]">
+              <div className="w-[20px] h-[20px] flex items-center justify-center flex-shrink-0">
+                <Icon name="info" color="#F9A825" style={{ fontSize: '20px' }} />
+              </div>
+              <p className="text-[15px] text-[#0F172A] leading-[19px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                ข้อมูลที่แก้ไขจะถูกบันทึกอัตโนมัติ และส่งให้ทีมตรวจสอบเมื่อกด "ส่งใหม่"
+              </p>
+            </div>
+          )}
+
           {/* Buttons */}
           <div className="flex justify-between items-center pt-2">
             <button
               type="button"
-              onClick={() => goToStep(0)}
+              onClick={() => mode === 'resubmit' ? navigate('/kyc/status') : goToStep(0)}
               className="px-6 py-2.5 rounded-lg border border-[#E2E8F0] text-[#717182] text-sm font-medium hover:bg-gray-50 transition-colors cursor-pointer"
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
             >
-              ← ย้อนกลับ
+              ← {mode === 'resubmit' ? 'ยกเลิก' : 'ย้อนกลับ'}
             </button>
             <button
               type="submit"
