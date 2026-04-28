@@ -1,10 +1,12 @@
 import { Routes, Route, Outlet } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout';
+import { KycProvider } from './context/KycContext';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import KYC from './pages/kyc/KYC';
 import KycSuccess from './pages/kyc/status/SuccessSubmit';
 import KycStatus from './pages/kyc/status/KycStatusPage';
+import KycResubmit from './pages/kyc/status/KycResubmitPage';
 import Admin from './pages/admin/Admin';
 import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
@@ -37,31 +39,21 @@ function App() {
         <Route path="/bookings" element={<BookingsPage />} />
         <Route path="/messages" element={<MessagePage />} />
         
-        {/* KYC page — only for caregiver (role 2) */}
+        {/* KYC routes — only for caregiver (role 2) */}
         <Route
-          path="/kyc"
           element={
             <RoleRoute requiredRole={2}>
-              <KYC />
+              <KycProvider>
+                <Outlet />
+              </KycProvider>
             </RoleRoute>
           }
-        />
-        <Route
-          path="/kyc/success"
-          element={
-            <RoleRoute requiredRole={2}>
-              <KycSuccess />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="/kyc/status"
-          element={
-            <RoleRoute requiredRole={2}>
-              <KycStatus />
-            </RoleRoute>
-          }
-        />
+        >
+          <Route path="/kyc" element={<KYC />} />
+          <Route path="/kyc/success" element={<KycSuccess />} />
+          <Route path="/kyc/status" element={<KycStatus />} />
+          <Route path="/kyc/resubmit" element={<KycResubmit />} />
+        </Route>
         
         {/* Admin page — only for admin (role 3) */}
         <Route
