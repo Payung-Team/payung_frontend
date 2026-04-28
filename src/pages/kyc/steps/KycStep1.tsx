@@ -77,6 +77,12 @@ const SKILL_OPTIONS = [
   { value: 'dementia_care', label: 'ดูแลสมองเสื่อม' },
 ];
 
+const GENDER_OPTIONS = [
+  { label: 'ชาย', value: 'male' },
+  { label: 'หญิง', value: 'female' },
+  { label: 'อื่นๆ', value: 'other' },
+];
+
 const HOURLY_RATE_OPTIONS = [
   { label: 'น้อยกว่า 100 บาท/ชม.', value: 80 },
   { label: '100 – 150 บาท/ชม.', value: 125 },
@@ -128,8 +134,24 @@ function KycStepper({ current }: { current: number }) {
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
-  const navigate = useNavigate();
   const { goToStep, step1Data, saveStep1 } = useKyc();
+  const navigate = useNavigate();
+
+  // Mocked rejected fields for resubmit mode
+  const REJECTED_FIELDS: Record<string, string> = mode === 'resubmit' ? {
+    firstName: 'ชื่อจริงไม่ตรงกับบัตรประชาชน',
+  } : {};
+
+  const getFieldStatus = (fieldName: string) => {
+    if (mode !== 'resubmit') return { isCorrect: false, isRejected: false, reason: '' };
+    const reason = REJECTED_FIELDS[fieldName];
+    return {
+      isCorrect: !reason,
+      isRejected: !!reason,
+      reason: reason || '',
+      rejectedReason: reason || '',
+    };
+  };
 
   const {
     register,
@@ -151,10 +173,32 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
         phone: '',
         skills: [],
         experienceYears: undefined as unknown as number,
-        hourlyRate: 0,
+        hourlyRate: '' as any,
         bio: '',
       },
   });
+
+  const currentValues = watch();
+
+  // Check if any rejected field has been changed from initial data
+  const hasModifiedRejectedFields = () => {
+    if (mode !== 'resubmit') return true;
+    const rejectedKeys = Object.keys(REJECTED_FIELDS);
+    if (rejectedKeys.length === 0) return true;
+
+    return rejectedKeys.some(key => {
+      const current = (currentValues as any)[key];
+      const initial = (step1Data as any)?.[key];
+      
+      // Special handle for arrays (skills)
+      if (Array.isArray(current)) {
+        return JSON.stringify(current) !== JSON.stringify(initial);
+      }
+      return current !== initial;
+    });
+  };
+
+  const isNextDisabled = mode === 'resubmit' && !hasModifiedRejectedFields();
 
   const birthDate = watch('birthDate');
   const calculateAge = (dateString: string) => {
@@ -224,12 +268,14 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
               label="ชื่อจริง"
               placeholder="สมชาย"
               error={errors.firstName?.message}
+              {...getFieldStatus('firstName')}
               {...register('firstName')}
             />
             <Input
               label="นามสกุล"
               placeholder="ใจดี"
               error={errors.lastName?.message}
+              {...getFieldStatus('lastName')}
               {...register('lastName')}
             />
           </div>
@@ -242,57 +288,80 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
               inputMode="numeric"
               maxLength={13}
               error={errors.idCardNumber?.message}
+              {...getFieldStatus('idCardNumber')}
               {...idCardReg}
               onChange={(e) => {
                 e.target.value = e.target.value.replace(/\D/g, '').slice(0, 13);
                 idCardReg.onChange(e);
               }}
             />
-            <p className="text-[12px] text-[#717182] mt-1" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-              ใช้สำหรับยืนยันตัวตนเท่านั้น ข้อมูลได้รับการเข้ารหัส
-            </p>
           </div>
 
           {/* วันเกิด - เพศ */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between items-center">
-                <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>วันเกิด</label>
-                {age !== null && age >= 0 && (
-                  <span className="text-xs font-medium text-[#2D6A58]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>อายุ {age} ปี</span>
-                )}
-              </div>
-              <input
-                type="date"
-                className={`px-3 py-2 border rounded-lg outline-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm bg-white ${errors.birthDate ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-                {...register('birthDate')}
-              />
-              {errors.birthDate && (
-                <span className="text-sm text-red-500" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                  {errors.birthDate.message}
-                </span>
-              )}
-            </div>
+            <Input
+              label={
+                <div className="flex justify-between items-center w-full">
+                  <span>วันเกิด</span>
+                  {age !== null && age >= 0 && (
+                    <span className="text-xs font-medium text-[#2D6A58]">อายุ {age} ปี</span>
+                  )}
+                </div>
+              }
+              type="date"
+              error={errors.birthDate?.message}
+              {...getFieldStatus('birthDate')}
+              {...register('birthDate')}
+            />
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>เพศ</label>
-              <select
-                className={`px-3 py-2 border rounded-lg outline-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm bg-white ${errors.gender ? 'border-red-500' : 'border-gray-300'
+              <div className="relative flex items-center">
+                <select
+                  {...register('gender')}
+                  disabled={getFieldStatus('gender').isCorrect}
+                  className={`w-full px-3 py-2 border rounded-lg outline-none transition-colors text-sm appearance-none ${
+                    getFieldStatus('gender').isCorrect
+                      ? 'bg-[#F0FDF4] border-[#10B981] text-[#064E3B] pr-16'
+                      : getFieldStatus('gender').isRejected
+                        ? 'bg-[#FEF2F2] border-[#DC2626] text-[#111827] pr-10'
+                        : errors.gender
+                          ? 'border-red-500 pr-10'
+                          : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] pr-10'
                   }`}
-                style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-                {...register('gender')}
-              >
-                <option value="">เลือกเพศ</option>
-                <option value="male">ชาย</option>
-                <option value="female">หญิง</option>
-                <option value="other">อื่นๆ</option>
-              </select>
-              {errors.gender && (
-                <span className="text-sm text-red-500" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                  {errors.gender.message}
+                  style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+                >
+                  <option value="" disabled>เลือกเพศ</option>
+                  {GENDER_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <div className="absolute right-3 flex items-center gap-1.5 pointer-events-none">
+                  {!getFieldStatus('gender').isCorrect && (
+                    <Icon name="expand_more" color={getFieldStatus('gender').isRejected ? "#DC2626" : "#717182"} style={{ fontSize: '20px' }} />
+                  )}
+                  {getFieldStatus('gender').isCorrect && (
+                    <div className="flex items-center gap-1.5">
+                      <Icon name="expand_more" color="#10B981" style={{ fontSize: '20px' }} />
+                      <div className="flex items-center justify-center w-5 h-5 bg-[#10B981] rounded-full">
+                        <Icon name="check" color="white" style={{ fontSize: '14px' }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {getFieldStatus('gender').isRejected && (
+                  <div className="absolute right-9 flex items-center justify-center w-5 h-5 border-[1.5px] border-[#DC2626] rounded-full text-[#DC2626] font-bold text-[12px] leading-none">
+                    !
+                  </div>
+                )}
+              </div>
+              {getFieldStatus('gender').isRejected && getFieldStatus('gender').reason && (
+                <span className="text-[11px] text-[#DC2626] font-normal mt-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                  {getFieldStatus('gender').reason}
                 </span>
+              )}
+              {errors.gender && (
+                <span className="text-sm text-red-500" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>{errors.gender.message}</span>
               )}
             </div>
           </div>
@@ -304,6 +373,7 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
             inputMode="tel"
             maxLength={12}
             error={errors.phone?.message}
+            {...getFieldStatus('phone')}
             {...phoneReg}
             onChange={(e) => {
               e.target.value = e.target.value.replace(/[^0-9-]/g, '').slice(0, 12);
@@ -320,6 +390,7 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
               inputMode="numeric"
               placeholder="0"
               error={errors.experienceYears?.message}
+              {...getFieldStatus('experienceYears')}
               {...expReg}
               onChange={(e) => {
                 e.target.value = e.target.value.replace(/\D/g, '');
@@ -329,54 +400,86 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
 
             {/* ค่าบริการ — dropdown range */}
             <div className="flex flex-col gap-1">
-              <label
-                className="text-sm font-medium text-gray-700"
-                style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-              >
-                ค่าบริการต่อชั่วโมง
-              </label>
-              <select
-                className={`px-3 py-2 border rounded-lg outline-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm bg-white ${errors.hourlyRate ? 'border-red-500' : 'border-gray-300'
+              <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>ค่าบริการต่อชั่วโมง</label>
+              <div className="relative flex items-center">
+                <select
+                  {...register('hourlyRate')}
+                  disabled={getFieldStatus('hourlyRate').isCorrect}
+                  className={`w-full px-3 py-2 border rounded-lg outline-none transition-colors text-sm appearance-none ${
+                    getFieldStatus('hourlyRate').isCorrect
+                      ? 'bg-[#F0FDF4] border-[#10B981] text-[#064E3B] pr-16'
+                      : getFieldStatus('hourlyRate').isRejected
+                        ? 'bg-[#FEF2F2] border-[#DC2626] text-[#111827] pr-10'
+                        : errors.hourlyRate
+                          ? 'border-red-500 pr-10'
+                          : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] pr-10'
                   }`}
-                style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-                defaultValue={step1Data?.hourlyRate ?? ''}
-                {...register('hourlyRate')}
-              >
-                <option value="">เลือกช่วงราคา</option>
-                {HOURLY_RATE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              {errors.hourlyRate && (
-                <span className="text-sm text-red-500" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                  {errors.hourlyRate.message}
+                  style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+                >
+                  <option value="" disabled>เลือกช่วงราคา</option>
+                  {HOURLY_RATE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <div className="absolute right-3 flex items-center gap-1.5 pointer-events-none">
+                  {!getFieldStatus('hourlyRate').isCorrect && (
+                    <Icon name="expand_more" color={getFieldStatus('hourlyRate').isRejected ? "#DC2626" : "#717182"} style={{ fontSize: '20px' }} />
+                  )}
+                  {getFieldStatus('hourlyRate').isCorrect && (
+                    <div className="flex items-center gap-1.5">
+                      <Icon name="expand_more" color="#10B981" style={{ fontSize: '20px' }} />
+                      <div className="flex items-center justify-center w-5 h-5 bg-[#10B981] rounded-full">
+                        <Icon name="check" color="white" style={{ fontSize: '14px' }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {getFieldStatus('hourlyRate').isRejected && (
+                  <div className="absolute right-9 flex items-center justify-center w-5 h-5 border-[1.5px] border-[#DC2626] rounded-full text-[#DC2626] font-bold text-[12px] leading-none">
+                    !
+                  </div>
+                )}
+              </div>
+              {getFieldStatus('hourlyRate').isRejected && getFieldStatus('hourlyRate').reason && (
+                <span className="text-[11px] text-[#DC2626] font-normal mt-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                  {getFieldStatus('hourlyRate').reason}
                 </span>
+              )}
+              {errors.hourlyRate && (
+                <span className="text-sm text-red-500" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>{errors.hourlyRate.message}</span>
               )}
             </div>
           </div>
 
           {/* ทักษะ */}
           <div className="flex flex-col gap-1.5">
-            <label
-              className="text-sm font-medium text-gray-700"
-              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-            >
-              ทักษะการดูแล
-            </label>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>ทักษะการดูแล</label>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2">
               {SKILL_OPTIONS.map((skill) => {
                 const selected = selectedSkills.includes(skill.value);
+                const { isCorrect, isRejected } = getFieldStatus('skills');
                 return (
                   <button
                     key={skill.value}
                     type="button"
+                    disabled={isCorrect}
                     onClick={() => toggleSkill(skill.value)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors cursor-pointer ${selected
-                        ? 'bg-[#2D6A58] text-white border-[#2D6A58]'
-                        : 'bg-white text-[#0A0A0A] border-[#E2E8F0] hover:border-[#2D6A58] hover:text-[#2D6A58]'
-                      }`}
+                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${isCorrect
+                      ? selected
+                        ? 'bg-[#F0FDF4] text-[#064E3B] border-[#10B981] opacity-80 cursor-default'
+                        : 'hidden'
+                      : isRejected
+                        ? selected
+                          ? 'bg-[#FEF2F2] text-[#DC2626] border-[#DC2626]'
+                          : 'bg-white text-[#0A0A0A] border-[#E2E8F0]'
+                        : selected
+                          ? 'bg-[#2D6A58] text-white border-[#2D6A58]'
+                          : 'bg-white text-[#0A0A0A] border-[#E2E8F0] hover:border-[#2D6A58] hover:text-[#2D6A58]'
+                      } cursor-pointer`}
                     style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                   >
                     {skill.label}
@@ -384,6 +487,11 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
                 );
               })}
             </div>
+            {getFieldStatus('skills').isRejected && (
+              <span className="text-[11px] text-[#DC2626] font-normal mt-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                {getFieldStatus('skills').reason}
+              </span>
+            )}
             {errors.skills && (
               <span className="text-sm text-red-500" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
                 {errors.skills.message}
@@ -392,25 +500,52 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
           </div>
 
           {/* แนะนำตัว */}
-          <div className="flex flex-col gap-1.5">
-            <label
-              className="text-sm font-medium text-gray-700"
-              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-            >
-              แนะนำตัว <span className="text-[#717182] font-normal">(ไม่บังคับ)</span>
-            </label>
-            <textarea
-              rows={4}
-              placeholder="เล่าสั้นๆ เกี่ยวกับประสบการณ์และความเชี่ยวชาญของคุณ..."
-              className={`px-3 py-2 border rounded-lg outline-none resize-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm ${errors.bio ? 'border-red-500' : 'border-gray-300'
-                }`}
-              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-              {...register('bio')}
-            />
-            {errors.bio && (
-              <span className="text-sm text-red-500">{errors.bio.message}</span>
-            )}
-          </div>
+          {(!(mode === 'resubmit' && !step1Data?.bio)) && (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5">
+                  <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                    แนะนำตัว <span className="text-[#717182] font-normal">(ไม่บังคับ)</span>
+                  </label>
+                </div>
+              </div>
+              
+              {getFieldStatus('bio').isCorrect ? (
+                <div className="relative flex items-center">
+                  <textarea
+                    rows={4}
+                    disabled
+                    value={watch('bio') || '-'}
+                    className="w-full px-3 py-2 border rounded-lg bg-[#F0FDF4] border-[#10B981] text-[#064E3B] text-sm pr-10 resize-none"
+                    style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+                  />
+                  <div className="absolute right-3 top-3 flex items-center justify-center w-5 h-5 bg-[#10B981] rounded-full">
+                    <svg width="12" height="10" viewBox="0 0 10 8" fill="none">
+                      <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                </div>
+              ) : (
+                <textarea
+                  rows={4}
+                  placeholder="เล่าสั้นๆ เกี่ยวกับประสบการณ์และความเชี่ยวชาญของคุณ..."
+                  className={`px-3 py-2 border rounded-lg outline-none resize-none transition-colors text-sm ${
+                    errors.bio ? 'border-red-500' : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58]'
+                  }`}
+                  style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+                  {...register('bio')}
+                />
+              )}
+              {getFieldStatus('bio').isRejected && (
+                <span className="text-[11px] text-[#DC2626] font-normal mt-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                  {getFieldStatus('bio').reason}
+                </span>
+              )}
+              {errors.bio && (
+                <span className="text-sm text-red-500">{errors.bio.message}</span>
+              )}
+            </div>
+          )}
 
           {/* Warning Info */}
           {mode === 'resubmit' && (
@@ -436,7 +571,10 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
             </button>
             <button
               type="submit"
-              className="px-8 py-2.5 rounded-lg bg-[#2D6A58] text-white text-sm font-bold hover:bg-[#255a4a] active:scale-[0.98] transition-all duration-150 cursor-pointer"
+              disabled={isNextDisabled}
+              className={`px-8 py-2.5 rounded-lg text-white text-sm font-bold active:scale-[0.98] transition-all duration-150 ${
+                isNextDisabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#2D6A58] hover:bg-[#255a4a] cursor-pointer'
+              }`}
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
             >
               ถัดไป →

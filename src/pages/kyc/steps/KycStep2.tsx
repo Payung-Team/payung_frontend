@@ -27,9 +27,7 @@ function KycStepper({ current }: { current: number }) {
                 }`}
               >
                 {done ? (
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M3 8L6.5 11.5L13 5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <Icon name="check" color="white" style={{ fontSize: '18px' }} />
                 ) : (
                   n
                 )}
@@ -59,11 +57,7 @@ const DOC_TYPES = [
     desc: 'แตะเพื่อเลือกไฟล์หรือถ่ายรูป',
     required: true,
     icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <rect x="1" y="4" width="20" height="14" rx="2" stroke="#2D6A58" strokeWidth="1.5" />
-        <circle cx="7" cy="10" r="2" stroke="#2D6A58" strokeWidth="1.5" />
-        <path d="M12 9h5M12 12h3" stroke="#2D6A58" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
+      <Icon name="credit_card" color="#2D6A58" style={{ fontSize: '22px' }} />
     ),
   },
   {
@@ -72,12 +66,7 @@ const DOC_TYPES = [
     desc: 'แตะเพื่อเลือกไฟล์หรือถ่ายรูป',
     required: true,
     icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <circle cx="9" cy="8" r="3" stroke="#2D6A58" strokeWidth="1.5" />
-        <path d="M3 18c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="#2D6A58" strokeWidth="1.5" strokeLinecap="round" />
-        <rect x="14" y="12" width="6" height="6" rx="1" stroke="#2D6A58" strokeWidth="1.5" />
-        <path d="M16 14h2M16 16h1" stroke="#2D6A58" strokeWidth="1.2" strokeLinecap="round" />
-      </svg>
+      <Icon name="account_circle" color="#2D6A58" style={{ fontSize: '22px' }} />
     ),
   },
   {
@@ -86,10 +75,7 @@ const DOC_TYPES = [
     desc: 'ไม่บังคับ · ถ้ามีจะช่วยให้ตรวจสอบเร็วขึ้น',
     required: false,
     icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <rect x="3" y="2" width="14" height="18" rx="2" stroke="#2D6A58" strokeWidth="1.5" />
-        <path d="M7 7h8M7 11h8M7 15h5" stroke="#2D6A58" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
+      <Icon name="description" color="#2D6A58" style={{ fontSize: '22px' }} />
     ),
   },
 ];
@@ -107,12 +93,7 @@ interface DocState {
 
 // ── Upload Icon ───────────────────────────────────────────────────────────
 function UploadIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <path d="M3 13v1.5A1.5 1.5 0 004.5 16h9a1.5 1.5 0 001.5-1.5V13" stroke="#717182" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M9 11V3m0 0L6 6m3-3l3 3" stroke="#717182" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <Icon name="file_upload" color="#717182" style={{ fontSize: '18px' }} />;
 }
 
 // ── Main Component ────────────────────────────────────────────────────────
@@ -540,10 +521,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                     }`}
                   >
                     {isSuccess ? (
-                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                        <circle cx="10" cy="10" r="9" fill="#2D6A58" />
-                        <path d="M6 10l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+                      <Icon name="check_circle" color="#2D6A58" style={{ fontSize: '20px' }} />
                     ) : (
                       doc.icon
                     )}
@@ -593,16 +571,10 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                       }`}
                     >
                       {isUploading ? (
-                        <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <circle cx="8" cy="8" r="6" stroke="#CBD5E1" strokeWidth="2" />
-                          <path d="M8 2a6 6 0 016 6" stroke="#2D6A58" strokeWidth="2" strokeLinecap="round" />
-                        </svg>
+                        <Icon name="refresh" className="animate-spin" color="#2D6A58" style={{ fontSize: '16px' }} />
                       ) : isError ? (
                         /* icon-upload-danger */
-                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                          <path d="M3 13v1.5A1.5 1.5 0 004.5 16h9a1.5 1.5 0 001.5-1.5V13" stroke="#C62828" strokeWidth="1.5" strokeLinecap="round" />
-                          <path d="M9 11V3m0 0L6 6m3-3l3 3" stroke="#C62828" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <Icon name="file_upload" color="#C62828" style={{ fontSize: '18px' }} />
                       ) : (
                         <UploadIcon />
                       )}
@@ -615,9 +587,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                         onClick={() => handleDelete(doc.type)}
                         className="w-9 h-9 bg-white border border-[#E2E8F0] rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors cursor-pointer"
                       >
-                         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                          <path d="M3 4.5h12M6.75 4.5V3a1.5 1.5 0 011.5-1.5h1.5a1.5 1.5 0 011.5 1.5v1.5M13.5 4.5v10.5A1.5 1.5 0 0112 16.5H6a1.5 1.5 0 01-1.5-1.5V4.5" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                         <Icon name="delete" color="#DC2626" style={{ fontSize: '18px' }} />
                       </button>
                     )}
                   </div>

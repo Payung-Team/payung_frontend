@@ -64,7 +64,9 @@ export default function KycResubmitPage() {
   if (loading || !isReady) return <div className="min-h-screen flex items-center justify-center">กำลังโหลด...</div>;
   if (error) return <div className="min-h-screen flex items-center justify-center text-red-500">เกิดข้อผิดพลาด: {error.message}</div>;
 
-  const rejectedReason = data?.kycStatus?.rejectedReason || 'ข้อมูลไม่ถูกต้อง';
+  // const rejectedReason = data?.kycStatus?.rejectedReason || 'ข้อมูลไม่ถูกต้อง';
+  const mockedRejectedReason = "รูปบัตรประชาชน: ภาพไม่ชัดเจน — ถ่ายใหม่ในที่แสงเพียงพอ ไม่มีเงาและไม่เอียง\nชื่อจริง: ไม่ตรงกับข้อมูลในรูปบัตร — ตรวจสอบอีกครั้งก่อนส่ง";
+  const rejectedReason = mockedRejectedReason; // data?.kycStatus?.rejectedReason || 'ข้อมูลไม่ถูกต้อง';
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] flex flex-col items-center py-[48px] px-4">
@@ -100,7 +102,7 @@ export default function KycResubmitPage() {
             <div className="flex flex-col gap-[10px]">
               {rejectedReason.split('\n').filter(r => r.trim()).map((reason, index) => {
                 // Try splitting by common separators: ":" or " — " or " - "
-                const parts = reason.split(/[:—\-]/);
+                const parts = reason.split(/[:—–\-]/);
                 const title = parts[0]?.trim() || reason;
                 const desc = parts.length > 1 ? parts.slice(1).join('—').trim() : 'กรุณาตรวจสอบและแก้ไขข้อมูล';
                 

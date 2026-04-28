@@ -78,9 +78,7 @@ function BenefitItem({ text }: { text: string }) {
   return (
     <div className="flex items-center gap-2.5">
       <div className="w-[18px] h-[18px] bg-[#16A34A] rounded-full flex items-center justify-center flex-shrink-0">
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-          <path d="M2.5 5L4.5 7L8 3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <Icon name="check" color="white" style={{ fontSize: '12px' }} />
       </div>
       <span className="text-[12.5px] font-semibold text-[#111827]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
         {text}

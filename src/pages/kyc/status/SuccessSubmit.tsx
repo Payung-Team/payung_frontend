@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import Icon from '../../../components/ui/Icon';
 
 export default function KycSuccess() {
   const navigate = useNavigate();
@@ -22,9 +23,7 @@ export default function KycSuccess() {
         <div className="relative w-24 h-24 flex items-center justify-center">
           <div className="absolute inset-0 bg-[#E0F6F1] rounded-full" />
           <div className="absolute inset-4 bg-[#0F766E] rounded-full flex items-center justify-center">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-              <path d="M5 12l5 5L20 7" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <Icon name="check" color="white" style={{ fontSize: '40px' }} />
           </div>
         </div>
 
