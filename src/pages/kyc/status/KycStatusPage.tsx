@@ -5,6 +5,7 @@ import { GET_KYC_STATUS, DELETE_KYC_DOCUMENT } from '../../../graphql/queries';
 import Icon from '../../../components/ui/Icon';
 import ImageModal from '../../../components/ui/ImageModal';
 import { useState } from 'react';
+import { supabase } from '../../../lib/supabase';
 
 // ── Components ────────────────────────────────────────────────────────────
 
@@ -62,10 +63,11 @@ function DocumentItem({ doc, onPreview }: DocumentItemProps) {
       <div className="flex items-center gap-2">
         <button
           onClick={handleView}
-          className="p-2 text-[#334055] hover:bg-[#F1F5F9] rounded-lg transition-colors cursor-pointer"
+          className="flex items-center gap-2 px-4 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-[13px] font-semibold text-[#475569] hover:bg-[#F8FAFC] hover:border-[#CBD5E1] transition-all cursor-pointer group"
           title={isPdf ? "เปิด PDF" : "ดูรูปภาพ"}
         >
-          <Icon name="open_in_new" size="medium" color="currentColor" />
+          <Icon name="visibility" size="small" color="#64748B" className="group-hover:text-[#0F172A] transition-colors" />
+          <span style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>ดูตัวอย่าง</span>
         </button>
       </div>
     </div>
@@ -120,7 +122,42 @@ export default function KycStatusPage() {
   const submittedAt = data?.kycStatus?.submittedAt;
   const verifiedAt = data?.kycStatus?.verifiedAt;
   const rejectedReason = data?.kycStatus?.rejectedReason;
-  const documents = data?.kycStatus?.documents || [];
+  const rawDocuments = data?.kycStatus?.documents || [];
+
+  const [refreshedDocs, setRefreshedDocs] = useState<KycDocument[]>([]);
+
+  // Refresh signed URLs for all documents
+  useEffect(() => {
+    const refreshAll = async () => {
+      const updated = await Promise.all(rawDocuments.map(async (doc: any) => {
+        if (doc.fileUrl.includes('/kyc-documents/') || doc.signedUrl?.includes('/kyc-documents/')) {
+          try {
+            const urlToSplit = doc.signedUrl || doc.fileUrl;
+            const parts = urlToSplit.split('/kyc-documents/');
+            const path = parts.length > 1 ? parts[1].split('?')[0] : null;
+            if (path) {
+              const { data: signData } = await supabase.storage
+                .from('kyc-documents')
+                .createSignedUrl(decodeURIComponent(path), 3600);
+              if (signData?.signedUrl) {
+                return { ...doc, signedUrl: signData.signedUrl };
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to refresh URL in Status Page:', err);
+          }
+        }
+        return doc;
+      }));
+      setRefreshedDocs(updated);
+    };
+
+    if (rawDocuments.length > 0) {
+      refreshAll();
+    }
+  }, [rawDocuments]);
+
+  const documents = refreshedDocs.length > 0 ? refreshedDocs : rawDocuments;
 
   useEffect(() => {
     if (!loading && !data?.kycStatus) {
