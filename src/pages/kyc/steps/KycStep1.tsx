@@ -25,11 +25,11 @@ function isValidThaiPhone(phone: string): boolean {
 const step1Schema = z.object({
   firstName: z
     .string()
-    .min(2, 'ชื่อจริงต้องมีอย่างน้อย 2 ตัวอักษร')
+    .min(1, 'กรุณากรอกชื่อจริง')
     .max(50, 'ชื่อจริงต้องไม่เกิน 50 ตัวอักษร'),
   lastName: z
     .string()
-    .min(2, 'นามสกุลต้องมีอย่างน้อย 2 ตัวอักษร')
+    .min(1, 'กรุณากรอกนามสกุล')
     .max(50, 'นามสกุลต้องไม่เกิน 50 ตัวอักษร'),
   birthDate: z
     .string()
@@ -39,9 +39,12 @@ const step1Schema = z.object({
       const today = new Date();
       return birth < today;
     }, 'วันเกิดต้องไม่เป็นอนาคต'),
-  gender: z.enum(['male', 'female', 'other'], {
-    errorMap: () => ({ message: 'กรุณาเลือกเพศ' }),
-  }),
+  gender: z
+    .string()
+    .min(1, 'กรุณาเลือกเพศ')
+    .refine((val) => ['male', 'female', 'other'].includes(val), {
+      message: 'กรุณาเลือกเพศ',
+    }),
   idCardNumber: z
     .string()
     .refine(isValidThaiId, 'เลขบัตรประชาชนไม่ถูกต้อง (ต้องเป็นตัวเลข 13 หลักที่ถูกต้อง)'),
@@ -97,9 +100,8 @@ function KycStepper({ current }: { current: number }) {
           <div key={n} className="flex items-center">
             <div className="flex flex-col items-center gap-1.5">
               <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
-                  done || active ? 'bg-[#2D6A58] text-white' : 'bg-[#E2E8F0] text-[#717182]'
-                }`}
+                className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${done || active ? 'bg-[#2D6A58] text-white' : 'bg-[#E2E8F0] text-[#717182]'
+                  }`}
               >
                 {done ? (
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -141,17 +143,17 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
     defaultValues: step1Data
       ? { ...step1Data }
       : {
-          firstName: '',
-          lastName: '',
-          birthDate: '',
-          gender: '' as any,
-          idCardNumber: '',
-          phone: '',
-          skills: [],
-          experienceYears: undefined as unknown as number,
-          hourlyRate: 0,
-          bio: '',
-        },
+        firstName: '',
+        lastName: '',
+        birthDate: '',
+        gender: '' as any,
+        idCardNumber: '',
+        phone: '',
+        skills: [],
+        experienceYears: undefined as unknown as number,
+        hourlyRate: 0,
+        bio: '',
+      },
   });
 
   const birthDate = watch('birthDate');
@@ -262,9 +264,8 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
               </div>
               <input
                 type="date"
-                className={`px-3 py-2 border rounded-lg outline-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm bg-white ${
-                  errors.birthDate ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`px-3 py-2 border rounded-lg outline-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm bg-white ${errors.birthDate ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                 {...register('birthDate')}
               />
@@ -278,9 +279,8 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>เพศ</label>
               <select
-                className={`px-3 py-2 border rounded-lg outline-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm bg-white ${
-                  errors.gender ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`px-3 py-2 border rounded-lg outline-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm bg-white ${errors.gender ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                 {...register('gender')}
               >
@@ -336,9 +336,8 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
                 ค่าบริการต่อชั่วโมง
               </label>
               <select
-                className={`px-3 py-2 border rounded-lg outline-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm bg-white ${
-                  errors.hourlyRate ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`px-3 py-2 border rounded-lg outline-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm bg-white ${errors.hourlyRate ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                 defaultValue={step1Data?.hourlyRate ?? ''}
                 {...register('hourlyRate')}
@@ -374,11 +373,10 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
                     key={skill.value}
                     type="button"
                     onClick={() => toggleSkill(skill.value)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors cursor-pointer ${
-                      selected
+                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors cursor-pointer ${selected
                         ? 'bg-[#2D6A58] text-white border-[#2D6A58]'
                         : 'bg-white text-[#0A0A0A] border-[#E2E8F0] hover:border-[#2D6A58] hover:text-[#2D6A58]'
-                    }`}
+                      }`}
                     style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                   >
                     {skill.label}
@@ -404,9 +402,8 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
             <textarea
               rows={4}
               placeholder="เล่าสั้นๆ เกี่ยวกับประสบการณ์และความเชี่ยวชาญของคุณ..."
-              className={`px-3 py-2 border rounded-lg outline-none resize-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm ${
-                errors.bio ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={`px-3 py-2 border rounded-lg outline-none resize-none transition-colors focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] text-sm ${errors.bio ? 'border-red-500' : 'border-gray-300'
+                }`}
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
               {...register('bio')}
             />
