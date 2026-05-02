@@ -50,6 +50,7 @@ export const ICON_NAMES = {
   login: 'login',
   person: 'person',
   account: 'account_circle',
+  trip: 'trip',
   
   // Status
   checkCircle: 'check_circle',

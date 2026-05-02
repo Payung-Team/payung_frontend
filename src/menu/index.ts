@@ -37,7 +37,15 @@ export {
   getCachedMenus,
 } from '../lib/menuLoader';
 
+export {
+  menuItemToNavItem,
+  menuItemsToNavItems,
+  convertIcon,
+  type NavItem,
+} from '../lib/menuAdapter';
+
 export { useMenuTemplate } from '../hooks/useMenuTemplate';
+export { useFilteredMenu } from '../hooks/useFilteredMenu';
 
 // Re-export component for convenience
 export { default as DynamicMenuRenderer } from '../components/DynamicMenuRenderer';

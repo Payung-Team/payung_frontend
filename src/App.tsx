@@ -10,12 +10,16 @@ import KycResubmit from './pages/kyc/status/KycResubmitPage';
 import Admin from './pages/admin/Admin';
 import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
+import CaregiverHome from './pages/caregiver/CaregiverHome';
+import CaregiverSettings from './pages/caregiver/CaregiverSettings';
+import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
 import SearchPage from './pages/search/SearchPage';
 import BookingsPage from './pages/profile/BookingsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
 import GuestRoute from './components/GuestRoute';
 import MessagePage from './pages/profile/MessagePage';
+import NotificationsPage from './pages/notifications/NotificationsPage';
 
 function App() {
   return (
@@ -34,10 +38,121 @@ function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<PayungHome />} />
+        {/* Patient home */}
+        <Route 
+          path="/patient-home" 
+          element={
+            <RoleRoute requiredRole={1}>
+              <PayungHome />
+            </RoleRoute>
+          } 
+        />
+
+        {/* Caregiver home */}
+        <Route 
+          path="/caregiver-home" 
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverHome />
+            </RoleRoute>
+          } 
+        />
+
+        {/* Admin home */}
+        <Route 
+          path="/admin-home" 
+          element={
+            <RoleRoute requiredRole={3}>
+              <PayungHome />
+            </RoleRoute>
+          } 
+        />
+
+        {/* Home - show based on role */}
+        <Route 
+          path="/" 
+          element={<PayungHome />}
+        />
+
         <Route path="/search" element={<SearchPage />} />
         <Route path="/bookings" element={<BookingsPage />} />
         <Route path="/messages" element={<MessagePage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
+
+        {/* Caregiver settings */}
+        <Route
+          path="/caregiver/settings"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        <Route
+          path="/caregiver/settings/account"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        <Route
+          path="/caregiver/settings/job-reception"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        <Route
+          path="/caregiver/settings/notifications"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        <Route
+          path="/caregiver/settings/language"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        <Route
+          path="/caregiver/settings/billing"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        {/* Caregiver availability */}
+        <Route
+          path="/caregiver/availability"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        {/* Caregiver edit profile */}
+        <Route
+          path="/caregiver/edit-profile"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverEditProfile />
+            </RoleRoute>
+          }
+        />
         
         {/* KYC routes — only for caregiver (role 2) */}
         <Route

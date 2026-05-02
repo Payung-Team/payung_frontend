@@ -4,23 +4,23 @@ import { Icon } from '../ui/Icon';
 import Skeleton from '../ui/Skeleton';
 import logoImg from '../../assets/logo_2.jpg';
 import type { NavItem } from './Navigation';
+import NotificationBell from './NotificationBell';
 
 interface HeaderProps {
-  navItems?: NavItem[];
-  profileDropdown?: React.ReactNode;
-  notificationCount?: number;
-  brandColor?: string;
-  isLoading?: boolean;
+  readonly navItems?: NavItem[];
+  readonly profileDropdown?: React.ReactNode;
+  readonly isLoading?: boolean;
+  readonly currentUserId?: string;
 }
 
 export default function Header({
   navItems = [],
   profileDropdown,
-  notificationCount = 0,
-  brandColor = '#52B69A',
   isLoading = false,
+  currentUserId,
 }: HeaderProps) {
   const location = useLocation();
+
   const isActive = (path: string) => location.pathname === path;
 
   return (
@@ -41,9 +41,7 @@ export default function Header({
                   <Skeleton width={104} height={36} borderRadius="8px" />
                 </>
               ) : (
-                navItems
-                  .filter(item => item.path !== '/messages')
-                  .map((item) => (
+                navItems.map((item) => (
                   <Link
                     key={item.path}
                     to={item.path}
@@ -108,13 +106,9 @@ export default function Header({
                 </Link>
 
                 {/* Notification Icon */}
-                <button className="relative w-9 h-9 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:cursor-pointer transition-colors rounded-full hover:bg-gray-100">
-                  <Icon name="notifications" size="medium" />
-                  {/* Default to showing dot for design preview if notificationCount > 0 or even hardcoded for now, but using prop */}
-                  {(notificationCount > 0 || true) && (
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#D4183D] rounded-full ring-2 ring-white" />
-                  )}
-                </button>
+                <NotificationBell
+                  currentUserId={currentUserId}
+                />
 
                 {/* Profile Dropdown */}
                 {profileDropdown}

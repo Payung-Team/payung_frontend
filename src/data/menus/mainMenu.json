@@ -6,45 +6,41 @@
     {
       "id": "home",
       "type": "navigation",
-      "label": "Home",
+      "label": "หน้าหลัก",
       "icon": "home-outline",
       "route": "/",
       "allowedRoles": ["patient", "caregiver", "admin"]
     },
     {
-      "id": "search",
+      "id": "search_caregivers",
       "type": "navigation",
-      "label": "Search",
-      "icon": "search-outline",
+      "label": "ค้นหาผู้ดูแล",
+      "icon": "person-outline",
       "route": "/search",
-      "allowedRoles": ["patient", "caregiver"]
+      "allowedRoles": ["patient"]
+    },
+    {
+      "id": "search_jobs",
+      "type": "navigation",
+      "label": "ค้นหางาน",
+      "icon": "document-text-outline",
+      "route": "/search",
+      "allowedRoles": ["caregiver"]
     },
     {
       "id": "bookings",
       "type": "navigation",
-      "label": "My Bookings",
+      "label": "นัดหมาย",
       "icon": "calendar-outline",
       "route": "/bookings",
       "allowedRoles": ["patient"]
     },
     {
-      "id": "messages",
+      "id": "my_jobs",
       "type": "navigation",
-      "label": "Messages",
-      "icon": "chatbubble-outline",
-      "route": "/messages",
-      "badge": {
-        "count": 0,
-        "color": "red"
-      },
-      "allowedRoles": ["patient", "caregiver"]
-    },
-    {
-      "id": "kyc",
-      "type": "navigation",
-      "label": "Verification",
-      "icon": "checkmark-circle-outline",
-      "route": "/kyc",
+      "label": "งานของฉัน",
+      "icon": "calendar-outline",
+      "route": "/jobs",
       "allowedRoles": ["caregiver"]
     },
     {

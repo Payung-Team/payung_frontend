@@ -52,6 +52,17 @@ export const GET_USER = gql`
       bio
       avatarUrl
       role
+      createdAt
+    }
+  }
+`;
+
+export const SET_CAREGIVER_SEARCHABLE = gql`
+  mutation SetSearchable($isSearchable: Boolean!) {
+    setSearchable(isSearchable: $isSearchable) {
+      id
+      kycStatus
+      isSearchable
     }
   }
 `;
@@ -84,8 +95,34 @@ export const GET_CAREGIVER_PROFILE = gql`
   query GetCaregiverProfile {
     myCaregiverProfile {
       id
+      fullName
+      citizenId
+      phone
+      address
+      bio
+      hourlyRate
+      skills
+      experienceYears
       kycStatus
+      kycSubmittedAt
+      kycVerifiedAt
       isSearchable
+      updatedAt
+    }
+  }
+`;
+
+export const UPDATE_CAREGIVER_PROFILE = gql`
+  mutation UpdateCaregiverProfile($input: UpdateCaregiverInput!) {
+    updateCaregiverProfile(input: $input) {
+      id
+      bio
+      hourlyRate
+      skills
+      experienceYears
+      phone
+      address
+      updatedAt
     }
   }
 `;
@@ -159,5 +196,52 @@ export const RESUBMIT_KYC = gql`
 export const DELETE_KYC_DOCUMENT = gql`
   mutation DeleteKycDocument($documentId: String!) {
     deleteKycDocument(documentId: $documentId)
+  }
+`;
+
+export const GET_NOTIFICATIONS = gql`
+  query GetNotifications($limit: Int, $offset: Int, $unreadOnly: Boolean) {
+    notifications(limit: $limit, offset: $offset, unreadOnly: $unreadOnly) {
+      id
+      userId
+      type
+      title
+      body
+      data
+      isRead
+      readAt
+      createdAt
+    }
+  }
+`;
+
+export const GET_UNREAD_COUNT = gql`
+  query GetUnreadCount {
+    unreadCount
+  }
+`;
+
+export const MARK_NOTIFICATION_AS_READ = gql`
+  mutation MarkNotificationAsRead($id: String!) {
+    markAsRead(id: $id) {
+      id
+      isRead
+      readAt
+    }
+  }
+`;
+
+export const MARK_ALL_NOTIFICATIONS_AS_READ = gql`
+  mutation MarkAllNotificationsAsRead {
+    markAllAsRead
+  }
+`;
+
+export const UPDATE_EMAIL_PREFERENCE = gql`
+  mutation UpdateEmailPreference($enabled: Boolean!) {
+    updateEmailPreference(enabled: $enabled) {
+      id
+      emailPreferences
+    }
   }
 `;

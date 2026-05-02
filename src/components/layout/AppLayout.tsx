@@ -3,10 +3,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast, type ToastMessage } from '../../hooks/useToast';
+import { useFilteredMenu } from '../../hooks/useFilteredMenu';
 import { GET_USER, GET_CAREGIVER_PROFILE } from '../../graphql/queries';
 import Header from './Header';
 import ProfileDropdown from './ProfileDropdown';
-import MobileNavigation, { type NavItem } from './Navigation';
+import CaregiverProfileDropdown from './CaregiverProfileDropdown';
+import MobileNavigation from './Navigation';
 import ViewProfileModal from './ViewProfileModal';
 import EditProfileModal from './EditProfileModal';
 import { ToastContainer } from '../ui/Toast';
@@ -18,14 +20,15 @@ interface AppLayoutProps {
 export default function AppLayout({ children }: AppLayoutProps) {
   const { user, userRole } = useAuth();
   const { toasts, removeToast } = useToast();
-  const { data: userData } = useQuery<any>(GET_USER);
+  const { navItems, isLoading: menuLoading, error: menuError } = useFilteredMenu('mainMenu', userRole);
+  const { data: userData } = useQuery<{ me: { id: string; role: number; displayName?: string; phone?: string; address?: string; bio?: string } } | undefined>(GET_USER);
   
   const [isViewProfileOpen, setIsViewProfileOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
-  const currentRole = userData?.me?.role || Number(userRole);
+  const currentRole = userData?.me?.role ?? userRole;
 
-  const { data: caregiverData } = useQuery<any>(GET_CAREGIVER_PROFILE, {
+  const { data: caregiverData } = useQuery<{ myCaregiverProfile?: { kycStatus: string } } | undefined>(GET_CAREGIVER_PROFILE, {
     skip: currentRole !== 2,
   });
 
@@ -42,48 +45,41 @@ export default function AppLayout({ children }: AppLayoutProps) {
     }
   }, [currentRole, caregiverData, location.pathname, navigate]);
 
-  const getNavItems = (): NavItem[] => {
-
-
-    if (currentRole === 2) {
-      // ผู้ดูแล (Caregiver)
-      return [
-        { path: '/', label: 'หน้าแรก', icon: 'home' },
-        { path: '/search-jobs', label: 'ค้นหางาน', icon: 'work' },
-        { path: '/my-jobs', label: 'งานของฉัน', icon: 'calendar_today' },
-        { path: '/profile', label: 'โปรไฟล์', icon: 'person' },
-      ];
+  // Log menu errors if any
+  useEffect(() => {
+    if (menuError) {
+      console.warn('Menu loading warning:', menuError);
     }
-    
-    // ผู้ใช้ทั่วไป (Patient / Guest)
-    return [
-      { path: '/', label: 'หน้าแรก', icon: 'home' },
-      { path: '/search', label: 'ค้นหาผู้ดูแล', icon: 'search' },
-      { path: '/bookings', label: 'นัดหมาย', icon: 'calendar_today' },
-      { path: '/messages', label: 'ข้อความ', icon: 'chat' },
-    ];
-  };
-
-  const navItems = getNavItems();
+  }, [menuError]);
 
   return (
     <div className="min-h-screen bg-[#F6FAF9] flex flex-col" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
       {/* Header */}
-      <Header
-        navItems={navItems}
-        profileDropdown={
-          <ProfileDropdown
-            onViewProfileClick={() => setIsViewProfileOpen(true)}
-            onEditProfileClick={() => setIsEditProfileOpen(true)}
-            avatarFallbackColor="#52B69A"
-            displayName={userData?.me?.displayName || ''}
-          />
-        }
-        brandColor="#52B69A"
-      />
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
+        <Header
+          navItems={navItems}
+          isLoading={menuLoading}
+          currentUserId={userData?.me?.id}
+          profileDropdown={
+            currentRole === 2 ? (
+              <CaregiverProfileDropdown
+                avatarFallbackColor="#52B69A"
+                displayName={userData?.me?.displayName || ''}
+              />
+            ) : (
+              <ProfileDropdown
+                onViewProfileClick={() => setIsViewProfileOpen(true)}
+                onEditProfileClick={() => setIsEditProfileOpen(true)}
+                avatarFallbackColor="#52B69A"
+                displayName={userData?.me?.displayName || ''}
+              />
+            )
+          }
+        />
+      </div>
 
       {/* Main Content */}
-      <main className="flex-1 pb-20 md:pb-0">
+      <main className="flex-1 pt-[70px] pb-20 md:pb-0">
         {children}
       </main>
 
