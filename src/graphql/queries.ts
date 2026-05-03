@@ -95,7 +95,11 @@ export const GET_CAREGIVER_PROFILE = gql`
   query GetCaregiverProfile {
     myCaregiverProfile {
       id
+      caregiverNumber
       fullName
+      idCardNumber
+      gender
+      dateOfBirth
       phone
       address
       bio
@@ -103,7 +107,11 @@ export const GET_CAREGIVER_PROFILE = gql`
       skills
       experienceYears
       kycStatus
+      kycSubmittedAt
+      kycVerifiedAt
+      resubmitCount
       isSearchable
+      createdAt
       updatedAt
     }
   }
@@ -172,6 +180,22 @@ export const GET_KYC_STATUS = gql`
         fileUrl
         signedUrl
         mimeType
+      }
+    }
+  }
+`;
+
+export const GET_KYC_DOCUMENTS = gql`
+  query GetKycDocuments {
+    kycStatus {
+      documents {
+        id
+        docType
+        fileName
+        fileUrl
+        fileSize
+        mimeType
+        uploadedAt
       }
     }
   }

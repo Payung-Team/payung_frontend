@@ -9,6 +9,7 @@ import {
   MARK_NOTIFICATION_AS_READ,
   SET_CAREGIVER_SEARCHABLE,
   UPDATE_EMAIL_PREFERENCE,
+  GET_KYC_DOCUMENTS,
 } from '../../graphql/queries';
 import { Icon } from '../../components/ui/Icon';
 import Avatar from '../../components/ui/Avatar';
@@ -238,6 +239,7 @@ const CaregiverSettings: React.FC = () => {
   const { data: caregiverData, loading: caregiverLoading } = useQuery<{
     myCaregiverProfile: {
       id: string;
+      caregiverNumber?: string;
       fullName?: string;
       kycStatus: string;
       kycSubmittedAt?: string;
@@ -245,8 +247,32 @@ const CaregiverSettings: React.FC = () => {
       isSearchable: boolean;
       idCardNumber?: string;
       dateOfBirth?: string;
+      gender?: string;
+      phone?: string;
+      address?: string;
+      bio?: string;
+      skills?: string[];
+      experienceYears?: number;
+      hourlyRate?: number;
+      resubmitCount?: number;
+      createdAt?: string;
+      updatedAt?: string;
     };
   }>(GET_CAREGIVER_PROFILE);
+
+  const { data: kycDocumentsData } = useQuery<{
+    kycStatus: {
+      documents: Array<{
+        id: string;
+        docType: string;
+        fileName: string;
+        fileUrl: string;
+        fileSize?: number;
+        mimeType?: string;
+        uploadedAt?: string;
+      }>;
+    };
+  }>(GET_KYC_DOCUMENTS);
 
   const [jobReceptionError, setJobReceptionError] = useState<string | null>(null);
   const [optimisticIsSearchable, setOptimisticIsSearchable] = useState<boolean | null>(null);
@@ -578,9 +604,6 @@ const CaregiverSettings: React.FC = () => {
                   <div className="flex items-start justify-between">
                     <div>
                       <h2 className="text-[20px] font-semibold text-[#0A0A0A] mb-1">โปรไฟล์ของฉัน</h2>
-                      <p className="text-[12px] text-[#717182]">
-                        {`${roleNames[user?.role ?? 0] || 'ไม่ระบุ'} • เข้าร่วมระบบ ${user?.createdAt ? new Date(user.createdAt).toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '-'}`}
-                      </p>
                     </div>
                   </div>
 
@@ -604,7 +627,16 @@ const CaregiverSettings: React.FC = () => {
                           </span>
                         </div>
                         <p className="text-[14px] text-[#717182] mb-2">ผู้ดูแลผู้สูงอายุ</p>
-                        <p className="text-[12px] text-[#B8C2CC]">สมัครเมื่อ 22/08/2024</p>
+                        <p className="text-[12px] text-[#B8C2CC]">
+                          {user?.createdAt 
+                            ? `เข้าร่วมระบบเมื่อ ${new Date(user.createdAt).toLocaleDateString('th-TH', { 
+                              year: 'numeric', 
+                              month: '2-digit', 
+                              day: '2-digit'
+                            })}`
+                            : 'เข้าร่วมระบบ -'
+                          }
+                        </p>
                       </div>
                     </div>
                   )}
@@ -621,16 +653,16 @@ const CaregiverSettings: React.FC = () => {
                 {/* Personal Info Section */}
                 {!isLoading && (
                   <div className="bg-white rounded-xl border border-[rgba(0,0,0,0.1)] p-6">
-                    <h3 className="text-[16px] font-semibold text-[#0A0A0A] mb-1">ข้อมูลส่วนตัว</h3>
-                    <p className="text-[12px] text-[#717182] mb-6">หากต้องการแก้ไขกรุณาติดต่อศูนย์บริการให้ความช่วยเหลือ</p>
+                    <h3 className="text-[16px] font-semibold text-[#0A0A0A] mb-6">ข้อมูลส่วนตัว</h3>
 
                     <div className="space-y-6">
                       {/* Caregiver ID */}
                       <div>
-                        <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">หมายเลขประจำตัวผู้ดูแล</label>
+                        <label htmlFor="caregiver-id" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">หมายเลขประจำตัวผู้ดูแล</label>
                         <input
+                          id="caregiver-id"
                           type="text"
-                          value={caregiver?.id || '-'}
+                          value={caregiver?.caregiverNumber || '-'}
                           readOnly
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
                         />
@@ -639,17 +671,19 @@ const CaregiverSettings: React.FC = () => {
                       {/* Name and Surname */}
                       <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ชื่อ</label>
+                          <label htmlFor="first-name" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ชื่อ</label>
                           <input
+                            id="first-name"
                             type="text"
                             value={caregiver?.fullName?.split(' ')[0] || '-'}
                             readOnly
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)] flex items-center justify-between"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
                           />
                         </div>
                         <div>
-                          <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">นามสกุล</label>
+                          <label htmlFor="last-name" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">นามสกุล</label>
                           <input
+                            id="last-name"
                             type="text"
                             value={caregiver?.fullName?.split(' ').slice(1).join(' ') || '-'}
                             readOnly
@@ -661,17 +695,31 @@ const CaregiverSettings: React.FC = () => {
                       {/* Gender and DOB */}
                       <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">เพศ</label>
-                          <button className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)] flex items-center justify-between">
-                            <span>-</span>
-                            <Icon name="expand_more" size="small" color="currentColor" />
-                          </button>
+                          <label htmlFor="gender" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">เพศ</label>
+                          <input
+                            id="gender"
+                            type="text"
+                            value={caregiver?.gender 
+                              ? caregiver.gender === 'male' 
+                                ? 'ชาย' 
+                                : caregiver.gender === 'female' 
+                                ? 'หญิง' 
+                                : 'อื่นๆ'
+                              : '-'
+                            }
+                            readOnly
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
+                          />
                         </div>
                         <div>
-                          <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">วันเกิด</label>
+                          <label htmlFor="dob" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">วันเกิด</label>
                           <input
+                            id="dob"
                             type="date"
-                            value={caregiver?.dateOfBirth || ''}
+                            value={caregiver?.dateOfBirth 
+                              ? new Date(caregiver.dateOfBirth).toISOString().split('T')[0]
+                              : ''
+                            }
                             readOnly
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
                             placeholder="-"
@@ -681,8 +729,9 @@ const CaregiverSettings: React.FC = () => {
 
                       {/* Citizen ID */}
                       <div>
-                        <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">เลขประจำตัวประชาชน</label>
+                        <label htmlFor="id-card" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">เลขประจำตัวประชาชน</label>
                         <input
+                          id="id-card"
                           type="text"
                           value={caregiver?.idCardNumber || '-'}
                           readOnly
@@ -702,17 +751,19 @@ const CaregiverSettings: React.FC = () => {
                       {/* Phone and Email */}
                       <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">เบอร์โทรศัพท์</label>
+                          <label htmlFor="phone" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">เบอร์โทรศัพท์</label>
                           <input
+                            id="phone"
                             type="tel"
-                            value={user?.phone || '-'}
+                            value={caregiver?.phone || user?.phone || '-'}
                             readOnly
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[#0A0A0A]"
                           />
                         </div>
                         <div>
-                          <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">อีเมล</label>
+                          <label htmlFor="email" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">อีเมล</label>
                           <input
+                            id="email"
                             type="email"
                             value={user?.email || '-'}
                             readOnly
@@ -723,9 +774,10 @@ const CaregiverSettings: React.FC = () => {
 
                       {/* Address */}
                       <div>
-                        <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ที่อยู่</label>
+                        <label htmlFor="address" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ที่อยู่</label>
                         <textarea
-                          value={user?.address || '-'}
+                          id="address"
+                          value={caregiver?.address || user?.address || '-'}
                           readOnly
                           rows={4}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[#717182] resize-none"
@@ -735,22 +787,29 @@ const CaregiverSettings: React.FC = () => {
                       {/* Province, District, Postal */}
                       <div className="grid grid-cols-3 gap-6">
                         <div>
-                          <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">จังหวัด</label>
-                          <button className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)] flex items-center justify-between">
-                            <span>-ยังไม่ได้เลือก-</span>
-                            <Icon name="expand_more" size="small" color="currentColor" />
-                          </button>
-                        </div>
-                        <div>
-                          <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">เขต/อำเภอ</label>
-                          <button className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)] flex items-center justify-between">
-                            <span>-ยังไม่ได้เลือก-</span>
-                            <Icon name="expand_more" size="small" color="currentColor" />
-                          </button>
-                        </div>
-                        <div>
-                          <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">รหัสไปรษณีย์</label>
+                          <label htmlFor="province" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">จังหวัด</label>
                           <input
+                            id="province"
+                            type="text"
+                            value="-ยังไม่ได้เลือก-"
+                            readOnly
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="district" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">เขต/อำเภอ</label>
+                          <input
+                            id="district"
+                            type="text"
+                            value="-ยังไม่ได้เลือก-"
+                            readOnly
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="postal" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">รหัสไปรษณีย์</label>
+                          <input
+                            id="postal"
                             type="text"
                             placeholder="-ยังไม่ได้เลือก-"
                             readOnly
@@ -766,10 +825,10 @@ const CaregiverSettings: React.FC = () => {
                 {!isLoading && (
                   <div className="bg-white rounded-xl border border-[rgba(0,0,0,0.1)] p-6">
                     <h3 className="text-[16px] font-semibold text-[#0A0A0A] mb-1">แนะนำตัว</h3>
-                    <p className="text-[14px] text-[#717182] mb-6">เขียนข้อความแนะนำตัวที่จะแสดงในโปรไฟล์ของคุณ</p>
 
                     <textarea
-                      value={user?.bio || '-'}
+                      id="bio"
+                      value={caregiver?.bio || user?.bio || '-'}
                       readOnly
                       rows={5}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[#717182] resize-none"
@@ -784,35 +843,58 @@ const CaregiverSettings: React.FC = () => {
 
                     <div className="space-y-6">
                       <div>
-                        <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ประสบการณ์ทำงาน (ปี)</label>
-                        <button className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)] flex items-center justify-between">
-                          <span>ยังไม่ได้เลือก</span>
-                          <Icon name="expand_more" size="small" color="currentColor" />
-                        </button>
+                        <label htmlFor="experience" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ประสบการณ์ทำงาน (ปี)</label>
+                        <input
+                          id="experience"
+                          type="text"
+                          value={caregiver?.experienceYears ? `${caregiver.experienceYears} ปี` : 'ยังไม่ได้เลือก'}
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
+                        />
                       </div>
 
                       <div>
-                        <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ประเภทการดูแล</label>
-                        <button className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)] flex items-center justify-between">
-                          <span>ยังไม่ได้เลือก</span>
-                          <Icon name="expand_more" size="small" color="currentColor" />
-                        </button>
+                        <label htmlFor="care-type" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ประเภทการดูแล</label>
+                        <input
+                          id="care-type"
+                          type="text"
+                          value={caregiver?.skills && caregiver.skills.length > 0 ? caregiver.skills.join(', ') : 'ยังไม่ได้เลือก'}
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
+                        />
                       </div>
 
                       <div>
-                        <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ทักษะความสามารถ</label>
-                        <button className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)] flex items-center justify-between">
-                          <span>ยังไม่ได้เลือก</span>
-                          <Icon name="expand_more" size="small" color="currentColor" />
-                        </button>
+                        <label htmlFor="skills" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ทักษะความสามารถ</label>
+                        <input
+                          id="skills"
+                          type="text"
+                          value={caregiver?.skills && caregiver.skills.length > 0 ? caregiver.skills.join(', ') : 'ยังไม่ได้เลือก'}
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
+                        />
                       </div>
 
                       <div>
-                        <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ภาษาที่สามารถสื่อสารได้</label>
-                        <button className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)] flex items-center justify-between">
-                          <span>ยังไม่ได้เลือก</span>
-                          <Icon name="expand_more" size="small" color="currentColor" />
-                        </button>
+                        <label htmlFor="language" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ภาษาที่สามารถสื่อสารได้</label>
+                        <input
+                          id="language"
+                          type="text"
+                          value="-ยังไม่ได้เลือก-"
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="hourly-rate" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">อัตราการจ้าง (บาท/ชั่วโมง)</label>
+                        <input
+                          id="hourly-rate"
+                          type="text"
+                          value={caregiver?.hourlyRate ? `฿${caregiver.hourlyRate.toFixed(2)}` : '-'}
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
+                        />
                       </div>
                     </div>
                   </div>
@@ -823,40 +905,70 @@ const CaregiverSettings: React.FC = () => {
                   <div className="bg-white rounded-xl border border-[rgba(0,0,0,0.1)] p-6">
                     <div className="mb-6">
                       <h3 className="text-[16px] font-semibold text-[#0A0A0A] mb-1">ใบรับรอง / ความน่าเชื่อถือ</h3>
-                      <p className="text-[14px] text-[#717182]">อัปโหลดเอกสารและใบรับรองเพื่อเพิ่มความน่าเชื่อถือ</p>
                     </div>
 
                     {/* Documents Container */}
                     <div className="bg-[#ECECF0] rounded-xl p-4 space-y-3">
                       {/* Header */}
                       <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-[16px] font-semibold text-[#0A0A0A]">เอกสารที่อัปโหลดแล้ว</h4>
-                        <a href="#" className="text-[14px] font-medium text-[#52B69A] underline">ติดตามสถานะ</a>
+                        <h4 className="text-[16px] font-semibold text-[#0A0A0A]">เอกสารที่อัปโหลดแล้ว ({kycDocumentsData?.kycStatus?.documents?.length || 0})</h4>
+                        <a href="/kyc/status" className="text-[14px] font-medium text-[#52B69A] underline">ติดตามสถานะ</a>
                       </div>
 
-                      {/* Document Item 1 */}
-                      <div className="bg-white rounded-lg p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3 flex-1">
-                          <Icon name="description" size="medium" color="currentColor" />
-                          <div className="flex-1">
-                            <p className="text-[14px] font-semibold text-[#0A0A0A]">ใบรับรองผู้ช่วยพยาบาล.pdf</p>
-                            <p className="text-[12px] text-[#717182]">อัปโหลดเมื่อ 15 ม.ค. 2564</p>
-                          </div>
+                      {/* Empty State */}
+                      {(!kycDocumentsData?.kycStatus?.documents || kycDocumentsData.kycStatus.documents.length === 0) && (
+                        <div className="bg-white rounded-lg p-4 text-center">
+                          <Icon name="description" size="medium" color="#717182" />
+                          <p className="text-[14px] text-[#717182] mt-2">ยังไม่มีเอกสารที่อัปโหลด</p>
+                          <button
+                            onClick={() => navigate('/kyc')}
+                            className="mt-3 px-4 py-2 bg-[#52B69A] text-white rounded-lg text-[14px] font-medium hover:bg-[#4a9d87] transition-colors"
+                          >
+                            ไปยืนยันตัวตน
+                          </button>
                         </div>
-                        <span className="px-2 py-1 bg-[#00A63E] text-white rounded-lg text-[12px] font-semibold">ยืนยันแล้ว</span>
-                      </div>
+                      )}
 
-                      {/* Document Item 2 */}
-                      <div className="bg-white rounded-lg p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3 flex-1">
-                          <Icon name="description" size="medium" color="currentColor" />
-                          <div className="flex-1">
-                            <p className="text-[14px] font-semibold text-[#0A0A0A]">สำเนาบัตรประชาชน.pdf</p>
-                            <p className="text-[12px] text-[#717182]">อัปโหลดเมื่อ 15 ม.ค. 2564</p>
-                          </div>
+                      {/* Document List */}
+                      {kycDocumentsData?.kycStatus?.documents && kycDocumentsData.kycStatus.documents.length > 0 && (
+                        <div className="space-y-3">
+                          {kycDocumentsData.kycStatus.documents.map((doc) => (
+                            <div key={doc.id} className="bg-white rounded-lg p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <Icon name="description" size="medium" color="#52B69A" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[14px] font-semibold text-[#0A0A0A] truncate">{doc.fileName}</p>
+                                  <p className="text-[12px] text-[#717182]">
+                                    {doc.uploadedAt ? `อัปโหลดเมื่อ ${new Date(doc.uploadedAt).toLocaleDateString('th-TH', { 
+                                      year: 'numeric', 
+                                      month: '2-digit', 
+                                      day: '2-digit',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}` : 'วันที่ไม่ระบุ'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {doc.fileSize && (
+                                  <span className="text-[12px] text-[#717182]">
+                                    {(doc.fileSize / 1024 / 1024).toFixed(2)} MB
+                                  </span>
+                                )}
+                                {caregiver?.kycStatus === 'verified' && (
+                                  <span className="px-3 py-1 bg-[#F0FDF4] text-[#16A34A] rounded-lg text-[12px] font-semibold">ยืนยันแล้ว</span>
+                                )}
+                                {caregiver?.kycStatus === 'pending' && (
+                                  <span className="px-3 py-1 bg-[#FFFBEB] text-[#F59E0B] rounded-lg text-[12px] font-semibold">รอตรวจสอบ</span>
+                                )}
+                                {caregiver?.kycStatus === 'rejected' && (
+                                  <span className="px-3 py-1 bg-[#FEF2F2] text-[#DC2626] rounded-lg text-[12px] font-semibold">ปฏิเสธ</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <span className="px-2 py-1 bg-[#00A63E] text-white rounded-lg text-[12px] font-semibold">ยืนยันแล้ว</span>
-                      </div>
+                      )}
                     </div>
                   </div>
                 )}
