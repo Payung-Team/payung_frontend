@@ -27,6 +27,7 @@ type CaregiverProfileFormData = z.infer<typeof CaregiverProfileSchema>;
 
 interface CaregiverData {
   id: string;
+  caregiverNumber?: string;
   fullName?: string;
   citizenId?: string;
   phone?: string;
@@ -264,7 +265,7 @@ const CaregiverEditProfile: React.FC = () => {
 
               <div className="space-y-6">
                 <ProfileFormFields
-                  caregiverId={caregiver?.id}
+                  caregiverId={caregiver?.caregiverNumber}
                   fullName={caregiver?.fullName}
                   citizenId={caregiver?.citizenId}
                   showTooltip={true}
