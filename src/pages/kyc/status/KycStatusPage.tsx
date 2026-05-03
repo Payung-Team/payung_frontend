@@ -410,7 +410,7 @@ export default function KycStatusPage() {
             </button>
             <div className="text-center">
               <button
-                onClick={() => navigate('/profile')}
+                onClick={() => navigate('/caregiver/settings/account')}
                 className="text-[13px] font-semibold text-[#0D9488] hover:underline cursor-pointer"
                 style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
               >

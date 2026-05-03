@@ -28,22 +28,80 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const currentRole = userData?.me?.role ?? userRole;
 
-  const { data: caregiverData } = useQuery<{ myCaregiverProfile?: { kycStatus: string } } | undefined>(GET_CAREGIVER_PROFILE, {
+  const { data: caregiverData, loading: caregiverLoading, error: caregiverError } = useQuery<{ myCaregiverProfile?: { kycStatus: string } } | undefined>(GET_CAREGIVER_PROFILE, {
     skip: currentRole !== 2,
+    fetchPolicy: 'cache-first',
+    errorPolicy: 'all',
   });
 
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Redirect immediately when caregiver data is available
   useEffect(() => {
-    if (currentRole === 2 && caregiverData?.myCaregiverProfile) {
+    console.log('AppLayout: Checking KYC redirect', {
+      currentRole,
+      caregiverLoading,
+      caregiverError: caregiverError?.message,
+      hasData: !!caregiverData?.myCaregiverProfile,
+      kycStatus: caregiverData?.myCaregiverProfile?.kycStatus,
+      currentPath: location.pathname,
+    });
+
+    if (currentRole === 2 && !caregiverLoading) {
+      // If error occurred or no data, skip redirect (user might not have profile yet)
+      if (caregiverError || !caregiverData?.myCaregiverProfile) {
+        console.warn('Caregiver profile not found or error:', caregiverError);
+        return;
+      }
+
       const kycStatus = caregiverData.myCaregiverProfile.kycStatus;
-      // บังคับ caregiver ที่ยังเป็น none ให้ไปหน้า /kyc เสมอ
-      if (kycStatus === 'none' && location.pathname !== '/kyc') {
+      
+      // Allow access to KYC-related pages and settings
+      const allowedUnverifiedPaths = [
+        '/kyc',
+        '/kyc/status',
+        '/caregiver/settings',
+        '/caregiver/settings/account',
+        '/caregiver/settings/job-reception',
+        '/caregiver/settings/notifications',
+        '/caregiver/settings/language',
+        '/caregiver/settings/billing',
+        '/caregiver/availability'
+      ];
+      
+      const isAllowedPath = allowedUnverifiedPaths.some(path => location.pathname.startsWith(path));
+      
+      // Redirect based on KYC status
+      if (kycStatus === 'none' && !isAllowedPath) {
+        // Not started - go to KYC form
+        console.log('Redirecting caregiver to /kyc (KYC not started)');
         navigate('/kyc', { replace: true });
+      } else if (kycStatus === 'pending' && !isAllowedPath) {
+        // Pending verification - go to KYC status page
+        console.log('Redirecting caregiver to /kyc/status (KYC pending)');
+        navigate('/kyc/status', { replace: true });
       }
     }
-  }, [currentRole, caregiverData, location.pathname, navigate]);
+  }, [currentRole, caregiverData, caregiverLoading, caregiverError, location.pathname, navigate]);
+
+  // Compute filtered nav items based on KYC status
+  const filteredNavItems = (() => {
+    if (currentRole === 2 && caregiverData?.myCaregiverProfile) {
+      const kycStatus = caregiverData.myCaregiverProfile.kycStatus;
+      const isKycUnverified = kycStatus === 'none' || kycStatus === 'pending';
+      
+      if (isKycUnverified) {
+        // Only show KYC-related and settings menu items for unverified caregivers
+        return navItems.filter(item => 
+          item.path === '/kyc' || 
+          item.path.includes('/settings') ||
+          item.path === '/caregiver/availability'
+        );
+      }
+    }
+    return navItems;
+  })();
 
   // Log menu errors if any
   useEffect(() => {
@@ -57,7 +115,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
         <Header
-          navItems={navItems}
+          navItems={filteredNavItems}
           isLoading={menuLoading}
           currentUserId={userData?.me?.id}
           profileDropdown={
@@ -84,7 +142,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <MobileNavigation navItems={navItems} />
+      <MobileNavigation navItems={filteredNavItems} />
 
       {/* View Profile Modal */}
       <ViewProfileModal

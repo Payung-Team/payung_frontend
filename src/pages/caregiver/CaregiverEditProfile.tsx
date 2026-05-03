@@ -93,10 +93,14 @@ const CaregiverEditProfile: React.FC = () => {
   // ⛔ Guard: KYC Verification Check
   useEffect(() => {
     if (!caregiverLoading && caregiver) {
-      const isKycVerified = caregiver.kycStatus?.toLowerCase() === 'verified';
+      const kycStatus = caregiver.kycStatus?.toLowerCase();
+      const isKycVerified = kycStatus === 'verified';
+      
       if (!isKycVerified) {
         setToastMessage({ type: 'warning', message: 'คุณต้องยืนยัน KYC เพื่อแก้ไขโปรไฟล์' });
-        setTimeout(() => navigate('/kyc/status'), 2000);
+        // Redirect to appropriate page based on KYC status
+        const redirectPath = kycStatus === 'pending' ? '/kyc/status' : '/kyc';
+        setTimeout(() => navigate(redirectPath), 2000);
       }
     }
   }, [caregiverLoading, caregiver, navigate]);

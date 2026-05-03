@@ -96,7 +96,6 @@ export const GET_CAREGIVER_PROFILE = gql`
     myCaregiverProfile {
       id
       fullName
-      citizenId
       phone
       address
       bio
@@ -104,8 +103,6 @@ export const GET_CAREGIVER_PROFILE = gql`
       skills
       experienceYears
       kycStatus
-      kycSubmittedAt
-      kycVerifiedAt
       isSearchable
       updatedAt
     }

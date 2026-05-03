@@ -182,13 +182,13 @@ export default function Register() {
 
   // Redirect after registration: caregiver → /kyc, patient → /
   useEffect(() => {
-    if (showSuccessModal && !loading && user) {
+    if (showSuccessModal) {
       const timer = setTimeout(() => {
         navigate(selectedRole === 'caregiver' ? '/kyc' : '/');
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [showSuccessModal, user, loading, navigate, selectedRole]);
+  }, [showSuccessModal, navigate, selectedRole]);
 
   const validate = useCallback((): FormErrors => {
     const errs: FormErrors = {};

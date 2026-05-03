@@ -1,5 +1,6 @@
 import { Routes, Route, Outlet } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout';
+import CaregiverSearchWrapper from './components/CaregiverSearchWrapper';
 import { KycProvider } from './context/KycContext';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -13,7 +14,6 @@ import PayungHome from './pages/home/HomePage';
 import CaregiverHome from './pages/caregiver/CaregiverHome';
 import CaregiverSettings from './pages/caregiver/CaregiverSettings';
 import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
-import SearchPage from './pages/search/SearchPage';
 import BookingsPage from './pages/profile/BookingsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
@@ -74,7 +74,7 @@ function App() {
           element={<PayungHome />}
         />
 
-        <Route path="/search" element={<SearchPage />} />
+        <Route path="/search" element={<CaregiverSearchWrapper />} />
         <Route path="/bookings" element={<BookingsPage />} />
         <Route path="/messages" element={<MessagePage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
