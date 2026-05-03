@@ -569,7 +569,7 @@ const CaregiverSettings: React.FC = () => {
 
       {/* ═══ Main Content ═══ */}
       <div className="flex-1 overflow-y-auto bg-[#F6F8F9]">
-          <div className="max-w-full px-8 py-7">
+          <div className="max-w-[1100px] mx-auto px-8 py-7">
             {activeMenu === 'account' && (
               <div className="space-y-6">
                 {/* Profile Card Section */}

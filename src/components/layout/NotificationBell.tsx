@@ -196,7 +196,11 @@ export default function NotificationBell({
         <div className="absolute right-0 top-11 z-50 w-[456px] overflow-hidden rounded-[10px] border border-[#DDE3E0] bg-white shadow-[0_8px_24px_rgba(10,46,43,0.12)]">
           <div className="flex h-[39px] items-center justify-between bg-[#F7F9F8] px-4 py-3">
             <div className="flex items-center gap-2">
-              <p className="text-[12px] font-semibold leading-[15px] text-[#1A2422]">🔔 การแจ้งเตือน</p>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A2422" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                <p className="text-[12px] font-semibold leading-[15px] text-[#1A2422]">การแจ้งเตือน</p>
               <span className="rounded-[10px] bg-[#F58634] px-[6px] py-[2px] text-[9px] font-bold leading-[11px] text-white">
                 {unreadCount} ใหม่
               </span>
