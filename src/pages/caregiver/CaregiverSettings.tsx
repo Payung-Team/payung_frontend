@@ -27,14 +27,14 @@ interface SettingsMenuItemProps {
 const SettingsTab: React.FC<SettingsMenuItemProps> = ({ icon, label, isActive, onClick }) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-left ${
+    className={`flex-shrink-0 md:w-full md:flex-shrink flex items-center gap-3 px-3 md:px-4 py-3 rounded-lg transition-colors text-left whitespace-nowrap ${
       isActive
         ? 'bg-[#E7F5EE] text-[#197A4A]'
         : 'text-[#0A0A0A] hover:bg-gray-100'
     }`}
   >
     <Icon name={icon} size="small" color={isActive ? '#197A4A' : 'currentColor'} />
-    <span className="font-medium text-[14px]">{label}</span>
+    <span className="font-medium text-[14px] hidden md:inline">{label}</span>
   </button>
 );
 
@@ -513,19 +513,19 @@ const CaregiverSettings: React.FC = () => {
 
   return (
     <div
-      className="h-screen bg-[#F6F8F9] flex overflow-hidden"
+      className="min-h-screen bg-[#F6F8F9] flex flex-col md:flex-row"
       style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
     >
       {/* ═══ Tab Navigation (Left Sidebar) ═══ */}
-      <div className="w-[250px] bg-white border-r border-gray-200 flex flex-col">
+      <div className="w-full md:w-[250px] bg-white border-b md:border-b-0 md:border-r border-gray-200 flex flex-col">
         {/* Tab Header */}
         <div className="bg-gray-100 px-6 py-4">
           <h3 className="text-[16px] font-bold text-[#0A0A0A]">ตั้งค่าบัญชี</h3>
         </div>
 
         {/* Tab Items */}
-        <div className="flex-1 overflow-y-auto px-3 py-4">
-          <div className="flex flex-col gap-2">
+        <div className="flex-1 overflow-y-auto px-3 py-4 flex md:flex-col gap-1 md:gap-2 overflow-x-auto md:overflow-x-visible">
+          <div className="flex md:flex-col gap-1 md:gap-2 w-max md:w-full">
             <SettingsTab
               icon="account_circle"
               label="บัญชี"
@@ -560,7 +560,7 @@ const CaregiverSettings: React.FC = () => {
         </div>
 
         {/* Help Center at bottom */}
-        <div className="border-t border-gray-200 px-3">
+        <div className="border-t border-gray-200 px-3 hidden md:block">
           <button className="w-full px-4 py-3 text-left text-[#0A0A0A] hover:bg-gray-100 transition-colors rounded-lg text-[14px] font-medium">
             Help Center
           </button>
@@ -569,7 +569,7 @@ const CaregiverSettings: React.FC = () => {
 
       {/* ═══ Main Content ═══ */}
       <div className="flex-1 overflow-y-auto bg-[#F6F8F9]">
-          <div className="max-w-[1100px] mx-auto px-8 py-7">
+          <div className="max-w-[1100px] mx-auto px-4 md:px-8 py-4 md:py-7">
             {activeMenu === 'account' && (
               <div className="space-y-6">
                 {/* Profile Card Section */}

@@ -74,6 +74,16 @@ export default function NotificationBell({
   const navigate = useNavigate();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const {
     data: unreadData,
@@ -162,6 +172,14 @@ export default function NotificationBell({
     await refetchNotifications();
   };
 
+  const handleClickBell = () => {
+    if (isMobile) {
+      navigate('/caregiver/settings/notifications');
+    } else {
+      setOpen((prev) => !prev);
+    }
+  };
+
   const handleClickItem = async (id: string) => {
     const item = items.find((entry) => entry.id === id);
     if (!item) {
@@ -182,7 +200,7 @@ export default function NotificationBell({
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={handleClickBell}
         className="relative w-9 h-9 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:cursor-pointer transition-colors rounded-full hover:bg-gray-100"
         aria-label="เปิดการแจ้งเตือน"
       >
@@ -192,8 +210,8 @@ export default function NotificationBell({
         )}
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-11 z-50 w-[456px] overflow-hidden rounded-[10px] border border-[#DDE3E0] bg-white shadow-[0_8px_24px_rgba(10,46,43,0.12)]">
+      {open && !isMobile && (
+        <div className="absolute right-0 top-11 z-50 w-full sm:w-[456px] max-w-[calc(100vw-16px)] overflow-hidden rounded-[10px] border border-[#DDE3E0] bg-white shadow-[0_8px_24px_rgba(10,46,43,0.12)]">
           <div className="flex h-[39px] items-center justify-between bg-[#F7F9F8] px-4 py-3">
             <div className="flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A2422" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

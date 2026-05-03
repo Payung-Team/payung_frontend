@@ -359,13 +359,15 @@ export default function KycStatusPage() {
           </div>
 
           {/* Verified Badge Preview */}
-          <div className="mb-8 p-1 px-1.5 pr-3 flex items-center gap-2 border border-dashed border-[#16A34A] rounded-full bg-white">
-            <div className="w-7 h-7 bg-gradient-to-br from-[#FFEDD5] to-[#FDBA8C] rounded-full flex items-center justify-center text-[13px] font-bold text-[#E07856]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              {(data?.kycStatus?.caregiver?.fullName?.[0] || 'ส').toUpperCase()}
+          <div className="mb-8 flex flex-col items-center gap-2 border border-dashed border-[#16A34A] rounded-[16px] bg-white p-4">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-gradient-to-br from-[#FFEDD5] to-[#FDBA8C] rounded-full flex items-center justify-center text-[13px] font-bold text-[#E07856]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                {(data?.kycStatus?.caregiver?.fullName?.[0] || 'ส').toUpperCase()}
+              </div>
+              <span className="text-[12px] font-semibold text-[#111827]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                {data?.kycStatus?.caregiver?.fullName || 'สมชาย ใจดี'}
+              </span>
             </div>
-            <span className="text-[12px] font-semibold text-[#111827]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-              {data?.kycStatus?.caregiver?.fullName || 'สมชาย ใจดี'}
-            </span>
             <div className="flex items-center gap-1 bg-[#FEF2F2] px-2 py-0.5 rounded-full">
               <Icon name="check" color="#16A34A" style={{ fontSize: '12px', fontWeight: 'bold' }} />
               <span className="text-[10px] font-bold text-[#16A34A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>ยืนยันแล้ว</span>
