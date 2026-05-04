@@ -15,14 +15,15 @@ const ProfileFormFields: React.FC<ProfileFormFieldsProps> = ({
   citizenId,
   showTooltip = true,
 }) => {
-  const nameParts = fullName ? fullName.split(' ') : ['', ''];
-  const [firstName, lastName] = nameParts;
+  const nameParts = fullName ? fullName.trim().split(' ') : ['', ''];
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
 
-  const fieldWithLock = (label: string, value: string) => (
+  const fieldWithLock = (label: string, value: string, tooltipText?: string) => (
     <div>
       <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">
-        {showTooltip && label.includes('เลขประจำตัว') ? (
-          <Tooltip content="ต้อง resubmit KYC เพื่อแก้ไขข้อมูลนี้" position="top">
+        {showTooltip && tooltipText ? (
+          <Tooltip content={tooltipText} position="top" delay={500}>
             <span className="flex items-center gap-1">
               {label}
               <Icon name="info" size="small" color="#717182" />
@@ -46,17 +47,30 @@ const ProfileFormFields: React.FC<ProfileFormFieldsProps> = ({
 
   return (
     <>
-      {/* Caregiver ID */}
-      {fieldWithLock('หมายเลขประจำตัวผู้ดูแล', caregiverId)}
+      {fieldWithLock(
+        'หมายเลขประจำตัวผู้ดูแล',
+        caregiverId,
+        'หมายเลขประจำตัวผู้ดูแลถูกกำหนดโดยระบบ ไม่สามารถแก้ไขได้',
+      )}
 
-      {/* Name and Surname */}
       <div className="grid grid-cols-2 gap-6">
-        {fieldWithLock('ชื่อ', firstName || 'สมหญิง')}
-        {fieldWithLock('นามสกุล', lastName || 'ใจดี')}
+        {fieldWithLock(
+          'ชื่อ',
+          firstName || 'สมหญิง',
+          'ต้องการแก้ไขกรุณาติดต่อ admin',
+        )}
+        {fieldWithLock(
+          'นามสกุล',
+          lastName || 'ใจดี',
+          'ต้องการแก้ไขกรุณาติดต่อ admin',
+        )}
       </div>
 
-      {/* Citizen ID */}
-      {fieldWithLock('เลขประจำตัวประชาชน', citizenId)}
+      {fieldWithLock(
+        'เลขประจำตัวประชาชน',
+        citizenId,
+        'ต้องการแก้ไขกรุณาติดต่อ admin',
+      )}
     </>
   );
 };

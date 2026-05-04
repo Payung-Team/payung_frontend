@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { GET_USER, GET_CAREGIVER_PROFILE, UPDATE_CAREGIVER_PROFILE } from '../../graphql/queries';
 import { Icon } from '../../components/ui/Icon';
+import Tooltip from '../../components/ui/Tooltip';
 import Avatar from '../../components/ui/Avatar';
 import Skeleton from '../../components/ui/Skeleton';
 import { Toast } from '../../components/ui/Toast';
@@ -49,7 +50,7 @@ interface CaregiverData {
   id: string;
   caregiverNumber?: string;
   fullName?: string;
-  citizenId?: string;
+  idCardNumber?: string;
   phone?: string;
   email?: string;
   address?: string;
@@ -304,13 +305,13 @@ const CaregiverEditProfile: React.FC = () => {
             {/* Personal Info Card - Read Only */}
             <div className="bg-white rounded-xl border border-[rgba(0,0,0,0.1)] p-6">
               <h3 className="text-[16px] font-semibold text-[#0A0A0A] mb-1">ข้อมูลส่วนตัว</h3>
-              <p className="text-[12px] text-[#717182] mb-6">หากต้องการแก้ไขกรุณา resubmit KYC</p>
+              <p className="text-[12px] text-[#717182] mb-6">หากต้องการแก้ไขกรุณาติดต่อ admin</p>
 
               <div className="space-y-6">
                 <ProfileFormFields
                   caregiverId={caregiver?.caregiverNumber}
                   fullName={caregiver?.fullName}
-                  citizenId={caregiver?.citizenId}
+                  citizenId={caregiver?.idCardNumber}
                   showTooltip={true}
                 />
               </div>
@@ -343,14 +344,24 @@ const CaregiverEditProfile: React.FC = () => {
 
                   {/* Email - Read Only */}
                   <div>
-                    <label htmlFor="email" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">อีเมล</label>
-                    <input
-                      id="email"
-                      type="email"
-                      value={user?.email || ''}
-                      disabled
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[#0A0A0A] cursor-not-allowed"
-                    />
+                    <label className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">
+                      <Tooltip content="ต้องการแก้ไขอีเมลกรุณาติดต่อ admin" position="top" delay={500}>
+                        <span className="flex items-center gap-1">
+                          อีเมล
+                          <Icon name="info" size="small" color="#717182" />
+                        </span>
+                      </Tooltip>
+                    </label>
+                    <div className="flex items-center gap-3 px-3 py-2 bg-[#F3F3F5] rounded-lg border border-gray-300">
+                      <input
+                        id="email"
+                        type="email"
+                        value={user?.email || ''}
+                        readOnly
+                        className="flex-1 bg-transparent text-[14px] text-[rgba(0,0,0,0.5)] outline-none"
+                      />
+                      <Icon name="lock" size="small" color="currentColor" />
+                    </div>
                   </div>
                 </div>
 
