@@ -900,33 +900,11 @@ const CaregiverSettings: React.FC = () => {
                       </div>
 
                       <div>
-                        <label htmlFor="care-type" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ประเภทการดูแล</label>
-                        <input
-                          id="care-type"
-                          type="text"
-                          value={caregiver?.skills && caregiver.skills.length > 0 ? caregiver.skills.join(', ') : 'ยังไม่ได้เลือก'}
-                          readOnly
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
-                        />
-                      </div>
-
-                      <div>
                         <label htmlFor="skills" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ทักษะความสามารถ</label>
                         <input
                           id="skills"
                           type="text"
                           value={caregiver?.skills && caregiver.skills.length > 0 ? caregiver.skills.join(', ') : 'ยังไม่ได้เลือก'}
-                          readOnly
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
-                        />
-                      </div>
-
-                      <div>
-                        <label htmlFor="language" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ภาษาที่สามารถสื่อสารได้</label>
-                        <input
-                          id="language"
-                          type="text"
-                          value="-ยังไม่ได้เลือก-"
                           readOnly
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
                         />
