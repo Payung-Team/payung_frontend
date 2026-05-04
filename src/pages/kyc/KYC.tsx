@@ -1,8 +1,14 @@
+import { KycProvider, useKyc } from '../../context/KycContext';
+import KycIntro from './KycIntro';
+import KycStep1 from './steps/KycStep1';
+import KycStep2 from './steps/KycStep2';
+import KycStep3 from './steps/KycStep3';
+
 export default function KYC() {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900">KYC Verification</h1>
-      <p className="mt-2 text-gray-600">KYC verification flow will be implemented here.</p>
-    </div>
-  );
+  const { step } = useKyc();
+
+  if (step === 1) return <KycStep1 />;
+  if (step === 2) return <KycStep2 />;
+  if (step === 3) return <KycStep3 />;
+  return <KycIntro />;
 }

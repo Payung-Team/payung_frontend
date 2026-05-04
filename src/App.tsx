@@ -1,23 +1,188 @@
-import { Routes, Route } from 'react-router-dom';
-import AppShell from './components/layout/AppShell';
-import Home from './pages/home/Home';
+import { Routes, Route, Outlet } from 'react-router-dom';
+import AppLayout from './components/layout/AppLayout';
+import CaregiverSearchWrapper from './components/CaregiverSearchWrapper';
+import { KycProvider } from './context/KycContext';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import KYC from './pages/kyc/KYC';
+import KycSuccess from './pages/kyc/status/SuccessSubmit';
+import KycStatus from './pages/kyc/status/KycStatusPage';
+import KycResubmit from './pages/kyc/status/KycResubmitPage';
 import Admin from './pages/admin/Admin';
 import NotFound from './pages/error/NotFound';
+import PayungHome from './pages/home/HomePage';
+import CaregiverHome from './pages/caregiver/CaregiverHome';
+import CaregiverSettings from './pages/caregiver/CaregiverSettings';
+import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
+import BookingsPage from './pages/profile/BookingsPage';
+import ProtectedRoute from './components/ProtectedRoute';
+import RoleRoute from './components/RoleRoute';
+import GuestRoute from './components/GuestRoute';
+import MessagePage from './pages/profile/MessagePage';
+import NotificationsPage from './pages/notifications/NotificationsPage';
 
 function App() {
   return (
     <Routes>
-      <Route element={<AppShell />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/kyc" element={<KYC />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="*" element={<NotFound />} />
+      {/* Auth pages — redirect to / if already logged in */}
+      <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+      <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+
+      {/* Protected pages — wrapped in ProtectedRoute and AppLayout */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <Outlet />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      >
+        {/* Patient home */}
+        <Route 
+          path="/patient-home" 
+          element={
+            <RoleRoute requiredRole={1}>
+              <PayungHome />
+            </RoleRoute>
+          } 
+        />
+
+        {/* Caregiver home */}
+        <Route 
+          path="/caregiver-home" 
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverHome />
+            </RoleRoute>
+          } 
+        />
+
+        {/* Admin home */}
+        <Route 
+          path="/admin-home" 
+          element={
+            <RoleRoute requiredRole={3}>
+              <PayungHome />
+            </RoleRoute>
+          } 
+        />
+
+        {/* Home - show based on role */}
+        <Route 
+          path="/" 
+          element={<PayungHome />}
+        />
+
+        <Route path="/search" element={<CaregiverSearchWrapper />} />
+        <Route path="/bookings" element={<BookingsPage />} />
+        <Route path="/messages" element={<MessagePage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
+
+        {/* Caregiver settings */}
+        <Route
+          path="/caregiver/settings"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        <Route
+          path="/caregiver/settings/account"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        <Route
+          path="/caregiver/settings/job-reception"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        <Route
+          path="/caregiver/settings/notifications"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        <Route
+          path="/caregiver/settings/language"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        <Route
+          path="/caregiver/settings/billing"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        {/* Caregiver availability */}
+        <Route
+          path="/caregiver/availability"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverSettings />
+            </RoleRoute>
+          }
+        />
+
+        {/* Caregiver edit profile */}
+        <Route
+          path="/caregiver/edit-profile"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverEditProfile />
+            </RoleRoute>
+          }
+        />
+        
+        {/* KYC routes — only for caregiver (role 2) */}
+        <Route
+          element={
+            <RoleRoute requiredRole={2}>
+              <KycProvider>
+                <Outlet />
+              </KycProvider>
+            </RoleRoute>
+          }
+        >
+          <Route path="/kyc" element={<KYC />} />
+          <Route path="/kyc/success" element={<KycSuccess />} />
+          <Route path="/kyc/status" element={<KycStatus />} />
+          <Route path="/kyc/resubmit" element={<KycResubmit />} />
+        </Route>
+        
+        {/* Admin page — only for admin (role 3) */}
+        <Route
+          path="/admin"
+          element={
+            <RoleRoute requiredRole={3}>
+              <Admin />
+            </RoleRoute>
+          }
+        />
       </Route>
+
+      {/* 404 - Not Found (must be last) */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
