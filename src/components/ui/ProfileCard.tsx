@@ -6,6 +6,7 @@ import { Icon } from './Icon';
 interface ProfileCardProps {
   user?: {
     displayName?: string;
+    fullName?: string;
     email: string;
     phone?: string;
     address?: string;
@@ -55,14 +56,14 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ user, loading, onEditProfile 
       <div className="text-center mb-5 group">
         <Avatar
           src={user.avatarUrl}
-          name={user.displayName || user.email}
+          name={user.fullName || user.displayName || user.email}
           size={76}
           className="mx-auto mb-3 transition-transform duration-200 cursor-pointer group-hover:scale-105"
           showStatus={true}
           gradient="linear-gradient(135deg,#76C893,#3A9A7E)"
         />
         <div className="text-[17px] font-bold text-[#1A1A1A] mb-0.5 group-hover:text-[#52B69A] transition-colors">
-          {user.displayName || 'ผู้ใช้แอป Payung'}
+          {user.fullName || user.displayName || 'ผู้ใช้แอป Payung'}
         </div>
         <div className="text-xs text-[#8A8C8E] mb-3">{user.email}</div>
 

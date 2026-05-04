@@ -4,11 +4,8 @@ import { GET_CAREGIVER_PROFILE } from '../graphql/queries';
 import SearchPage from '../pages/search/SearchPage';
 import UnverifiedCaregiverPage from '../pages/caregiver/UnverifiedCaregiverPage';
 import { useAuth } from '../context/AuthContext';
+import Skeleton from './ui/Skeleton';
 
-/**
- * Wrapper component that determines whether to show SearchPage or UnverifiedCaregiverPage
- * based on caregiver's KYC verification status
- */
 export default function CaregiverSearchWrapper() {
   const { userRole } = useAuth();
   const { data: caregiverData, loading } = useQuery<{ myCaregiverProfile?: { kycStatus: string } } | undefined>(GET_CAREGIVER_PROFILE, {
@@ -16,7 +13,16 @@ export default function CaregiverSearchWrapper() {
   });
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="px-4 py-8 max-w-[1280px] mx-auto space-y-4">
+        <Skeleton height={56} borderRadius="12px" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <Skeleton key={i} height={200} borderRadius="14px" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   // For non-caregivers, show the search page

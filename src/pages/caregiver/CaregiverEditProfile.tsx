@@ -11,7 +11,16 @@ import Skeleton from '../../components/ui/Skeleton';
 import { Toast } from '../../components/ui/Toast';
 import type { ToastType } from '../../components/ui/Toast';
 import ProfileFormFields from '../../components/ui/ProfileFormFields';
+import ThaiAddressSelector from '../../components/ui/ThaiAddressSelector';
 import AlertModal from '../../components/ui/AlertModal';
+
+function formatPhone(val?: string | null): string {
+  if (!val) return '';
+  const digits = val.replace(/\D/g, '').slice(0, 10);
+  if (digits.length > 6) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  if (digits.length > 3) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return digits;
+}
 
 // Zod Schema สำหรับ validation
 const CaregiverProfileSchema = z.object({
@@ -19,14 +28,26 @@ const CaregiverProfileSchema = z.object({
   hourlyRate: z.number().positive('ค่าชั่วโมงต้องเป็นจำนวนบวก').optional().nullable(),
   skills: z.array(z.string()).optional().nullable(),
   experienceYears: z.number().min(0, 'ประสบการณ์ต้องเป็นจำนวนไม่ติดลบ').optional().nullable(),
-  phone: z.string().regex(/^\d{10}$/, 'เบอร์โทรศัพท์ต้องเป็น 10 หลัก').optional().nullable(),
+  phone: z
+    .string()
+    .refine(
+      (val) => !val || /^\d{3}-\d{3}-\d{4}$/.test(val),
+      'เบอร์โทรศัพท์ไม่ถูกต้อง (เช่น 081-234-5678)',
+    )
+    .optional()
+    .nullable(),
   address: z.string().max(500, 'ที่อยู่ต้องไม่เกิน 500 ตัวอักษร').optional().nullable(),
+  province: z.string().optional().nullable(),
+  amphoe: z.string().optional().nullable(),
+  district: z.string().optional().nullable(),
+  postalCode: z.string().optional().nullable(),
 });
 
 type CaregiverProfileFormData = z.infer<typeof CaregiverProfileSchema>;
 
 interface CaregiverData {
   id: string;
+  caregiverNumber?: string;
   fullName?: string;
   citizenId?: string;
   phone?: string;
@@ -112,6 +133,7 @@ const CaregiverEditProfile: React.FC = () => {
     watch,
     formState: { errors },
     setValue,
+    reset,
   } = useForm<CaregiverProfileFormData>({
     resolver: zodResolver(CaregiverProfileSchema),
     mode: 'onChange',
@@ -120,12 +142,33 @@ const CaregiverEditProfile: React.FC = () => {
       hourlyRate: caregiver?.hourlyRate || 0,
       skills: caregiver?.skills || [],
       experienceYears: caregiver?.experienceYears || 0,
-      phone: caregiver?.phone || '',
+      phone: formatPhone(caregiver?.phone),
       address: caregiver?.address || '',
+      province: '',
+      amphoe: '',
+      district: '',
+      postalCode: '',
     },
   });
 
   const watchedValues = watch();
+
+  // Populate all form fields when caregiver data loads
+  useEffect(() => {
+    if (!caregiver) return;
+    reset({
+      bio: caregiver.bio || '',
+      hourlyRate: caregiver.hourlyRate || 0,
+      skills: caregiver.skills || [],
+      experienceYears: caregiver.experienceYears || 0,
+      phone: formatPhone(caregiver.phone),
+      address: caregiver.address || '',
+      province: '',
+      amphoe: '',
+      district: '',
+      postalCode: '',
+    });
+  }, [caregiver?.id]);
 
   // Track dirty state
   useEffect(() => {
@@ -133,7 +176,7 @@ const CaregiverEditProfile: React.FC = () => {
       watchedValues.bio !== (caregiver?.bio || '') ||
       watchedValues.hourlyRate !== (caregiver?.hourlyRate || 0) ||
       watchedValues.experienceYears !== (caregiver?.experienceYears || 0) ||
-      watchedValues.phone !== (caregiver?.phone || '') ||
+      watchedValues.phone !== formatPhone(caregiver?.phone) ||
       watchedValues.address !== (caregiver?.address || '') ||
       JSON.stringify(watchedValues.skills) !== JSON.stringify(caregiver?.skills || []);
 
@@ -149,8 +192,9 @@ const CaregiverEditProfile: React.FC = () => {
       if (data.bio) input.bio = data.bio;
       if (data.hourlyRate && data.hourlyRate > 0) input.hourlyRate = data.hourlyRate;
       if (data.experienceYears !== undefined && data.experienceYears !== null) input.experienceYears = data.experienceYears;
-      if (data.phone) input.phone = data.phone;
-      if (data.address) input.address = data.address;
+      if (data.phone) input.phone = data.phone.replace(/-/g, '');
+      const addressParts = [data.address, data.district, data.amphoe, data.province, data.postalCode].filter(Boolean);
+      if (addressParts.length > 0) input.address = addressParts.join(' ');
       if (data.skills && data.skills.length > 0) input.skills = data.skills;
 
       const result = await updateCaregiverProfile({
@@ -193,7 +237,7 @@ const CaregiverEditProfile: React.FC = () => {
           <Skeleton width="200px" height="32px" />
         </div>
         <div className="flex-1 flex overflow-hidden px-8 py-7">
-          <div className="flex-1 max-w-[500px] space-y-6">
+          <div className="flex-1 max-w-[700px] space-y-6">
             <Skeleton width="100%" height="200px" />
             <Skeleton width="100%" height="300px" />
           </div>
@@ -256,7 +300,7 @@ const CaregiverEditProfile: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* ═══ Center Edit Form ═══ */}
         <div className="flex-1 overflow-y-auto bg-[#F6FAF9] px-8 py-7 flex justify-center">
-          <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-[500px] space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-[700px] space-y-6">
             {/* Personal Info Card - Read Only */}
             <div className="bg-white rounded-xl border border-[rgba(0,0,0,0.1)] p-6">
               <h3 className="text-[16px] font-semibold text-[#0A0A0A] mb-1">ข้อมูลส่วนตัว</h3>
@@ -264,7 +308,7 @@ const CaregiverEditProfile: React.FC = () => {
 
               <div className="space-y-6">
                 <ProfileFormFields
-                  caregiverId={caregiver?.id}
+                  caregiverId={caregiver?.caregiverNumber}
                   fullName={caregiver?.fullName}
                   citizenId={caregiver?.citizenId}
                   showTooltip={true}
@@ -277,29 +321,37 @@ const CaregiverEditProfile: React.FC = () => {
               <h3 className="text-[16px] font-semibold text-[#0A0A0A] mb-6">ข้อมูลติดต่อ</h3>
 
               <div className="space-y-6">
-                {/* Phone */}
-                <div>
-                  <label htmlFor="phone" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">เบอร์โทรศัพท์</label>
-                  <input
-                    id="phone"
-                    type="tel"
-                    {...register('phone')}
-                    placeholder="081-234-5678"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-white text-[#0A0A0A] focus:outline-none focus:ring-2 focus:ring-[#52B69A]"
-                  />
-                  {errors.phone && <p className="text-[12px] text-red-500 mt-1">{errors.phone.message}</p>}
-                </div>
+                {/* Phone + Email row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Phone */}
+                  <div>
+                    <label htmlFor="phone" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">เบอร์โทรศัพท์</label>
+                    <input
+                      id="phone"
+                      type="tel"
+                      {...(() => { const { onChange: _, ...rest } = register('phone'); return rest; })()}
+                      onChange={(e) => {
+                        const formatted = formatPhone(e.target.value);
+                        setValue('phone', formatted, { shouldValidate: true });
+                      }}
+                      placeholder="081-234-5678"
+                      maxLength={12}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-white text-[#0A0A0A] focus:outline-none focus:ring-2 focus:ring-[#52B69A]"
+                    />
+                    {errors.phone && <p className="text-[12px] text-red-500 mt-1">{errors.phone.message}</p>}
+                  </div>
 
-                {/* Email - Read Only */}
-                <div>
-                  <label htmlFor="email" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">อีเมล</label>
-                  <input
-                    id="email"
-                    type="email"
-                    value={user?.email || ''}
-                    disabled
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[#0A0A0A] cursor-not-allowed"
-                  />
+                  {/* Email - Read Only */}
+                  <div>
+                    <label htmlFor="email" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">อีเมล</label>
+                    <input
+                      id="email"
+                      type="email"
+                      value={user?.email || ''}
+                      disabled
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[#0A0A0A] cursor-not-allowed"
+                    />
+                  </div>
                 </div>
 
                 {/* Address */}
@@ -313,6 +365,30 @@ const CaregiverEditProfile: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-white text-[#0A0A0A] resize-none focus:outline-none focus:ring-2 focus:ring-[#52B69A]"
                   />
                   {errors.address && <p className="text-[12px] text-red-500 mt-1">{errors.address.message}</p>}
+                </div>
+
+                {/* Province / Amphoe / District cascading dropdowns */}
+                <ThaiAddressSelector
+                  provinceValue={watch('province') ?? ''}
+                  amphoeValue={watch('amphoe') ?? ''}
+                  districtValue={watch('district') ?? ''}
+                  onProvinceChange={(v) => setValue('province', v, { shouldValidate: true })}
+                  onAmphoeChange={(v) => setValue('amphoe', v, { shouldValidate: true })}
+                  onDistrictChange={(v) => setValue('district', v, { shouldValidate: true })}
+                  onZipcodeChange={(v) => setValue('postalCode', v)}
+                />
+
+                {/* Postal Code (auto-filled) */}
+                <div>
+                  <label htmlFor="postalCode" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">รหัสไปรษณีย์</label>
+                  <input
+                    id="postalCode"
+                    type="text"
+                    value={watch('postalCode') ?? ''}
+                    readOnly
+                    placeholder="กรอกอัตโนมัติเมื่อเลือกตำบล"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[#0A0A0A] cursor-not-allowed"
+                  />
                 </div>
               </div>
             </div>
@@ -340,36 +416,39 @@ const CaregiverEditProfile: React.FC = () => {
               <h3 className="text-[14px] font-semibold text-[#0A0A0A] mb-6">ข้อมูลวิชาชีพ</h3>
 
               <div className="space-y-6">
-                {/* Experience Years */}
-                <div>
-                  <label htmlFor="experienceYears" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ประสบการณ์ทำงาน (ปี)</label>
-                  <input
-                    id="experienceYears"
-                    type="number"
-                    {...register('experienceYears', { valueAsNumber: true })}
-                    placeholder="0"
-                    min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-white text-[#0A0A0A] focus:outline-none focus:ring-2 focus:ring-[#52B69A]"
-                  />
-                  {errors.experienceYears && (
-                    <p className="text-[12px] text-red-500 mt-1">{errors.experienceYears.message}</p>
-                  )}
-                </div>
+                {/* Experience Years + Hourly Rate row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Experience Years */}
+                  <div>
+                    <label htmlFor="experienceYears" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ประสบการณ์ทำงาน (ปี)</label>
+                    <input
+                      id="experienceYears"
+                      type="number"
+                      {...register('experienceYears', { valueAsNumber: true })}
+                      placeholder="0"
+                      min="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-white text-[#0A0A0A] focus:outline-none focus:ring-2 focus:ring-[#52B69A]"
+                    />
+                    {errors.experienceYears && (
+                      <p className="text-[12px] text-red-500 mt-1">{errors.experienceYears.message}</p>
+                    )}
+                  </div>
 
-                {/* Hourly Rate */}
-                <div>
-                  <label htmlFor="hourlyRate" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ค่าชั่วโมง (บาท)</label>
-                  <input
-                    id="hourlyRate"
-                    type="number"
-                    {...register('hourlyRate', { valueAsNumber: true })}
-                    placeholder="0"
-                    min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-white text-[#0A0A0A] focus:outline-none focus:ring-2 focus:ring-[#52B69A]"
-                  />
-                  {errors.hourlyRate && (
-                    <p className="text-[12px] text-red-500 mt-1">{errors.hourlyRate.message}</p>
-                  )}
+                  {/* Hourly Rate */}
+                  <div>
+                    <label htmlFor="hourlyRate" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ค่าชั่วโมง (บาท)</label>
+                    <input
+                      id="hourlyRate"
+                      type="number"
+                      {...register('hourlyRate', { valueAsNumber: true })}
+                      placeholder="0"
+                      min="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-white text-[#0A0A0A] focus:outline-none focus:ring-2 focus:ring-[#52B69A]"
+                    />
+                    {errors.hourlyRate && (
+                      <p className="text-[12px] text-red-500 mt-1">{errors.hourlyRate.message}</p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Skills */}
@@ -491,7 +570,7 @@ const CaregiverEditProfile: React.FC = () => {
                   {/* Info */}
                   <div className="flex-1 pt-6">
                     <div className="flex items-center gap-2 mb-2">
-                      <h2 className="text-[20px] font-semibold text-[#0A0A0A]">{displayName}</h2>
+                      <h2 className="text-[20px] font-semibold text-[#0A0A0A]">{caregiver?.fullName || displayName}</h2>
                       <span className="px-2 py-1 bg-[#00A63E] text-white rounded-lg text-[12px] font-semibold">
                         ✓ ยืนยันตัวตน
                       </span>

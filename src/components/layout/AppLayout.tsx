@@ -28,7 +28,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const currentRole = userData?.me?.role ?? userRole;
 
-  const { data: caregiverData, loading: caregiverLoading, error: caregiverError } = useQuery<{ myCaregiverProfile?: { kycStatus: string } } | undefined>(GET_CAREGIVER_PROFILE, {
+  const { data: caregiverData, loading: caregiverLoading, error: caregiverError } = useQuery<{ myCaregiverProfile?: { kycStatus: string; fullName?: string } } | undefined>(GET_CAREGIVER_PROFILE, {
     skip: currentRole !== 2,
     fetchPolicy: 'cache-first',
     errorPolicy: 'all',
@@ -113,7 +113,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className="min-h-screen bg-[#F6FAF9] flex flex-col" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
       {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
+      <div className="fixed top-0 left-0 right-0 z-50">
         <Header
           navItems={filteredNavItems}
           isLoading={menuLoading}
@@ -122,7 +122,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             currentRole === 2 ? (
               <CaregiverProfileDropdown
                 avatarFallbackColor="#52B69A"
-                displayName={userData?.me?.displayName || ''}
+                displayName={caregiverData?.myCaregiverProfile?.fullName || userData?.me?.displayName || ''}
               />
             ) : (
               <ProfileDropdown

@@ -24,10 +24,10 @@ export default function Header({
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <header className="h-[63px] border-b border-black/10 bg-white px-4 md:px-6 w-full flex items-center sticky top-0 z-40">
-      <div className="flex items-center w-full max-w-[1440px] mx-auto gap-4 md:gap-8">
+    <header className="h-[70px] border-b border-black/10 bg-white px-4 md:px-6 w-full flex items-center sticky top-0 z-40">
+      <div className="flex items-center w-full gap-4 md:gap-8">
         <Link to="/" className="flex items-center flex-shrink-0 hover:opacity-80 transition-opacity">
-          <img src={logoImg} alt="Payung Logo" className="h-[40px] md:h-[60px] w-auto object-contain" />
+          <img src={logoImg} alt="Payung Logo" className="h-[36px] md:h-[44px] w-auto object-contain" />
         </Link>
 
         {/* Desktop Navigation */}

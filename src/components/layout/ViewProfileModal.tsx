@@ -2,6 +2,7 @@ import { useQuery } from '@apollo/client/react';
 import { GET_USER } from '../../graphql/queries';
 import Avatar from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
+import Skeleton from '../ui/Skeleton';
 
 interface ViewProfileModalProps {
   readonly isOpen: boolean;
@@ -42,10 +43,21 @@ export default function ViewProfileModal({
           </button>
         </div>
 
-        {/* Loading State */}
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#52B69A]"></div>
+          <div className="space-y-6">
+            <div className="flex flex-col items-center pb-6 border-b border-gray-200 gap-3">
+              <Skeleton circle width={70} height={70} />
+              <Skeleton width={120} height={16} borderRadius="6px" />
+              <Skeleton width={160} height={12} borderRadius="6px" />
+            </div>
+            <div className="space-y-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="space-y-1.5">
+                  <Skeleton width={80} height={12} borderRadius="4px" />
+                  <Skeleton height={36} borderRadius="8px" />
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <>

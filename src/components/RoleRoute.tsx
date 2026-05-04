@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQuery } from '@apollo/client/react';
 import { GET_USER } from '../graphql/queries';
-import Spinner from './ui/Spinner';
+import PageSkeleton from './ui/PageSkeleton';
 
 interface RoleRouteProps {
   children: ReactNode;
@@ -33,13 +33,8 @@ const RoleRoute: React.FC<RoleRouteProps> = ({ children, requiredRole }) => {
 
   const isLoading = authLoading || (session && queryLoading);
 
-  // กำลังตรวจสอบ auth status หรือ ดึงข้อมูล role
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner size="lg" />
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   // ไม่มี session → redirect ไป login

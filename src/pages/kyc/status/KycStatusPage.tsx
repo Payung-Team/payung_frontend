@@ -4,6 +4,7 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import { GET_KYC_STATUS, DELETE_KYC_DOCUMENT } from '../../../graphql/queries';
 import Icon from '../../../components/ui/Icon';
 import ImageModal from '../../../components/ui/ImageModal';
+import Skeleton from '../../../components/ui/Skeleton';
 import { useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 
@@ -189,10 +190,34 @@ export default function KycStatusPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100vh-64px)] bg-[#F8F9FB] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-[#0F766E] border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-[#64748B] font-medium" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>กำลังโหลดข้อมูล...</p>
+      <div className="min-h-[calc(100vh-64px)] bg-[#F8F9FB] px-4 py-8" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+        <div className="max-w-2xl mx-auto space-y-5">
+          <Skeleton width={80} height={20} borderRadius="6px" />
+          <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+            <div className="flex items-center gap-4">
+              <Skeleton width={64} height={64} circle />
+              <div className="flex-1 space-y-2">
+                <Skeleton width={140} height={20} borderRadius="6px" />
+                <Skeleton width={200} height={14} borderRadius="6px" />
+              </div>
+              <Skeleton width={90} height={28} borderRadius="20px" />
+            </div>
+            <Skeleton height={1} borderRadius="0px" style={{ background: '#F1F5F9' }} />
+            <Skeleton height={14} borderRadius="6px" />
+            <Skeleton width="60%" height={14} borderRadius="6px" />
+          </div>
+          <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+            <Skeleton width={120} height={18} borderRadius="6px" />
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton width={40} height={40} borderRadius="8px" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton height={14} borderRadius="4px" />
+                  <Skeleton width="40%" height={12} borderRadius="4px" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );

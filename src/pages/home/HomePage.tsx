@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { useNavigate, Link } from 'react-router-dom';
-import { GET_USER } from '../../graphql/queries';
+import { GET_USER, GET_CAREGIVER_PROFILE } from '../../graphql/queries';
 import Skeleton from '../../components/ui/Skeleton';
 import Avatar from '../../components/ui/Avatar';
 import ProfileCard from '../../components/ui/ProfileCard';
@@ -24,6 +24,13 @@ interface UserData {
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { data, loading, error } = useQuery<UserData>(GET_USER);
+  const { data: caregiverData, loading: caregiverLoading } = useQuery<{
+    myCaregiverProfile?: { fullName?: string };
+  }>(GET_CAREGIVER_PROFILE, {
+    skip: data?.me?.role !== 2,
+    fetchPolicy: 'cache-first',
+    errorPolicy: 'all',
+  });
   
 
   const [isEditOpen, setIsEditOpen] = React.useState(false);
@@ -57,9 +64,9 @@ const HomePage: React.FC = () => {
         <main className="max-w-[1000px] mx-auto px-6 pt-7 pb-[120px] grid grid-cols-1 md:grid-cols-[300px_1fr] gap-7 items-start">
 
           {/* Profile card */}
-          <ProfileCard 
-            user={data?.me} 
-            loading={loading} 
+          <ProfileCard
+            user={data?.me ? { ...data.me, fullName: caregiverData?.myCaregiverProfile?.fullName } : undefined}
+            loading={loading || caregiverLoading}
             onEditProfile={handleOpenEdit}
           />
 
@@ -67,7 +74,7 @@ const HomePage: React.FC = () => {
           <div className="flex flex-col gap-6">
 
             {/* Greeting banner */}
-            {loading || !data?.me ? (
+            {loading || caregiverLoading || !data?.me ? (
               <Skeleton height={80} borderRadius={24} />
             ) : (
               <div
@@ -76,7 +83,7 @@ const HomePage: React.FC = () => {
               >
                 <div className="absolute -top-8 -right-5 w-40 h-40 rounded-full bg-white/10 pointer-events-none" />
                 <h2 className="text-[22px] font-bold mb-1 relative z-10">
-                  สวัสดีค่ะ คุณ {data.me.displayName || 'ผู้ใช้ Payung'}
+                  สวัสดีค่ะ คุณ {caregiverData?.myCaregiverProfile?.fullName || data.me.displayName || 'ผู้ใช้ Payung'}
                 </h2>
                 <p className="text-sm opacity-80 relative z-10"> {/* TODO: Add appointment count */}
                   เริ่มต้นค้นหาผู้ดูแลที่เหมาะกับคุณ

@@ -91,9 +91,9 @@ const CaregiverHome: React.FC = () => {
         <main className="max-w-[1000px] mx-auto px-6 pt-7 pb-[120px] grid grid-cols-1 md:grid-cols-[300px_1fr] gap-7 items-start">
 
           {/* Profile card */}
-          <ProfileCard 
-            user={data?.me} 
-            loading={loading} 
+          <ProfileCard
+            user={data?.me ? { ...data.me, fullName: caregiverData?.myCaregiverProfile?.fullName } : undefined}
+            loading={loading || caregiverLoading}
             onEditProfile={() => setIsEditOpen(true)}
           />
 
@@ -101,7 +101,7 @@ const CaregiverHome: React.FC = () => {
           <div className="flex flex-col gap-6">
 
             {/* Greeting banner */}
-            {loading || !data?.me ? (
+            {loading || caregiverLoading || !data?.me ? (
               <Skeleton height={80} borderRadius={24} />
             ) : (
               <div
@@ -110,7 +110,7 @@ const CaregiverHome: React.FC = () => {
               >
                 <div className="absolute -top-8 -right-5 w-40 h-40 rounded-full bg-white/10 pointer-events-none" />
                 <h2 className="text-[22px] font-bold mb-1 relative z-10">
-                  สวัสดีค่ะ คุณ {data.me.displayName || 'ผู้ดูแล Payung'}
+                  สวัสดีค่ะ คุณ {caregiverData?.myCaregiverProfile?.fullName || data.me.displayName || 'ผู้ดูแล Payung'}
                 </h2>
                 <p className="text-sm opacity-80 relative z-10">
                   {caregiverData?.myCaregiverProfile?.kycStatus === 'verified' 

@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import ThailandAddressSimple from 'thailand-address-simple';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -17,6 +18,14 @@ import Skeleton from '../../components/ui/Skeleton';
 import { useToast } from '../../hooks/useToast';
 import { ToastContainer } from '../../components/ui/Toast';
 import { supabase } from '../../lib/supabase';
+
+function formatPhone(val?: string | null): string {
+  if (!val) return '-';
+  const d = val.replace(/\D/g, '').slice(0, 10);
+  if (d.length > 6) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+  if (d.length > 3) return `${d.slice(0, 3)}-${d.slice(3)}`;
+  return d || '-';
+}
 
 interface SettingsMenuItemProps {
   icon: string;
@@ -194,6 +203,28 @@ const notificationStateClasses: Record<
   },
 };
 
+const addressDb = new ThailandAddressSimple();
+let addressDbReady = false;
+addressDb.init().then(() => { addressDbReady = true; });
+
+interface ParsedAddress { province: string; amphoe: string; district: string; zipcode: string }
+
+function parseAddressComponents(raw: string): ParsedAddress {
+  const empty = { province: '', amphoe: '', district: '', zipcode: '' };
+  if (!raw || !addressDbReady) return empty;
+  const zipcodeMatch = raw.match(/\b(\d{5})\b/);
+  if (zipcodeMatch) {
+    const candidates = addressDb.searchByZipCode(zipcodeMatch[1]);
+    const best =
+      candidates.find(c => raw.includes(c.province) && raw.includes(c.amphoe) && raw.includes(c.district)) ||
+      candidates.find(c => raw.includes(c.province) && raw.includes(c.amphoe)) ||
+      candidates.find(c => raw.includes(c.province)) ||
+      candidates[0];
+    if (best) return { province: best.province, amphoe: best.amphoe, district: best.district, zipcode: best.zipcode };
+  }
+  return empty;
+}
+
 const CaregiverSettings: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -202,6 +233,7 @@ const CaregiverSettings: React.FC = () => {
     () => resolveSettingsMenu(location.pathname, location.search),
     [location.pathname, location.search],
   );
+  const [parsedAddress, setParsedAddress] = useState<ParsedAddress>({ province: '', amphoe: '', district: '', zipcode: '' });
   const [activeNotificationFilter, setActiveNotificationFilter] =
     useState<NotificationFilter>('all');
   const [jobReceptionChecklist, setJobReceptionChecklist] = useState<
@@ -345,6 +377,20 @@ const CaregiverSettings: React.FC = () => {
       ? 'ผู้ดูแลจะเห็นโปรไฟล์ของคุณและสามารถจองได้'
       : 'โปรไฟล์จะไม่ปรากฏในการค้นหา เปิดเมื่อพร้อม'
     : 'พร้อมใช้งานหลังยืนยันตัวตน';
+
+  useEffect(() => {
+    const rawAddress = caregiver?.address || user?.address || '';
+    if (!rawAddress) return;
+    const tryParse = () => {
+      const result = parseAddressComponents(rawAddress);
+      if (result.province) {
+        setParsedAddress(result);
+      } else if (!addressDbReady) {
+        setTimeout(tryParse, 300);
+      }
+    };
+    tryParse();
+  }, [caregiver?.address, user?.address]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -595,7 +641,7 @@ const CaregiverSettings: React.FC = () => {
 
       {/* ═══ Main Content ═══ */}
       <div className="flex-1 overflow-y-auto bg-[#F6F8F9]">
-          <div className="max-w-[1100px] mx-auto px-4 md:px-8 py-4 md:py-7">
+          <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-4 md:py-7">
             {activeMenu === 'account' && (
               <div className="space-y-6">
                 {/* Profile Card Section */}
@@ -620,7 +666,7 @@ const CaregiverSettings: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="text-[20px] font-medium text-[#0A0A0A]">
-                            {displayName}
+                            {caregiver?.fullName || displayName}
                           </h3>
                           <span className="px-3 py-1 bg-[#00A63E] text-white rounded-lg text-[12px] font-semibold">
                             ✓ ยืนยันตัวตน
@@ -755,7 +801,7 @@ const CaregiverSettings: React.FC = () => {
                           <input
                             id="phone"
                             type="tel"
-                            value={caregiver?.phone || user?.phone || '-'}
+                            value={formatPhone(caregiver?.phone || user?.phone)}
                             readOnly
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[#0A0A0A]"
                           />
@@ -784,24 +830,24 @@ const CaregiverSettings: React.FC = () => {
                         />
                       </div>
 
-                      {/* Province, District, Postal */}
+                      {/* Province, Amphoe, Postal */}
                       <div className="grid grid-cols-3 gap-6">
                         <div>
                           <label htmlFor="province" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">จังหวัด</label>
                           <input
                             id="province"
                             type="text"
-                            value="-ยังไม่ได้เลือก-"
+                            value={parsedAddress.province || '-ยังไม่ได้เลือก-'}
                             readOnly
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
                           />
                         </div>
                         <div>
-                          <label htmlFor="district" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">เขต/อำเภอ</label>
+                          <label htmlFor="amphoe" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">เขต/อำเภอ</label>
                           <input
-                            id="district"
+                            id="amphoe"
                             type="text"
-                            value="-ยังไม่ได้เลือก-"
+                            value={parsedAddress.amphoe || '-ยังไม่ได้เลือก-'}
                             readOnly
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
                           />
@@ -811,7 +857,7 @@ const CaregiverSettings: React.FC = () => {
                           <input
                             id="postal"
                             type="text"
-                            placeholder="-ยังไม่ได้เลือก-"
+                            value={parsedAddress.zipcode || '-ยังไม่ได้เลือก-'}
                             readOnly
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
                           />
