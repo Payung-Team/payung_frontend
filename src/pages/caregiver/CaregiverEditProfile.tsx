@@ -577,12 +577,6 @@ const CaregiverEditProfile: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2 text-[14px] text-[#717182]">
                       <span>{watchedValues.experienceYears || 0}+ ปีประสบการณ์</span>
-                      {watchedValues.phone && (
-                        <>
-                          <span>•</span>
-                          <span>{watchedValues.phone}</span>
-                        </>
-                      )}
                     </div>
                   </div>
                 </div>
