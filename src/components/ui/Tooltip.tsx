@@ -1,47 +1,68 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface TooltipProps {
   content: string;
   children: React.ReactNode;
-  position?: 'top' | 'bottom' | 'left' | 'right';
+  delay?: number;
+  position?: 'top' | 'bottom';
 }
 
-const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'bottom' }) => {
-  const [isVisible, setIsVisible] = useState(false);
+const Tooltip: React.FC<TooltipProps> = ({ content, children, delay = 500, position = 'top' }) => {
+  const [visible, setVisible] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
-  const positionClasses = {
-    top: 'bottom-full mb-2',
-    bottom: 'top-full mt-2',
-    left: 'right-full mr-2',
-    right: 'left-full ml-2',
+  const show = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setVisible(true), delay);
   };
 
-  const arrowClasses = {
-    top: 'top-full left-1/2 -translate-x-1/2 border-t-gray-900 border-r-transparent border-b-transparent border-l-transparent',
-    bottom: 'bottom-full left-1/2 -translate-x-1/2 border-b-gray-900 border-r-transparent border-t-transparent border-l-transparent',
-    left: 'left-full top-1/2 -translate-y-1/2 border-l-gray-900 border-r-transparent border-t-transparent border-b-transparent',
-    right: 'right-full top-1/2 -translate-y-1/2 border-r-gray-900 border-l-transparent border-t-transparent border-b-transparent',
+  const hide = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setVisible(false);
   };
+
+  // Check viewport after tooltip mounts
+  useEffect(() => {
+    if (!visible || !tooltipRef.current) return;
+    const rect = tooltipRef.current.getBoundingClientRect();
+    setAlignRight(rect.right > window.innerWidth - 8);
+  }, [visible]);
+
+  const isTop = position === 'top';
 
   return (
-    <div className="relative inline-flex items-center">
+    <div
+      ref={wrapperRef}
+      className="relative inline-flex items-center"
+      onMouseEnter={show}
+      onMouseLeave={hide}
+    >
       <button
         type="button"
         className="cursor-help inline-flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#52B69A] rounded"
-        onMouseEnter={() => setIsVisible(true)}
-        onMouseLeave={() => setIsVisible(false)}
         aria-label="ข้อมูลเพิ่มเติม"
       >
         {children}
       </button>
 
-      {isVisible && (
+      {visible && (
         <div
-          className={`absolute z-50 px-3 py-2 bg-gray-900 text-white text-[12px] rounded-lg whitespace-nowrap pointer-events-none ${positionClasses[position]}`}
+          ref={tooltipRef}
+          role="tooltip"
+          className={`absolute z-[999] pointer-events-none ${alignRight ? 'right-0' : 'left-0'} ${isTop ? 'bottom-full mb-2' : 'top-full mt-2'}`}
         >
-          {content}
+          <div className="bg-gray-900 text-white text-[12px] leading-relaxed rounded-lg px-3 py-2 max-w-[220px] whitespace-normal shadow-lg">
+            {content}
+          </div>
           <div
-            className={`absolute w-0 h-0 border-4 ${arrowClasses[position]}`}
+            className={`absolute w-0 h-0 border-[5px] border-transparent ${alignRight ? 'right-3' : 'left-3'}`}
+            style={isTop
+              ? { top: '100%', borderTopColor: '#111827' }
+              : { bottom: '100%', borderBottomColor: '#111827' }
+            }
           />
         </div>
       )}
