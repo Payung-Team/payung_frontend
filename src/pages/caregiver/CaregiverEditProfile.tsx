@@ -188,8 +188,8 @@ const CaregiverEditProfile: React.FC = () => {
     try {
       const input: any = {};
       
-      // Only include fields that have values
-      if (data.bio) input.bio = data.bio;
+      // bio is optional — send even if empty to allow clearing
+      if (data.bio !== undefined && data.bio !== null) input.bio = data.bio;
       if (data.hourlyRate && data.hourlyRate > 0) input.hourlyRate = data.hourlyRate;
       if (data.experienceYears !== undefined && data.experienceYears !== null) input.experienceYears = data.experienceYears;
       if (data.phone) input.phone = data.phone.replace(/-/g, '');
@@ -550,84 +550,70 @@ const CaregiverEditProfile: React.FC = () => {
         </div>
 
         {/* ═══ Right Profile Preview ═══ */}
-        <div className="w-[500px] overflow-y-auto">
+        <div className="w-[500px] overflow-y-auto border-l border-gray-200">
           <div className="p-6">
-            <h3 className="text-[20px] font-medium text-[#717182] mb-6">ตัวอย่างหน้าโปรไฟล์</h3>
+            {/* Preview Header */}
+            <div className="flex items-center gap-2 mb-6">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#52B69A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <h3 className="text-[14px] font-semibold text-[#52B69A] uppercase tracking-wide">ตัวอย่างหน้าโปรไฟล์</h3>
+              <span className="ml-auto text-[11px] bg-[#52B69A]/10 text-[#52B69A] px-2 py-0.5 rounded-full font-medium">Preview</span>
+            </div>
 
-            {/* Profile Card */}
-            <div className="bg-white rounded-xl border border-[rgba(0,0,0,0.1)] overflow-hidden">
-              {/* Profile Header */}
-              <div className="bg-[#52B69A] h-[120px]"></div>
+            {/* Profile Card — framed in dashed green border */}
+            <div className="rounded-2xl border-2 border-dashed border-[#52B69A]/40 p-2">
+              <div className="bg-white rounded-xl border border-[rgba(0,0,0,0.1)] overflow-hidden">
+                {/* Profile Header */}
+                <div className="bg-[#52B69A] h-[120px]"></div>
 
-              {/* Profile Content */}
-              <div className="p-6">
-                <div className="flex items-start gap-6 mb-6">
-                  {/* Avatar */}
-                  <div className="relative -mt-16">
-                    <Avatar name={displayName} size={128} fallbackColor="#52B69A" />
+                {/* Profile Content */}
+                <div className="p-6">
+                  <div className="flex items-start gap-6 mb-6">
+                    <div className="relative -mt-16">
+                      <Avatar name={caregiver?.fullName || displayName} size={128} fallbackColor="#52B69A" />
+                    </div>
+                    <div className="flex-1 pt-6">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h2 className="text-[20px] font-semibold text-[#0A0A0A]">{caregiver?.fullName || displayName}</h2>
+                        <span className="px-2 py-1 bg-[#00A63E] text-white rounded-lg text-[12px] font-semibold">✓ ยืนยันตัวตน</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[14px] text-[#717182]">
+                        <span>{watchedValues.experienceYears || 0}+ ปีประสบการณ์</span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Info */}
-                  <div className="flex-1 pt-6">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h2 className="text-[20px] font-semibold text-[#0A0A0A]">{caregiver?.fullName || displayName}</h2>
-                      <span className="px-2 py-1 bg-[#00A63E] text-white rounded-lg text-[12px] font-semibold">
-                        ✓ ยืนยันตัวตน
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[14px] text-[#717182]">
-                      <span>{watchedValues.experienceYears || 0}+ ปีประสบการณ์</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* About Section */}
-                {watchedValues.bio ? (
                   <div className="mb-6">
                     <h4 className="text-[18px] font-semibold text-[#52B69A] mb-2">เกี่ยวกับฉัน</h4>
-                    <p className="text-[14px] text-[rgba(0,0,0,0.5)]">{watchedValues.bio}</p>
+                    <p className="text-[14px] text-[rgba(0,0,0,0.5)]">{watchedValues.bio || <span className="text-[#BDBDBD]">ยังไม่มีแนะนำตัว</span>}</p>
                   </div>
-                ) : (
-                  <div className="mb-6">
-                    <h4 className="text-[18px] font-semibold text-[#52B69A] mb-2">เกี่ยวกับฉัน</h4>
-                    <p className="text-[14px] text-[#BDBDBD]">ยังไม่มีแนะนำตัว</p>
-                  </div>
-                )}
 
-                {watchedValues.hourlyRate ? (
                   <div className="mb-6 p-3 bg-[#F3F3F5] rounded-lg">
                     <p className="text-[14px] font-semibold text-[#0A0A0A]">
                       ค่าชั่วโมง:{' '}
-                      <span className="text-[#52B69A]">
-                        {new Intl.NumberFormat('th-TH').format(watchedValues.hourlyRate)} บาท
-                      </span>
+                      {watchedValues.hourlyRate
+                        ? <span className="text-[#52B69A]">{new Intl.NumberFormat('th-TH').format(watchedValues.hourlyRate)} บาท</span>
+                        : <span className="text-[#BDBDBD]">ยังไม่ได้กำหนด</span>}
                     </p>
                   </div>
-                ) : (
-                  <div className="mb-6 p-3 bg-[#F3F3F5] rounded-lg">
-                    <p className="text-[14px] font-semibold text-[#0A0A0A]">
-                      ค่าชั่วโมง: <span className="text-[#BDBDBD]">ยังไม่ได้กำหนด</span>
-                    </p>
-                  </div>
-                )}
 
-                {/* Skills Section */}
-                <div className="mb-6">
-                  <h4 className="text-[18px] font-semibold text-[#52B69A] mb-3 flex items-center gap-2">
-                    <Icon name="star" size="small" color="currentColor" />
-                    ทักษะความสามารถ
-                  </h4>
-                  {watchedValues.skills && watchedValues.skills.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {watchedValues.skills.map((skill) => (
-                        <span key={skill} className="px-3 py-1 bg-[#ECEEF2] text-[#030213] rounded-lg text-[12px] font-semibold">
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-[14px] text-[#BDBDBD]">ยังไม่มีทักษะ</p>
-                  )}
+                  <div>
+                    <h4 className="text-[18px] font-semibold text-[#52B69A] mb-3 flex items-center gap-2">
+                      <Icon name="star" size="small" color="currentColor" />
+                      ทักษะความสามารถ
+                    </h4>
+                    {watchedValues.skills && watchedValues.skills.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {watchedValues.skills.map((skill) => (
+                          <span key={skill} className="px-3 py-1 bg-[#ECEEF2] text-[#030213] rounded-lg text-[12px] font-semibold">{skill}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[14px] text-[#BDBDBD]">ยังไม่มีทักษะ</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
