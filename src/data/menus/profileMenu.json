@@ -1,0 +1,69 @@
+{
+  "menuId": "profile_menu",
+  "menuTitle": "Profile Management",
+  "description": "User profile related actions and navigation",
+  "navigation": [
+    {
+      "id": "profile_overview",
+      "type": "navigation",
+      "label": "Overview",
+      "icon": "eye-outline",
+      "route": "/profile",
+      "allowedRoles": ["patient", "caregiver", "admin"]
+    },
+    {
+      "id": "profile_bookings",
+      "type": "navigation",
+      "label": "My Bookings",
+      "icon": "calendar-outline",
+      "route": "/profile/bookings",
+      "allowedRoles": ["patient"]
+    },
+    {
+      "id": "profile_messages",
+      "type": "navigation",
+      "label": "Messages",
+      "icon": "chatbubble-outline",
+      "route": "/profile/messages",
+      "allowedRoles": ["patient", "caregiver"]
+    },
+    {
+      "id": "profile_reviews",
+      "type": "navigation",
+      "label": "Reviews",
+      "icon": "star-outline",
+      "route": "/profile/reviews",
+      "allowedRoles": ["caregiver"]
+    }
+  ],
+  "sidebarExtras": [
+    {
+      "id": "profile_edit",
+      "type": "action",
+      "label": "Edit Profile",
+      "icon": "pencil-outline",
+      "action": "handleEditProfile",
+      "allowedRoles": ["patient", "caregiver", "admin"]
+    },
+    {
+      "id": "profile_delete",
+      "type": "action",
+      "label": "Delete Account",
+      "icon": "trash-outline",
+      "action": "handleDeleteAccount",
+      "variant": "danger",
+      "confirmRequired": true,
+      "confirmMessage": "Are you sure? This action cannot be undone.",
+      "allowedRoles": ["patient", "caregiver"]
+    },
+    {
+      "id": "profile_verify",
+      "type": "action",
+      "label": "Verify Account",
+      "icon": "checkmark-circle-outline",
+      "action": "handleVerifyAccount",
+      "variant": "primary",
+      "allowedRoles": ["caregiver"]
+    }
+  ]
+}
