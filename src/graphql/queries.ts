@@ -201,6 +201,68 @@ export const GET_KYC_DOCUMENTS = gql`
   }
 `;
 
+export const ADMIN_KYC_LIST = gql`
+  query AdminKycList(
+    $status: KycStatusFilter
+    $search: String
+    $page: Int
+    $limit: Int
+    $countSearch: String
+  ) {
+    list: adminKycList(input: {
+      status: $status
+      search: $search
+      page: $page
+      limit: $limit
+    }) {
+      items {
+        id
+        caregiverNumber
+        fullName
+        email
+        kycStatus
+        submittedAt
+        documentCount
+      }
+      total
+      page
+      totalPages
+    }
+    allCount: adminKycList(input: {
+      status: all
+      search: $countSearch
+      page: 1
+      limit: 1
+    }) {
+      total
+    }
+    pendingCount: adminKycList(input: {
+      status: pending
+      search: $countSearch
+      page: 1
+      limit: 1
+    }) {
+      total
+    }
+    verifiedCount: adminKycList(input: {
+      status: verified
+      search: $countSearch
+      page: 1
+      limit: 1
+    }) {
+      total
+    }
+    rejectedCount: adminKycList(input: {
+      status: rejected
+      search: $countSearch
+      page: 1
+      limit: 1
+    }) {
+      total
+    }
+  }
+`;
+
 export const RESUBMIT_KYC = gql`
   mutation ResubmitKyc($input: KycInput!) {
     resubmitKyc(input: $input) {

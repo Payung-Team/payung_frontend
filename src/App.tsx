@@ -9,6 +9,7 @@ import KycSuccess from './pages/kyc/status/SuccessSubmit';
 import KycStatus from './pages/kyc/status/KycStatusPage';
 import KycResubmit from './pages/kyc/status/KycResubmitPage';
 import Admin from './pages/admin/Admin';
+import KycReviewListPage from './pages/admin/KycReviewListPage';
 import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
 import CaregiverHome from './pages/caregiver/CaregiverHome';
@@ -170,7 +171,8 @@ function App() {
           <Route path="/kyc/resubmit" element={<KycResubmit />} />
         </Route>
         
-        {/* Admin page — only for admin (role 3) */}
+      </Route>
+      {/* Admin page — only for admin (role 3) */}
         <Route
           path="/admin"
           element={
@@ -179,7 +181,14 @@ function App() {
             </RoleRoute>
           }
         />
-      </Route>
+        <Route
+          path="/admin/kyc"
+          element={
+            <RoleRoute requiredRole={3}>
+              <KycReviewListPage />
+            </RoleRoute>
+          }
+        />
 
       {/* 404 - Not Found (must be last) */}
       <Route path="*" element={<NotFound />} />
