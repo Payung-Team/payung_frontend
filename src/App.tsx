@@ -10,6 +10,7 @@ import KycStatus from './pages/kyc/status/KycStatusPage';
 import KycResubmit from './pages/kyc/status/KycResubmitPage';
 import Admin from './pages/admin/Admin';
 import KycReviewListPage from './pages/admin/KycReviewListPage';
+import KycReviewDetailPage from './pages/admin/KycReviewDetailPage';
 import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
 import CaregiverHome from './pages/caregiver/CaregiverHome';
@@ -186,6 +187,14 @@ function App() {
           element={
             <RoleRoute requiredRole={3}>
               <KycReviewListPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/admin/kyc/:caregiverId"
+          element={
+            <RoleRoute requiredRole={3}>
+              <KycReviewDetailPage />
             </RoleRoute>
           }
         />

@@ -3,9 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AuthLayout from '../../components/layout/AuthLayout';
 import AuthInput from '../../components/ui/AuthInput';
 import Alert from '../../components/ui/AlertInvalid';
-import SuccessModal from '../../components/ui/SuccessModal';
 import { useRegister } from '../../hooks/useRegister';
-import { useAuth } from '../../context/AuthContext';
 import { Icon } from '../../components/ui/Icon';
 
 // Icons
@@ -172,23 +170,11 @@ export default function Register() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [errorCount, setErrorCount] = useState(0);
 
   const navigate = useNavigate();
 
   const { registerUser } = useRegister();
-  const { user, loading } = useAuth();
-
-  // Redirect after registration: caregiver → /kyc, patient → /
-  useEffect(() => {
-    if (showSuccessModal) {
-      const timer = setTimeout(() => {
-        navigate(selectedRole === 'caregiver' ? '/kyc' : '/');
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [showSuccessModal, navigate, selectedRole]);
 
   const validate = useCallback((): FormErrors => {
     const errs: FormErrors = {};
@@ -239,8 +225,8 @@ export default function Register() {
         setErrorCount(prev => prev + 1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
-        // Success -> show modal
-        setShowSuccessModal(true);
+        // Success -> redirect immediately
+        navigate(selectedRole === 'caregiver' ? '/kyc' : '/');
       }
     } else {
       setErrorCount(prev => prev + 1);
@@ -370,10 +356,6 @@ export default function Register() {
           <span className="cursor-pointer underline hover:text-[#8A8C8E]">นโยบายความเป็นส่วนตัว</span>
         </p>
       </form>
-      <SuccessModal
-        isOpen={showSuccessModal}
-        onClose={() => navigate(selectedRole === 'caregiver' ? '/kyc' : '/')}
-      />
     </AuthLayout>
   );
 }

@@ -263,6 +263,87 @@ export const ADMIN_KYC_LIST = gql`
   }
 `;
 
+export const ADMIN_KYC_DETAIL = gql`
+  query AdminKycDetail($caregiverId: ID!) {
+    adminKycDetail(caregiverId: $caregiverId) {
+      caregiver {
+        id
+        userId
+        caregiverNumber
+        fullName
+        email
+        idCardNumber
+        gender
+        dateOfBirth
+        address
+        phone
+        skills
+        experienceYears
+        hourlyRate
+        bio
+        kycStatus
+        kycSubmittedAt
+        kycVerifiedAt
+        resubmitCount
+        createdAt
+        updatedAt
+      }
+      documents {
+        id
+        docType
+        fileName
+        fileUrl
+        fileSize
+        mimeType
+        signedUrl
+        uploadedAt
+      }
+      resubmitCount
+      reviews {
+        id
+        action
+        reason
+        reviewedBy
+        reviewedAt
+      }
+    }
+  }
+`;
+
+export const ADMIN_USER_DETAIL = gql`
+  query AdminUserDetail($userId: ID!) {
+    adminUserDetail(userId: $userId) {
+      user {
+        id
+        email
+        displayName
+        phone
+      }
+    }
+  }
+`;
+
+export const APPROVE_KYC = gql`
+  mutation ApproveKyc($caregiverId: ID!) {
+    approveKyc(caregiverId: $caregiverId) {
+      id
+      kycStatus
+      kycVerifiedAt
+      updatedAt
+    }
+  }
+`;
+
+export const REJECT_KYC = gql`
+  mutation RejectKyc($caregiverId: ID!, $reasons: [RejectionReasonItem!]!) {
+    rejectKyc(input: { caregiverId: $caregiverId, reasons: $reasons }) {
+      id
+      kycStatus
+      updatedAt
+    }
+  }
+`;
+
 export const RESUBMIT_KYC = gql`
   mutation ResubmitKyc($input: KycInput!) {
     resubmitKyc(input: $input) {
