@@ -12,6 +12,7 @@ export function convertNumericRole(roleNum: number | null): UserRoleType | null 
     1: 'patient',
     2: 'caregiver',
     3: 'admin',
+    4: 'super_admin',
   };
   return roleNum ? roleMap[roleNum] : null;
 }
@@ -20,6 +21,9 @@ export function convertNumericRole(roleNum: number | null): UserRoleType | null 
  * Check if user has permission to view a menu item
  */
 export function hasMenuPermission(userRole: UserRoleType, allowedRoles: UserRoleType[]): boolean {
+  if (userRole === 'super_admin') {
+    return allowedRoles.includes('super_admin') || allowedRoles.includes('admin');
+  }
   return allowedRoles.includes(userRole);
 }
 
