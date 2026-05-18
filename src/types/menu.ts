@@ -2,7 +2,7 @@
  * Type definitions for dynamic menu system
  */
 
-export type UserRoleType = 'patient' | 'caregiver' | 'admin';
+export type UserRoleType = 'patient' | 'caregiver' | 'admin' | 'super_admin';
 export type MenuItemVariant = 'primary' | 'secondary' | 'danger' | 'default';
 export type MenuItemType = 'navigation' | 'action' | 'divider';
 
