@@ -1,6 +1,7 @@
 import React, { type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getPostLoginRedirect } from '../utils/getRedirectPath';
 import Skeleton from './ui/Skeleton';
 
 interface GuestRouteProps {
@@ -8,7 +9,7 @@ interface GuestRouteProps {
 }
 
 const GuestRoute: React.FC<GuestRouteProps> = ({ children }) => {
-  const { session, loading } = useAuth();
+  const { session, loading, userRole, mustChangePassword } = useAuth();
 
   if (loading) {
     return (
@@ -25,7 +26,9 @@ const GuestRoute: React.FC<GuestRouteProps> = ({ children }) => {
   }
 
   if (session) {
-    return <Navigate to="/" replace />;
+    const role = userRole ?? Number(localStorage.getItem('userRole') || 1);
+    const mustChange = mustChangePassword ?? (localStorage.getItem('mustChangePassword') === 'true');
+    return <Navigate to={getPostLoginRedirect({ role, mustChangePassword: mustChange })} replace />;
   }
 
   return <>{children}</>;
