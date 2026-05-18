@@ -8,6 +8,7 @@ import { LOGIN_USER } from '../../graphql/queries';
 import { supabase } from '../../lib/supabase';
 import { Icon } from '../../components/ui/Icon';
 import { useAuth } from '../../context/AuthContext';
+import { getPostLoginRedirect } from '../../utils/getRedirectPath';
 
 // Icons
 const EmailIcon = <Icon name="email" size="small" color="currentColor" />;
@@ -27,24 +28,34 @@ export default function Login() {
   const [formError, setFormError] = useState('');
   const [errorCount, setErrorCount] = useState(0);
   const navigate = useNavigate();
-  const { setUserRole } = useAuth();
+  const { setUserRole, setMustChangePassword } = useAuth();
 
   const [loginMutation, { loading: isSubmitting }] = useMutation(LOGIN_USER, {
     onCompleted: async (data) => {
-      // Set Supabase session with tokens from backend
+      const loginUser = data?.login?.user;
+
+      // ตรวจสอบบัญชีถูกระงับก่อน set session
+      if (loginUser?.isActive === false) {
+        setFormError('บัญชีของคุณถูกระงับ กรุณาติดต่อผู้ดูแลระบบ');
+        setErrorCount(prev => prev + 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
       if (data?.login?.accessToken && data?.login?.refreshToken) {
         await supabase.auth.setSession({
           access_token: data.login.accessToken,
           refresh_token: data.login.refreshToken,
         });
       }
-      
-      if (data?.login?.user?.role) {
-        setUserRole(data.login.user.role);
-      }
-      
-      // Redirect to home
-      navigate('/');
+
+      const role = loginUser?.role ?? 1;
+      const mustChangePassword = loginUser?.mustChangePassword ?? false;
+
+      setUserRole(role);
+      setMustChangePassword(mustChangePassword);
+
+      navigate(getPostLoginRedirect({ role, mustChangePassword }));
     },
     onError: (error) => {
       console.error('Login mutation error details:', error);

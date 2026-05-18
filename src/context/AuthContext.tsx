@@ -7,13 +7,15 @@ import type { User, Session, SignUpWithPasswordCredentials, SignInWithPasswordCr
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  userRole: number | null; // 1 = patient, 2 = caregiver, 3 = admin
+  userRole: number | null; // 1 = patient, 2 = caregiver, 3 = admin, 4 = super_admin
+  mustChangePassword: boolean | null;
   loading: boolean;
   error: AuthError | Error | null;
   login: (credentials: SignInWithPasswordCredentials) => Promise<{ data: any; error: any }>;
   register: (credentials: SignUpWithPasswordCredentials) => Promise<{ data: any; error: any }>;
   logout: () => Promise<{ error: any }>;
-  setUserRole: (role: number) => void; // สำหรับ set role เมื่อ login/register สำเร็จ
+  setUserRole: (role: number) => void;
+  setMustChangePassword: (value: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<number | null>(null);
+  const [mustChangePassword, setMustChangePasswordState] = useState<boolean | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<AuthError | Error | null>(null);
   const initialized = useRef(false);
@@ -29,10 +32,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // useEffect เพื่อเช็คสถานะการล็อกอิน
   useEffect(() => {
-    // ลองอ่าน role จาก localStorage ขณะ loading
+    // ลองอ่าน role และ mustChangePassword จาก localStorage ขณะ loading
     const savedUserRole = localStorage.getItem('userRole');
     if (savedUserRole) {
       setUserRole(parseInt(savedUserRole, 10));
+    }
+    const savedMustChangePassword = localStorage.getItem('mustChangePassword');
+    if (savedMustChangePassword !== null) {
+      setMustChangePasswordState(savedMustChangePassword === 'true');
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -40,10 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        // ถ้าไม่มี session ให้ลบ role
+        // ถ้าไม่มี session ให้ลบ role และ mustChangePassword
         if (!currentSession) {
           setUserRole(null);
+          setMustChangePasswordState(null);
           localStorage.removeItem('userRole');
+          localStorage.removeItem('mustChangePassword');
         }
 
         if (!initialized.current) {
@@ -97,7 +106,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setSession(null);
         setUserRole(null);
+        setMustChangePasswordState(null);
         localStorage.removeItem('userRole');
+        localStorage.removeItem('mustChangePassword');
         
         // ล้าง Apollo cache หากมี client
         try {
@@ -120,8 +131,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('userRole', role.toString());
   };
 
+  const handleSetMustChangePassword = (value: boolean) => {
+    setMustChangePasswordState(value);
+    localStorage.setItem('mustChangePassword', value.toString());
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, userRole, loading, error, login, register, logout, setUserRole: handleSetUserRole }}>
+    <AuthContext.Provider value={{ user, session, userRole, mustChangePassword, loading, error, login, register, logout, setUserRole: handleSetUserRole, setMustChangePassword: handleSetMustChangePassword }}>
       {children}
     </AuthContext.Provider>
   );

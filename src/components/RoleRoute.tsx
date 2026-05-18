@@ -7,13 +7,14 @@ import PageSkeleton from './ui/PageSkeleton';
 
 interface RoleRouteProps {
   children: ReactNode;
-  requiredRole: number; // 1 = patient, 2 = caregiver, 3 = admin
+  requiredRole: number | number[]; // 1 = patient, 2 = caregiver, 3 = admin, 4 = super_admin
 }
 
 const ROLE_NAMES: Record<number, string> = {
   1: 'patient',
   2: 'caregiver',
   3: 'admin',
+  4: 'super_admin',
 };
 
 /**
@@ -50,10 +51,12 @@ const RoleRoute: React.FC<RoleRouteProps> = ({ children, requiredRole }) => {
     return <Navigate to="/" replace />;
   }
 
+  const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+
   // ตรวจสอบ role ว่าตรงกับ requiredRole หรือไม่
-  if (currentRole !== requiredRole) {
+  if (!allowedRoles.includes(currentRole)) {
     console.warn(
-      `User role mismatch: expected ${ROLE_NAMES[requiredRole]} (${requiredRole}), got ${ROLE_NAMES[currentRole] || 'unknown'} (${currentRole})`
+      `User role mismatch: expected [${allowedRoles.map(r => ROLE_NAMES[r] || r).join(', ')}], got ${ROLE_NAMES[currentRole] || 'unknown'} (${currentRole})`
     );
     return <Navigate to="/" replace />;
   }

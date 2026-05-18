@@ -12,7 +12,18 @@ export const LOGIN_USER = gql`
         id
         email
         role
+        isActive
+        mustChangePassword
       }
+    }
+  }
+`;
+
+export const COMPLETE_PASSWORD_CHANGE = gql`
+  mutation CompletePasswordChange {
+    completePasswordChange {
+      id
+      mustChangePassword
     }
   }
 `;

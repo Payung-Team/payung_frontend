@@ -20,6 +20,8 @@ import BookingsPage from './pages/profile/BookingsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
 import GuestRoute from './components/GuestRoute';
+import MustChangePasswordGuard from './components/MustChangePasswordGuard';
+import ChangePasswordPage from './pages/auth/ChangePasswordPage';
 import MessagePage from './pages/profile/MessagePage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 
@@ -30,13 +32,18 @@ function App() {
       <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
       <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
 
-      {/* Protected pages — wrapped in ProtectedRoute and AppLayout */}
+      {/* Change password — session required แต่ไม่ผ่าน MustChangePasswordGuard */}
+      <Route path="/change-password" element={<ProtectedRoute><ChangePasswordPage /></ProtectedRoute>} />
+
+      {/* Protected pages — wrapped in ProtectedRoute, MustChangePasswordGuard and AppLayout */}
       <Route
         element={
           <ProtectedRoute>
-            <AppLayout>
-              <Outlet />
-            </AppLayout>
+            <MustChangePasswordGuard>
+              <AppLayout>
+                <Outlet />
+              </AppLayout>
+            </MustChangePasswordGuard>
           </ProtectedRoute>
         }
       >
@@ -173,29 +180,35 @@ function App() {
         </Route>
         
       </Route>
-      {/* Admin page — only for admin (role 3) */}
+      {/* Admin pages — for admin (role 3) and super_admin (role 4) */}
         <Route
           path="/admin"
           element={
-            <RoleRoute requiredRole={3}>
-              <Admin />
-            </RoleRoute>
+            <MustChangePasswordGuard>
+              <RoleRoute requiredRole={[3, 4]}>
+                <Admin />
+              </RoleRoute>
+            </MustChangePasswordGuard>
           }
         />
         <Route
           path="/admin/kyc"
           element={
-            <RoleRoute requiredRole={3}>
-              <KycReviewListPage />
-            </RoleRoute>
+            <MustChangePasswordGuard>
+              <RoleRoute requiredRole={[3, 4]}>
+                <KycReviewListPage />
+              </RoleRoute>
+            </MustChangePasswordGuard>
           }
         />
         <Route
           path="/admin/kyc/:caregiverId"
           element={
-            <RoleRoute requiredRole={3}>
-              <KycReviewDetailPage />
-            </RoleRoute>
+            <MustChangePasswordGuard>
+              <RoleRoute requiredRole={[3, 4]}>
+                <KycReviewDetailPage />
+              </RoleRoute>
+            </MustChangePasswordGuard>
           }
         />
 
