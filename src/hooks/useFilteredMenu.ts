@@ -3,7 +3,7 @@
  * Automatically converts menu items to NavItems for Navigation component
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { loadMenuTemplate } from '../lib/menuLoader';
 import { filterMenuTemplate } from '../lib/menuUtils';
 import { menuItemsToNavItems } from '../lib/menuAdapter';
@@ -53,28 +53,32 @@ export function useFilteredMenu(
   }, [menuName]);
 
   // Filter menu when template or userRole changes
-  let filteredMenu: FilteredMenu | null = null;
-  let navItems: NavItem[] = [];
+  const { navItems, filteredMenu, filterError } = useMemo(() => {
+    let filteredMenu: FilteredMenu | null = null;
+    let navItems: NavItem[] = [];
+    let filterError: string | null = null;
 
-  if (!isLoading && template && userRole !== null) {
-    try {
-      const stringRole = convertNumericRole(userRole);
-      if (stringRole) {
-        filteredMenu = filterMenuTemplate(template, stringRole);
-        navItems = menuItemsToNavItems(filteredMenu.navigation);
-      } else {
-        setError(`Invalid user role: ${userRole}`);
+    if (!isLoading && template && userRole !== null) {
+      try {
+        const stringRole = convertNumericRole(userRole);
+        if (stringRole) {
+          filteredMenu = filterMenuTemplate(template, stringRole);
+          navItems = menuItemsToNavItems(filteredMenu.navigation);
+        } else {
+          filterError = `Invalid user role: ${userRole}`;
+        }
+      } catch (err) {
+        filterError = err instanceof Error ? err.message : 'Failed to filter menu';
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to filter menu';
-      setError(errorMessage);
     }
-  }
+
+    return { navItems, filteredMenu, filterError };
+  }, [isLoading, template, userRole]);
 
   return {
     navItems,
     filteredMenu,
     isLoading,
-    error,
+    error: error || filterError,
   };
 }
