@@ -420,3 +420,51 @@ export const UPDATE_EMAIL_PREFERENCE = gql`
     }
   }
 `;
+
+export const ADMIN_DASHBOARD = gql`
+  query AdminDashboard {
+    adminDashboard {
+      summary {
+        totalUsers
+        totalCaregivers
+        pendingKyc
+        verifiedKyc
+        rejectedKyc
+      }
+      weeklySubmissions {
+        week
+        count
+        approved
+      }
+      avgReviewTimeHours
+      recentActivity {
+        type
+        caregiverName
+        action
+        timestamp
+      }
+    }
+  }
+`;
+
+export const ADMIN_PENDING_COUNT = gql`
+  query AdminPendingCount {
+    pendingCount: adminKycList(input: { status: pending, page: 1, limit: 1 }) {
+      total
+    }
+  }
+`;
+
+export const ADMIN_PENDING_QUEUE = gql`
+  query AdminPendingQueue {
+    list: adminKycList(input: { status: pending, page: 1, limit: 5 }) {
+      items {
+        id
+        fullName
+        kycStatus
+        submittedAt
+      }
+      total
+    }
+  }
+`;

@@ -11,6 +11,7 @@ import KycResubmit from './pages/kyc/status/KycResubmitPage';
 import Admin from './pages/admin/Admin';
 import KycReviewListPage from './pages/admin/KycReviewListPage';
 import KycReviewDetailPage from './pages/admin/KycReviewDetailPage';
+import AdminLayout from './components/layout/AdminLayout';
 import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
 import CaregiverHome from './pages/caregiver/CaregiverHome';
@@ -181,36 +182,19 @@ function App() {
         
       </Route>
       {/* Admin pages — for admin (role 3) and super_admin (role 4) */}
-        <Route
-          path="/admin"
-          element={
-            <MustChangePasswordGuard>
-              <RoleRoute requiredRole={[3, 4]}>
-                <Admin />
-              </RoleRoute>
-            </MustChangePasswordGuard>
-          }
-        />
-        <Route
-          path="/admin/kyc"
-          element={
-            <MustChangePasswordGuard>
-              <RoleRoute requiredRole={[3, 4]}>
-                <KycReviewListPage />
-              </RoleRoute>
-            </MustChangePasswordGuard>
-          }
-        />
-        <Route
-          path="/admin/kyc/:caregiverId"
-          element={
-            <MustChangePasswordGuard>
-              <RoleRoute requiredRole={[3, 4]}>
-                <KycReviewDetailPage />
-              </RoleRoute>
-            </MustChangePasswordGuard>
-          }
-        />
+      <Route
+        element={
+          <MustChangePasswordGuard>
+            <RoleRoute requiredRole={[3, 4]}>
+              <AdminLayout />
+            </RoleRoute>
+          </MustChangePasswordGuard>
+        }
+      >
+        <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/kyc" element={<KycReviewListPage />} />
+        <Route path="/admin/kyc/:caregiverId" element={<KycReviewDetailPage />} />
+      </Route>
 
       {/* 404 - Not Found (must be last) */}
       <Route path="*" element={<NotFound />} />

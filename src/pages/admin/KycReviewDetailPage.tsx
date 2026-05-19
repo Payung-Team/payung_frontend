@@ -628,19 +628,8 @@ export default function KycReviewDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] text-gray-900" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-      <header className="border-b border-[#E5E7EB] bg-white px-4 py-3 md:ml-16 md:px-8">
-        <div className="flex h-10 items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold leading-6 text-[#064E3B]" style={{ fontFamily: "'Inter', sans-serif" }}>
-              ตรวจสอบเอกสาร KYC
-            </h1>
-            <p className="mt-0.5 text-xs leading-[15px] text-[#6B7280]">ตรวจสอบและจัดการเอกสาร KYC ของผู้ดูแล</p>
-          </div>
-        </div>
-      </header>
-
-      <main className="md:ml-16">
+    <div className="bg-[#F9FAFB] text-gray-900" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+      <main>
         <section className="mx-auto max-w-[1312px] px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">

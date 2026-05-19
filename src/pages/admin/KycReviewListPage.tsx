@@ -245,16 +245,7 @@ export default function KycReviewListPage() {
   );
 
   return (
-    <div className="min-h-[calc(100vh-70px)] bg-[#F9FAFB] text-gray-900">
-      <section className="border-b border-gray-200 bg-white px-4 py-4 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-[1312px] items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-[#064E3B]">ตรวจสอบเอกสาร KYC</h1>
-            <p className="mt-1 text-xs text-gray-500">ตรวจสอบและจัดการเอกสาร KYC ของผู้ดูแล</p>
-          </div>
-        </div>
-      </section>
-
+    <div className="bg-[#F9FAFB] text-gray-900">
       <section className="mx-auto max-w-[1312px] px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-3 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <FilterTabs
