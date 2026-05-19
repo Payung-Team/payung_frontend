@@ -68,13 +68,13 @@ function App() {
         />
 
         {/* Admin home */}
-        <Route 
-          path="/admin-home" 
+        <Route
+          path="/admin-home"
           element={
-            <RoleRoute requiredRole={3}>
+            <RoleRoute requiredRole={[3, 4]}>
               <PayungHome />
             </RoleRoute>
-          } 
+          }
         />
 
         {/* Home - show based on role */}

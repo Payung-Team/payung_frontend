@@ -24,7 +24,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<number | null>(null);
-  const [mustChangePassword, setMustChangePasswordState] = useState<boolean | null>(null);
+  const [mustChangePassword, setMustChangePasswordState] = useState<boolean | null>(() => {
+    const saved = localStorage.getItem('mustChangePassword');
+    return saved !== null ? saved === 'true' : null;
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<AuthError | Error | null>(null);
   const initialized = useRef(false);
@@ -32,14 +35,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // useEffect เพื่อเช็คสถานะการล็อกอิน
   useEffect(() => {
-    // ลองอ่าน role และ mustChangePassword จาก localStorage ขณะ loading
+    // ลองอ่าน role จาก localStorage ขณะ loading
     const savedUserRole = localStorage.getItem('userRole');
     if (savedUserRole) {
       setUserRole(parseInt(savedUserRole, 10));
-    }
-    const savedMustChangePassword = localStorage.getItem('mustChangePassword');
-    if (savedMustChangePassword !== null) {
-      setMustChangePasswordState(savedMustChangePassword === 'true');
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
