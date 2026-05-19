@@ -5,6 +5,7 @@ import { useKyc } from '../../../context/KycContext';
 import { useAuth } from '../../../context/AuthContext';
 import { SUBMIT_KYC, RESUBMIT_KYC } from '../../../graphql/queries';
 import Icon from '../../../components/ui/Icon';
+import Tooltip from '../../../components/ui/Tooltip';
 import { supabase } from '../../../lib/supabase';
 import { useEffect } from 'react';
 
@@ -50,7 +51,7 @@ function KycStepper({ current }: { current: number }) {
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function KycStep3({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
-  const { goToStep, step1Data, uploadedDocs } = useKyc();
+  const { goToStep, step1Data, uploadedDocs, initialStep1Data, initialDocs } = useKyc();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isConsented, setIsConsented] = useState(false);
@@ -88,6 +89,21 @@ export default function KycStep3({ mode = 'create' }: { mode?: 'create' | 'resub
       refreshAll();
     }
   }, [uploadedDocs]);
+
+  const hasDataChanged = () => {
+    if (mode !== 'resubmit') return true;
+    if (!initialStep1Data || !step1Data) return true;
+    
+    if (JSON.stringify(initialStep1Data) !== JSON.stringify(step1Data)) return true;
+    
+    const initialDocIds = initialDocs.map(d => d.docId).sort().join(',');
+    const currentDocIds = uploadedDocs.map(d => d.docId).sort().join(',');
+    if (initialDocIds !== currentDocIds) return true;
+    
+    return false;
+  };
+
+  const isChanged = hasDataChanged();
 
   const handleEditPersonalInfo = () => {
     goToStep(1);
@@ -290,23 +306,39 @@ export default function KycStep3({ mode = 'create' }: { mode?: 'create' | 'resub
           >
             ← ย้อนกลับ
           </button>
-          <button
-            type="button"
-            disabled={(mode !== 'resubmit' && !isConsented) || loading}
-            onClick={handleSubmit}
-            className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-150 flex items-center justify-center gap-2 ${(mode === 'resubmit' || isConsented) && !loading
-                ? 'bg-[#2D6A58] text-white hover:bg-[#255a4a] active:scale-[0.98] cursor-pointer'
-                : 'bg-[#CBD5E1] text-white cursor-not-allowed'
-              }`}
-            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-          >
-            {loading ? (
-              <>
-                <Icon name="refresh" className="animate-spin" color="white" style={{ fontSize: '16px' }} />
-                กำลังส่ง...
-              </>
-            ) : mode === 'resubmit' ? 'ส่งเอกสารอีกครั้ง' : 'ส่งข้อมูล'}
-          </button>
+          
+          {mode === 'resubmit' && !isChanged ? (
+            <Tooltip content="กรุณาแก้ไขข้อมูลอย่างน้อย 1 รายการก่อนส่งข้อมูลอีกครั้ง" position="top">
+              <div className="inline-block">
+                <button
+                  type="button"
+                  disabled={true}
+                  className="px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-150 flex items-center justify-center gap-2 bg-[#CBD5E1] text-white cursor-not-allowed"
+                  style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+                >
+                  ส่งเอกสารอีกครั้ง
+                </button>
+              </div>
+            </Tooltip>
+          ) : (
+            <button
+              type="button"
+              disabled={(mode !== 'resubmit' && !isConsented) || loading}
+              onClick={handleSubmit}
+              className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-150 flex items-center justify-center gap-2 ${(mode === 'resubmit' || isConsented) && !loading
+                  ? 'bg-[#2D6A58] text-white hover:bg-[#255a4a] active:scale-[0.98] cursor-pointer'
+                  : 'bg-[#CBD5E1] text-white cursor-not-allowed'
+                }`}
+              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+            >
+              {loading ? (
+                <>
+                  <Icon name="refresh" className="animate-spin" color="white" style={{ fontSize: '16px' }} />
+                  กำลังส่ง...
+                </>
+              ) : mode === 'resubmit' ? 'ส่งเอกสารอีกครั้ง' : 'ส่งข้อมูล'}
+            </button>
+          )}
         </div>
       </div>
     </div>

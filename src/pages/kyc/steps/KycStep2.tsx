@@ -98,25 +98,14 @@ function UploadIcon() {
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
-  const { goToStep, saveDoc, removeDoc, uploadedDocs } = useKyc();
+  const { goToStep, saveDoc, removeDoc, uploadedDocs, initialDocs } = useKyc();
   const { user } = useAuth();
   
-  // Mock rejected types for resubmit mode as requested
-  const [rejectedTypes] = useState<Set<string>>(new Set(['id_card_front']));
-
   const [docStates, setDocStates] = useState<Record<string, DocState>>(() => {
     const initial: Record<string, DocState> = {};
     DOC_TYPES.forEach((d) => {
       const existing = uploadedDocs.find((u) => u.docType === d.type);
-      const isRejected = mode === 'resubmit' && rejectedTypes.has(d.type);
-
-      if (isRejected && existing) {
-        initial[d.type] = { 
-          status: 'error', 
-          fileName: existing.fileName, 
-          error: 'ภาพไม่ชัดเจน — ถ่ายใหม่ในที่แสงเพียงพอ ไม่มีเงาและไม่เอียง' 
-        };
-      } else if (existing) {
+      if (existing) {
         initial[d.type] = { status: 'success', fileName: existing.fileName };
       } else {
         initial[d.type] = { status: 'idle' };
@@ -160,12 +149,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
     const newStates: Record<string, DocState> = {};
     DOC_TYPES.forEach((d) => {
       const existing = uploadedDocs.find((u) => u.docType === d.type);
-      const isRejected = mode === 'resubmit' && rejectedTypes.has(d.type);
-      
-      // Keep the error state if it's already rejected and not yet deleted
-      if (isRejected && existing && docStates[d.type]?.status === 'error') {
-        newStates[d.type] = docStates[d.type];
-      } else if (existing) {
+      if (existing) {
         newStates[d.type] = { status: 'success', fileName: existing.fileName };
       } else {
         newStates[d.type] = { status: 'idle' };
@@ -348,9 +332,6 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
 
   const canProceed = displayedDocTypes.every((t) => {
     const state = docStates[t.type];
-    if (mode === 'resubmit' && rejectedTypes.has(t.type)) {
-      return state.status === 'success';
-    }
     return t.required ? state.status === 'success' : true;
   });
 
@@ -382,146 +363,55 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
         )}
 
         {/* Document Upload Zones */}
-        <div className={mode === 'resubmit' ? 'flex flex-col gap-[12px] w-full' : 'flex flex-col gap-3 mb-8'}>
+        <div className={mode === 'resubmit' ? 'flex flex-col gap-[12px] w-full mb-8' : 'flex flex-col gap-3 mb-8'}>
           {displayedDocTypes.map((doc) => {
             const state = docStates[doc.type];
             const isSuccess = state.status === 'success';
             const isUploading = state.status === 'uploading';
-            const isError = state.status === 'error'; // This is "Rejected" in resubmit mode
-            const wasRejected = mode === 'resubmit' && rejectedTypes.has(doc.type);
-            const isFixed = wasRejected && isSuccess;
+            const isError = state.status === 'error';
 
-            if (mode === 'resubmit') {
-              return (
-                <div
-                  key={doc.type}
-                  className={`flex flex-col p-[16px_20px] rounded-[12px] w-full min-h-[72px] justify-center transition-all ${
-                    isSuccess
-                      ? 'bg-[#E8F0EB] border-[1.5px] border-[#14502C]'
-                      : isError
-                      ? 'bg-[#F6DFDF] border-[1.5px] border-[#C62828]'
-                      : 'bg-[#F2F7FC] border border-dashed border-[#919497]'
-                  }`}
-                >
-                  <div className="flex items-center gap-[11px] w-full">
-                    {/* Icon Box */}
-                    <div className={`w-[40px] h-[40px] border rounded-[10px] flex items-center justify-center flex-shrink-0 transition-colors  ${
-                      isSuccess ? 'bg-[#FCFDFE] border-[#B5BEC6]' : 'bg-[#FFFFFF] border-[#CBD5E1]'
-                    }`}>
-                      {doc.type === 'id_card_front' ? (
-                        <Icon name="credit_card" color={isSuccess ? '#115E59' : '#485569'} />
-                      ) : doc.type === 'id_card_selfie' ? (
-                        <Icon name="account_circle" color={isSuccess ? '#115E59' : '#485569'} />
-                      ) : (
-                        <Icon name="description" color={isSuccess ? '#115E59' : '#485569'} />
-                      )}
-                    </div>
+            const isEdited = mode === 'resubmit' && (() => {
+              const initial = initialDocs?.find(d => d.docType === doc.type);
+              const current = uploadedDocs.find(d => d.docType === doc.type);
+              return initial?.docId !== current?.docId;
+            })();
 
-                    {/* Info Box */}
-                    <div className="flex-1 flex flex-col gap-[4px]">
-                      <span className="text-[15px] font-semibold text-[#0F172A] leading-[19px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                        {doc.title}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[13px] font-medium leading-[16px] ${isError ? 'text-[#DC2626]' : 'text-[#64748B]'}`} style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                          {isUploading ? 'กำลังอัปโหลด...' : isSuccess ? `${state.fileName}` : isError ? state.error : doc.desc}
-                        </span>
-                      </div>
-                    </div>
+            const containerClass = mode === 'resubmit'
+              ? isEdited
+                ? 'border border-[#10B981] bg-white'
+                : 'border border-transparent bg-gray-200'
+              : isSuccess
+                ? 'border-2 border-[#0F766E] bg-[#E8F0EB]'
+                : isError
+                  ? 'border border-[#951E1E] bg-[#F9EAEA]'
+                  : isUploading
+                    ? 'border border-[#F1F5F9] bg-white'
+                    : 'border border-dashed border-[#CBD5E1] bg-[#F8FAFC] hover:border-[#2D6A58]';
 
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-[8px] flex-shrink-0">
-                      {isError && (
-                        <div className="flex items-center bg-[#FEF2F2] border border-[#DC2626]/10 rounded-full px-[8px] py-[3px] gap-[4px]">
-                          <Icon name="close" color="#DC2626" style={{ fontSize: '10px', fontWeight: 'bold' }} />
-                          <span className="text-[9px] font-bold text-[#DC2626] uppercase tracking-[0.4px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                            เอกสารไม่ผ่าน
-                          </span>
-                        </div>
-                      )}
-
-                      {isSuccess && (
-                        <span className="text-[24px] font-bold text-[#1B6B3A] px-2">✓</span>
-                      )}
-                      
-                      {isSuccess ? (
-                        <div className="flex items-center gap-[8px]">
-                          <button
-                            onClick={() => handlePreview(doc.type, doc.title)}
-                            className="w-[36px] h-[36px] bg-white border border-[#E2E8F0] rounded-[8px] flex items-center justify-center hover:bg-gray-50 transition-colors cursor-pointer"
-                          >
-                            <Icon name="visibility" color="#485569" style={{ fontSize: '18px' }} />
-                          </button>
-                          {/* Only show delete button for newly fixed items or if it's not the initial correct state */}
-                          {isFixed && (
-                            <button
-                              onClick={() => handleDelete(doc.type)}
-                              className="w-[36px] h-[36px] bg-white border border-[#E2E8F0] rounded-[8px] flex items-center justify-center hover:bg-red-50 transition-colors group cursor-pointer"
-                            >
-                              <Icon name="delete" color="#DC2626" style={{ fontSize: '18px' }} />
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-[8px]">
-                          {isError && (
-                            <button
-                              onClick={() => handlePreview(doc.type, doc.title)}
-                              className="w-[36px] h-[36px] bg-white border border-[#E2E8F0] rounded-[8px] flex items-center justify-center hover:bg-gray-50 transition-colors cursor-pointer"
-                            >
-                              <Icon name="visibility" color="#485569" style={{ fontSize: '18px' }} />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => isError ? handleDelete(doc.type) : fileRefs.current[doc.type]?.click()}
-                            className="w-[36px] h-[36px] bg-white border border-[#E2E8F0] rounded-[8px] flex items-center justify-center hover:bg-gray-50 transition-colors cursor-pointer"
-                          >
-                            {isError ? (
-                              <Icon name="delete" color="#DC2626" style={{ fontSize: '18px' }} />
-                            ) : (
-                              <Icon name="file_upload" color="#334055" style={{ fontSize: '18px' }} />
-                            )}
-                          </button>
-                        </div>
-                      )}
-                      <input
-                        type="file"
-                        className="hidden"
-                        ref={el => fileRefs.current[doc.type] = el}
-                        onChange={e => e.target.value && handleFileChange(doc.type, e.target.files![0])}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            }
+            const iconBoxClass = mode === 'resubmit'
+              ? isEdited
+                ? 'bg-[#F0FDF4] border-[#10B981]'
+                : 'bg-[#F3F4F6] border-transparent'
+              : isSuccess 
+                ? 'bg-[#E0F6F1] border-[#0F766E]' 
+                : 'bg-white border-[#CBD5E1]';
+            
+            const checkIconColor = mode === 'resubmit' && isEdited
+              ? '#10B981'
+              : '#2D6A58';
 
             return (
               <div key={doc.type}>
                 <div
-                  className={`flex items-center gap-4 px-5 py-4 rounded-[20px] transition-all ${
-                    isSuccess
-                      ? 'border-2 border-[#0F766E] bg-[#E8F0EB]'
-                      : isError
-                      ? 'border border-[#951E1E] bg-[#F9EAEA]'
-                      : isUploading
-                      ? 'border border-[#F1F5F9] bg-white'
-                      : 'border border-dashed border-[#CBD5E1] bg-[#F8FAFC] hover:border-[#2D6A58]'
-                  }`}
+                  className={`flex items-center gap-4 px-5 py-4 rounded-[20px] transition-all ${containerClass}`}
                   style={{ height: '72px' }}
                 >
                   {/* Doc Icon Box */}
                   <div 
-                    className={`w-10 h-10 flex items-center justify-center flex-shrink-0 rounded-[10px] border transition-colors ${
-                      isSuccess 
-                        ? 'bg-[#E0F6F1] border-[#0F766E]' 
-                        : isError 
-                        ? 'bg-white border-[#CBD5E1]' 
-                        : 'bg-white border-[#CBD5E1]'
-                    }`}
+                    className={`w-10 h-10 flex items-center justify-center flex-shrink-0 rounded-[10px] border transition-colors ${iconBoxClass}`}
                   >
                     {isSuccess ? (
-                      <Icon name="check_circle" color="#2D6A58" style={{ fontSize: '20px' }} />
+                      <Icon name="check_circle" color={checkIconColor} style={{ fontSize: '20px' }} />
                     ) : (
                       doc.icon
                     )}
@@ -531,7 +421,9 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                   <div className="flex-1 min-w-0">
                     <p
                       className={`text-[15px] font-semibold leading-[19px] ${
-                        isError ? 'text-[#C62828]' : 'text-[#0F172A]'
+                        mode === 'resubmit' && !isEdited
+                          ? 'text-[#4B5563]'
+                          : isError ? 'text-[#C62828]' : 'text-[#0F172A]'
                       }`}
                       style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                     >
@@ -539,7 +431,9 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                     </p>
                     <p
                       className={`text-[13px] leading-[16px] truncate ${
-                        isError ? 'text-[#DC2626]' : 'text-[#64748B]'
+                        mode === 'resubmit' && !isEdited
+                          ? 'text-[#6B7280]'
+                          : isError ? 'text-[#DC2626]' : 'text-[#64748B]'
                       }`}
                       style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                     >

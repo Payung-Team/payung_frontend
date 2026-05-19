@@ -7,10 +7,12 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   isCorrect?: boolean;
   isRejected?: boolean;
   rejectedReason?: string;
+  isEdited?: boolean;
+  isResubmitMode?: boolean;
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, className = '', isCorrect, isRejected, rejectedReason, ...props }, ref) => {
+  ({ label, error, className = '', isCorrect, isRejected, rejectedReason, isEdited, isResubmitMode, ...props }, ref) => {
     return (
       <div className="flex flex-col gap-1">
         {label && (
@@ -26,11 +28,15 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                 ? 'bg-[#F0FDF4] border-[#10B981] text-[#064E3B] pr-10 focus:border-[#10B981] focus:ring-0' 
                 : isRejected
                   ? 'bg-[#FEF2F2] border-[#DC2626] text-[#111827] pr-10 focus:border-[#DC2626] focus:ring-0'
-                  : error 
-                    ? 'border-red-500' 
-                    : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58]'
+                  : isResubmitMode
+                    ? isEdited
+                      ? 'bg-white border-[#10B981] text-gray-900 focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]'
+                      : 'bg-gray-200 border-transparent text-[#9CA3AF] focus:border-[#2D6A58]'
+                    : error 
+                      ? 'border-red-500' 
+                      : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58]'
             } ${className}`}
-            disabled={isCorrect || props.disabled}
+            disabled={props.disabled}
             {...props}
           />
           {isCorrect && (

@@ -24,6 +24,8 @@ interface KycContextType {
   step: number; // 0 = intro, 1 = step1, 2 = step2, 3 = step3
   step1Data: KycStep1Data | null;
   uploadedDocs: UploadedDoc[];
+  initialStep1Data: KycStep1Data | null;
+  initialDocs: UploadedDoc[];
   goToStep: (step: number) => void;
   saveStep1: (data: KycStep1Data) => void;
   saveDoc: (doc: UploadedDoc) => void;
@@ -37,6 +39,8 @@ export function KycProvider({ children }: { children: ReactNode }) {
   const [step, setStep] = useState(0);
   const [step1Data, setStep1Data] = useState<KycStep1Data | null>(null);
   const [uploadedDocs, setUploadedDocs] = useState<UploadedDoc[]>([]);
+  const [initialStep1Data, setInitialStep1Data] = useState<KycStep1Data | null>(null);
+  const [initialDocs, setInitialDocs] = useState<UploadedDoc[]>([]);
 
   function saveDoc(doc: UploadedDoc) {
     setUploadedDocs((prev) => {
@@ -52,6 +56,8 @@ export function KycProvider({ children }: { children: ReactNode }) {
   function setInitialData(data: { step1: KycStep1Data; docs: UploadedDoc[] }) {
     setStep1Data(data.step1);
     setUploadedDocs(data.docs);
+    setInitialStep1Data(data.step1);
+    setInitialDocs(data.docs);
   }
 
   return (
@@ -59,6 +65,8 @@ export function KycProvider({ children }: { children: ReactNode }) {
       step,
       step1Data,
       uploadedDocs,
+      initialStep1Data,
+      initialDocs,
       goToStep: setStep,
       saveStep1: setStep1Data,
       saveDoc,

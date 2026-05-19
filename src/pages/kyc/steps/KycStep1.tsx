@@ -134,22 +134,19 @@ function KycStepper({ current }: { current: number }) {
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
-  const { goToStep, step1Data, saveStep1 } = useKyc();
+  const { goToStep, step1Data, saveStep1, initialStep1Data } = useKyc();
   const navigate = useNavigate();
 
-  // Mocked rejected fields for resubmit mode
-  const REJECTED_FIELDS: Record<string, string> = mode === 'resubmit' ? {
-    firstName: 'ชื่อจริงไม่ตรงกับบัตรประชาชน',
-  } : {};
+  const checkEdited = (fieldName: keyof Step1Form) => {
+    if (mode !== 'resubmit' || !initialStep1Data) return false;
+    return JSON.stringify(watch(fieldName)) !== JSON.stringify(initialStep1Data[fieldName]);
+  };
 
-  const getFieldStatus = (fieldName: string) => {
-    if (mode !== 'resubmit') return { isCorrect: false, isRejected: false, reason: '' };
-    const reason = REJECTED_FIELDS[fieldName];
+  const getFieldProps = (fieldName: keyof Step1Form) => {
+    if (mode !== 'resubmit') return {};
     return {
-      isCorrect: !reason,
-      isRejected: !!reason,
-      reason: reason || '',
-      rejectedReason: reason || '',
+      isResubmitMode: true,
+      isEdited: checkEdited(fieldName),
     };
   };
 
@@ -168,37 +165,17 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
         firstName: '',
         lastName: '',
         birthDate: '',
-        gender: '' as any,
+        gender: '' as unknown as string,
         idCardNumber: '',
         phone: '',
         skills: [],
-        experienceYears: undefined as unknown as number,
-        hourlyRate: '' as any,
+        experienceYears: '' as unknown as number,
+        hourlyRate: '' as unknown as number,
         bio: '',
       },
   });
 
-  const currentValues = watch();
-
-  // Check if any rejected field has been changed from initial data
-  const hasModifiedRejectedFields = () => {
-    if (mode !== 'resubmit') return true;
-    const rejectedKeys = Object.keys(REJECTED_FIELDS);
-    if (rejectedKeys.length === 0) return true;
-
-    return rejectedKeys.some(key => {
-      const current = (currentValues as any)[key];
-      const initial = (step1Data as any)?.[key];
-      
-      // Special handle for arrays (skills)
-      if (Array.isArray(current)) {
-        return JSON.stringify(current) !== JSON.stringify(initial);
-      }
-      return current !== initial;
-    });
-  };
-
-  const isNextDisabled = mode === 'resubmit' && !hasModifiedRejectedFields();
+  const isNextDisabled = false;
 
   const birthDate = watch('birthDate');
   const calculateAge = (dateString: string) => {
@@ -266,16 +243,16 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="ชื่อจริง"
-              placeholder="สมชาย"
+              placeholder={mode === 'resubmit' ? initialStep1Data?.firstName : "สมชาย"}
               error={errors.firstName?.message}
-              {...getFieldStatus('firstName')}
+              {...getFieldProps('firstName')}
               {...register('firstName')}
             />
             <Input
               label="นามสกุล"
-              placeholder="ใจดี"
+              placeholder={mode === 'resubmit' ? initialStep1Data?.lastName : "ใจดี"}
               error={errors.lastName?.message}
-              {...getFieldStatus('lastName')}
+              {...getFieldProps('lastName')}
               {...register('lastName')}
             />
           </div>
@@ -284,11 +261,11 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
           <div>
             <Input
               label="เลขบัตรประชาชน 13 หลัก"
-              placeholder="1-2345-67890-12-3"
+              placeholder={mode === 'resubmit' ? initialStep1Data?.idCardNumber : "1-2345-67890-12-3"}
               inputMode="numeric"
               maxLength={13}
               error={errors.idCardNumber?.message}
-              {...getFieldStatus('idCardNumber')}
+              {...getFieldProps('idCardNumber')}
               {...idCardReg}
               onChange={(e) => {
                 e.target.value = e.target.value.replace(/\D/g, '').slice(0, 13);
@@ -310,7 +287,7 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
               }
               type="date"
               error={errors.birthDate?.message}
-              {...getFieldStatus('birthDate')}
+              {...getFieldProps('birthDate')}
               {...register('birthDate')}
             />
 
@@ -319,15 +296,14 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
               <div className="relative flex items-center">
                 <select
                   {...register('gender')}
-                  disabled={getFieldStatus('gender').isCorrect}
-                  className={`w-full px-3 py-2 border rounded-lg outline-none transition-colors text-sm appearance-none ${
-                    getFieldStatus('gender').isCorrect
-                      ? 'bg-[#F0FDF4] border-[#10B981] text-[#064E3B] pr-16'
-                      : getFieldStatus('gender').isRejected
-                        ? 'bg-[#FEF2F2] border-[#DC2626] text-[#111827] pr-10'
-                        : errors.gender
-                          ? 'border-red-500 pr-10'
-                          : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] pr-10'
+                  className={`w-full px-3 py-2 border rounded-lg outline-none transition-colors text-sm appearance-none pr-10 ${
+                    mode === 'resubmit'
+                      ? checkEdited('gender')
+                        ? 'bg-white border-[#10B981] text-gray-900 focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]'
+                        : 'bg-gray-200 border-transparent text-[#9CA3AF] focus:border-[#2D6A58]'
+                      : errors.gender
+                        ? 'border-red-500'
+                        : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58]'
                   }`}
                   style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                 >
@@ -337,29 +313,9 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
                   ))}
                 </select>
                 <div className="absolute right-3 flex items-center gap-1.5 pointer-events-none">
-                  {!getFieldStatus('gender').isCorrect && (
-                    <Icon name="expand_more" color={getFieldStatus('gender').isRejected ? "#DC2626" : "#717182"} style={{ fontSize: '20px' }} />
-                  )}
-                  {getFieldStatus('gender').isCorrect && (
-                    <div className="flex items-center gap-1.5">
-                      <Icon name="expand_more" color="#10B981" style={{ fontSize: '20px' }} />
-                      <div className="flex items-center justify-center w-5 h-5 bg-[#10B981] rounded-full">
-                        <Icon name="check" color="white" style={{ fontSize: '14px' }} />
-                      </div>
-                    </div>
-                  )}
+                  <Icon name="expand_more" color="#717182" style={{ fontSize: '20px' }} />
                 </div>
-                {getFieldStatus('gender').isRejected && (
-                  <div className="absolute right-9 flex items-center justify-center w-5 h-5 border-[1.5px] border-[#DC2626] rounded-full text-[#DC2626] font-bold text-[12px] leading-none">
-                    !
-                  </div>
-                )}
               </div>
-              {getFieldStatus('gender').isRejected && getFieldStatus('gender').reason && (
-                <span className="text-[11px] text-[#DC2626] font-normal mt-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                  {getFieldStatus('gender').reason}
-                </span>
-              )}
               {errors.gender && (
                 <span className="text-sm text-red-500" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>{errors.gender.message}</span>
               )}
@@ -369,11 +325,11 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
           {/* เบอร์โทร — ตัวเลขและขีด */}
           <Input
             label="เบอร์โทรศัพท์"
-            placeholder="+66 81-234-5678"
+            placeholder={mode === 'resubmit' ? initialStep1Data?.phone : "+66 81-234-5678"}
             inputMode="tel"
             maxLength={12}
             error={errors.phone?.message}
-            {...getFieldStatus('phone')}
+            {...getFieldProps('phone')}
             {...phoneReg}
             onChange={(e) => {
               e.target.value = e.target.value.replace(/[^0-9-]/g, '').slice(0, 12);
@@ -388,9 +344,9 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
               label="ประสบการณ์ (ปี)"
               type="text"
               inputMode="numeric"
-              placeholder="0"
+              placeholder={mode === 'resubmit' ? String(initialStep1Data?.experienceYears || 0) : "0"}
               error={errors.experienceYears?.message}
-              {...getFieldStatus('experienceYears')}
+              {...getFieldProps('experienceYears')}
               {...expReg}
               onChange={(e) => {
                 e.target.value = e.target.value.replace(/\D/g, '');
@@ -404,15 +360,14 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
               <div className="relative flex items-center">
                 <select
                   {...register('hourlyRate')}
-                  disabled={getFieldStatus('hourlyRate').isCorrect}
-                  className={`w-full px-3 py-2 border rounded-lg outline-none transition-colors text-sm appearance-none ${
-                    getFieldStatus('hourlyRate').isCorrect
-                      ? 'bg-[#F0FDF4] border-[#10B981] text-[#064E3B] pr-16'
-                      : getFieldStatus('hourlyRate').isRejected
-                        ? 'bg-[#FEF2F2] border-[#DC2626] text-[#111827] pr-10'
-                        : errors.hourlyRate
-                          ? 'border-red-500 pr-10'
-                          : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] pr-10'
+                  className={`w-full px-3 py-2 border rounded-lg outline-none transition-colors text-sm appearance-none pr-10 ${
+                    mode === 'resubmit'
+                      ? checkEdited('hourlyRate')
+                        ? 'bg-white border-[#10B981] text-gray-900 focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]'
+                        : 'bg-gray-200 border-transparent text-[#9CA3AF] focus:border-[#2D6A58]'
+                      : errors.hourlyRate
+                        ? 'border-red-500'
+                        : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58]'
                   }`}
                   style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                 >
@@ -422,29 +377,9 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
                   ))}
                 </select>
                 <div className="absolute right-3 flex items-center gap-1.5 pointer-events-none">
-                  {!getFieldStatus('hourlyRate').isCorrect && (
-                    <Icon name="expand_more" color={getFieldStatus('hourlyRate').isRejected ? "#DC2626" : "#717182"} style={{ fontSize: '20px' }} />
-                  )}
-                  {getFieldStatus('hourlyRate').isCorrect && (
-                    <div className="flex items-center gap-1.5">
-                      <Icon name="expand_more" color="#10B981" style={{ fontSize: '20px' }} />
-                      <div className="flex items-center justify-center w-5 h-5 bg-[#10B981] rounded-full">
-                        <Icon name="check" color="white" style={{ fontSize: '14px' }} />
-                      </div>
-                    </div>
-                  )}
+                  <Icon name="expand_more" color="#717182" style={{ fontSize: '20px' }} />
                 </div>
-                {getFieldStatus('hourlyRate').isRejected && (
-                  <div className="absolute right-9 flex items-center justify-center w-5 h-5 border-[1.5px] border-[#DC2626] rounded-full text-[#DC2626] font-bold text-[12px] leading-none">
-                    !
-                  </div>
-                )}
               </div>
-              {getFieldStatus('hourlyRate').isRejected && getFieldStatus('hourlyRate').reason && (
-                <span className="text-[11px] text-[#DC2626] font-normal mt-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                  {getFieldStatus('hourlyRate').reason}
-                </span>
-              )}
               {errors.hourlyRate && (
                 <span className="text-sm text-red-500" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>{errors.hourlyRate.message}</span>
               )}
@@ -461,21 +396,20 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
             <div className="flex flex-wrap gap-2">
               {SKILL_OPTIONS.map((skill) => {
                 const selected = selectedSkills.includes(skill.value);
-                const { isCorrect, isRejected } = getFieldStatus('skills');
                 return (
                   <button
                     key={skill.value}
                     type="button"
-                    disabled={isCorrect}
                     onClick={() => toggleSkill(skill.value)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${isCorrect
-                      ? selected
-                        ? 'bg-[#F0FDF4] text-[#064E3B] border-[#10B981] opacity-80 cursor-default'
-                        : 'hidden'
-                      : isRejected
-                        ? selected
-                          ? 'bg-[#FEF2F2] text-[#DC2626] border-[#DC2626]'
-                          : 'bg-white text-[#0A0A0A] border-[#E2E8F0]'
+                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                      mode === 'resubmit'
+                        ? checkEdited('skills')
+                          ? selected
+                            ? 'bg-[#10B981] text-white border-[#10B981]'
+                            : 'bg-white text-[#0A0A0A] border-[#E2E8F0] hover:border-[#10B981] hover:text-[#10B981]'
+                          : selected
+                            ? 'bg-gray-200 text-[#9CA3AF] border-transparent'
+                            : 'bg-white text-[#0A0A0A] border-[#E2E8F0]'
                         : selected
                           ? 'bg-[#2D6A58] text-white border-[#2D6A58]'
                           : 'bg-white text-[#0A0A0A] border-[#E2E8F0] hover:border-[#2D6A58] hover:text-[#2D6A58]'
@@ -487,11 +421,6 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
                 );
               })}
             </div>
-            {getFieldStatus('skills').isRejected && (
-              <span className="text-[11px] text-[#DC2626] font-normal mt-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                {getFieldStatus('skills').reason}
-              </span>
-            )}
             {errors.skills && (
               <span className="text-sm text-red-500" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
                 {errors.skills.message}
@@ -510,37 +439,23 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
                 </div>
               </div>
               
-              {getFieldStatus('bio').isCorrect ? (
-                <div className="relative flex items-center">
-                  <textarea
-                    rows={4}
-                    disabled
-                    value={watch('bio') || '-'}
-                    className="w-full px-3 py-2 border rounded-lg bg-[#F0FDF4] border-[#10B981] text-[#064E3B] text-sm pr-10 resize-none"
-                    style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-                  />
-                  <div className="absolute right-3 top-3 flex items-center justify-center w-5 h-5 bg-[#10B981] rounded-full">
-                    <svg width="12" height="10" viewBox="0 0 10 8" fill="none">
-                      <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                </div>
-              ) : (
+              <div className="relative flex items-center">
                 <textarea
                   rows={4}
-                  placeholder="เล่าสั้นๆ เกี่ยวกับประสบการณ์และความเชี่ยวชาญของคุณ..."
-                  className={`px-3 py-2 border rounded-lg outline-none resize-none transition-colors text-sm ${
-                    errors.bio ? 'border-red-500' : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58]'
+                  placeholder={mode === 'resubmit' && initialStep1Data?.bio ? initialStep1Data.bio : "เล่าสั้นๆ เกี่ยวกับประสบการณ์และความเชี่ยวชาญของคุณ..."}
+                  className={`w-full px-3 py-2 border rounded-lg outline-none resize-none transition-colors text-sm ${
+                    mode === 'resubmit'
+                      ? checkEdited('bio')
+                        ? 'bg-white border-[#10B981] text-gray-900 focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]'
+                        : 'bg-gray-200 border-transparent text-[#9CA3AF] focus:border-[#2D6A58]'
+                      : errors.bio 
+                        ? 'border-red-500' 
+                        : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58]'
                   }`}
                   style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                   {...register('bio')}
                 />
-              )}
-              {getFieldStatus('bio').isRejected && (
-                <span className="text-[11px] text-[#DC2626] font-normal mt-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                  {getFieldStatus('bio').reason}
-                </span>
-              )}
+              </div>
               {errors.bio && (
                 <span className="text-sm text-red-500">{errors.bio.message}</span>
               )}
