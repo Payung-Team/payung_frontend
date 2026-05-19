@@ -184,11 +184,13 @@ function App() {
       {/* Admin pages — for admin (role 3) and super_admin (role 4) */}
       <Route
         element={
-          <MustChangePasswordGuard>
-            <RoleRoute requiredRole={[3, 4]}>
-              <AdminLayout />
-            </RoleRoute>
-          </MustChangePasswordGuard>
+          <ProtectedRoute>
+            <MustChangePasswordGuard>
+              <RoleRoute requiredRole={[3, 4]}>
+                <AdminLayout />
+              </RoleRoute>
+            </MustChangePasswordGuard>
+          </ProtectedRoute>
         }
       >
         <Route path="/admin" element={<Admin />} />

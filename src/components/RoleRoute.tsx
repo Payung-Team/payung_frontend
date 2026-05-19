@@ -17,6 +17,13 @@ const ROLE_NAMES: Record<number, string> = {
   4: 'super_admin',
 };
 
+const ROLE_HOME: Record<number, string> = {
+  1: '/patient-home',
+  2: '/caregiver-home',
+  3: '/admin',
+  4: '/admin',
+};
+
 /**
  * RoleRoute — ป้องกันการเข้า route ตาม role ของ user
  * 
@@ -28,7 +35,7 @@ const ROLE_NAMES: Record<number, string> = {
  */
 const RoleRoute: React.FC<RoleRouteProps> = ({ children, requiredRole }) => {
   const { session, loading: authLoading, userRole } = useAuth();
-  const { data: userData, loading: queryLoading } = useQuery(GET_USER, {
+  const { data: userData, loading: queryLoading, error: queryError } = useQuery(GET_USER, {
     skip: !session, // ไม่โหลดถ้ายังไม่มี session
   });
 
@@ -43,7 +50,14 @@ const RoleRoute: React.FC<RoleRouteProps> = ({ children, requiredRole }) => {
     return <Navigate to="/login" replace />;
   }
 
-  const currentRole = userData?.me?.role || Number(userRole);
+  // Query errored — don't fall back to localStorage to prevent tampered-role bypass
+  if (queryError) {
+    console.warn('Failed to fetch user role, denying access:', queryError.message);
+    return <Navigate to="/" replace />;
+  }
+
+  // GraphQL role is authoritative; localStorage is only a fallback for initial render
+  const currentRole = userData?.me?.role || (userRole ? Number(userRole) : null);
 
   // ถ้าไม่มี userRole ก็ redirect ไป /
   if (!currentRole) {
@@ -55,10 +69,11 @@ const RoleRoute: React.FC<RoleRouteProps> = ({ children, requiredRole }) => {
 
   // ตรวจสอบ role ว่าตรงกับ requiredRole หรือไม่
   if (!allowedRoles.includes(currentRole)) {
+    const redirectTo = ROLE_HOME[currentRole] ?? '/';
     console.warn(
-      `User role mismatch: expected [${allowedRoles.map(r => ROLE_NAMES[r] || r).join(', ')}], got ${ROLE_NAMES[currentRole] || 'unknown'} (${currentRole})`
+      `User role mismatch: expected [${allowedRoles.map(r => ROLE_NAMES[r] || r).join(', ')}], got ${ROLE_NAMES[currentRole] || 'unknown'} (${currentRole}) — redirecting to ${redirectTo}`
     );
-    return <Navigate to="/" replace />;
+    return <Navigate to={redirectTo} replace />;
   }
 
   // role ตรงกัน → render children
