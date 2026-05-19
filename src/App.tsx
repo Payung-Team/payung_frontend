@@ -1,4 +1,7 @@
-import { Routes, Route, Outlet } from 'react-router-dom';
+import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
+import { getPostLoginRedirect } from './utils/getRedirectPath';
+import PageSkeleton from './components/ui/PageSkeleton';
 import AppLayout from './components/layout/AppLayout';
 import CaregiverSearchWrapper from './components/CaregiverSearchWrapper';
 import { KycProvider } from './context/KycContext';
@@ -25,6 +28,12 @@ import MustChangePasswordGuard from './components/MustChangePasswordGuard';
 import ChangePasswordPage from './pages/auth/ChangePasswordPage';
 import MessagePage from './pages/profile/MessagePage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
+
+function HomeRedirect() {
+  const { userRole, mustChangePassword, loading } = useAuth();
+  if (loading || userRole === null) return <PageSkeleton />;
+  return <Navigate to={getPostLoginRedirect({ role: userRole, mustChangePassword: mustChangePassword ?? false })} replace />;
+}
 
 function App() {
   return (
@@ -69,20 +78,17 @@ function App() {
         />
 
         {/* Admin home */}
-        <Route 
-          path="/admin-home" 
+        <Route
+          path="/admin-home"
           element={
-            <RoleRoute requiredRole={3}>
+            <RoleRoute requiredRole={[3, 4]}>
               <PayungHome />
             </RoleRoute>
-          } 
+          }
         />
 
-        {/* Home - show based on role */}
-        <Route 
-          path="/" 
-          element={<PayungHome />}
-        />
+        {/* Home - redirect based on role */}
+        <Route path="/" element={<HomeRedirect />} />
 
         <Route path="/search" element={<CaregiverSearchWrapper />} />
         <Route path="/bookings" element={<BookingsPage />} />

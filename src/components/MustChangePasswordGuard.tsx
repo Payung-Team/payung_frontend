@@ -7,7 +7,11 @@ interface Props {
 }
 
 const MustChangePasswordGuard: React.FC<Props> = ({ children }) => {
-  const { mustChangePassword } = useAuth();
+  const { mustChangePassword, loading } = useAuth();
+
+  if (loading) {
+    return null;
+  }
 
   if (mustChangePassword === true) {
     return <Navigate to="/change-password" replace />;

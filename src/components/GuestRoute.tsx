@@ -26,9 +26,11 @@ const GuestRoute: React.FC<GuestRouteProps> = ({ children }) => {
   }
 
   if (session) {
-    const role = userRole ?? Number(localStorage.getItem('userRole') || 1);
-    const mustChange = mustChangePassword ?? (localStorage.getItem('mustChangePassword') === 'true');
-    return <Navigate to={getPostLoginRedirect({ role, mustChangePassword: mustChange })} replace />;
+    const savedRole = localStorage.getItem('userRole');
+    const savedMustChange = localStorage.getItem('mustChangePassword');
+    const role = savedRole ? parseInt(savedRole, 10) : 1;
+    const mustChangePassword = savedMustChange === 'true';
+    return <Navigate to={getPostLoginRedirect({ role, mustChangePassword })} replace />;
   }
 
   return <>{children}</>;
