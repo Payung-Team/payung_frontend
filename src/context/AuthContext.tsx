@@ -23,7 +23,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [userRole, setUserRole] = useState<number | null>(null);
+  const [userRole, setUserRole] = useState<number | null>(() => {
+    const saved = localStorage.getItem('userRole');
+    return saved ? parseInt(saved, 10) : null;
+  });
   const [mustChangePassword, setMustChangePasswordState] = useState<boolean | null>(() => {
     const saved = localStorage.getItem('mustChangePassword');
     return saved !== null ? saved === 'true' : null;
@@ -33,14 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const initialized = useRef(false);
   const apolloClient = useApolloClient();
 
-  // useEffect เพื่อเช็คสถานะการล็อกอิน
   useEffect(() => {
-    // ลองอ่าน role จาก localStorage ขณะ loading
-    const savedUserRole = localStorage.getItem('userRole');
-    if (savedUserRole) {
-      setUserRole(parseInt(savedUserRole, 10));
-    }
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, currentSession: Session | null) => {
         setSession(currentSession);
