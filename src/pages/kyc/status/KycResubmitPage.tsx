@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { GET_KYC_STATUS } from '../../../graphql/queries';
 import { useKyc } from '../../../context/KycContext';
@@ -10,6 +10,7 @@ import KycRejectionList from '../../../components/ui/KycRejectionList';
 
 export default function KycResubmitPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { setInitialData, step, goToStep } = useKyc();
   const { data, loading, error } = useQuery<any>(GET_KYC_STATUS, {
     fetchPolicy: 'network-only',
@@ -54,12 +55,13 @@ export default function KycResubmitPage() {
             fileUrl: d.signedUrl || d.fileUrl,
           })),
         });
-        // Start at Step 1 for resubmission
-        if (step === 0) goToStep(1);
+        // Start at target step if provided in route state, otherwise Step 1
+        const targetStep = location.state?.step || 1;
+        goToStep(targetStep);
         setIsReady(true);
       }
     }
-  }, [data, loading, navigate, setInitialData, step, goToStep, isReady]);
+  }, [data, loading, navigate, location.state, setInitialData, step, goToStep, isReady]);
 
   if (loading || !isReady) return <div className="min-h-screen flex items-center justify-center">กำลังโหลด...</div>;
   if (error) return <div className="min-h-screen flex items-center justify-center text-red-500">เกิดข้อผิดพลาด: {error.message}</div>;
@@ -67,6 +69,18 @@ export default function KycResubmitPage() {
   const kyc = data?.kycStatus;
   const rejectionReasons = kyc?.caregiver?.rejectionReasons || [];
   const rejectedReason = kyc?.rejectedReason;
+
+  const handleItemClick = (reason: any) => {
+    let targetStep = 1;
+    if (reason.documentType === 'ข้อมูลส่วนตัว') {
+      targetStep = 1;
+    } else if (reason.documentType === 'บัตรประชาชน' || reason.documentType === 'รูปถ่ายคู่บัตรประชาชน') {
+      targetStep = 2;
+    } else if (reason.documentType === 'ใบรับรองอบรม') {
+      targetStep = 3;
+    }
+    goToStep(targetStep);
+  };
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] flex flex-col items-center py-[48px] px-4">
@@ -90,7 +104,11 @@ export default function KycResubmitPage() {
         {/* Rejection Alert Section */}
         {(rejectionReasons.length > 0 || rejectedReason) && (
           <div className="w-full pb-4 border-b border-[#E2E8F0] mb-2">
-            <KycRejectionList rejectionReasons={rejectionReasons} rejectedReason={rejectedReason} />
+            <KycRejectionList 
+              rejectionReasons={rejectionReasons} 
+              rejectedReason={rejectedReason} 
+              onItemClick={handleItemClick}
+            />
           </div>
         )}
 

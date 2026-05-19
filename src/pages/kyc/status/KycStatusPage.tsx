@@ -117,6 +117,18 @@ export default function KycStatusPage() {
     setPreview({ isOpen: true, url, name });
   };
 
+  const handleItemClick = (reason: any) => {
+    let targetStep = 1;
+    if (reason.documentType === 'ข้อมูลส่วนตัว') {
+      targetStep = 1;
+    } else if (reason.documentType === 'บัตรประชาชน' || reason.documentType === 'รูปถ่ายคู่บัตรประชาชน') {
+      targetStep = 2;
+    } else if (reason.documentType === 'ใบรับรองอบรม') {
+      targetStep = 3;
+    }
+    navigate('/kyc/resubmit', { state: { step: targetStep } });
+  };
+
   const status = data?.kycStatus?.status;
   const submittedAt = data?.kycStatus?.submittedAt;
   const verifiedAt = data?.kycStatus?.verifiedAt;
@@ -471,7 +483,11 @@ export default function KycStatusPage() {
           </div>
 
           {/* Items to fix list */}
-          <KycRejectionList rejectionReasons={rejectionReasons} rejectedReason={rejectedReason} />
+          <KycRejectionList 
+            rejectionReasons={rejectionReasons} 
+            rejectedReason={rejectedReason} 
+            onItemClick={handleItemClick}
+          />
 
           {/* Actions */}
           <div className="w-full flex gap-3">
