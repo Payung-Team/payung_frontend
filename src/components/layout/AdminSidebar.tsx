@@ -1,4 +1,19 @@
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+
+interface NavMenuItem {
+  to: string;
+  label: string;
+  icon: string;
+  end: boolean;
+  minRole: number;
+}
+
+const NAV_MENU: NavMenuItem[] = [
+  { to: '/admin',       label: 'Dashboard',    icon: 'dashboard',            end: true,  minRole: 3 },
+  { to: '/admin/kyc',   label: 'KYC Review',   icon: 'fact_check',           end: false, minRole: 3 },
+  { to: '/admin/users', label: 'จัดการ Admin', icon: 'admin_panel_settings', end: false, minRole: 4 },
+];
 
 interface AdminSidebarProps {
   pendingKyc: number;
@@ -15,13 +30,19 @@ export default function AdminSidebar({
   onClose,
   collapsed = false,
 }: Readonly<AdminSidebarProps>) {
+  const { userRole } = useAuth();
   const initial = displayName.charAt(0).toUpperCase() || 'A';
 
-  const navItems = [
-    { to: '/admin', label: 'Dashboard', icon: 'dashboard', end: true, badge: null as number | null },
-    { to: '/admin/kyc', label: 'KYC Review', icon: 'fact_check', end: false, badge: pendingKyc > 0 ? pendingKyc : null },
-    { to: '/admin/users', label: 'จัดการ Admin', icon: 'admin_panel_settings', end: false, badge: null },
-  ];
+  // AdminSidebar is only reachable inside RoleRoute([3,4]), so null means still loading — default to 3
+  const effectiveRole = userRole ?? 3;
+  const kycBadge = pendingKyc > 0 ? pendingKyc : null;
+
+  const navItems = NAV_MENU
+    .filter((item) => effectiveRole >= item.minRole)
+    .map((item) => ({
+      ...item,
+      badge: item.to === '/admin/kyc' ? kycBadge : null,
+    }));
 
   return (
     <aside

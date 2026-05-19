@@ -468,3 +468,60 @@ export const ADMIN_PENDING_QUEUE = gql`
     }
   }
 `;
+
+export const ADMIN_USER_LIST = gql`
+  query AdminUserList($role: RoleFilter, $search: String) {
+    adminUserList(input: { role: $role, search: $search, page: 1, limit: 100 }) {
+      items {
+        id
+        email
+        displayName
+        role
+        isActive
+        isSuspended
+        createdAt
+      }
+      total
+    }
+  }
+`;
+
+export const INVITE_ADMIN = gql`
+  mutation InviteAdmin($email: String!, $firstName: String!, $lastName: String!, $role: Int!) {
+    inviteAdmin(input: { email: $email, firstName: $firstName, lastName: $lastName, role: $role }) {
+      user {
+        id
+        email
+        displayName
+        role
+      }
+      tempPasswordSent
+    }
+  }
+`;
+
+export const TOGGLE_ADMIN_STATUS = gql`
+  mutation ToggleAdminStatus($adminId: ID!, $isActive: Boolean!) {
+    toggleAdminStatus(input: { adminId: $adminId, isActive: $isActive }) {
+      user {
+        id
+        email
+        isActive
+      }
+      action
+    }
+  }
+`;
+
+export const CANCEL_SCHEDULED_DELETE = gql`
+  mutation CancelScheduledDelete($adminId: ID!) {
+    cancelScheduledDelete(input: { adminId: $adminId }) {
+      user {
+        id
+        email
+        isActive
+      }
+      reactivated
+    }
+  }
+`;
