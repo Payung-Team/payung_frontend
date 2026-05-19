@@ -32,6 +32,18 @@ function getPageInfo(pathname: string): { title: string; breadcrumb: string } {
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem('admin-sidebar-collapsed') === 'true',
+  );
+
+  const toggleCollapse = () => {
+    setCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('admin-sidebar-collapsed', String(next));
+      return next;
+    });
+  };
+
   const { logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -81,6 +93,7 @@ export default function AdminLayout() {
           displayName={displayName}
           onLogout={handleLogout}
           onClose={() => setSidebarOpen(false)}
+          collapsed={collapsed}
         />
       </div>
 
@@ -101,12 +114,12 @@ export default function AdminLayout() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Hamburger — mobile only */}
+            {/* Hamburger — opens drawer on mobile, toggles collapse on desktop */}
             <button
               type="button"
-              className="lg:hidden"
-              onClick={() => setSidebarOpen(true)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', color: '#6B7280' }}
+              className="hidden lg:flex"
+              onClick={toggleCollapse}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, alignItems: 'center', color: '#6B7280' }}
             >
               <span className="material-icons" style={{ fontSize: 22 }}>menu</span>
             </button>
