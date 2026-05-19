@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Icon } from './Icon';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
-type ToastPosition = 'bottom-right' | 'top-center';
-type ToastVariant = 'default' | 'soft-card';
+type ToastPosition = 'bottom-right' | 'top-center' | 'top-right';
+type ToastVariant = 'default' | 'soft-card' | 'admin-toast';
 
 interface ToastProps {
   readonly message: string;
@@ -78,6 +78,37 @@ export function Toast({
     );
   }
 
+  if (variant === 'admin-toast') {
+    const bgClass = {
+      success: 'bg-[#ECFDF5] border border-[#10B981]/25 text-[#047857]',
+      error: 'bg-[#FEF2F2] border border-[#EF4444]/20 text-[#DC2626]',
+      info: 'bg-[#EFF6FF] border border-[#3B82F6]/20 text-[#1D4ED8]',
+      warning: 'bg-[#FFFBEB] border border-[#F59E0B]/20 text-[#D97706]',
+    }[type];
+
+    return (
+      <div
+        className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 text-[14px] font-semibold leading-5 shadow-sm transition-all duration-200 ${bgClass} ${fadeClass}`}
+        style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+      >
+        <span>{message}</span>
+        {onClose && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full hover:bg-black/5 opacity-85 hover:opacity-100 transition-all cursor-pointer"
+            aria-label="Dismiss toast"
+          >
+            <Icon name="close" size="small" className="text-current scale-75" />
+          </button>
+        )}
+      </div>
+    );
+  }
+
   const bgColor = {
     success: 'bg-green-500',
     error: 'bg-red-500',
@@ -115,6 +146,8 @@ export function ToastContainer({
   const positionClass =
     position === 'top-center'
       ? 'fixed top-6 left-1/2 -translate-x-1/2 z-50'
+      : position === 'top-right'
+      ? 'fixed top-6 right-6 z-50'
       : 'fixed bottom-4 right-4 z-50';
 
   return (

@@ -607,8 +607,9 @@ export default function KycReviewDetailPage() {
     try {
       await approveKyc({ variables: { caregiverId } });
       setIsApproveOpen(false);
-      toast.success('อนุมัติ KYC สำเร็จ');
+      toast.success('อนุมัติ KYC เรียบร้อยแล้ว');
       await refetch();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (mutationError) {
       toast.error(mutationError instanceof Error ? mutationError.message : 'อนุมัติ KYC ไม่สำเร็จ');
     }
@@ -620,8 +621,9 @@ export default function KycReviewDetailPage() {
     try {
       await rejectKyc({ variables: { caregiverId, reasons } });
       setIsRejectOpen(false);
-      toast.success('ปฏิเสธ KYC สำเร็จ');
+      toast.success('ปฏิเสธ KYC เรียบร้อยแล้ว');
       await refetch();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (mutationError) {
       toast.error(mutationError instanceof Error ? mutationError.message : 'ปฏิเสธ KYC ไม่สำเร็จ');
     }
@@ -692,7 +694,7 @@ export default function KycReviewDetailPage() {
                     ส่งใหม่ {resubmitCount} ครั้ง
                   </span>
                 </div>
-
+                {/*Avatar*/}
                 <div className="mt-4 flex items-center gap-4">
                   <Avatar name={caregiver.fullName} size={56} className="shrink-0" />
                   <div>
@@ -702,7 +704,7 @@ export default function KycReviewDetailPage() {
                     </p>
                   </div>
                 </div>
-
+                {/*Personal Information*/}
                 <dl className="mt-5 grid gap-x-6 gap-y-4 sm:grid-cols-2">
                   {personalFields.map((field) => (
                     <CaregiverField key={field.label} label={field.label} value={field.value} />
@@ -731,7 +733,8 @@ export default function KycReviewDetailPage() {
                   </div>
                 ) : null}
               </article>
-
+              
+              {/*KYC History*/}
               <article className="rounded-xl border border-[#E5E7EB] bg-white px-6 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
                 <h3 className="text-base font-semibold leading-5 text-[#064E3B]">ประวัติการดำเนินการ</h3>
                 <div className="mt-4">
@@ -776,7 +779,8 @@ export default function KycReviewDetailPage() {
                 </div>
               </article>
             </div>
-
+            
+            {/*Documents Preview*/}
             <aside className="rounded-xl border border-[#E5E7EB] bg-white px-6 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
               <div className="relative flex min-h-[433px] items-center justify-center overflow-hidden rounded-xl bg-[#959698]">
                 {selectedDoc && documentUrl ? (
@@ -831,7 +835,8 @@ export default function KycReviewDetailPage() {
                 {documents.length === 0 ? <p className="rounded-lg bg-[#F9FAFB] px-4 py-6 text-center text-sm text-gray-500">ยังไม่มีเอกสารที่อัปโหลด</p> : null}
               </div>
             </aside>
-
+            
+            {/*Action Buttons*/}
             <div className="lg:col-span-2 lg:flex lg:justify-end">
               <div className="flex w-full gap-3 sm:w-auto">
                 <button
@@ -853,6 +858,7 @@ export default function KycReviewDetailPage() {
               </div>
             </div>
 
+            {/*Pending Status*/}
             {!isPending ? (
               <p className="text-right text-sm text-gray-500 lg:col-span-2">
                 เอกสารนี้อยู่ในสถานะ {statusLabel(caregiver.kycStatus)} จึงไม่สามารถอนุมัติหรือปฏิเสธซ้ำได้
@@ -887,7 +893,12 @@ export default function KycReviewDetailPage() {
         imageUrl={documentUrl}
         title={selectedDoc ? (docTypeLabel[selectedDoc.docType] ?? selectedDoc.docType) : 'Preview'}
       />
-      <ToastContainer toasts={toast.toasts as (ToastMessage & { id: string })[]} onRemove={toast.removeToast} />
+      <ToastContainer
+        toasts={toast.toasts as (ToastMessage & { id: string })[]}
+        onRemove={toast.removeToast}
+        position="top-right"
+        variant="admin-toast"
+      />
     </div>
   );
 }
