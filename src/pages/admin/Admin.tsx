@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { ADMIN_DASHBOARD, ADMIN_PENDING_QUEUE } from '../../graphql/queries';
@@ -342,10 +342,22 @@ function EmptyBox({ height, title, subtitle }: { height: number; title: string; 
 export default function Admin() {
   const navigate = useNavigate();
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { data: dashData, loading: dashLoading } = useQuery<DashboardData>(ADMIN_DASHBOARD, {
+  const { data: dashData, loading: dashLoading, refetch } = useQuery<DashboardData>(ADMIN_DASHBOARD, {
     fetchPolicy: 'network-only',
+    pollInterval: 60_000,
   });
+
+  useEffect(() => {
+    if (dashData) setLastUpdated(new Date());
+  }, [dashData]);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try { await refetch(); } finally { setIsRefreshing(false); }
+  }, [refetch]);
   const { data: queueData, loading: queueLoading } = useQuery<PendingData>(ADMIN_PENDING_QUEUE, {
     fetchPolicy: 'cache-and-network',
   });
@@ -441,6 +453,36 @@ export default function Admin() {
           })}
         </div>
       )}
+
+      {/* ── Refresh bar ─────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+        {lastUpdated && !skeletonMode && (
+          <span style={{ color: '#9CA3AF', fontSize: 11 }}>
+            อัปเดตล่าสุด {lastUpdated.toLocaleTimeString('th-TH-u-ca-gregory', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={isRefreshing || skeletonMode}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            background: 'white', border: '1px solid #E5E7EB',
+            borderRadius: 8, padding: '5px 12px',
+            color: '#374151', fontSize: 12, fontWeight: 500,
+            cursor: isRefreshing || skeletonMode ? 'not-allowed' : 'pointer',
+            opacity: isRefreshing || skeletonMode ? 0.6 : 1,
+          }}
+        >
+          <span
+            className={`material-icons${isRefreshing ? ' animate-spin' : ''}`}
+            style={{ fontSize: 14 }}
+          >
+            refresh
+          </span>
+          {isRefreshing ? 'กำลังโหลด...' : 'Refresh'}
+        </button>
+      </div>
 
       {/* ── Loading indicator text ───────────────────────────────────── */}
       {skeletonMode && (
