@@ -1,0 +1,64 @@
+{
+  "menuId": "patient_menu",
+  "menuTitle": "Patient Navigation",
+  "description": "Navigation menu for patient role",
+  "navigation": [
+    {
+      "id": "home-patient",
+      "type": "navigation",
+      "label": "หน้าหลัก",
+      "icon": "home-outline",
+      "route": "/patient-home",
+      "allowedRoles": ["patient"]
+    },
+    {
+      "id": "search_caregivers",
+      "type": "navigation",
+      "label": "ค้นหาผู้ดูแล",
+      "icon": "person-outline",
+      "route": "/search",
+      "allowedRoles": ["patient"]
+    },
+    {
+      "id": "bookings",
+      "type": "navigation",
+      "label": "นัดหมาย",
+      "icon": "calendar-outline",
+      "route": "/bookings",
+      "allowedRoles": ["patient"]
+    }
+  ],
+  "avatar": [
+    {
+      "id": "view_profile",
+      "type": "navigation",
+      "label": "View Profile",
+      "icon": "person-outline",
+      "route": "/profile",
+      "allowedRoles": ["patient"]
+    },
+    {
+      "id": "edit_profile",
+      "type": "action",
+      "label": "Edit Profile",
+      "icon": "create-outline",
+      "action": "handleEditProfile",
+      "allowedRoles": ["patient"]
+    },
+    {
+      "id": "divider_1",
+      "type": "divider",
+      "label": "",
+      "allowedRoles": ["patient"]
+    },
+    {
+      "id": "logout",
+      "type": "action",
+      "label": "Logout",
+      "icon": "log-out-outline",
+      "action": "handleLogout",
+      "variant": "danger",
+      "allowedRoles": ["patient"]
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "menuId": "caregiver_menu",
+  "menuTitle": "Caregiver Navigation",
+  "description": "Navigation menu for caregiver role",
+  "navigation": [
+    {
+      "id": "home-caregiver",
+      "type": "navigation",
+      "label": "หน้าหลัก",
+      "icon": "home-outline",
+      "route": "/caregiver-home",
+      "allowedRoles": ["caregiver"]
+    },
+    {
+      "id": "search_jobs",
+      "type": "navigation",
+      "label": "ค้นหางาน",
+      "icon": "document-text-outline",
+      "route": "/search",
+      "allowedRoles": ["caregiver"]
+    },
+    {
+      "id": "my_jobs",
+      "type": "navigation",
+      "label": "งานของฉัน",
+      "icon": "calendar-outline",
+      "route": "/jobs",
+      "allowedRoles": ["caregiver"]
+    }
+  ],
+  "avatar": [
+    {
+      "id": "view_profile",
+      "type": "navigation",
+      "label": "View Profile",
+      "icon": "person-outline",
+      "route": "/profile",
+      "allowedRoles": ["caregiver"]
+    },
+    {
+      "id": "edit_profile",
+      "type": "action",
+      "label": "Edit Profile",
+      "icon": "create-outline",
+      "action": "handleEditProfile",
+      "allowedRoles": ["caregiver"]
+    },
+    {
+      "id": "divider_1",
+      "type": "divider",
+      "label": "",
+      "allowedRoles": ["caregiver"]
+    },
+    {
+      "id": "logout",
+      "type": "action",
+      "label": "Logout",
+      "icon": "log-out-outline",
+      "action": "handleLogout",
+      "variant": "danger",
+      "allowedRoles": ["caregiver"]
+    }
+  ]
+}

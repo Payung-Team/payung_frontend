@@ -85,5 +85,38 @@
       "confirmMessage": "This will reset all system data. Are you sure?",
       "allowedRoles": ["admin"]
     }
+  ],
+  "avatar": [
+    {
+      "id": "view_profile",
+      "type": "navigation",
+      "label": "View Profile",
+      "icon": "person-outline",
+      "route": "/profile",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "id": "edit_profile",
+      "type": "action",
+      "label": "Edit Profile",
+      "icon": "create-outline",
+      "action": "handleEditProfile",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "id": "divider_1",
+      "type": "divider",
+      "label": "",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "id": "logout",
+      "type": "action",
+      "label": "Logout",
+      "icon": "log-out-outline",
+      "action": "handleLogout",
+      "variant": "danger",
+      "allowedRoles": ["admin"]
+    }
   ]
 }

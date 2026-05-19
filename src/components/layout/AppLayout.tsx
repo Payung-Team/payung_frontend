@@ -20,7 +20,17 @@ interface AppLayoutProps {
 export default function AppLayout({ children }: AppLayoutProps) {
   const { user, userRole } = useAuth();
   const { toasts, removeToast } = useToast();
-  const { navItems, isLoading: menuLoading, error: menuError } = useFilteredMenu('mainMenu', userRole);
+  const menuName = (() => {
+    if (userRole === 2) return 'caregiverMenu' as const;
+    if (userRole === 3) return 'adminMenu' as const;
+    return 'patientMenu' as const;
+  })();
+  const homeRoute = (() => {
+    if (userRole === 2) return '/caregiver-home';
+    if (userRole === 3) return '/';
+    return '/patient-home';
+  })();
+  const { navItems, isLoading: menuLoading, error: menuError } = useFilteredMenu(menuName, userRole);
   const { data: userData } = useQuery<{ me: { id: string; role: number; displayName?: string; phone?: string; address?: string; bio?: string } } | undefined>(GET_USER);
   
   const [isViewProfileOpen, setIsViewProfileOpen] = useState(false);
@@ -118,6 +128,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           navItems={filteredNavItems}
           isLoading={menuLoading}
           currentUserId={userData?.me?.id}
+          homeRoute={homeRoute}
           profileDropdown={
             currentRole === 2 ? (
               <CaregiverProfileDropdown
