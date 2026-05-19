@@ -183,6 +183,11 @@ export const GET_KYC_STATUS = gql`
         hourlyRate
         bio
         kycStatus
+        rejectionReasons {
+          title
+          detail
+          documentType
+        }
       }
       documents {
         id

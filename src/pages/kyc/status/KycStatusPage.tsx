@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@apollo/client/react';
-import { GET_KYC_STATUS, DELETE_KYC_DOCUMENT } from '../../../graphql/queries';
+import { useQuery } from '@apollo/client/react';
+import { GET_KYC_STATUS } from '../../../graphql/queries';
 import Icon from '../../../components/ui/Icon';
 import ImageModal from '../../../components/ui/ImageModal';
 import Skeleton from '../../../components/ui/Skeleton';
 import { useState } from 'react';
 import { supabase } from '../../../lib/supabase';
+import KycRejectionList from '../../../components/ui/KycRejectionList';
 
 // ── Components ────────────────────────────────────────────────────────────
 
@@ -92,7 +93,7 @@ function BenefitItem({ text }: { text: string }) {
 
 export default function KycStatusPage() {
   const navigate = useNavigate();
-  const { data, loading, error, refetch } = useQuery(GET_KYC_STATUS, {
+  const { data, loading, error, refetch } = useQuery<any>(GET_KYC_STATUS, {
     fetchPolicy: 'network-only',
     notifyOnNetworkStatusChange: true,
   });
@@ -104,7 +105,6 @@ export default function KycStatusPage() {
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [refetch]);
-  const [deleteDoc] = useMutation(DELETE_KYC_DOCUMENT);
 
   // Preview State
   const [preview, setPreview] = useState<{ isOpen: boolean; url: string; name: string }>({
@@ -121,6 +121,7 @@ export default function KycStatusPage() {
   const submittedAt = data?.kycStatus?.submittedAt;
   const verifiedAt = data?.kycStatus?.verifiedAt;
   const rejectedReason = data?.kycStatus?.rejectedReason;
+  const rejectionReasons = data?.kycStatus?.caregiver?.rejectionReasons || [];
   const rawDocuments = data?.kycStatus?.documents || [];
 
   const [refreshedDocs, setRefreshedDocs] = useState<KycDocument[]>([]);
@@ -164,18 +165,6 @@ export default function KycStatusPage() {
       // navigate('/kyc');
     }
   }, [loading, data, navigate]);
-
-  const handleDelete = async (id: string) => {
-    if (window.confirm('ยืนยันการลบเอกสาร?')) {
-      try {
-        await deleteDoc({ variables: { documentId: id } });
-        refetch();
-      } catch (err) {
-        console.error('Delete doc error:', err);
-        alert('เกิดข้อผิดพลาดในการลบเอกสาร');
-      }
-    }
-  };
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -466,7 +455,7 @@ export default function KycStatusPage() {
               ต้องแก้ไขข้อมูลบางส่วน
             </h1>
             <p className="max-w-[340px] text-[13.5px] text-[#64748B] leading-[22px] mx-auto" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-              ทีมงานตรวจสอบข้อมูลของคุณแล้ว พบ 2 รายการที่ต้องแก้ไข กรุณาอัปเดตและส่งใหม่ ใช้เวลาไม่เกิน 5 นาที
+              ทีมงานตรวจสอบข้อมูลของคุณแล้ว พบ {rejectionReasons.length > 0 ? `${rejectionReasons.length} รายการ` : 'ข้อมูลบางส่วน'}ที่ต้องแก้ไข กรุณาอัปเดตและส่งใหม่ ใช้เวลาไม่เกิน 5 นาที
             </p>
           </div>
 
@@ -482,42 +471,7 @@ export default function KycStatusPage() {
           </div>
 
           {/* Items to fix list */}
-          <div className="w-full mb-10">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-[11px] font-bold tracking-[0.08em] text-[#94A3B8] uppercase" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>รายการที่ต้องแก้ไข</span>
-              <div className="bg-[#FEF2F2] px-2.5 py-0.5 rounded-full">
-                <span className="text-[11px] font-bold text-[#DC2626]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>2 รายการ</span>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center gap-4 p-4 bg-white border border-[#F1F5F9] rounded-[16px] hover:border-[#E2E8F0] transition-all cursor-pointer group">
-                <div className="w-[26px] h-[26px] bg-[#FEF2F2] rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-[12px] font-bold text-[#DC2626]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>1</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[14px] font-semibold text-[#0F172A] mb-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>รูปบัตรประชาชน</p>
-                  <p className="text-[11.5px] text-[#94A3B8] leading-[16px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                    ภาพไม่ชัดเจน — ถ่ายใหม่ในที่แสงเพียงพอ ไม่มีเงาและไม่เอียง
-                  </p>
-                </div>
-                <Icon name="chevron_right" color="#CBD5E1" style={{ fontSize: '18px' }} className="group-hover:text-[#94A3B8] transition-colors" />
-              </div>
-
-              <div className="flex items-center gap-4 p-4 bg-white border border-[#F1F5F9] rounded-[16px] hover:border-[#E2E8F0] transition-all cursor-pointer group">
-                <div className="w-[26px] h-[26px] bg-[#FEF2F2] rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-[12px] font-bold text-[#DC2626]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>2</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[14px] font-semibold text-[#0F172A] mb-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>เลขบัตรประชาชน</p>
-                  <p className="text-[11.5px] text-[#94A3B8] leading-[16px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                    ไม่ตรงกับข้อมูลในรูปบัตร — ตรวจสอบอีกครั้งก่อนส่ง
-                  </p>
-                </div>
-                <Icon name="chevron_right" color="#CBD5E1" style={{ fontSize: '18px' }} className="group-hover:text-[#94A3B8] transition-colors" />
-              </div>
-            </div>
-          </div>
+          <KycRejectionList rejectionReasons={rejectionReasons} rejectedReason={rejectedReason} />
 
           {/* Actions */}
           <div className="w-full flex gap-3">
