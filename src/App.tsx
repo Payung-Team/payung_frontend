@@ -197,7 +197,7 @@ function App() {
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/kyc" element={<KycReviewListPage />} />
         <Route path="/admin/kyc/:caregiverId" element={<KycReviewDetailPage />} />
-        <Route path="/admin/users" element={<RoleRoute requiredRole={4}><AdminUsersPage /></RoleRoute>} />
+        <Route path="/admin/users" element={<AdminUsersPage />} />
       </Route>
 
       {/* 404 - Not Found (must be last) */}

@@ -5,6 +5,8 @@ import {
   INVITE_ADMIN,
   TOGGLE_ADMIN_STATUS,
   CANCEL_SCHEDULED_DELETE,
+  SUSPEND_USER,
+  ACTIVATE_USER,
 } from '../../graphql/queries';
 import { useAuth } from '../../context/AuthContext';
 import Icon from '../../components/ui/Icon';
@@ -17,7 +19,8 @@ import Pagination from '../../components/ui/Pagination';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-type StatusFilter = 'all' | 'active' | 'deactivated';
+type RoleFilterKey = 'all' | 'super_admin' | 'admin' | 'caregiver' | 'patient';
+type ActionType = 'none' | 'user' | 'admin';
 
 interface UserSummary {
   id: string;
@@ -30,12 +33,17 @@ interface UserSummary {
 }
 
 interface AdminUserListResponse {
-  adminUserList: {
+  list: {
     items: UserSummary[];
     total: number;
     page: number;
     totalPages: number;
   };
+  allCount: { total: number };
+  superAdminCount: { total: number };
+  adminCount: { total: number };
+  caregiverCount: { total: number };
+  patientCount: { total: number };
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────
@@ -44,15 +52,11 @@ const PAGE_SIZE = 20;
 const TABLE_GRID_COLUMNS = 'minmax(160px,1.5fr) minmax(180px,2fr) 140px 200px 140px minmax(130px,auto)';
 
 const ROLE_LABELS: Record<number, { label: string; badgeClass: string; textClass: string }> = {
+  1: { label: 'ผู้ใช้', badgeClass: 'bg-gray-100', textClass: 'text-gray-600' },
+  2: { label: 'ผู้ดูแล', badgeClass: 'bg-[#FEF3C7]', textClass: 'text-amber-700' },
   3: { label: 'Admin', badgeClass: 'bg-[#C8DBFF]', textClass: 'text-[#4472C4]' },
   4: { label: 'Super Admin', badgeClass: 'bg-[#E8D8FF]', textClass: 'text-[#793DCD]' },
 };
-
-const STATUS_FILTERS: Array<{ key: StatusFilter; label: string }> = [
-  { key: 'all', label: 'ทั้งหมด' },
-  { key: 'active', label: 'เปิดใช้งาน' },
-  { key: 'deactivated', label: 'ถูกปิดใช้งาน' },
-];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -70,6 +74,11 @@ function formatDate(value?: string | null) {
 function getInitial(displayName?: string, email?: string) {
   const name = displayName || email || '';
   return name.charAt(0).toUpperCase() || 'A';
+}
+
+function getActionType(viewerRole: number, targetRole: number): ActionType {
+  if (targetRole >= 3) return viewerRole === 4 ? 'admin' : 'none';
+  return viewerRole >= 3 ? 'user' : 'none';
 }
 
 // ─── Skeleton ──────────────────────────────────────────────────────────────
@@ -111,12 +120,8 @@ function InviteAdminModal({ onClose, onSuccess }: Readonly<InviteModalProps>) {
   const [submitError, setSubmitError] = useState('');
 
   const [inviteAdmin, { loading }] = useMutation(INVITE_ADMIN, {
-    onCompleted: () => {
-      onSuccess();
-    },
-    onError: (err) => {
-      setSubmitError(err.message);
-    },
+    onCompleted: () => { onSuccess(); },
+    onError: (err) => { setSubmitError(err.message); },
   });
 
   function validate() {
@@ -132,10 +137,7 @@ function InviteAdminModal({ onClose, onSuccess }: Readonly<InviteModalProps>) {
     e.preventDefault();
     setSubmitError('');
     const errs = validate();
-    if (Object.keys(errs).length > 0) {
-      setFieldErrors(errs);
-      return;
-    }
+    if (Object.keys(errs).length > 0) { setFieldErrors(errs); return; }
     setFieldErrors({});
     inviteAdmin({
       variables: {
@@ -270,12 +272,13 @@ function InviteAdminModal({ onClose, onSuccess }: Readonly<InviteModalProps>) {
 
 interface ConfirmDeactivateProps {
   user: UserSummary;
+  isAdminTarget: boolean;
   onClose: () => void;
   onConfirm: () => void;
   loading: boolean;
 }
 
-function ConfirmDeactivateModal({ user, onClose, onConfirm, loading }: Readonly<ConfirmDeactivateProps>) {
+function ConfirmDeactivateModal({ user, isAdminTarget, onClose, onConfirm, loading }: Readonly<ConfirmDeactivateProps>) {
   const name = user.displayName || user.email;
   return (
     <dialog open className="fixed inset-0 z-50 m-0 flex h-screen w-screen max-w-none items-center justify-center p-0">
@@ -288,8 +291,10 @@ function ConfirmDeactivateModal({ user, onClose, onConfirm, loading }: Readonly<
           ปิดการใช้งานบัญชี
         </h2>
         <p className="mt-1 text-xs text-gray-500" style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
-          คุณต้องการปิดการใช้งานบัญชีของ <span className="font-semibold text-gray-700">{name}</span> หรือไม่?
-          บัญชีจะถูกระงับทันทีและจะถูกลบถาวรหลังจากสิ้นสุด grace period
+          คุณต้องการปิดการใช้งานบัญชีของ <span className="font-semibold text-gray-700">{name}</span> หรือไม่?{' '}
+          {isAdminTarget
+            ? 'บัญชีจะถูกระงับทันทีและจะถูกลบถาวรหลังจากสิ้นสุด grace period'
+            : 'บัญชีจะถูกระงับทันที'}
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -320,9 +325,10 @@ function ConfirmDeactivateModal({ user, onClose, onConfirm, loading }: Readonly<
 
 export default function AdminUsersPage() {
   const { userRole } = useAuth();
-  const isSuperAdmin = userRole === 4;
+  const viewerRole = userRole ?? 3;
+  const isSuperAdmin = viewerRole === 4;
 
-  const [activeFilter, setActiveFilter] = useState<StatusFilter>('all');
+  const [activeFilter, setActiveFilter] = useState<RoleFilterKey>('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -330,27 +336,21 @@ export default function AdminUsersPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const trimmedSearch = search.trim();
+  const roleVariable = activeFilter === 'all' ? undefined : activeFilter;
 
-  const { data: adminData, loading: adminLoading, error: adminError, refetch: refetchAdmins } = useQuery<AdminUserListResponse>(
+  const { data, loading: queryLoading, error: queryError, refetch } = useQuery<AdminUserListResponse>(
     ADMIN_USER_LIST,
     {
-      variables: { role: 'admin', search: trimmedSearch || undefined },
+      variables: {
+        role: roleVariable,
+        search: trimmedSearch || undefined,
+        page,
+        limit: PAGE_SIZE,
+        countSearch: trimmedSearch || undefined,
+      },
       fetchPolicy: 'cache-and-network',
     },
   );
-
-  const { data: superData, loading: superLoading, error: superError, refetch: refetchSuper } = useQuery<AdminUserListResponse>(
-    ADMIN_USER_LIST,
-    {
-      variables: { role: 'super_admin', search: trimmedSearch || undefined },
-      fetchPolicy: 'cache-and-network',
-    },
-  );
-
-  const refetchAll = useCallback(() => {
-    refetchAdmins();
-    refetchSuper();
-  }, [refetchAdmins, refetchSuper]);
 
   function showToast(message: string, type: 'success' | 'error') {
     setToast({ message, type });
@@ -358,66 +358,57 @@ export default function AdminUsersPage() {
   }
 
   const [toggleStatus, { loading: toggleLoading }] = useMutation(TOGGLE_ADMIN_STATUS, {
-    onCompleted: () => {
-      showToast('อัปเดตสถานะเรียบร้อย', 'success');
-      setConfirmDeactivate(null);
-      refetchAll();
-    },
-    onError: (err) => {
-      showToast(err.message, 'error');
-      setConfirmDeactivate(null);
-    },
+    onCompleted: () => { showToast('อัปเดตสถานะเรียบร้อย', 'success'); setConfirmDeactivate(null); refetch(); },
+    onError: (err) => { showToast(err.message, 'error'); setConfirmDeactivate(null); },
   });
 
   const [cancelDelete, { loading: cancelLoading }] = useMutation(CANCEL_SCHEDULED_DELETE, {
-    onCompleted: () => {
-      showToast('ยกเลิกการปิดใช้งานเรียบร้อย', 'success');
-      refetchAll();
-    },
-    onError: (err) => {
-      showToast(err.message, 'error');
-      console.error(err);
-    },
+    onCompleted: () => { showToast('เปิดใช้งานบัญชีเรียบร้อย', 'success'); refetch(); },
+    onError: (err) => { showToast(err.message, 'error'); },
   });
 
-  // Merge admin + super_admin results, sort newest first
-  const allItems = useMemo<UserSummary[]>(() => {
-    const admins = adminData?.adminUserList.items ?? [];
-    const supers = superData?.adminUserList.items ?? [];
-    return [...supers, ...admins].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-  }, [adminData, superData]);
+  const [suspendUser, { loading: suspendLoading }] = useMutation(SUSPEND_USER, {
+    onCompleted: () => { showToast('ปิดการใช้งานบัญชีเรียบร้อย', 'success'); setConfirmDeactivate(null); refetch(); },
+    onError: (err) => { showToast(err.message, 'error'); setConfirmDeactivate(null); },
+  });
 
-  // Status filter
-  const filteredItems = useMemo(() => {
-    switch (activeFilter) {
-      case 'active': return allItems.filter((u) => u.isActive && !u.isSuspended);
-      case 'deactivated': return allItems.filter((u) => !u.isActive || u.isSuspended);
-      default: return allItems;
+  const [activateUser, { loading: activateLoading }] = useMutation(ACTIVATE_USER, {
+    onCompleted: () => { showToast('เปิดใช้งานบัญชีเรียบร้อย', 'success'); refetch(); },
+    onError: (err) => { showToast(err.message, 'error'); },
+  });
+
+  const handleDeactivate = useCallback((target: UserSummary) => {
+    if (target.role >= 3) {
+      toggleStatus({ variables: { adminId: target.id, isActive: false } });
+    } else {
+      suspendUser({ variables: { userId: target.id } });
     }
-  }, [allItems, activeFilter]);
+  }, [toggleStatus, suspendUser]);
 
-  // Client-side pagination
-  const totalFiltered = filteredItems.length;
-  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
-  const pagedItems = filteredItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const firstItem = totalFiltered === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const lastItem = Math.min(page * PAGE_SIZE, totalFiltered);
+  const handleActivate = useCallback((target: UserSummary) => {
+    if (target.role >= 3) {
+      cancelDelete({ variables: { adminId: target.id } });
+    } else {
+      activateUser({ variables: { userId: target.id } });
+    }
+  }, [cancelDelete, activateUser]);
 
-  const counts = useMemo(() => ({
-    all: allItems.length,
-    active: allItems.filter((u) => u.isActive && !u.isSuspended).length,
-    deactivated: allItems.filter((u) => !u.isActive || u.isSuspended).length,
-  }), [allItems]);
+  const items = data?.list.items ?? [];
+  const totalItems = data?.list.total ?? 0;
+  const totalPages = data?.list.totalPages ?? 1;
+  const firstItem = totalItems === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const lastItem = Math.min(page * PAGE_SIZE, totalItems);
 
-  const filterTabs = useMemo<FilterTabItem<StatusFilter>[]>(
-    () => STATUS_FILTERS.map((f) => ({ key: f.key, label: f.label, count: counts[f.key] })),
-    [counts],
-  );
+  const filterTabs = useMemo<FilterTabItem<RoleFilterKey>[]>(() => [
+    { key: 'all', label: 'ทั้งหมด', count: data?.allCount.total ?? 0 },
+    { key: 'super_admin', label: 'Super Admin', count: data?.superAdminCount.total ?? 0 },
+    { key: 'admin', label: 'Admin', count: data?.adminCount.total ?? 0 },
+    { key: 'caregiver', label: 'ผู้ดูแล', count: data?.caregiverCount.total ?? 0 },
+    { key: 'patient', label: 'ผู้ใช้', count: data?.patientCount.total ?? 0 },
+  ], [data]);
 
-  const isLoading = (adminLoading && !adminData) && (superLoading && !superData);
-  const queryError = adminError ?? superError;
+  const isLoading = queryLoading && !data;
+  const actionLoading = toggleLoading || cancelLoading || suspendLoading || activateLoading;
 
   const columns = useMemo<DataTableColumn<UserSummary>[]>(() => [
     {
@@ -447,8 +438,10 @@ export default function AdminUsersPage() {
         const meta = ROLE_LABELS[item.role];
         if (!meta) return <span className="text-xs text-gray-400">-</span>;
         return (
-          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${meta.badgeClass} ${meta.textClass}`}
-            style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
+          <span
+            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${meta.badgeClass} ${meta.textClass}`}
+            style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+          >
             {meta.label}
           </span>
         );
@@ -461,16 +454,20 @@ export default function AdminUsersPage() {
         const isActive = item.isActive && !item.isSuspended;
         if (isActive) {
           return (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#D1FAE5] px-2.5 py-0.5 text-xs font-semibold text-[#1B6B3A]"
-              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#D1FAE5] px-2.5 py-0.5 text-xs font-semibold text-[#1B6B3A]"
+              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+            >
               <span className="h-1.5 w-1.5 rounded-full bg-[#059669]" aria-hidden="true"></span>
               {'เปิดใช้งาน'}
             </span>
           );
         }
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-500"
-            style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-500"
+            style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-gray-400" aria-hidden="true"></span>
             {'ถูกปิดใช้งาน'}
           </span>
@@ -487,41 +484,37 @@ export default function AdminUsersPage() {
       key: 'actions',
       header: 'จัดการ',
       render: (item) => {
+        const action = getActionType(viewerRole, item.role);
+        if (action === 'none') return <span className="text-xs text-gray-400">-</span>;
+
         const isActive = item.isActive && !item.isSuspended;
-        if (!isSuperAdmin) {
-          return <span className="text-xs text-gray-400">-</span>;
-        }
         if (isActive) {
           return (
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={toggleLoading}
-                onClick={() => setConfirmDeactivate(item)}
-                className="inline-flex items-center gap-1 rounded-md border border-[#F7C1C1] px-2.5 py-1 text-xs font-semibold text-red-500 hover:bg-red-50 disabled:opacity-50"
-                style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-              >
-                ปิดใช้งาน
-              </button>
-            </div>
+            <button
+              type="button"
+              disabled={actionLoading}
+              onClick={() => setConfirmDeactivate(item)}
+              className="inline-flex items-center gap-1 rounded-md border border-[#F7C1C1] px-2.5 py-1 text-xs font-semibold text-red-500 hover:bg-red-50 disabled:opacity-50"
+              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+            >
+              ปิดใช้งาน
+            </button>
           );
         }
         return (
           <button
             type="button"
-            disabled={cancelLoading}
-            onClick={() =>
-              cancelDelete({ variables: { adminId: item.id } })
-            }
+            disabled={actionLoading}
+            onClick={() => handleActivate(item)}
             className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
             style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
           >
-            ยกเลิกการปิดใช้งาน
+            เปิดใช้งาน
           </button>
         );
       },
     },
-  ], [isSuperAdmin, toggleLoading, cancelLoading, cancelDelete]);
+  ], [viewerRole, actionLoading, handleActivate]);
 
   return (
     <div className="bg-[#F9FAFB] text-gray-900">
@@ -578,7 +571,7 @@ export default function AdminUsersPage() {
 
         <DataTable
           columns={columns}
-          items={pagedItems}
+          items={items}
           getRowKey={(item) => item.id}
           gridTemplateColumns={TABLE_GRID_COLUMNS}
           loading={isLoading}
@@ -589,27 +582,27 @@ export default function AdminUsersPage() {
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
                 <Icon name="error" variant="outlined" />
               </div>
-              <h2 className="mt-4 text-base font-semibold text-gray-900">โหลดรายการ Admin ไม่สำเร็จ</h2>
+              <h2 className="mt-4 text-base font-semibold text-gray-900">โหลดรายการผู้ใช้ไม่สำเร็จ</h2>
               <p className="mt-1 max-w-md text-sm text-gray-500">{err.message}</p>
             </div>
           )}
           renderEmpty={
             <div className="flex min-h-80 flex-col items-center justify-center px-6 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-[#0D9488]">
-                <Icon name="admin_panel_settings" variant="outlined" />
+                <Icon name="people" variant="outlined" />
               </div>
-              <h2 className="mt-4 text-base font-semibold text-gray-900">ไม่พบรายการ Admin</h2>
+              <h2 className="mt-4 text-base font-semibold text-gray-900">ไม่พบรายการผู้ใช้</h2>
               <p className="mt-1 max-w-md text-sm text-gray-500">
                 {trimmedSearch
-                  ? `ไม่พบ Admin ที่ตรงกับ "${trimmedSearch}"`
-                  : 'ยังไม่มี Admin ในแท็บนี้'}
+                  ? `ไม่พบผู้ใช้ที่ตรงกับ "${trimmedSearch}"`
+                  : 'ยังไม่มีผู้ใช้ในแท็บนี้'}
               </p>
             </div>
           }
           footer={
             <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-gray-500" style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
-                แสดง {firstItem}-{lastItem} จาก {totalFiltered} รายการ
+                แสดง {firstItem}-{lastItem} จาก {totalItems} รายการ
               </p>
               <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
             </div>
@@ -624,7 +617,7 @@ export default function AdminUsersPage() {
           onSuccess={() => {
             setShowInviteModal(false);
             showToast('ส่งคำเชิญเรียบร้อยแล้ว', 'success');
-            refetchAll();
+            refetch();
           }}
         />
       )}
@@ -632,11 +625,10 @@ export default function AdminUsersPage() {
       {confirmDeactivate && (
         <ConfirmDeactivateModal
           user={confirmDeactivate}
+          isAdminTarget={confirmDeactivate.role >= 3}
           onClose={() => setConfirmDeactivate(null)}
-          onConfirm={() =>
-            toggleStatus({ variables: { adminId: confirmDeactivate.id, isActive: false } })
-          }
-          loading={toggleLoading}
+          onConfirm={() => handleDeactivate(confirmDeactivate)}
+          loading={actionLoading}
         />
       )}
     </div>

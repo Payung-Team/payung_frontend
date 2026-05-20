@@ -12,7 +12,7 @@ interface NavMenuItem {
 const NAV_MENU: NavMenuItem[] = [
   { to: '/admin',       label: 'Dashboard',    icon: 'dashboard',            end: true,  minRole: 3 },
   { to: '/admin/kyc',   label: 'KYC Review',   icon: 'fact_check',           end: false, minRole: 3 },
-  { to: '/admin/users', label: 'จัดการ Admin', icon: 'admin_panel_settings', end: false, minRole: 4 },
+  { to: '/admin/users', label: 'จัดการผู้ใช้', icon: 'admin_panel_settings', end: false, minRole: 3 },
 ];
 
 interface AdminSidebarProps {
