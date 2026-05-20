@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import {
   ADMIN_USER_LIST,
@@ -325,6 +326,7 @@ function ConfirmDeactivateModal({ user, isAdminTarget, onClose, onConfirm, loadi
 
 export default function AdminUsersPage() {
   const { userRole } = useAuth();
+  const navigate = useNavigate();
   const viewerRole = userRole ?? 3;
   const isSuperAdmin = viewerRole === 4;
 
@@ -488,33 +490,46 @@ export default function AdminUsersPage() {
         if (action === 'none') return <span className="text-xs text-gray-400">-</span>;
 
         const isActive = item.isActive && !item.isSuspended;
-        if (isActive) {
-          return (
-            <button
-              type="button"
-              disabled={actionLoading}
-              onClick={() => setConfirmDeactivate(item)}
-              className="inline-flex items-center gap-1 rounded-md border border-[#F7C1C1] px-2.5 py-1 text-xs font-semibold text-red-500 hover:bg-red-50 disabled:opacity-50"
-              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-            >
-              ปิดใช้งาน
-            </button>
-          );
-        }
+        const isCaregiver = item.role === 2;
+
         return (
-          <button
-            type="button"
-            disabled={actionLoading}
-            onClick={() => handleActivate(item)}
-            className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-            style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-          >
-            เปิดใช้งาน
-          </button>
+          <div className="flex items-center gap-2">
+            {isCaregiver && (
+              <button
+                type="button"
+                onClick={() => navigate(`/admin/users/${item.id}`)}
+                className="inline-flex items-center gap-1 rounded-md border border-emerald-300 px-2.5 py-1 text-xs font-semibold text-emerald-600 hover:bg-emerald-50"
+                style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+              >
+                แก้ไข
+              </button>
+            )}
+            {isActive ? (
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => setConfirmDeactivate(item)}
+                className="inline-flex items-center gap-1 rounded-md border border-[#F7C1C1] px-2.5 py-1 text-xs font-semibold text-red-500 hover:bg-red-50 disabled:opacity-50"
+                style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+              >
+                ปิดใช้งาน
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => handleActivate(item)}
+                className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+              >
+                เปิดใช้งาน
+              </button>
+            )}
+          </div>
         );
       },
     },
-  ], [viewerRole, actionLoading, handleActivate]);
+  ], [viewerRole, actionLoading, handleActivate, navigate]);
 
   return (
     <div className="bg-[#F9FAFB] text-gray-900">
