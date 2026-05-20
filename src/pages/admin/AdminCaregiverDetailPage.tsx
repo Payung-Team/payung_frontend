@@ -487,26 +487,23 @@ export default function AdminCaregiverDetailPage() {
                             value={fieldValues.firstName}
                             onChange={(e) => handleFieldChange('firstName', e.target.value)}
                             disabled={!unlockedFields.firstName}
-                            className={`w-full rounded-lg border px-3 py-2 pr-10 text-sm outline-none transition-all ${
-                              unlockedFields.firstName
+                            className={`w-full rounded-lg border px-3 py-2 pr-10 text-sm outline-none transition-all ${unlockedFields.firstName
                                 ? 'border-[#059669] bg-white text-gray-900 focus:ring-1 focus:ring-[#059669] focus:border-[#059669]'
                                 : 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
-                            }`}
+                              }`}
                           />
-                          <div className={`absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none ${
-                            unlockedFields.firstName ? 'text-[#059669]' : 'text-gray-400'
-                          }`}>
+                          <div className={`absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none ${unlockedFields.firstName ? 'text-[#059669]' : 'text-gray-400'
+                            }`}>
                             <Icon name={unlockedFields.firstName ? 'lock_open' : 'lock'} size="small" />
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => toggleLock('firstName')}
-                          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${
-                            unlockedFields.firstName
+                          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${unlockedFields.firstName
                               ? 'border-[#059669] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5]'
                               : 'border-gray-200 bg-white text-gray-400 hover:bg-gray-50'
-                          }`}
+                            }`}
                         >
                           <Icon name={unlockedFields.firstName ? 'lock_open' : 'lock'} size="small" />
                         </button>
@@ -528,26 +525,23 @@ export default function AdminCaregiverDetailPage() {
                             value={fieldValues.lastName}
                             onChange={(e) => handleFieldChange('lastName', e.target.value)}
                             disabled={!unlockedFields.lastName}
-                            className={`w-full rounded-lg border px-3 py-2 pr-10 text-sm outline-none transition-all ${
-                              unlockedFields.lastName
+                            className={`w-full rounded-lg border px-3 py-2 pr-10 text-sm outline-none transition-all ${unlockedFields.lastName
                                 ? 'border-[#059669] bg-white text-gray-900 focus:ring-1 focus:ring-[#059669] focus:border-[#059669]'
                                 : 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
-                            }`}
+                              }`}
                           />
-                          <div className={`absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none ${
-                            unlockedFields.lastName ? 'text-[#059669]' : 'text-gray-400'
-                          }`}>
+                          <div className={`absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none ${unlockedFields.lastName ? 'text-[#059669]' : 'text-gray-400'
+                            }`}>
                             <Icon name={unlockedFields.lastName ? 'lock_open' : 'lock'} size="small" />
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => toggleLock('lastName')}
-                          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${
-                            unlockedFields.lastName
+                          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${unlockedFields.lastName
                               ? 'border-[#059669] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5]'
                               : 'border-gray-200 bg-white text-gray-400 hover:bg-gray-50'
-                          }`}
+                            }`}
                         >
                           <Icon name={unlockedFields.lastName ? 'lock_open' : 'lock'} size="small" />
                         </button>
@@ -569,26 +563,23 @@ export default function AdminCaregiverDetailPage() {
                             value={unlockedFields.idCardNumber ? fieldValues.idCardNumber : maskIdCard(fieldValues.idCardNumber)}
                             onChange={(e) => handleFieldChange('idCardNumber', e.target.value)}
                             disabled={!unlockedFields.idCardNumber}
-                            className={`w-full rounded-lg border px-3 py-2 pr-10 text-sm outline-none transition-all ${
-                              unlockedFields.idCardNumber
+                            className={`w-full rounded-lg border px-3 py-2 pr-10 text-sm outline-none transition-all ${unlockedFields.idCardNumber
                                 ? 'border-[#059669] bg-white text-gray-900 focus:ring-1 focus:ring-[#059669] focus:border-[#059669]'
                                 : 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
-                            }`}
+                              }`}
                           />
-                          <div className={`absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none ${
-                            unlockedFields.idCardNumber ? 'text-[#059669]' : 'text-gray-400'
-                          }`}>
+                          <div className={`absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none ${unlockedFields.idCardNumber ? 'text-[#059669]' : 'text-gray-400'
+                            }`}>
                             <Icon name={unlockedFields.idCardNumber ? 'lock_open' : 'lock'} size="small" />
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => toggleLock('idCardNumber')}
-                          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${
-                            unlockedFields.idCardNumber
+                          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${unlockedFields.idCardNumber
                               ? 'border-[#059669] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5]'
                               : 'border-gray-200 bg-white text-gray-400 hover:bg-gray-50'
-                          }`}
+                            }`}
                         >
                           <Icon name={unlockedFields.idCardNumber ? 'lock_open' : 'lock'} size="small" />
                         </button>
@@ -610,26 +601,23 @@ export default function AdminCaregiverDetailPage() {
                             value={fieldValues.email}
                             onChange={(e) => handleFieldChange('email', e.target.value)}
                             disabled={!unlockedFields.email}
-                            className={`w-full rounded-lg border px-3 py-2 pr-10 text-sm outline-none transition-all ${
-                              unlockedFields.email
+                            className={`w-full rounded-lg border px-3 py-2 pr-10 text-sm outline-none transition-all ${unlockedFields.email
                                 ? 'border-[#059669] bg-white text-gray-900 focus:ring-1 focus:ring-[#059669] focus:border-[#059669]'
                                 : 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
-                            }`}
+                              }`}
                           />
-                          <div className={`absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none ${
-                            unlockedFields.email ? 'text-[#059669]' : 'text-gray-400'
-                          }`}>
+                          <div className={`absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none ${unlockedFields.email ? 'text-[#059669]' : 'text-gray-400'
+                            }`}>
                             <Icon name={unlockedFields.email ? 'lock_open' : 'lock'} size="small" />
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => toggleLock('email')}
-                          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${
-                            unlockedFields.email
+                          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${unlockedFields.email
                               ? 'border-[#059669] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5]'
                               : 'border-gray-200 bg-white text-gray-400 hover:bg-gray-50'
-                          }`}
+                            }`}
                         >
                           <Icon name={unlockedFields.email ? 'lock_open' : 'lock'} size="small" />
                         </button>

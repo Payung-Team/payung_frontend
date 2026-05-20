@@ -1007,7 +1007,13 @@ export default function AdminUsersPage() {
             <button
               type="button"
               disabled={actionLoading}
-              onClick={() => setEditTarget(item)}
+              onClick={() => {
+                if (item.role === 2) {
+                  navigate(`/admin/users/${item.id}`);
+                } else {
+                  setEditTarget(item);
+                }
+              }}
               className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
               style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
             >
