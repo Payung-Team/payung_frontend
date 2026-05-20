@@ -479,6 +479,7 @@ export const ADMIN_USER_LIST = gql`
         role
         isActive
         isSuspended
+        scheduledDeleteAt
         createdAt
       }
       total
@@ -521,7 +522,7 @@ export const TOGGLE_ADMIN_STATUS = gql`
 `;
 
 export const CANCEL_SCHEDULED_DELETE = gql`
-  mutation CancelScheduledDelete($adminId: ID!) {
+  mutation CancelScheduledDelete($adminId: String!) {
     cancelScheduledDelete(input: { adminId: $adminId }) {
       user {
         id
@@ -529,6 +530,33 @@ export const CANCEL_SCHEDULED_DELETE = gql`
         isActive
       }
       reactivated
+    }
+  }
+`;
+
+export const UPDATE_ADMIN_USER = gql`
+  mutation UpdateAdminUser($adminId: ID!, $firstName: String, $lastName: String, $email: String, $role: Int) {
+    editAdminInfo(input: { adminId: $adminId, firstName: $firstName, lastName: $lastName, email: $email, role: $role }) {
+      user {
+        id
+        email
+        displayName
+        role
+      }
+    }
+  }
+`;
+
+export const SCHEDULE_DELETE_ADMIN = gql`
+  mutation ScheduleDeleteAdmin($adminId: String!, $gracePeriodDays: Int!) {
+    scheduleDeleteAdmin(input: { adminId: $adminId, gracePeriodDays: $gracePeriodDays }) {
+      user {
+        id
+        email
+        isActive
+      }
+      scheduledDeleteAt
+      gracePeriodDays
     }
   }
 `;
