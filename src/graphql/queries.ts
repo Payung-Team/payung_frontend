@@ -596,3 +596,28 @@ export const ACTIVATE_USER = gql`
     }
   }
 `;
+
+export const ADMIN_UPDATE_CAREGIVER_INFO = gql`
+  mutation AdminUpdateCaregiverInfo($input: AdminUpdateCaregiverInfoInput!) {
+    adminUpdateCaregiverInfo(input: $input) {
+      id
+      firstName
+      lastName
+      idCardNumber
+      email
+    }
+  }
+`;
+
+export const ADMIN_EDIT_USER = gql`
+  mutation AdminEditUser($input: AdminEditUserInput!) {
+    adminEditUser(input: $input) {
+      id
+      displayName
+      email
+      phone
+      address
+      bio
+    }
+  }
+`;

@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery } from '@apollo/client/react';
+import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
+import { ADMIN_UPDATE_CAREGIVER_INFO } from '../../graphql/queries';
 import Icon from '../../components/ui/Icon';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Avatar from '../../components/ui/Avatar';
@@ -154,8 +155,10 @@ export default function AdminCaregiverDetailPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'general' | 'kyc'>('general');
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   // 1. Fetch User & Caregiver Details by userId
-  const { data: userDetailData, loading: userDetailLoading, error: userDetailError } = useQuery(
+  const { data: userDetailData, loading: userDetailLoading, error: userDetailError, refetch: refetchUserDetail } = useQuery(
     GET_ADMIN_CAREGIVER_DETAIL,
     {
       variables: { userId: caregiverId },
@@ -163,6 +166,18 @@ export default function AdminCaregiverDetailPage() {
       fetchPolicy: 'cache-and-network',
     }
   );
+
+  const [updateCaregiverInfo, { loading: saveLoading }] = useMutation(ADMIN_UPDATE_CAREGIVER_INFO, {
+    onCompleted: () => {
+      setSavedOverrides(null);
+      setSaveError(null);
+      setUnlockedFields({ firstName: false, lastName: false, idCardNumber: false, email: false });
+      refetchUserDetail();
+    },
+    onError: (err) => {
+      setSaveError(err.message);
+    },
+  });
 
   const caregiver = userDetailData?.adminUserDetail?.caregiver;
   const user = userDetailData?.adminUserDetail?.user;
@@ -269,18 +284,16 @@ export default function AdminCaregiverDetailPage() {
   }, [fieldValues, initialValues]);
 
   const handleSave = () => {
-    setSavedOverrides({
-      firstName: fieldValues.firstName,
-      lastName: fieldValues.lastName,
-      idCardNumber: fieldValues.idCardNumber,
-      email: fieldValues.email,
-    });
-    setUnlockedFields({
-      firstName: false,
-      lastName: false,
-      idCardNumber: false,
-      email: false,
-    });
+    if (!caregiver?.id) return;
+    setSaveError(null);
+
+    const input: Record<string, string> = { caregiverId: caregiver.id };
+    if (fieldValues.firstName !== initialValues.firstName) input.firstName = fieldValues.firstName;
+    if (fieldValues.lastName !== initialValues.lastName) input.lastName = fieldValues.lastName;
+    if (fieldValues.idCardNumber !== initialValues.idCardNumber) input.idCardNumber = fieldValues.idCardNumber;
+    if (fieldValues.email !== initialValues.email) input.email = fieldValues.email;
+
+    updateCaregiverInfo({ variables: { input } });
   };
 
   const handleCancel = () => {
@@ -632,21 +645,31 @@ export default function AdminCaregiverDetailPage() {
 
                     {/* Buttons Bar shown only when modified */}
                     {isModified && (
-                      <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 md:col-span-2">
-                        <button
-                          type="button"
-                          onClick={handleCancel}
-                          className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
-                        >
-                          ยกเลิก
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleSave}
-                          className="inline-flex h-9 items-center justify-center rounded-lg bg-[#059669] px-4 text-sm font-semibold text-white hover:bg-[#047857] shadow-sm transition-colors cursor-pointer"
-                        >
-                          บันทึกการแก้ไข
-                        </button>
+                      <div className="md:col-span-2 pt-6 border-t border-gray-100 space-y-3">
+                        {saveError && (
+                          <p className="text-xs text-red-500 text-right">{saveError}</p>
+                        )}
+                        <div className="flex justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={handleCancel}
+                            disabled={saveLoading}
+                            className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            ยกเลิก
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={saveLoading || !caregiver?.id}
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#059669] px-4 text-sm font-semibold text-white hover:bg-[#047857] shadow-sm transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {saveLoading && (
+                              <span className="material-icons animate-spin" style={{ fontSize: 14 }}>refresh</span>
+                            )}
+                            {saveLoading ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
