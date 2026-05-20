@@ -31,7 +31,7 @@ interface UserSummary {
   displayName?: string;
   role: number;
   isActive: boolean;
-  isSuspended: boolean;
+  isSuspended?: boolean | null;
   scheduledDeleteAt?: string | null;
   createdAt: string;
 }
