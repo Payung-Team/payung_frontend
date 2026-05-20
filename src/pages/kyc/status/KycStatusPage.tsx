@@ -333,7 +333,7 @@ export default function KycStatusPage() {
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto pt-4">
+          <div className="pt-4">
             <button
               onClick={() => refetch()}
               className="flex items-center justify-center gap-2 px-7 py-3 bg-white border border-[#CBD5E1] rounded-xl text-[#334055] font-semibold hover:bg-[#F8FAFC] transition-colors w-full sm:w-[180px] cursor-pointer"
@@ -341,13 +341,6 @@ export default function KycStatusPage() {
             >
               <Icon name="refresh" color="currentColor" style={{ fontSize: '18px' }} />
               รีเฟรชสถานะ
-            </button>
-            <button
-              onClick={() => navigate('/')}
-              className="flex items-center justify-center gap-2 px-7 py-3 bg-[#0F766E] text-white font-semibold rounded-xl shadow-[0px_4px_10px_-2px_rgba(15,118,110,0.24)] hover:bg-[#0D635C] transition-all w-full sm:w-[200px] cursor-pointer"
-              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-            >
-              กลับหน้าหลัก
             </button>
           </div>
         </div>

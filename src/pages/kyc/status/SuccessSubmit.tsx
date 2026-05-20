@@ -52,15 +52,8 @@ export default function KycSuccess() {
         {/* Action Buttons */}
         <div className="flex flex-col items-center gap-3 w-full max-w-[320px]">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/kyc/status')}
             className="w-full h-[47px] bg-[#0F766E] text-white rounded-xl font-semibold text-[15px] flex items-center justify-center shadow-lg shadow-[#0F1181E] hover:bg-[#0D655E] transition-all cursor-pointer"
-            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-          >
-            กลับหน้าหลัก
-          </button>
-          <button
-            onClick={() => navigate('/kyc/status')} // or another relevant route
-            className="h-[34px] flex items-center gap-1.5 text-[14px] font-semibold text-[#0F766E] hover:underline cursor-pointer"
             style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
           >
             ดูสถานะการยืนยัน →
