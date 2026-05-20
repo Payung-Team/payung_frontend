@@ -4,10 +4,12 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import {
   ADMIN_USER_LIST,
   INVITE_ADMIN,
-  TOGGLE_ADMIN_STATUS,
+  SCHEDULE_DELETE_ADMIN,
   CANCEL_SCHEDULED_DELETE,
+  TOGGLE_ADMIN_STATUS,
   SUSPEND_USER,
   ACTIVATE_USER,
+  UPDATE_ADMIN_USER,
 } from '../../graphql/queries';
 import { useAuth } from '../../context/AuthContext';
 import Icon from '../../components/ui/Icon';
@@ -30,6 +32,7 @@ interface UserSummary {
   role: number;
   isActive: boolean;
   isSuspended: boolean;
+  scheduledDeleteAt?: string | null;
   createdAt: string;
 }
 
@@ -50,7 +53,7 @@ interface AdminUserListResponse {
 // ─── Constants ─────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 20;
-const TABLE_GRID_COLUMNS = 'minmax(160px,1.5fr) minmax(180px,2fr) 140px 200px 140px minmax(130px,auto)';
+const TABLE_GRID_COLUMNS = 'minmax(160px,1.5fr) minmax(180px,2fr) 140px 200px 140px minmax(190px,auto)';
 
 const ROLE_LABELS: Record<number, { label: string; badgeClass: string; textClass: string }> = {
   1: { label: 'ผู้ใช้', badgeClass: 'bg-gray-100', textClass: 'text-gray-600' },
@@ -60,6 +63,12 @@ const ROLE_LABELS: Record<number, { label: string; badgeClass: string; textClass
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
+
+function daysUntil(dateStr?: string | null): number {
+  if (!dateStr) return 0;
+  const diff = new Date(dateStr).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
 
 function formatDate(value?: string | null) {
   if (!value) return '-';
@@ -80,6 +89,13 @@ function getInitial(displayName?: string, email?: string) {
 function getActionType(viewerRole: number, targetRole: number): ActionType {
   if (targetRole >= 3) return viewerRole === 4 ? 'admin' : 'none';
   return viewerRole >= 3 ? 'user' : 'none';
+}
+
+function splitDisplayName(displayName?: string) {
+  if (!displayName) return { firstName: '', lastName: '' };
+  const idx = displayName.indexOf(' ');
+  if (idx === -1) return { firstName: displayName, lastName: '' };
+  return { firstName: displayName.slice(0, idx), lastName: displayName.slice(idx + 1) };
 }
 
 // ─── Skeleton ──────────────────────────────────────────────────────────────
@@ -115,8 +131,31 @@ interface InviteModalProps {
   onSuccess: () => void;
 }
 
+const INPUT_STYLE_BASE: React.CSSProperties = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '10px 14px',
+  borderRadius: 8,
+  fontFamily: 'Bai Jamjuree, sans-serif',
+  fontSize: 13,
+  lineHeight: '16px',
+  color: '#1F2937',
+  outline: 'none',
+  background: '#FFFFFF',
+};
+
+const LABEL_STYLE: React.CSSProperties = {
+  display: 'block',
+  fontFamily: 'Bai Jamjuree, sans-serif',
+  fontWeight: 600,
+  fontSize: 12,
+  lineHeight: '18px',
+  color: '#4B5563',
+  marginBottom: 6,
+};
+
 function InviteAdminModal({ onClose, onSuccess }: Readonly<InviteModalProps>) {
-  const [form, setForm] = useState({ email: '', firstName: '', lastName: '', role: 3 });
+  const [form, setForm] = useState({ email: '', firstName: '', lastName: '', role: '' });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState('');
 
@@ -127,10 +166,11 @@ function InviteAdminModal({ onClose, onSuccess }: Readonly<InviteModalProps>) {
 
   function validate() {
     const errs: Record<string, string> = {};
-    if (!form.email.trim()) errs.email = 'กรุณากรอกอีเมล';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'รูปแบบอีเมลไม่ถูกต้อง';
     if (!form.firstName.trim()) errs.firstName = 'กรุณากรอกชื่อ';
     if (!form.lastName.trim()) errs.lastName = 'กรุณากรอกนามสกุล';
+    if (!form.email.trim()) errs.email = 'กรุณากรอกอีเมล';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'รูปแบบอีเมลไม่ถูกต้อง';
+    if (!form.role) errs.role = 'กรุณาเลือกบทบาท';
     return errs;
   }
 
@@ -145,122 +185,404 @@ function InviteAdminModal({ onClose, onSuccess }: Readonly<InviteModalProps>) {
         email: form.email.trim(),
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
-        role: form.role,
+        role: Number.parseInt(form.role, 10),
       },
     });
   }
 
   return (
-    <dialog open className="fixed inset-0 z-50 m-0 flex h-screen w-screen max-w-none items-center justify-center p-0">
-      <button type="button" aria-label="ปิด" className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-        <div className="mb-5 flex items-start justify-between">
-          <div>
-            <h2 className="text-base font-bold text-[#064E3B]" style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
-              เชิญ Admin ใหม่
-            </h2>
-            <p className="mt-0.5 text-xs text-gray-500" style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
-              ระบบจะส่งรหัสผ่านชั่วคราวไปยังอีเมลที่กรอก
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="ml-4 rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          >
-            <span className="material-icons text-lg">close</span>
-          </button>
-        </div>
+    <dialog open className="fixed inset-0 z-50 m-0 flex h-screen w-screen max-w-none items-center justify-center p-0 bg-black/40 backdrop-blur-sm">
+      <button type="button" aria-label="ปิด" className="absolute inset-0" onClick={onClose} />
+      <div
+        className="relative z-10 w-full"
+        style={{
+          maxWidth: 480,
+          background: '#FFFFFF',
+          borderRadius: 16,
+          boxShadow: '0px 12px 40px rgba(0, 0, 0, 0.12)',
+          padding: '28px 28px 28px 28px',
+        }}
+      >
+        {/* Header */}
+        <h2
+          style={{
+            fontFamily: 'Bai Jamjuree, sans-serif',
+            fontWeight: 700,
+            fontSize: 18,
+            lineHeight: '27px',
+            color: '#064E3B',
+            margin: 0,
+          }}
+        >
+          เชิญ Admin ใหม่
+        </h2>
+        <p
+          style={{
+            fontFamily: 'Bai Jamjuree, sans-serif',
+            fontWeight: 400,
+            fontSize: 13,
+            lineHeight: '20px',
+            color: '#6B7280',
+            margin: '5px 0 20px 0',
+          }}
+        >
+          ระบบจะส่งคำเชิญและรหัสบัญชีชั่วคราวไปยังอีเมลที่กรอก
+        </p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="invite-firstName" className="mb-1 block text-xs font-semibold text-gray-600" style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
-                ชื่อ
-              </label>
-              <input
-                id="invite-firstName"
-                type="text"
-                value={form.firstName}
-                onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
-                className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]/40 ${fieldErrors.firstName ? 'border-red-400' : 'border-gray-200'}`}
-                style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-                placeholder="ชื่อ"
-              />
-              {fieldErrors.firstName && <p className="mt-1 text-xs text-red-500">{fieldErrors.firstName}</p>}
-            </div>
-            <div>
-              <label htmlFor="invite-lastName" className="mb-1 block text-xs font-semibold text-gray-600" style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
-                นามสกุล
-              </label>
-              <input
-                id="invite-lastName"
-                type="text"
-                value={form.lastName}
-                onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
-                className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]/40 ${fieldErrors.lastName ? 'border-red-400' : 'border-gray-200'}`}
-                style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-                placeholder="นามสกุล"
-              />
-              {fieldErrors.lastName && <p className="mt-1 text-xs text-red-500">{fieldErrors.lastName}</p>}
-            </div>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* ชื่อ */}
+          <div>
+            <label htmlFor="invite-firstName" style={LABEL_STYLE}>
+              {'ชื่อ '}
+              <span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <input
+              id="invite-firstName"
+              type="text"
+              value={form.firstName}
+              onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+              placeholder="ชื่อ"
+              style={{
+                ...INPUT_STYLE_BASE,
+                border: `0.8px solid ${fieldErrors.firstName ? '#EF4444' : '#E5E7EB'}`,
+              }}
+            />
+            {fieldErrors.firstName && (
+              <p style={{ marginTop: 4, fontSize: 11, color: '#EF4444', fontFamily: 'Bai Jamjuree, sans-serif' }}>
+                {fieldErrors.firstName}
+              </p>
+            )}
           </div>
 
+          {/* นามสกุล */}
           <div>
-            <label htmlFor="invite-email" className="mb-1 block text-xs font-semibold text-gray-600" style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
-              อีเมล
+            <label htmlFor="invite-lastName" style={LABEL_STYLE}>
+              {'นามสกุล '}
+              <span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <input
+              id="invite-lastName"
+              type="text"
+              value={form.lastName}
+              onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+              placeholder="นามสกุล"
+              style={{
+                ...INPUT_STYLE_BASE,
+                border: `0.8px solid ${fieldErrors.lastName ? '#EF4444' : '#E5E7EB'}`,
+              }}
+            />
+            {fieldErrors.lastName && (
+              <p style={{ marginTop: 4, fontSize: 11, color: '#EF4444', fontFamily: 'Bai Jamjuree, sans-serif' }}>
+                {fieldErrors.lastName}
+              </p>
+            )}
+          </div>
+
+          {/* อีเมล */}
+          <div>
+            <label htmlFor="invite-email" style={LABEL_STYLE}>
+              {'อีเมล '}
+              <span style={{ color: '#EF4444' }}>*</span>
             </label>
             <input
               id="invite-email"
               type="email"
               value={form.email}
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-              className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]/40 ${fieldErrors.email ? 'border-red-400' : 'border-gray-200'}`}
-              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-              placeholder="admin@example.com"
+              placeholder="name@payung.co"
+              style={{
+                ...INPUT_STYLE_BASE,
+                border: `0.8px solid ${fieldErrors.email ? '#EF4444' : '#E5E7EB'}`,
+              }}
             />
-            {fieldErrors.email && <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p>}
+            {fieldErrors.email && (
+              <p style={{ marginTop: 4, fontSize: 11, color: '#EF4444', fontFamily: 'Bai Jamjuree, sans-serif' }}>
+                {fieldErrors.email}
+              </p>
+            )}
           </div>
 
+          {/* บทบาท */}
           <div>
-            <label htmlFor="invite-role" className="mb-1 block text-xs font-semibold text-gray-600" style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
-              บทบาท
+            <label htmlFor="invite-role" style={LABEL_STYLE}>
+              {'บทบาท '}
+              <span style={{ color: '#EF4444' }}>*</span>
             </label>
-            <select
-              id="invite-role"
-              value={form.role}
-              onChange={(e) => setForm((f) => ({ ...f, role: Number.parseInt(e.target.value, 10) }))}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]/40"
-              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-            >
-              <option value={3}>Admin</option>
-              <option value={4}>Super Admin</option>
-            </select>
+            <div style={{ position: 'relative' }}>
+              <select
+                id="invite-role"
+                value={form.role}
+                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                style={{
+                  ...INPUT_STYLE_BASE,
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  border: `0.8px solid ${fieldErrors.role ? '#EF4444' : '#E5E7EB'}`,
+                  color: form.role ? '#1F2937' : 'rgba(31, 41, 55, 0.5)',
+                  cursor: 'pointer',
+                  paddingRight: 36,
+                }}
+              >
+                <option value="" disabled>เลือกบทบาท</option>
+                <option value="3">Admin</option>
+                <option value="4">Super Admin</option>
+              </select>
+              <span
+                className="material-icons"
+                style={{
+                  position: 'absolute',
+                  right: 10,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  fontSize: 19,
+                  color: '#757575',
+                  pointerEvents: 'none',
+                }}
+              >
+                expand_more
+              </span>
+            </div>
+            {fieldErrors.role && (
+              <p style={{ marginTop: 4, fontSize: 11, color: '#EF4444', fontFamily: 'Bai Jamjuree, sans-serif' }}>
+                {fieldErrors.role}
+              </p>
+            )}
           </div>
 
+          {/* Server error */}
           {submitError && (
-            <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600" style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
+            <div
+              style={{
+                borderRadius: 6,
+                background: '#FEF2F2',
+                padding: '8px 12px',
+                fontSize: 12,
+                color: '#DC2626',
+                fontFamily: 'Bai Jamjuree, sans-serif',
+              }}
+            >
               {submitError}
             </div>
           )}
 
-          <div className="mt-1 flex justify-end gap-2">
+          {/* Action buttons */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+              style={{
+                width: 115,
+                height: 42,
+                background: '#FFFFFF',
+                border: '0.8px solid rgba(0, 0, 0, 0.1)',
+                borderRadius: 4,
+                fontFamily: 'Bai Jamjuree, sans-serif',
+                fontWeight: 500,
+                fontSize: 14,
+                color: '#0A0A0A',
+                cursor: 'pointer',
+              }}
             >
               ยกเลิก
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center gap-1.5 rounded-lg bg-[#059669] px-4 py-2 text-xs font-semibold text-white hover:bg-[#047857] disabled:opacity-60"
-              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+              style={{
+                width: 143,
+                height: 42,
+                background: loading ? '#6EE7B7' : '#059669',
+                boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
+                borderRadius: 4,
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 4,
+                fontFamily: 'Bai Jamjuree, sans-serif',
+                fontWeight: 500,
+                fontSize: 14,
+                color: '#FFFFFF',
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
             >
-              {loading && <span className="material-icons animate-spin text-sm">refresh</span>}
+              {loading
+                ? <span className="material-icons animate-spin" style={{ fontSize: 18 }}>refresh</span>
+                : <span className="material-icons" style={{ fontSize: 18 }}>mail</span>
+              }
               ส่งคำเชิญ
+            </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+  );
+}
+
+// ─── Edit Admin Modal ──────────────────────────────────────────────────────
+
+interface EditAdminModalProps {
+  user: UserSummary;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function EditAdminModal({ user, onClose, onSuccess }: Readonly<EditAdminModalProps>) {
+  const { firstName: initFirst, lastName: initLast } = splitDisplayName(user.displayName);
+  const [form, setForm] = useState({ firstName: initFirst, lastName: initLast, email: user.email, role: String(user.role) });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState('');
+
+  const [updateAdmin, { loading }] = useMutation(UPDATE_ADMIN_USER, {
+    onCompleted: () => { onSuccess(); },
+    onError: (err) => { setSubmitError(err.message); },
+  });
+
+  function validate() {
+    const errs: Record<string, string> = {};
+    if (!form.firstName.trim()) errs.firstName = 'กรุณากรอกชื่อ';
+    if (!form.lastName.trim()) errs.lastName = 'กรุณากรอกนามสกุล';
+    if (!form.email.trim()) errs.email = 'กรุณากรอกอีเมล';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'รูปแบบอีเมลไม่ถูกต้อง';
+    if (!form.role) errs.role = 'กรุณาเลือกบทบาท';
+    return errs;
+  }
+
+  function handleSubmit(e: React.SyntheticEvent) {
+    e.preventDefault();
+    setSubmitError('');
+    const errs = validate();
+    if (Object.keys(errs).length > 0) { setFieldErrors(errs); return; }
+    setFieldErrors({});
+    updateAdmin({
+      variables: {
+        adminId: user.id,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+        role: Number.parseInt(form.role, 10),
+      },
+    });
+  }
+
+  return (
+    <dialog open className="fixed inset-0 z-50 m-0 flex h-screen w-screen max-w-none items-center justify-center p-0 bg-black/40 backdrop-blur-sm">
+      <button type="button" aria-label="ปิด" className="absolute inset-0" onClick={onClose} />
+      <div
+        className="relative z-10 w-full"
+        style={{
+          maxWidth: 480,
+          background: '#FFFFFF',
+          borderRadius: 16,
+          boxShadow: '0px 12px 40px rgba(0, 0, 0, 0.12)',
+          padding: 28,
+        }}
+      >
+        <h2 style={{ fontFamily: 'Bai Jamjuree, sans-serif', fontWeight: 700, fontSize: 18, lineHeight: '27px', color: '#064E3B', margin: 0 }}>
+          แก้ไขข้อมูลผู้ดูแลระบบ
+        </h2>
+        <p style={{ fontFamily: 'Bai Jamjuree, sans-serif', fontWeight: 600, fontSize: 13, lineHeight: '20px', color: '#0D9488', margin: '5px 0 20px 0' }}>
+          {user.displayName || user.email}
+        </p>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* ชื่อ */}
+          <div>
+            <label htmlFor="edit-firstName" style={LABEL_STYLE}>
+              {'ชื่อ '}<span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <input
+              id="edit-firstName"
+              type="text"
+              value={form.firstName}
+              onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+              placeholder="ชื่อ"
+              style={{ ...INPUT_STYLE_BASE, border: `0.8px solid ${fieldErrors.firstName ? '#EF4444' : '#E5E7EB'}` }}
+            />
+            {fieldErrors.firstName && <p style={{ marginTop: 4, fontSize: 11, color: '#EF4444', fontFamily: 'Bai Jamjuree, sans-serif' }}>{fieldErrors.firstName}</p>}
+          </div>
+
+          {/* นามสกุล */}
+          <div>
+            <label htmlFor="edit-lastName" style={LABEL_STYLE}>
+              {'นามสกุล '}<span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <input
+              id="edit-lastName"
+              type="text"
+              value={form.lastName}
+              onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+              placeholder="นามสกุล"
+              style={{ ...INPUT_STYLE_BASE, border: `0.8px solid ${fieldErrors.lastName ? '#EF4444' : '#E5E7EB'}` }}
+            />
+            {fieldErrors.lastName && <p style={{ marginTop: 4, fontSize: 11, color: '#EF4444', fontFamily: 'Bai Jamjuree, sans-serif' }}>{fieldErrors.lastName}</p>}
+          </div>
+
+          {/* อีเมล */}
+          <div>
+            <label htmlFor="edit-email" style={LABEL_STYLE}>
+              {'อีเมล '}<span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <input
+              id="edit-email"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              placeholder="name@payung.co"
+              style={{ ...INPUT_STYLE_BASE, border: `0.8px solid ${fieldErrors.email ? '#EF4444' : '#E5E7EB'}` }}
+            />
+            {fieldErrors.email && <p style={{ marginTop: 4, fontSize: 11, color: '#EF4444', fontFamily: 'Bai Jamjuree, sans-serif' }}>{fieldErrors.email}</p>}
+          </div>
+
+          {/* บทบาท */}
+          <div>
+            <label htmlFor="edit-role" style={LABEL_STYLE}>
+              {'บทบาท '}<span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <div style={{ position: 'relative' }}>
+              <select
+                id="edit-role"
+                value={form.role}
+                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                style={{
+                  ...INPUT_STYLE_BASE,
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  border: `0.8px solid ${fieldErrors.role ? '#EF4444' : '#E5E7EB'}`,
+                  cursor: 'pointer',
+                  paddingRight: 36,
+                }}
+              >
+                <option value="3">Admin</option>
+                <option value="4">Super Admin</option>
+              </select>
+              <span className="material-icons" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 19, color: '#757575', pointerEvents: 'none' }}>
+                expand_more
+              </span>
+            </div>
+          </div>
+
+          {submitError && (
+            <div style={{ borderRadius: 6, background: '#FEF2F2', padding: '8px 12px', fontSize: 12, color: '#DC2626', fontFamily: 'Bai Jamjuree, sans-serif' }}>
+              {submitError}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ width: 115, height: 42, background: '#FFFFFF', border: '0.8px solid rgba(0,0,0,0.1)', borderRadius: 4, fontFamily: 'Bai Jamjuree, sans-serif', fontWeight: 500, fontSize: 14, color: '#0A0A0A', cursor: 'pointer' }}
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{ width: 143, height: 42, background: loading ? 'rgba(5,150,105,0.5)' : '#059669', boxShadow: '0px 4px 4px rgba(0,0,0,0.25)', borderRadius: 4, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontFamily: 'Bai Jamjuree, sans-serif', fontWeight: 500, fontSize: 14, color: '#FFFFFF', cursor: loading ? 'not-allowed' : 'pointer' }}
+            >
+              {loading && <span className="material-icons animate-spin" style={{ fontSize: 18 }}>refresh</span>}
+              บันทึก
             </button>
           </div>
         </form>
@@ -280,29 +602,180 @@ interface ConfirmDeactivateProps {
 }
 
 function ConfirmDeactivateModal({ user, isAdminTarget, onClose, onConfirm, loading }: Readonly<ConfirmDeactivateProps>) {
-  const name = user.displayName || user.email;
+  const [inputValue, setInputValue] = useState('');
+  const confirmName = user.displayName || user.email;
+  const isMatch = inputValue === confirmName;
+
   return (
-    <dialog open className="fixed inset-0 z-50 m-0 flex h-screen w-screen max-w-none items-center justify-center p-0">
-      <button type="button" aria-label="ปิด" className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
-          <span className="material-icons text-red-500">person_off</span>
+    <dialog open className="fixed inset-0 z-50 m-0 flex h-screen w-screen max-w-none items-center justify-center p-0 bg-black/40 backdrop-blur-sm">
+      <button type="button" aria-label="ปิด" className="absolute inset-0" onClick={onClose} />
+      <div
+        className="relative z-10 w-full"
+        style={{
+          maxWidth: 614,
+          background: '#FFFFFF',
+          borderRadius: 12,
+          padding: '33px 68px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 22,
+        }}
+      >
+        {/* Icon */}
+        <span className="material-icons" style={{ fontSize: 69, color: '#F24822' }}>person_off</span>
+
+        {/* Title + subtitle */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, width: '100%' }}>
+          <h2 style={{ fontFamily: 'Bai Jamjuree, sans-serif', fontWeight: 600, fontSize: 20, lineHeight: '25px', color: '#DC2626', margin: 0, textAlign: 'center' }}>
+            ปิดการใช้งาน?
+          </h2>
+          <p style={{ fontFamily: 'Bai Jamjuree, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '24px', color: '#717182', margin: 0, textAlign: 'center' }}>
+            {isAdminTarget
+              ? 'บัญชีจะถูกระงับทันทีและจะถูกลบถาวรภายใน 7 วัน หากไม่มีการเปิดใช้งาน'
+              : 'บัญชีของผู้ใช้นี้จะถูกระงับทันที'}
+          </p>
         </div>
-        <h2 className="text-sm font-bold text-gray-900" style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
-          ปิดการใช้งานบัญชี
-        </h2>
-        <p className="mt-1 text-xs text-gray-500" style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
-          คุณต้องการปิดการใช้งานบัญชีของ <span className="font-semibold text-gray-700">{name}</span> หรือไม่?{' '}
-          {isAdminTarget
-            ? 'บัญชีจะถูกระงับทันทีและจะถูกลบถาวรหลังจากสิ้นสุด grace period'
-            : 'บัญชีจะถูกระงับทันที'}
-        </p>
-        <div className="mt-5 flex justify-end gap-2">
+
+        {/* Input section */}
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ fontFamily: 'Bai Jamjuree, sans-serif', fontWeight: 500, fontSize: 15, lineHeight: '24px', color: '#575859', margin: 0 }}>
+            {'พิมพ์ชื่อ '}
+            <span style={{ fontWeight: 600 }}>"{confirmName}"</span>
+            {' ลงในช่องด้านล่างเพื่อยืนยันการปิดใช้งาน'}
+          </p>
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder={confirmName}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              height: 50,
+              padding: '13px 16px',
+              fontFamily: 'Bai Jamjuree, sans-serif',
+              fontWeight: 500,
+              fontSize: 15,
+              lineHeight: '24px',
+              color: '#575859',
+              background: '#FFFFFF',
+              border: `1.5px solid ${isMatch ? '#059669' : '#DC2626'}`,
+              borderRadius: 8,
+              outline: 'none',
+            }}
+          />
+        </div>
+
+        {/* Buttons */}
+        <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 }}>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-            style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+            style={{
+              width: 115,
+              height: 35,
+              background: '#FFFFFF',
+              border: '0.8px solid rgba(0,0,0,0.1)',
+              borderRadius: 4,
+              fontFamily: 'Bai Jamjuree, sans-serif',
+              fontWeight: 500,
+              fontSize: 14,
+              color: '#0A0A0A',
+              cursor: 'pointer',
+            }}
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!isMatch || loading}
+            style={{
+              width: 143,
+              height: 35,
+              background: '#FEF2F2',
+              border: '1px solid rgba(220,38,38,0.2)',
+              borderRadius: 4,
+              fontFamily: 'Bai Jamjuree, sans-serif',
+              fontWeight: 500,
+              fontSize: 14,
+              color: isMatch ? '#DC2626' : 'rgba(220,38,38,0.5)',
+              cursor: isMatch && !loading ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            {loading && <span className="material-icons animate-spin" style={{ fontSize: 14 }}>refresh</span>}
+            ปิดการใช้งาน
+          </button>
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
+// ─── Confirm Activate Modal ────────────────────────────────────────────────
+
+interface ConfirmActivateProps {
+  user: UserSummary;
+  onClose: () => void;
+  onConfirm: () => void;
+  loading: boolean;
+}
+
+function ConfirmActivateModal({ user, onClose, onConfirm, loading }: Readonly<ConfirmActivateProps>) {
+  const name = user.displayName || user.email;
+  return (
+    <dialog open className="fixed inset-0 z-50 m-0 flex h-screen w-screen max-w-none items-center justify-center p-0 bg-black/40 backdrop-blur-sm">
+      <button type="button" aria-label="ปิด" className="absolute inset-0" onClick={onClose} />
+      <div
+        className="relative z-10 w-full"
+        style={{
+          maxWidth: 614,
+          background: '#FFFFFF',
+          borderRadius: 12,
+          padding: '33px 68px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 22,
+        }}
+      >
+        {/* Icon */}
+        <div style={{ width: 88, height: 88, borderRadius: '50%', background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <span className="material-icons" style={{ fontSize: 64, color: '#14AE5C' }}>check</span>
+        </div>
+
+        {/* Title + subtitle */}
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <h2 style={{ fontFamily: 'Bai Jamjuree, sans-serif', fontWeight: 600, fontSize: 24, lineHeight: '30px', color: '#059669', margin: 0, textAlign: 'center', width: '100%' }}>
+            เปิดการใช้งาน?
+          </h2>
+          <p style={{ fontFamily: 'Bai Jamjuree, sans-serif', fontWeight: 600, fontSize: 14, lineHeight: '24px', color: '#717182', margin: 0, textAlign: 'center', width: '100%' }}>
+            บัญชีของ <span style={{ color: '#059669' }}>{name}</span> จะถูกเปิดใช้งานและยกเลิกการตั้งเวลาลบทันที
+          </p>
+        </div>
+
+        {/* Buttons */}
+        <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              width: 115,
+              height: 35,
+              background: '#FFFFFF',
+              border: '0.8px solid rgba(0,0,0,0.1)',
+              borderRadius: 4,
+              fontFamily: 'Bai Jamjuree, sans-serif',
+              fontWeight: 500,
+              fontSize: 14,
+              color: '#0A0A0A',
+              cursor: 'pointer',
+            }}
           >
             ยกเลิก
           </button>
@@ -310,11 +783,26 @@ function ConfirmDeactivateModal({ user, isAdminTarget, onClose, onConfirm, loadi
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className="flex items-center gap-1.5 rounded-lg bg-red-500 px-4 py-2 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-60"
-            style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+            style={{
+              width: 143,
+              height: 35,
+              background: '#ECFDF5',
+              border: '1px solid #059669',
+              borderRadius: 4,
+              fontFamily: 'Bai Jamjuree, sans-serif',
+              fontWeight: 500,
+              fontSize: 14,
+              color: '#059669',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              opacity: loading ? 0.6 : 1,
+            }}
           >
-            {loading && <span className="material-icons animate-spin text-sm">refresh</span>}
-            ปิดการใช้งาน
+            {loading && <span className="material-icons animate-spin" style={{ fontSize: 14 }}>refresh</span>}
+            เปิดการใช้งาน
           </button>
         </div>
       </div>
@@ -335,6 +823,8 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState<UserSummary | null>(null);
+  const [confirmActivate, setConfirmActivate] = useState<UserSummary | null>(null);
+  const [editTarget, setEditTarget] = useState<UserSummary | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const trimmedSearch = search.trim();
@@ -359,8 +849,8 @@ export default function AdminUsersPage() {
     setTimeout(() => setToast(null), 4000);
   }
 
-  const [toggleStatus, { loading: toggleLoading }] = useMutation(TOGGLE_ADMIN_STATUS, {
-    onCompleted: () => { showToast('อัปเดตสถานะเรียบร้อย', 'success'); setConfirmDeactivate(null); refetch(); },
+  const [scheduleDelete, { loading: scheduleDeleteLoading }] = useMutation(SCHEDULE_DELETE_ADMIN, {
+    onCompleted: () => { showToast('ปิดการใช้งานและกำหนดลบบัญชีเรียบร้อย', 'success'); setConfirmDeactivate(null); refetch(); },
     onError: (err) => { showToast(err.message, 'error'); setConfirmDeactivate(null); },
   });
 
@@ -379,21 +869,30 @@ export default function AdminUsersPage() {
     onError: (err) => { showToast(err.message, 'error'); },
   });
 
+  const [toggleStatus, { loading: toggleLoading }] = useMutation(TOGGLE_ADMIN_STATUS, {
+    onCompleted: () => { showToast('เปิดใช้งานบัญชีเรียบร้อย', 'success'); refetch(); },
+    onError: (err) => { showToast(err.message, 'error'); },
+  });
+
   const handleDeactivate = useCallback((target: UserSummary) => {
     if (target.role >= 3) {
-      toggleStatus({ variables: { adminId: target.id, isActive: false } });
+      scheduleDelete({ variables: { adminId: target.id, gracePeriodDays: 7 } });
     } else {
       suspendUser({ variables: { userId: target.id } });
     }
-  }, [toggleStatus, suspendUser]);
+  }, [scheduleDelete, suspendUser]);
 
   const handleActivate = useCallback((target: UserSummary) => {
     if (target.role >= 3) {
-      cancelDelete({ variables: { adminId: target.id } });
+      if (target.scheduledDeleteAt) {
+        cancelDelete({ variables: { adminId: target.id } });
+      } else {
+        toggleStatus({ variables: { adminId: target.id, isActive: true } });
+      }
     } else {
       activateUser({ variables: { userId: target.id } });
     }
-  }, [cancelDelete, activateUser]);
+  }, [cancelDelete, toggleStatus, activateUser]);
 
   const items = data?.list.items ?? [];
   const totalItems = data?.list.total ?? 0;
@@ -410,7 +909,7 @@ export default function AdminUsersPage() {
   ], [data]);
 
   const isLoading = queryLoading && !data;
-  const actionLoading = toggleLoading || cancelLoading || suspendLoading || activateLoading;
+  const actionLoading = scheduleDeleteLoading || cancelLoading || suspendLoading || activateLoading || toggleLoading;
 
   const columns = useMemo<DataTableColumn<UserSummary>[]>(() => [
     {
@@ -465,6 +964,19 @@ export default function AdminUsersPage() {
             </span>
           );
         }
+        if (item.scheduledDeleteAt) {
+          const days = daysUntil(item.scheduledDeleteAt);
+          return (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700"
+              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+              title={`กำหนดลบ: ${formatDate(item.scheduledDeleteAt)}`}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
+              {days > 0 ? `ลบใน ${days} วัน` : 'ลบวันนี้'}
+            </span>
+          );
+        }
         return (
           <span
             className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-500"
@@ -490,20 +1002,18 @@ export default function AdminUsersPage() {
         if (action === 'none') return <span className="text-xs text-gray-400">-</span>;
 
         const isActive = item.isActive && !item.isSuspended;
-        const isCaregiver = item.role === 2;
-
         return (
-          <div className="flex items-center gap-2">
-            {isCaregiver && (
-              <button
-                type="button"
-                onClick={() => navigate(`/admin/users/${item.id}`)}
-                className="inline-flex items-center gap-1 rounded-md border border-emerald-300 px-2.5 py-1 text-xs font-semibold text-emerald-600 hover:bg-emerald-50"
-                style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-              >
-                แก้ไข
-              </button>
-            )}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={actionLoading}
+              onClick={() => setEditTarget(item)}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+            >
+              <span className="material-icons" style={{ fontSize: 13 }}>edit</span>
+              {'แก้ไข'}
+            </button>
             {isActive ? (
               <button
                 type="button"
@@ -514,11 +1024,21 @@ export default function AdminUsersPage() {
               >
                 ปิดใช้งาน
               </button>
+            ) : item.scheduledDeleteAt ? (
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => setConfirmActivate(item)}
+                className="inline-flex items-center gap-1 rounded-md border border-amber-300 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+              >
+                เปิดใช้งาน
+              </button>
             ) : (
               <button
                 type="button"
                 disabled={actionLoading}
-                onClick={() => handleActivate(item)}
+                onClick={() => setConfirmActivate(item)}
                 className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                 style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
               >
@@ -529,7 +1049,7 @@ export default function AdminUsersPage() {
         );
       },
     },
-  ], [viewerRole, actionLoading, handleActivate, navigate]);
+  ], [viewerRole, actionLoading]);
 
   return (
     <div className="bg-[#F9FAFB] text-gray-900">
@@ -637,12 +1157,33 @@ export default function AdminUsersPage() {
         />
       )}
 
+      {editTarget && (
+        <EditAdminModal
+          user={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSuccess={() => {
+            setEditTarget(null);
+            showToast('อัปเดตข้อมูลเรียบร้อยแล้ว', 'success');
+            refetch();
+          }}
+        />
+      )}
+
       {confirmDeactivate && (
         <ConfirmDeactivateModal
           user={confirmDeactivate}
           isAdminTarget={confirmDeactivate.role >= 3}
           onClose={() => setConfirmDeactivate(null)}
           onConfirm={() => handleDeactivate(confirmDeactivate)}
+          loading={actionLoading}
+        />
+      )}
+
+      {confirmActivate && (
+        <ConfirmActivateModal
+          user={confirmActivate}
+          onClose={() => setConfirmActivate(null)}
+          onConfirm={() => { handleActivate(confirmActivate); setConfirmActivate(null); }}
           loading={actionLoading}
         />
       )}

@@ -17,7 +17,7 @@ interface Summary {
   rejectedKyc: number;
 }
 
-interface WeeklyPoint { week: string; count: number; approved?: number; }
+interface WeeklyPoint { week: string; count: number; }
 
 interface Activity {
   caregiverName: string;
@@ -132,16 +132,14 @@ function LineChart({ data }: { data: WeeklyPoint[] }) {
   const plotH = H - padT - padB;
 
   const n = data.length;
-  const approvedOf = (d: WeeklyPoint) => d.approved ?? 0;
-  const maxVal = Math.max(...data.map(d => Math.max(d.count, approvedOf(d))), 1);
+  const maxVal = Math.max(...data.map(d => d.count), 1);
 
   const xOf = (i: number) =>
     padL + (n < 2 ? plotW / 2 : (i / (n - 1)) * plotW);
   const yOf = (v: number) =>
     padT + plotH - (v / maxVal) * plotH;
 
-  const submissionPts = data.map((d, i) => ({ x: xOf(i), y: yOf(d.count),        v: d.count,        label: d.week }));
-  const approvedPts   = data.map((d, i) => ({ x: xOf(i), y: yOf(approvedOf(d)),  v: approvedOf(d),  label: d.week }));
+  const submissionPts = data.map((d, i) => ({ x: xOf(i), y: yOf(d.count), v: d.count, label: d.week }));
 
   const polyOf = (pts: typeof submissionPts) => pts.map(p => `${p.x},${p.y}`).join(' ');
   const areaOf = (pts: typeof submissionPts) =>
@@ -154,15 +152,10 @@ function LineChart({ data }: { data: WeeklyPoint[] }) {
     <div style={{ width: '100%' }}>
       {/* Legend */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 8, justifyContent: 'flex-end' }}>
-        {[
-          { color: '#10B981', label: 'KYC Submissions' },
-          { color: '#3B82F6', label: 'Verified' },
-        ].map(({ color, label }) => (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 24, height: 2.5, background: color, borderRadius: 2 }} />
-            <span style={{ color: '#6B7280', fontSize: 11 }}>{label}</span>
-          </div>
-        ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 24, height: 2.5, background: '#10B981', borderRadius: 2 }} />
+          <span style={{ color: '#6B7280', fontSize: 11 }}>KYC Submissions</span>
+        </div>
       </div>
 
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 150 }}>
@@ -170,10 +163,6 @@ function LineChart({ data }: { data: WeeklyPoint[] }) {
           <linearGradient id="gradSubmit" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#10B981" stopOpacity="0.12" />
             <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="gradApproved" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.10" />
-            <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -190,21 +179,16 @@ function LineChart({ data }: { data: WeeklyPoint[] }) {
           );
         })}
 
-        {/* Area fills */}
+        {/* Area fill */}
         {n > 1 && <polygon points={areaOf(submissionPts)} fill="url(#gradSubmit)" />}
-        {n > 1 && <polygon points={areaOf(approvedPts)}   fill="url(#gradApproved)" />}
 
-        {/* Lines */}
+        {/* Line */}
         {n > 1 && (
           <polyline points={polyOf(submissionPts)} fill="none" stroke="#10B981" strokeWidth="2.5"
             strokeLinejoin="round" strokeLinecap="round" />
         )}
-        {n > 1 && (
-          <polyline points={polyOf(approvedPts)} fill="none" stroke="#3B82F6" strokeWidth="2.5"
-            strokeLinejoin="round" strokeLinecap="round" />
-        )}
 
-        {/* Data points — submissions */}
+        {/* Data points */}
         {submissionPts.map((p, i) => (
           <g key={`s${i}`}>
             <circle cx={p.x} cy={p.y} r="4.5" fill="white" stroke="#10B981" strokeWidth="2.5" />
@@ -212,15 +196,7 @@ function LineChart({ data }: { data: WeeklyPoint[] }) {
           </g>
         ))}
 
-        {/* Data points — approvals */}
-        {approvedPts.map((p, i) => (
-          <g key={`a${i}`}>
-            <circle cx={p.x} cy={p.y} r="4.5" fill="white" stroke="#3B82F6" strokeWidth="2.5" />
-            <title>{`สัปดาห์ ${formatWeekLabel(p.label)}: ยืนยัน ${p.v} ราย`}</title>
-          </g>
-        ))}
-
-        {/* X-axis week labels (show first, middle, last to avoid crowding) */}
+        {/* X-axis week labels */}
         {data.map((d, i) => {
           const show = i === 0 || i === Math.floor((n - 1) / 2) || i === n - 1;
           if (!show) return null;

@@ -123,6 +123,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <CaregiverProfileDropdown
                 avatarFallbackColor="#52B69A"
                 displayName={caregiverData?.myCaregiverProfile?.fullName || userData?.me?.displayName || ''}
+                kycStatus={caregiverData?.myCaregiverProfile?.kycStatus}
               />
             ) : (
               <ProfileDropdown

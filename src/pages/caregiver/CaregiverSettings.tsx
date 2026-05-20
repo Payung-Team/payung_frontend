@@ -13,6 +13,7 @@ import {
   GET_KYC_DOCUMENTS,
 } from '../../graphql/queries';
 import { Icon } from '../../components/ui/Icon';
+import KycStatusBadge from '../../components/ui/KycStatusBadge';
 import Avatar from '../../components/ui/Avatar';
 import Skeleton from '../../components/ui/Skeleton';
 import { useToast } from '../../hooks/useToast';
@@ -668,9 +669,7 @@ const CaregiverSettings: React.FC = () => {
                           <h3 className="text-[20px] font-medium text-[#0A0A0A]">
                             {caregiver?.fullName || displayName}
                           </h3>
-                          <span className="px-3 py-1 bg-[#00A63E] text-white rounded-lg text-[12px] font-semibold">
-                            ✓ ยืนยันตัวตน
-                          </span>
+                          <KycStatusBadge status={caregiver?.kycStatus} />
                         </div>
                         <p className="text-[14px] text-[#717182] mb-2">ผู้ดูแลผู้สูงอายุ</p>
                         <p className="text-[12px] text-[#B8C2CC]">
@@ -689,12 +688,30 @@ const CaregiverSettings: React.FC = () => {
                 </div>
 
                 {/* Edit Profile Button */}
-                <button
-                  onClick={() => navigate('/caregiver/edit-profile')}
-                  className="w-full px-6 py-3 bg-[#52B69A] text-white rounded-lg text-[14px] font-medium hover:bg-[#4a9d87] transition-colors"
-                >
-                  แก้ไขโปรไฟล์
-                </button>
+                {(() => {
+                  const canEdit = caregiver?.kycStatus === 'verified';
+                  return (
+                    <div className="relative group">
+                      <button
+                        disabled={!canEdit}
+                        onClick={() => canEdit && navigate('/caregiver/edit-profile')}
+                        className={`w-full px-6 py-3 rounded-lg text-[14px] font-medium transition-colors ${
+                          canEdit
+                            ? 'bg-[#52B69A] text-white hover:bg-[#4a9d87] cursor-pointer'
+                            : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
+                        }`}
+                      >
+                        แก้ไขโปรไฟล์
+                      </button>
+                      {!canEdit && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap z-10 pointer-events-none">
+                          แก้ไขได้ต่อเมื่อได้รับการอนุมัติการยืนยันตัวตน
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Personal Info Section */}
                 {!isLoading && (

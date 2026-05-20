@@ -9,12 +9,14 @@ interface CaregiverProfileDropdownProps {
   onSettingsClick?: () => void;
   avatarFallbackColor?: string;
   displayName?: string;
+  kycStatus?: string;
 }
 
 export default function CaregiverProfileDropdown({
   onSettingsClick,
   avatarFallbackColor = '#52B69A',
   displayName,
+  kycStatus,
 }: CaregiverProfileDropdownProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -69,19 +71,22 @@ export default function CaregiverProfileDropdown({
           </div>
 
           <div className="py-2">
-            <button
-              onClick={handleSettings}
-              className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
-            >
-              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                <Icon name="settings" size="small" />
-              </div>
-              <div className="flex-1 text-left">
-                <p className="text-sm font-medium text-gray-900">ตั้งค่า</p>
-              </div>
-            </button>
-
-            <div className="border-t border-gray-200 my-2" />
+            {kycStatus !== 'none' && (
+              <>
+                <button
+                  onClick={handleSettings}
+                  className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                    <Icon name="settings" size="small" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-medium text-gray-900">ตั้งค่า</p>
+                  </div>
+                </button>
+                <div className="border-t border-gray-200 my-2" />
+              </>
+            )}
 
             <button
               onClick={handleLogout}

@@ -1,6 +1,6 @@
 import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
-import { getPostLoginRedirect } from './utils/getRedirectPath';
+import { useQuery } from '@apollo/client/react';
+import { GET_CAREGIVER_PROFILE } from './graphql/queries';
 import PageSkeleton from './components/ui/PageSkeleton';
 import AppLayout from './components/layout/AppLayout';
 import CaregiverSearchWrapper from './components/CaregiverSearchWrapper';
@@ -31,10 +31,21 @@ import ChangePasswordPage from './pages/auth/ChangePasswordPage';
 import MessagePage from './pages/profile/MessagePage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 
-function HomeRedirect() {
-  const { userRole, mustChangePassword, loading } = useAuth();
-  if (loading || userRole === null) return <PageSkeleton />;
-  return <Navigate to={getPostLoginRedirect({ role: userRole, mustChangePassword: mustChangePassword ?? false })} replace />;
+function KycFormGuard({ children }: { children: React.ReactNode }) {
+  const { data, loading } = useQuery<{ myCaregiverProfile?: { kycStatus: string } }>(GET_CAREGIVER_PROFILE);
+
+  if (loading) return <PageSkeleton />;
+
+  const status = data?.myCaregiverProfile?.kycStatus;
+
+  if (status === 'pending' || status === 'rejected') {
+    return <Navigate to="/kyc/status" replace />;
+  }
+  if (status === 'verified') {
+    return <Navigate to="/caregiver-home" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 function App() {
@@ -182,7 +193,7 @@ function App() {
             </RoleRoute>
           }
         >
-          <Route path="/kyc" element={<KYC />} />
+          <Route path="/kyc" element={<KycFormGuard><KYC /></KycFormGuard>} />
           <Route path="/kyc/success" element={<KycSuccess />} />
           <Route path="/kyc/status" element={<KycStatus />} />
           <Route path="/kyc/resubmit" element={<KycResubmit />} />
