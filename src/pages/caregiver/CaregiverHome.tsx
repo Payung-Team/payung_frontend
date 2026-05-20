@@ -112,10 +112,18 @@ const CaregiverHome: React.FC = () => {
                 <h2 className="text-[22px] font-bold mb-1 relative z-10">
                   สวัสดีค่ะ คุณ {caregiverData?.myCaregiverProfile?.fullName || data.me.displayName || 'ผู้ดูแล Payung'}
                 </h2>
-                <p className="text-sm opacity-80 relative z-10">
-                  {caregiverData?.myCaregiverProfile?.kycStatus === 'verified' 
-                    ? '✅ บัญชีของคุณได้รับการยืนยันแล้ว' 
-                    : '⚠️ กรุณาทำการยืนยัน KYC เพื่อเริ่มรับการจอง'}
+                <p className="text-sm opacity-80 relative z-10 flex items-center gap-1">
+                  {caregiverData?.myCaregiverProfile?.kycStatus === 'verified' ? (
+                    <>
+                      <Icon name="check_circle" style={{ fontSize: '16px' }} />
+                      บัญชีของคุณได้รับการยืนยันแล้ว
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="warning" style={{ fontSize: '16px' }} />
+                      กรุณาทำการยืนยัน KYC เพื่อเริ่มรับการจอง
+                    </>
+                  )}
                 </p>
 
                 {availabilityBadge && (
