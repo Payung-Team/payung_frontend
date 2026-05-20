@@ -8,6 +8,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import Avatar from '../../components/ui/Avatar';
 import KycDocumentsPreview from '../../components/ui/KycDocumentsPreview';
 import KycHistoryCard from '../../components/ui/KycHistoryCard';
+import ConfirmModal from '../../components/ui/ConfirmModal';
 
 // ─── GraphQL Queries ────────────────────────────────────────────────────────
 
@@ -91,6 +92,31 @@ const GET_ADMIN_CAREGIVER_DETAIL = gql`
   }
 `;
 
+const GET_LOCKED_FIELDS_LOCAL = gql`
+  query GetLockedFields($entityId: String!) {
+    lockedFields(entityType: CAREGIVER_PROFILE, entityId: $entityId) {
+      fieldName
+      lockedBy
+      lockedAt
+    }
+  }
+`;
+
+const TOGGLE_FIELD_LOCK_LOCAL = gql`
+  mutation ToggleFieldLock($entityId: ID!, $fieldName: String!, $lock: Boolean!) {
+    toggleFieldLock(input: {
+      entityType: CAREGIVER_PROFILE
+      entityId: $entityId
+      fieldName: $fieldName
+      lock: $lock
+    }) {
+      fieldName
+      locked
+      success
+    }
+  }
+`;
+
 // ─── Helpers & Mappings ─────────────────────────────────────────────────────
 
 const statusMeta = {
@@ -147,15 +173,23 @@ const maskIdCard = (idCard?: string) => {
   return '*********' + cleanId.slice(-4);
 };
 
-
-
+const LOCKABLE_FIELDS = ['firstName', 'lastName', 'idCardNumber', 'email'] as const;
+type LockableField = typeof LOCKABLE_FIELDS[number];
 
 export default function AdminCaregiverDetailPage() {
   const { caregiverId } = useParams<{ caregiverId: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'general' | 'kyc'>('general');
-
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Lock confirm modal state
+  const [lockConfirmModal, setLockConfirmModal] = useState<{
+    field: LockableField;
+    action: 'lock' | 'unlock';
+  } | null>(null);
+
+  // Fields admin has unlocked in this editing session (will be re-locked on save/cancel)
+  const [sessionUnlockedFields, setSessionUnlockedFields] = useState<Set<string>>(new Set());
 
   // 1. Fetch User & Caregiver Details by userId
   const { data: userDetailData, loading: userDetailLoading, error: userDetailError, refetch: refetchUserDetail } = useQuery(
@@ -167,22 +201,36 @@ export default function AdminCaregiverDetailPage() {
     }
   );
 
-  const [updateCaregiverInfo, { loading: saveLoading }] = useMutation(ADMIN_UPDATE_CAREGIVER_INFO, {
-    onCompleted: () => {
-      setSavedOverrides(null);
-      setSaveError(null);
-      setUnlockedFields({ firstName: false, lastName: false, idCardNumber: false, email: false });
-      refetchUserDetail();
-    },
-    onError: (err) => {
-      setSaveError(err.message);
-    },
-  });
-
   const caregiver = userDetailData?.adminUserDetail?.caregiver;
   const user = userDetailData?.adminUserDetail?.user;
 
-  // 2. Fetch KYC Documents & Reviews using caregiver.id
+  // 2. Fetch locked fields from backend
+  const { data: lockedFieldsData, refetch: refetchLockedFields } = useQuery<{
+    lockedFields: Array<{ fieldName: string; lockedBy: string; lockedAt: string }>;
+  }>(
+    GET_LOCKED_FIELDS_LOCAL,
+    {
+      variables: { entityId: caregiver?.id },
+      skip: !caregiver?.id,
+      fetchPolicy: 'cache-and-network',
+    }
+  );
+
+  const backendLockedFields: Array<{ fieldName: string; lockedBy: string; lockedAt: string }> =
+    lockedFieldsData?.lockedFields ?? [];
+
+  // A field is editable only when backend says it's not locked
+  // While lockedFieldsData hasn't loaded yet, default to locked (safe)
+  const isFieldEditable = (fieldName: LockableField): boolean => {
+    if (sessionUnlockedFields.has(fieldName)) return true;
+    if (!lockedFieldsData) return false;
+    return !backendLockedFields.some(f => f.fieldName === fieldName);
+  };
+
+  const [updateCaregiverInfo, { loading: saveLoading }] = useMutation(ADMIN_UPDATE_CAREGIVER_INFO);
+  const [toggleFieldLockMutation, { loading: lockLoading }] = useMutation(TOGGLE_FIELD_LOCK_LOCAL);
+
+  // 3. Fetch KYC Documents & Reviews using caregiver.id
   const { data: kycDetailData, loading: kycDetailLoading } = useQuery(
     ADMIN_KYC_DETAIL_LOCAL,
     {
@@ -195,9 +243,6 @@ export default function AdminCaregiverDetailPage() {
   const documents = kycDetailData?.adminKycDetail?.documents ?? [];
   const reviews = kycDetailData?.adminKycDetail?.reviews ?? [];
 
-
-
-
   const isLoading = userDetailLoading || (caregiver?.id && kycDetailLoading);
 
   const currentStatusMeta = caregiver?.kycStatus
@@ -205,11 +250,9 @@ export default function AdminCaregiverDetailPage() {
     : statusMeta.none;
 
   const isSuspended = userDetailData?.adminUserDetail?.isSuspended;
-
   const editLogs = kycDetailData?.adminKycDetail?.editHistory ?? [];
   const isActive = user?.isActive && !isSuspended;
 
-  // Split full name
   const nameParts = useMemo(() => {
     if (!caregiver?.fullName) return { firstName: '-', lastName: '-' };
     const parts = caregiver.fullName.trim().split(/\s+/);
@@ -218,14 +261,6 @@ export default function AdminCaregiverDetailPage() {
       lastName: parts.slice(1).join(' ') || '-',
     };
   }, [caregiver?.fullName]);
-
-  // States for locked/unlocked fields and their editable values
-  const [unlockedFields, setUnlockedFields] = useState<Record<string, boolean>>({
-    firstName: false,
-    lastName: false,
-    idCardNumber: false,
-    email: false,
-  });
 
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({
     firstName: '',
@@ -236,21 +271,14 @@ export default function AdminCaregiverDetailPage() {
 
   const [savedOverrides, setSavedOverrides] = useState<Record<string, string> | null>(null);
 
-  // Track initial values to detect changes
   const initialValues = useMemo(() => {
     const fn = savedOverrides?.firstName || (caregiver?.fullName ? caregiver.fullName.trim().split(/\s+/)[0] : '-');
     const ln = savedOverrides?.lastName || (caregiver?.fullName ? caregiver.fullName.trim().split(/\s+/).slice(1).join(' ') : '-');
     const ic = savedOverrides?.idCardNumber || caregiver?.idCardNumber || '';
     const em = savedOverrides?.email || caregiver?.email || user?.email || '';
-    return {
-      firstName: fn,
-      lastName: ln,
-      idCardNumber: ic,
-      email: em,
-    };
+    return { firstName: fn, lastName: ln, idCardNumber: ic, email: em };
   }, [caregiver, user, savedOverrides]);
 
-  // Sync fieldValues when initial values change (e.g. on load)
   useEffect(() => {
     setFieldValues({
       firstName: initialValues.firstName,
@@ -260,18 +288,8 @@ export default function AdminCaregiverDetailPage() {
     });
   }, [initialValues]);
 
-  const toggleLock = (field: string) => {
-    setUnlockedFields((prev) => ({
-      ...prev,
-      [field]: !prev[field],
-    }));
-  };
-
   const handleFieldChange = (field: string, value: string) => {
-    setFieldValues((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFieldValues(prev => ({ ...prev, [field]: value }));
   };
 
   const isModified = useMemo(() => {
@@ -283,7 +301,21 @@ export default function AdminCaregiverDetailPage() {
     );
   }, [fieldValues, initialValues]);
 
-  const handleSave = () => {
+  // Re-lock all fields that admin unlocked in this session
+  const relockSessionFields = async (caregiverId: string) => {
+    if (sessionUnlockedFields.size === 0) return;
+    await Promise.all(
+      [...sessionUnlockedFields].map(field =>
+        toggleFieldLockMutation({
+          variables: { entityId: caregiverId, fieldName: field, lock: true },
+        })
+      )
+    );
+    setSessionUnlockedFields(new Set());
+    refetchLockedFields();
+  };
+
+  const handleSave = async () => {
     if (!caregiver?.id) return;
     setSaveError(null);
 
@@ -293,22 +325,61 @@ export default function AdminCaregiverDetailPage() {
     if (fieldValues.idCardNumber !== initialValues.idCardNumber) input.idCardNumber = fieldValues.idCardNumber;
     if (fieldValues.email !== initialValues.email) input.email = fieldValues.email;
 
-    updateCaregiverInfo({ variables: { input } });
+    try {
+      await updateCaregiverInfo({ variables: { input } });
+      await relockSessionFields(caregiver.id);
+      setSavedOverrides(null);
+      setSaveError(null);
+      refetchUserDetail();
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+    }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     setFieldValues({
       firstName: initialValues.firstName,
       lastName: initialValues.lastName,
       idCardNumber: initialValues.idCardNumber,
       email: initialValues.email,
     });
-    setUnlockedFields({
-      firstName: false,
-      lastName: false,
-      idCardNumber: false,
-      email: false,
-    });
+    if (caregiver?.id) {
+      await relockSessionFields(caregiver.id);
+    }
+  };
+
+  // Open confirm modal when admin clicks a field's lock/unlock button
+  const handleLockClick = (field: LockableField) => {
+    const locked = !isFieldEditable(field);
+    setLockConfirmModal({ field, action: locked ? 'unlock' : 'lock' });
+  };
+
+  // Execute the toggle after confirm
+  const handleLockConfirm = async () => {
+    if (!lockConfirmModal || !caregiver?.id) return;
+    const { field, action } = lockConfirmModal;
+
+    try {
+      await toggleFieldLockMutation({
+        variables: { entityId: caregiver.id, fieldName: field, lock: action === 'lock' },
+      });
+
+      if (action === 'unlock') {
+        setSessionUnlockedFields(prev => new Set([...prev, field]));
+      } else {
+        setSessionUnlockedFields(prev => {
+          const next = new Set(prev);
+          next.delete(field);
+          return next;
+        });
+      }
+
+      setLockConfirmModal(null);
+      await refetchLockedFields();
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการเปลี่ยนสถานะล็อค');
+      setLockConfirmModal(null);
+    }
   };
 
   if (isLoading && !userDetailData) {
@@ -345,8 +416,75 @@ export default function AdminCaregiverDetailPage() {
     );
   }
 
+  const isBusy = saveLoading || lockLoading;
+
+  // Helper to build field props for each lockable field
+  const buildFieldProps = (field: LockableField) => {
+    const editable = isFieldEditable(field);
+    return {
+      editable,
+      inputClass: `w-full rounded-lg border px-3 py-2 pr-10 text-sm outline-none transition-all ${
+        editable
+          ? 'border-[#059669] bg-white text-gray-900 focus:ring-1 focus:ring-[#059669] focus:border-[#059669]'
+          : 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
+      }`,
+      iconClass: `absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none ${
+        editable ? 'text-[#059669]' : 'text-gray-400'
+      }`,
+      btnClass: `flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${
+        editable
+          ? 'border-[#059669] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5]'
+          : 'border-gray-200 bg-white text-gray-400 hover:bg-gray-50'
+      }`,
+      iconName: editable ? 'lock_open' : 'lock',
+    };
+  };
+
+  const fp = {
+    firstName: buildFieldProps('firstName'),
+    lastName: buildFieldProps('lastName'),
+    idCardNumber: buildFieldProps('idCardNumber'),
+    email: buildFieldProps('email'),
+  };
+
+  const lockModalText = lockConfirmModal?.action === 'unlock'
+    ? {
+        title: 'ปลดล็อคฟิลด์นี้?',
+        description: 'เมื่อปลดล็อคแล้ว คุณจะสามารถแก้ไขข้อมูลในฟิลด์นี้ได้ หลังจากบันทึกหรือยกเลิก ฟิลด์จะถูกล็อคกลับโดยอัตโนมัติ',
+        confirmText: 'ปลดล็อค',
+        iconName: 'lock_open',
+        iconBgColor: 'bg-[#059669]',
+        confirmBtnBgColor: 'bg-[#059669]',
+        confirmBtnHoverBgColor: 'hover:bg-[#047857]',
+      }
+    : {
+        title: 'ล็อคฟิลด์นี้?',
+        description: 'เมื่อล็อคแล้ว ฟิลด์นี้จะไม่สามารถแก้ไขได้จนกว่าจะมีการปลดล็อค',
+        confirmText: 'ล็อค',
+        iconName: 'lock',
+        iconBgColor: 'bg-[#DC2626]',
+        confirmBtnBgColor: 'bg-[#DC2626]',
+        confirmBtnHoverBgColor: 'hover:bg-[#B91C1C]',
+      };
+
   return (
     <div className="bg-[#F9FAFB] min-h-screen text-gray-900 pb-12" style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
+      {/* Lock/Unlock Confirm Modal */}
+      <ConfirmModal
+        isOpen={!!lockConfirmModal}
+        isLoading={lockLoading}
+        title={lockModalText.title}
+        description={lockModalText.description}
+        confirmText={lockModalText.confirmText}
+        cancelText="ยกเลิก"
+        iconName={lockModalText.iconName}
+        iconBgColor={lockModalText.iconBgColor}
+        confirmBtnBgColor={lockModalText.confirmBtnBgColor}
+        confirmBtnHoverBgColor={lockModalText.confirmBtnHoverBgColor}
+        onClose={() => setLockConfirmModal(null)}
+        onConfirm={handleLockConfirm}
+      />
+
       {/* ─── Breadcrumb Header ─── */}
       <section className="mx-auto max-w-[1312px] px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -381,19 +519,14 @@ export default function AdminCaregiverDetailPage() {
 
         {/* Left Column: Side Card & History */}
         <aside className="space-y-6">
-          {/* Side Profile Card */}
           <div className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col items-center text-center">
-            {/* Avatar */}
             <Avatar
               name={caregiver.fullName}
               size={96}
               src={user?.avatarUrl || undefined}
               className="text-[#0D9488] mb-4"
             />
-
-            <h3 className="font-bold text-gray-900 text-base">
-              {caregiver.fullName}
-            </h3>
+            <h3 className="font-bold text-gray-900 text-base">{caregiver.fullName}</h3>
             <p className="text-xs text-gray-500 mt-1">{caregiver.email || user?.email}</p>
 
             <div className="w-full border-t border-gray-100 my-4" />
@@ -417,19 +550,16 @@ export default function AdminCaregiverDetailPage() {
             </div>
           </div>
 
-          {/* Edit History Card */}
           <KycHistoryCard
             caregiver={caregiver}
             reviews={reviews}
             editHistory={editLogs}
             onlyKycLogs={false}
           />
-
         </aside>
 
         {/* Right Column: Tabbed Content Cards */}
         <div className="space-y-6">
-          {/* Navigation Tabs */}
           <div className="flex border-b border-gray-200 gap-6">
             <button
               onClick={() => setActiveTab('general')}
@@ -445,7 +575,6 @@ export default function AdminCaregiverDetailPage() {
             </button>
           </div>
 
-          {/* Tab Content Panels */}
           <div className="rounded-xl border border-[#E5E7EB] bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)] min-h-[400px]">
             {activeTab === 'general' && (
               <div className="space-y-8">
@@ -464,6 +593,7 @@ export default function AdminCaregiverDetailPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Caregiver Number — always locked, no toggle */}
                     <div className="md:col-span-2">
                       <label className="inline-flex items-center text-xs font-semibold text-gray-500 mb-1">
                         หมายเลขประจำตัวผู้ดูแล
@@ -491,6 +621,7 @@ export default function AdminCaregiverDetailPage() {
                       </div>
                     </div>
 
+                    {/* First Name */}
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-1">ชื่อ</label>
                       <div className="flex gap-2 items-center">
@@ -499,26 +630,20 @@ export default function AdminCaregiverDetailPage() {
                             type="text"
                             value={fieldValues.firstName}
                             onChange={(e) => handleFieldChange('firstName', e.target.value)}
-                            disabled={!unlockedFields.firstName}
-                            className={`w-full rounded-lg border px-3 py-2 pr-10 text-sm outline-none transition-all ${unlockedFields.firstName
-                                ? 'border-[#059669] bg-white text-gray-900 focus:ring-1 focus:ring-[#059669] focus:border-[#059669]'
-                                : 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
-                              }`}
+                            disabled={!fp.firstName.editable}
+                            className={fp.firstName.inputClass}
                           />
-                          <div className={`absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none ${unlockedFields.firstName ? 'text-[#059669]' : 'text-gray-400'
-                            }`}>
-                            <Icon name={unlockedFields.firstName ? 'lock_open' : 'lock'} size="small" />
+                          <div className={fp.firstName.iconClass}>
+                            <Icon name={fp.firstName.iconName} size="small" />
                           </div>
                         </div>
                         <button
                           type="button"
-                          onClick={() => toggleLock('firstName')}
-                          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${unlockedFields.firstName
-                              ? 'border-[#059669] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5]'
-                              : 'border-gray-200 bg-white text-gray-400 hover:bg-gray-50'
-                            }`}
+                          onClick={() => handleLockClick('firstName')}
+                          disabled={isBusy}
+                          className={`${fp.firstName.btnClass} disabled:opacity-50 disabled:cursor-not-allowed`}
                         >
-                          <Icon name={unlockedFields.firstName ? 'lock_open' : 'lock'} size="small" />
+                          <Icon name={fp.firstName.iconName} size="small" />
                         </button>
                       </div>
                       {fieldValues.firstName !== initialValues.firstName && (
@@ -529,6 +654,7 @@ export default function AdminCaregiverDetailPage() {
                       )}
                     </div>
 
+                    {/* Last Name */}
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-1">นามสกุล</label>
                       <div className="flex gap-2 items-center">
@@ -537,26 +663,20 @@ export default function AdminCaregiverDetailPage() {
                             type="text"
                             value={fieldValues.lastName}
                             onChange={(e) => handleFieldChange('lastName', e.target.value)}
-                            disabled={!unlockedFields.lastName}
-                            className={`w-full rounded-lg border px-3 py-2 pr-10 text-sm outline-none transition-all ${unlockedFields.lastName
-                                ? 'border-[#059669] bg-white text-gray-900 focus:ring-1 focus:ring-[#059669] focus:border-[#059669]'
-                                : 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
-                              }`}
+                            disabled={!fp.lastName.editable}
+                            className={fp.lastName.inputClass}
                           />
-                          <div className={`absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none ${unlockedFields.lastName ? 'text-[#059669]' : 'text-gray-400'
-                            }`}>
-                            <Icon name={unlockedFields.lastName ? 'lock_open' : 'lock'} size="small" />
+                          <div className={fp.lastName.iconClass}>
+                            <Icon name={fp.lastName.iconName} size="small" />
                           </div>
                         </div>
                         <button
                           type="button"
-                          onClick={() => toggleLock('lastName')}
-                          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${unlockedFields.lastName
-                              ? 'border-[#059669] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5]'
-                              : 'border-gray-200 bg-white text-gray-400 hover:bg-gray-50'
-                            }`}
+                          onClick={() => handleLockClick('lastName')}
+                          disabled={isBusy}
+                          className={`${fp.lastName.btnClass} disabled:opacity-50 disabled:cursor-not-allowed`}
                         >
-                          <Icon name={unlockedFields.lastName ? 'lock_open' : 'lock'} size="small" />
+                          <Icon name={fp.lastName.iconName} size="small" />
                         </button>
                       </div>
                       {fieldValues.lastName !== initialValues.lastName && (
@@ -567,34 +687,29 @@ export default function AdminCaregiverDetailPage() {
                       )}
                     </div>
 
+                    {/* ID Card Number */}
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-1">เลขประจำตัวประชาชน</label>
                       <div className="flex gap-2 items-center">
                         <div className="relative flex-1">
                           <input
                             type="text"
-                            value={unlockedFields.idCardNumber ? fieldValues.idCardNumber : maskIdCard(fieldValues.idCardNumber)}
+                            value={fp.idCardNumber.editable ? fieldValues.idCardNumber : maskIdCard(fieldValues.idCardNumber)}
                             onChange={(e) => handleFieldChange('idCardNumber', e.target.value)}
-                            disabled={!unlockedFields.idCardNumber}
-                            className={`w-full rounded-lg border px-3 py-2 pr-10 text-sm outline-none transition-all ${unlockedFields.idCardNumber
-                                ? 'border-[#059669] bg-white text-gray-900 focus:ring-1 focus:ring-[#059669] focus:border-[#059669]'
-                                : 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
-                              }`}
+                            disabled={!fp.idCardNumber.editable}
+                            className={fp.idCardNumber.inputClass}
                           />
-                          <div className={`absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none ${unlockedFields.idCardNumber ? 'text-[#059669]' : 'text-gray-400'
-                            }`}>
-                            <Icon name={unlockedFields.idCardNumber ? 'lock_open' : 'lock'} size="small" />
+                          <div className={fp.idCardNumber.iconClass}>
+                            <Icon name={fp.idCardNumber.iconName} size="small" />
                           </div>
                         </div>
                         <button
                           type="button"
-                          onClick={() => toggleLock('idCardNumber')}
-                          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${unlockedFields.idCardNumber
-                              ? 'border-[#059669] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5]'
-                              : 'border-gray-200 bg-white text-gray-400 hover:bg-gray-50'
-                            }`}
+                          onClick={() => handleLockClick('idCardNumber')}
+                          disabled={isBusy}
+                          className={`${fp.idCardNumber.btnClass} disabled:opacity-50 disabled:cursor-not-allowed`}
                         >
-                          <Icon name={unlockedFields.idCardNumber ? 'lock_open' : 'lock'} size="small" />
+                          <Icon name={fp.idCardNumber.iconName} size="small" />
                         </button>
                       </div>
                       {fieldValues.idCardNumber !== initialValues.idCardNumber && (
@@ -605,6 +720,7 @@ export default function AdminCaregiverDetailPage() {
                       )}
                     </div>
 
+                    {/* Email */}
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-1">อีเมล</label>
                       <div className="flex gap-2 items-center">
@@ -613,26 +729,20 @@ export default function AdminCaregiverDetailPage() {
                             type="text"
                             value={fieldValues.email}
                             onChange={(e) => handleFieldChange('email', e.target.value)}
-                            disabled={!unlockedFields.email}
-                            className={`w-full rounded-lg border px-3 py-2 pr-10 text-sm outline-none transition-all ${unlockedFields.email
-                                ? 'border-[#059669] bg-white text-gray-900 focus:ring-1 focus:ring-[#059669] focus:border-[#059669]'
-                                : 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
-                              }`}
+                            disabled={!fp.email.editable}
+                            className={fp.email.inputClass}
                           />
-                          <div className={`absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none ${unlockedFields.email ? 'text-[#059669]' : 'text-gray-400'
-                            }`}>
-                            <Icon name={unlockedFields.email ? 'lock_open' : 'lock'} size="small" />
+                          <div className={fp.email.iconClass}>
+                            <Icon name={fp.email.iconName} size="small" />
                           </div>
                         </div>
                         <button
                           type="button"
-                          onClick={() => toggleLock('email')}
-                          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${unlockedFields.email
-                              ? 'border-[#059669] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5]'
-                              : 'border-gray-200 bg-white text-gray-400 hover:bg-gray-50'
-                            }`}
+                          onClick={() => handleLockClick('email')}
+                          disabled={isBusy}
+                          className={`${fp.email.btnClass} disabled:opacity-50 disabled:cursor-not-allowed`}
                         >
-                          <Icon name={unlockedFields.email ? 'lock_open' : 'lock'} size="small" />
+                          <Icon name={fp.email.iconName} size="small" />
                         </button>
                       </div>
                       {fieldValues.email !== initialValues.email && (
@@ -643,7 +753,7 @@ export default function AdminCaregiverDetailPage() {
                       )}
                     </div>
 
-                    {/* Buttons Bar shown only when modified */}
+                    {/* Action Buttons — shown only when fields are modified */}
                     {isModified && (
                       <div className="md:col-span-2 pt-6 border-t border-gray-100 space-y-3">
                         {saveError && (
@@ -653,15 +763,15 @@ export default function AdminCaregiverDetailPage() {
                           <button
                             type="button"
                             onClick={handleCancel}
-                            disabled={saveLoading}
-                            className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
+                            disabled={isBusy}
+                            className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             ยกเลิก
                           </button>
                           <button
                             type="button"
                             onClick={handleSave}
-                            disabled={saveLoading || !caregiver?.id}
+                            disabled={isBusy || !caregiver?.id}
                             className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#059669] px-4 text-sm font-semibold text-white hover:bg-[#047857] shadow-sm transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                           >
                             {saveLoading && (
@@ -675,7 +785,7 @@ export default function AdminCaregiverDetailPage() {
                   </div>
                 </div>
 
-                {/* Card 2: ข้อมูลอื่นๆ */}
+                {/* Card 2: ข้อมูลอื่นๆ — caregiver-editable, admin read-only */}
                 <div className="space-y-6 pt-6 border-t border-gray-100">
                   <div className="flex items-center justify-between">
                     <h4 className="text-base font-bold text-[#064E3B]">ข้อมูลอื่นๆ</h4>
@@ -736,7 +846,6 @@ export default function AdminCaregiverDetailPage() {
                 <div className="border-b border-gray-100 pb-3">
                   <h4 className="text-base font-bold text-[#064E3B]">ข้อมูล KYC & เอกสาร</h4>
                 </div>
-
                 <KycDocumentsPreview documents={documents} docTypeLabel={docTypeLabels} variant="plain" layout="split" />
               </div>
             )}
