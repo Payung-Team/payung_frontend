@@ -2,6 +2,8 @@ import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { GET_CAREGIVER_PROFILE } from './graphql/queries';
 import PageSkeleton from './components/ui/PageSkeleton';
+import { useAuth } from './context/AuthContext';
+import { getPostLoginRedirect } from './utils/getRedirectPath';
 import AppLayout from './components/layout/AppLayout';
 import CaregiverSearchWrapper from './components/CaregiverSearchWrapper';
 import { KycProvider } from './context/KycContext';
@@ -46,6 +48,12 @@ function KycFormGuard({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
+}
+
+function HomeRedirect() {
+  const { userRole, mustChangePassword, loading } = useAuth();
+  if (loading || userRole === null) return <PageSkeleton />;
+  return <Navigate to={getPostLoginRedirect({ role: userRole, mustChangePassword: mustChangePassword ?? false })} replace />;
 }
 
 function App() {
