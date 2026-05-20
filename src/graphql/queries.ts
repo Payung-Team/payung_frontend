@@ -434,7 +434,6 @@ export const ADMIN_DASHBOARD = gql`
       weeklySubmissions {
         week
         count
-        approved
       }
       avgReviewTimeHours
       recentActivity {

@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { GET_USER, GET_CAREGIVER_PROFILE, UPDATE_CAREGIVER_PROFILE } from '../../graphql/queries';
+import KycStatusBadge from '../../components/ui/KycStatusBadge';
 import { Icon } from '../../components/ui/Icon';
 import Tooltip from '../../components/ui/Tooltip';
 import Avatar from '../../components/ui/Avatar';
@@ -121,7 +122,7 @@ const CaregiverEditProfile: React.FC = () => {
       if (!isKycVerified) {
         setToastMessage({ type: 'warning', message: 'คุณต้องยืนยัน KYC เพื่อแก้ไขโปรไฟล์' });
         // Redirect to appropriate page based on KYC status
-        const redirectPath = kycStatus === 'pending' ? '/kyc/status' : '/kyc';
+        const redirectPath = (kycStatus === 'pending' || kycStatus === 'rejected') ? '/kyc/status' : '/kyc';
         setTimeout(() => navigate(redirectPath), 2000);
       }
     }
@@ -588,7 +589,7 @@ const CaregiverEditProfile: React.FC = () => {
                     <div className="flex-1 pt-6">
                       <div className="flex items-center gap-2 mb-2">
                         <h2 className="text-[20px] font-semibold text-[#0A0A0A]">{caregiver?.fullName || displayName}</h2>
-                        <span className="px-2 py-1 bg-[#00A63E] text-white rounded-lg text-[12px] font-semibold">✓ ยืนยันตัวตน</span>
+                        <KycStatusBadge status={caregiver?.kycStatus} />
                       </div>
                       <div className="flex items-center gap-2 text-[14px] text-[#717182]">
                         <span>{watchedValues.experienceYears || 0}+ ปีประสบการณ์</span>
