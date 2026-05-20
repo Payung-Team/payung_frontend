@@ -473,3 +473,89 @@ export const ADMIN_PENDING_QUEUE = gql`
     }
   }
 `;
+
+export const ADMIN_USER_LIST = gql`
+  query AdminUserList($role: RoleFilter, $search: String, $page: Int, $limit: Int, $countSearch: String) {
+    list: adminUserList(input: { role: $role, search: $search, page: $page, limit: $limit }) {
+      items {
+        id
+        email
+        displayName
+        role
+        isActive
+        isSuspended
+        createdAt
+      }
+      total
+      page
+      totalPages
+    }
+    allCount: adminUserList(input: { search: $countSearch, page: 1, limit: 1 }) { total }
+    superAdminCount: adminUserList(input: { role: super_admin, search: $countSearch, page: 1, limit: 1 }) { total }
+    adminCount: adminUserList(input: { role: admin, search: $countSearch, page: 1, limit: 1 }) { total }
+    caregiverCount: adminUserList(input: { role: caregiver, search: $countSearch, page: 1, limit: 1 }) { total }
+    patientCount: adminUserList(input: { role: patient, search: $countSearch, page: 1, limit: 1 }) { total }
+  }
+`;
+
+export const INVITE_ADMIN = gql`
+  mutation InviteAdmin($email: String!, $firstName: String!, $lastName: String!, $role: Int!) {
+    inviteAdmin(input: { email: $email, firstName: $firstName, lastName: $lastName, role: $role }) {
+      user {
+        id
+        email
+        displayName
+        role
+      }
+      tempPasswordSent
+    }
+  }
+`;
+
+export const TOGGLE_ADMIN_STATUS = gql`
+  mutation ToggleAdminStatus($adminId: ID!, $isActive: Boolean!) {
+    toggleAdminStatus(input: { adminId: $adminId, isActive: $isActive }) {
+      user {
+        id
+        email
+        isActive
+      }
+      action
+    }
+  }
+`;
+
+export const CANCEL_SCHEDULED_DELETE = gql`
+  mutation CancelScheduledDelete($adminId: ID!) {
+    cancelScheduledDelete(input: { adminId: $adminId }) {
+      user {
+        id
+        email
+        isActive
+      }
+      reactivated
+    }
+  }
+`;
+
+export const SUSPEND_USER = gql`
+  mutation SuspendUser($userId: ID!) {
+    suspendUser(userId: $userId) {
+      id
+      email
+      isActive
+      isSuspended
+    }
+  }
+`;
+
+export const ACTIVATE_USER = gql`
+  mutation ActivateUser($userId: ID!) {
+    activateUser(userId: $userId) {
+      id
+      email
+      isActive
+      isSuspended
+    }
+  }
+`;

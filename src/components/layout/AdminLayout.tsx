@@ -26,7 +26,7 @@ function getPageInfo(pathname: string): { title: string; breadcrumb: string } {
   if (pathname === '/admin') return { title: 'Dashboard', breadcrumb: 'หน้าหลัก / Dashboard' };
   if (pathname === '/admin/kyc') return { title: 'KYC Review', breadcrumb: 'หน้าหลัก / KYC Review' };
   if (pathname.startsWith('/admin/kyc/')) return { title: 'ตรวจสอบ KYC', breadcrumb: 'หน้าหลัก / KYC Review / ตรวจสอบ' };
-  if (pathname === '/admin/users') return { title: 'จัดการ Admin', breadcrumb: 'หน้าหลัก / จัดการ Admin' };
+  if (pathname === '/admin/users') return { title: 'จัดการผู้ใช้', breadcrumb: 'หน้าหลัก / จัดการผู้ใช้' };
   return { title: 'Admin', breadcrumb: 'หน้าหลัก / Admin' };
 }
 
