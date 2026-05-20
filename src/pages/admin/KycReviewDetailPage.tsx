@@ -6,8 +6,9 @@ import { ToastContainer } from '../../components/ui/Toast';
 import { useToast, type ToastMessage } from '../../hooks/useToast';
 import Icon from '../../components/ui/Icon';
 import Skeleton from '../../components/ui/Skeleton';
-import ImageModal from '../../components/ui/ImageModal';
 import Avatar from '../../components/ui/Avatar';
+import KycDocumentsPreview from '../../components/ui/KycDocumentsPreview';
+import KycHistoryCard from '../../components/ui/KycHistoryCard';
 import StatusBadge from '../../components/ui/StatusBadge';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 
@@ -55,12 +56,21 @@ interface KycReview {
   reviewedAt: string;
 }
 
+interface CaregiverEditLog {
+  id: string;
+  action: string;
+  editorName?: string | null;
+  createdAt: string;
+  fieldChanges?: Array<{ field: string; oldValue?: string; newValue?: string }> | null;
+}
+
 interface AdminKycDetailResponse {
   adminKycDetail: {
     caregiver: CaregiverDetail;
     documents: KycDocument[];
     resubmitCount: number;
     reviews: KycReview[];
+    editHistory: CaregiverEditLog[];
   };
 }
 
@@ -117,20 +127,6 @@ function formatThaiDateTime(value?: string | null) {
   });
 }
 
-function formatFileSize(bytes?: number | null) {
-  if (!bytes || bytes <= 0) return '-';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let size = bytes;
-  let unitIndex = 0;
-
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-
-  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
-}
-
 function getAge(dateOfBirth?: string | null) {
   if (!dateOfBirth) return '-';
   const birthDate = new Date(dateOfBirth);
@@ -144,19 +140,6 @@ function getAge(dateOfBirth?: string | null) {
   }
 
   return `${age} ปี`;
-}
-
-
-function isPdf(doc?: KycDocument | null) {
-  return doc?.mimeType === 'application/pdf' || doc?.fileName.toLowerCase().endsWith('.pdf');
-}
-
-function isImage(doc?: KycDocument | null) {
-  return Boolean(doc?.mimeType?.startsWith('image/'));
-}
-
-function getDocumentUrl(doc?: KycDocument | null) {
-  return doc?.signedUrl || doc?.fileUrl || '';
 }
 
 function statusLabel(status: KycStatus) {
@@ -208,10 +191,8 @@ function Dropdown({
           </option>
         ))}
       </select>
-      <div className="absolute right-[6px] top-[7px] pointer-events-none text-[#757575]">
-        <svg width="9" height="9" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M2.5 4.5L5.5 7.5L8.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+      <div className="absolute right-[4px] pointer-events-none text-[#757575] flex items-center h-full">
+        <Icon name="expand_more" size="small" />
       </div>
     </div>
   );
@@ -500,9 +481,7 @@ function RejectModal({
                   onClick={() => handleRemoveRow(row.id)}
                   className="w-[26px] h-[26px] shrink-0 flex items-center justify-center text-[#6B7280] hover:text-[#EF4444] transition-colors cursor-pointer"
                 >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M13 1L1 13M1 1L13 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  <Icon name="close" size="small" />
                 </button>
               </div>
             ))}
@@ -551,10 +530,8 @@ export default function KycReviewDetailPage() {
   const { caregiverId } = useParams<{ caregiverId: string }>();
   const navigate = useNavigate();
   const toast = useToast();
-  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [isRejectOpen, setIsRejectOpen] = useState(false);
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   const { data, loading, error, refetch } = useQuery<AdminKycDetailResponse>(ADMIN_KYC_DETAIL, {
     variables: { caregiverId },
@@ -565,9 +542,8 @@ export default function KycReviewDetailPage() {
   const caregiver = data?.adminKycDetail.caregiver;
   const documents = data?.adminKycDetail.documents ?? [];
   const reviews = data?.adminKycDetail.reviews ?? [];
+  const editHistory = data?.adminKycDetail.editHistory ?? [];
   const resubmitCount = data?.adminKycDetail.resubmitCount ?? caregiver?.resubmitCount ?? 0;
-  const selectedDoc = documents.find((doc) => doc.id === selectedDocId) ?? documents[0] ?? null;
-  const documentUrl = getDocumentUrl(selectedDoc);
   const isPending = caregiver?.kycStatus === 'pending';
 
 
@@ -724,135 +700,47 @@ export default function KycReviewDetailPage() {
               </article>
               
               {/*KYC History*/}
-              <article className="rounded-xl border border-[#E5E7EB] bg-white px-6 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-                <h3 className="text-base font-semibold leading-5 text-[#064E3B]">ประวัติการดำเนินการ</h3>
-                <div className="mt-4">
-                  {reviews.length > 0 ? (
-                    <>
-                      {reviews.map((review) => {
-                      const isRejected = review.action === 'rejected';
-                      return (
-                        <div key={review.id} className="flex gap-3 border-b border-[#F3F4F6] py-2.5 last:border-b-0">
-                          <span className={`mt-0.5 h-6 w-6 shrink-0 rounded-full ${isRejected ? 'bg-[#EF4444]' : 'bg-[#059669]'}`} />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[13px] font-medium leading-4 text-[#1F2937]">
-                              {isRejected ? 'ปฏิเสธเอกสาร KYC' : 'อนุมัติเอกสาร KYC'}
-                            </p>
-                            <p className="mt-1 text-xs leading-5 text-[#6B7280]">เหตุผล: {review.reason || '-'}</p>
-                            <p className="mt-0.5 text-[11px] leading-[14px] text-[#9CA3AF]">โดย {review.reviewedBy}</p>
-                          </div>
-                          <time className="shrink-0 text-[10px] leading-3 text-[#9CA3AF]">{formatThaiDateTime(review.reviewedAt)}</time>
-                        </div>
-                      );
-                      })}
-                      <div className="flex gap-3 border-b border-[#F3F4F6] py-2.5 last:border-b-0">
-                        <span className="mt-0.5 h-6 w-6 shrink-0 rounded-full bg-[#F59E0B]" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-medium leading-4 text-[#1F2937]">ส่งเอกสาร KYC</p>
-                          <p className="mt-1 text-xs leading-5 text-[#6B7280]">เหตุผล: -</p>
-                          <p className="mt-0.5 text-[11px] leading-[14px] text-[#9CA3AF]">โดย {caregiver.fullName}</p>
-                        </div>
-                        <time className="shrink-0 text-[10px] leading-3 text-[#9CA3AF]">{formatThaiDateTime(caregiver.kycSubmittedAt)}</time>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex gap-3 border-b border-[#F3F4F6] py-2.5">
-                      <span className="mt-0.5 h-6 w-6 shrink-0 rounded-full bg-[#F59E0B]" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium leading-4 text-[#1F2937]">ส่งเอกสาร KYC</p>
-                        <p className="mt-0.5 text-[11px] leading-[14px] text-[#9CA3AF]">โดย {caregiver.fullName}</p>
-                      </div>
-                      <time className="shrink-0 text-[10px] leading-3 text-[#9CA3AF]">{formatThaiDateTime(caregiver.kycSubmittedAt)}</time>
-                    </div>
-                  )}
+              <KycHistoryCard
+                caregiver={caregiver}
+                reviews={reviews}
+                editHistory={editHistory}
+                onlyKycLogs={true}
+              />
+            </div>
+            
+            {/*Right Column: Documents Preview + Action Buttons*/}
+            <div className="space-y-6 self-start">
+              <KycDocumentsPreview documents={documents} docTypeLabel={docTypeLabel} />
+              
+              {/*Action Buttons*/}
+              <div className="flex justify-end">
+                <div className="flex w-full gap-3 sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setIsRejectOpen(true)}
+                    disabled={!isPending}
+                    className="inline-flex h-8 w-full items-center justify-center rounded-lg border-[1.5px] border-[#EF4444] px-4 text-[13px] font-semibold leading-4 text-[#DC2626] hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-transparent sm:w-[114px] cursor-pointer"
+                  >
+                    ปฏิเสธ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsApproveOpen(true)}
+                    disabled={!isPending}
+                    className="inline-flex h-8 w-full items-center justify-center rounded-lg bg-[#059669] px-4 text-[13px] font-semibold leading-4 text-white hover:bg-[#047857] disabled:cursor-not-allowed disabled:bg-gray-300 sm:w-[142px] cursor-pointer"
+                  >
+                    อนุมัติ
+                  </button>
                 </div>
-              </article>
+              </div>
+
+              {/*Pending Status*/}
+              {!isPending ? (
+                <p className="text-right text-sm text-gray-500">
+                  เอกสารนี้อยู่ในสถานะ {statusLabel(caregiver.kycStatus)} จึงไม่สามารถอนุมัติหรือปฏิเสธซ้ำได้
+                </p>
+              ) : null}
             </div>
-            
-            {/*Documents Preview*/}
-            <aside className="rounded-xl border border-[#E5E7EB] bg-white px-6 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-              <div className="relative flex min-h-[433px] items-center justify-center overflow-hidden rounded-xl bg-[#959698]">
-                {selectedDoc && documentUrl ? (
-                  isPdf(selectedDoc) ? (
-                    <iframe title={selectedDoc.fileName} src={documentUrl} className="h-[433px] w-full rounded-xl bg-white" />
-                  ) : isImage(selectedDoc) ? (
-                    <>
-                      <img src={documentUrl} alt={selectedDoc.fileName} className="h-[433px] w-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setIsImageModalOpen(true)}
-                        className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-lg bg-black/40 text-white hover:bg-black/60 transition-colors cursor-pointer"
-                      >
-                        <Icon name="open_in_full" />
-                      </button>
-                    </>
-                  ) : (
-                    <a href={documentUrl} target="_blank" rel="noreferrer" className="text-base font-semibold text-[#F5FFFC] underline cursor-pointer">
-                      เปิดเอกสาร
-                    </a>
-                  )
-                ) : (
-                  <span className="text-base font-semibold text-[#F5FFFC]">ตัวอย่างเอกสาร</span>
-                )}
-              </div>
-
-              <h3 className="mt-6 text-base font-bold leading-5 text-[#064E3B]">เอกสารที่อัปโหลด</h3>
-
-              <div className="mt-4 space-y-3">
-                {documents.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl bg-[#F9FAFB] p-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-10 w-10 shrink-0 rounded-lg bg-[#EFF6FF]" />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium leading-5 text-[#1F2937]">
-                          {docTypeLabel[doc.docType] ?? doc.docType}
-                        </p>
-                        <p className="truncate text-xs leading-4 text-[#9CA3AF]">
-                          {isPdf(doc) ? 'PDF' : doc.mimeType.split('/')[1]?.toUpperCase() || 'IMAGE'} · {formatFileSize(doc.fileSize)}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDocId(doc.id)}
-                      className="shrink-0 rounded-full border border-[#059669] px-3.5 py-1 text-xs font-semibold text-[#059669] hover:bg-[#ECFDF5] transition-colors cursor-pointer"
-                    >
-                      ดูเอกสาร
-                    </button>
-                  </div>
-                ))}
-                {documents.length === 0 ? <p className="rounded-lg bg-[#F9FAFB] px-4 py-6 text-center text-sm text-gray-500">ยังไม่มีเอกสารที่อัปโหลด</p> : null}
-              </div>
-            </aside>
-            
-            {/*Action Buttons*/}
-            <div className="lg:col-span-2 lg:flex lg:justify-end">
-              <div className="flex w-full gap-3 sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setIsRejectOpen(true)}
-                  disabled={!isPending}
-                  className="inline-flex h-8 w-full items-center justify-center rounded-lg border-[1.5px] border-[#EF4444] px-4 text-[13px] font-semibold leading-4 text-[#DC2626] hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-transparent sm:w-[114px] cursor-pointer"
-                >
-                  ปฏิเสธ
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsApproveOpen(true)}
-                  disabled={!isPending}
-                  className="inline-flex h-8 w-full items-center justify-center rounded-lg bg-[#059669] px-4 text-[13px] font-semibold leading-4 text-white hover:bg-[#047857] disabled:cursor-not-allowed disabled:bg-gray-300 sm:w-[142px] cursor-pointer"
-                >
-                  อนุมัติ
-                </button>
-              </div>
-            </div>
-
-            {/*Pending Status*/}
-            {!isPending ? (
-              <p className="text-right text-sm text-gray-500 lg:col-span-2">
-                เอกสารนี้อยู่ในสถานะ {statusLabel(caregiver.kycStatus)} จึงไม่สามารถอนุมัติหรือปฏิเสธซ้ำได้
-              </p>
-            ) : null}
           </section>
         )}
       </main>
@@ -875,12 +763,6 @@ export default function KycReviewDetailPage() {
         caregiverName={caregiver?.fullName || ''}
         onClose={() => setIsRejectOpen(false)}
         onConfirm={handleReject}
-      />
-      <ImageModal
-        isOpen={isImageModalOpen}
-        onClose={() => setIsImageModalOpen(false)}
-        imageUrl={documentUrl}
-        title={selectedDoc ? (docTypeLabel[selectedDoc.docType] ?? selectedDoc.docType) : 'Preview'}
       />
       <ToastContainer
         toasts={toast.toasts as (ToastMessage & { id: string })[]}

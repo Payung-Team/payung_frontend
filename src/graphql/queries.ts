@@ -320,7 +320,19 @@ export const ADMIN_KYC_DETAIL = gql`
         action
         reason
         reviewedBy
+        reviewerName
         reviewedAt
+      }
+      editHistory {
+        id
+        action
+        editorName
+        createdAt
+        fieldChanges {
+          field
+          oldValue
+          newValue
+        }
       }
     }
   }
