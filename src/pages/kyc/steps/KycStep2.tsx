@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { useAuth } from '../../../context/AuthContext';
-import { useKyc } from '../../../context/KycContext';
+import { useKyc, type UploadedDoc } from '../../../context/KycContext';
 import { UPLOAD_KYC_DOCUMENT, DELETE_KYC_DOCUMENT } from '../../../graphql/queries';
 import { supabase } from '../../../lib/supabase';
 import AlertModal from '../../../components/ui/AlertModal';
@@ -98,7 +98,7 @@ function UploadIcon() {
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
-  const { goToStep, saveDoc, removeDoc, uploadedDocs, initialDocs } = useKyc();
+  const { goToStep, saveDoc, removeDoc, uploadedDocs, initialDocs, addPendingDeleteDoc } = useKyc();
   const { user } = useAuth();
   
   const [docStates, setDocStates] = useState<Record<string, DocState>>(() => {
@@ -115,6 +115,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
   });
 
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const pendingReuploadRef = useRef<Record<string, UploadedDoc | null>>({});
   const [uploadKycDocument] = useMutation(UPLOAD_KYC_DOCUMENT);
   const [deleteDocMutation] = useMutation(DELETE_KYC_DOCUMENT);
 
@@ -210,7 +211,65 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
         },
       });
 
-      const docId: string = result.data?.uploadKycDocument?.id;
+      const docId: string = (result.data as any)?.uploadKycDocument?.id;
+      saveDoc({ docId, docType, fileName: file.name, fileUrl: previewUrl });
+      setDocState(docType, { status: 'success', fileName: file.name });
+    } catch (err: any) {
+      setDocState(docType, {
+        status: 'error',
+        error: err?.message ?? 'อัปโหลดไม่สำเร็จ กรุณาลองใหม่',
+      });
+    }
+  }
+
+  async function handleReupload(docType: string, file: File, oldDoc: UploadedDoc) {
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setDocState(docType, { status: 'error', error: 'รองรับเฉพาะ JPG, PNG, PDF' });
+      return;
+    }
+    if (file.size > MAX_SIZE) {
+      setDocState(docType, { status: 'error', error: 'ไฟล์ใหญ่เกิน 5 MB · ลองย่อขนาดแล้วอัปโหลดอีกครั้ง' });
+      return;
+    }
+
+    setDocState(docType, { status: 'uploading', fileName: file.name, error: undefined });
+
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg';
+      const path = `${user?.id ?? 'unknown'}/${Date.now()}-${docType}.${ext}`;
+
+      const { error: storageError } = await supabase.storage
+        .from('kyc-documents')
+        .upload(path, file, { upsert: true });
+
+      if (storageError) throw new Error(storageError.message);
+
+      const { data: publicData } = supabase.storage.from('kyc-documents').getPublicUrl(path);
+      const cleanUrl = publicData.publicUrl;
+
+      const { data: signedData } = await supabase.storage
+        .from('kyc-documents')
+        .createSignedUrl(path, 3600);
+
+      const previewUrl = signedData?.signedUrl || cleanUrl;
+
+      const result = await uploadKycDocument({
+        variables: {
+          input: {
+            docType,
+            fileUrl: cleanUrl,
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: file.type,
+          },
+        },
+      });
+
+      const docId: string = (result.data as any)?.uploadKycDocument?.id;
+
+      // Track old doc for cleanup on step 3 submit (storage + DB deleted together)
+      addPendingDeleteDoc(oldDoc);
+
       saveDoc({ docId, docType, fileName: file.name, fileUrl: previewUrl });
       setDocState(docType, { status: 'success', fileName: file.name });
     } catch (err: any) {
@@ -234,7 +293,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
         const path = parts.length > 1 ? parts[1].split('?')[0] : null;
 
         if (path) {
-          const { data, error } = await supabase.storage
+          const { data } = await supabase.storage
             .from('kyc-documents')
             .createSignedUrl(decodeURIComponent(path), 3600); // 1 hour
           
@@ -449,30 +508,50 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
 
                   {/* Actions */}
                   <div className="flex items-center gap-2">
-                    {/* Upload/Retry Button */}
-                    <button
-                      type="button"
-                      disabled={isUploading}
-                      onClick={() => fileRefs.current[doc.type]?.click()}
-                      className={`flex items-center justify-center flex-shrink-0 transition-all cursor-pointer ${
-                        isError
-                          ? 'w-[61px] h-9 bg-white border border-[#951E1E] rounded-lg'
-                          : isUploading
-                          ? 'w-9 h-9 opacity-40 cursor-not-allowed'
-                          : isSuccess
-                          ? 'hidden' // Button Hidden on success in some designs, or used as replace
-                          : 'w-9 h-9 bg-white border border-[#E2E8F0] rounded-lg hover:border-[#2D6A58]'
-                      }`}
-                    >
-                      {isUploading ? (
+                    {/* Uploading spinner */}
+                    {isUploading && (
+                      <button type="button" disabled className="w-9 h-9 opacity-40 cursor-not-allowed flex items-center justify-center">
                         <Icon name="refresh" className="animate-spin" color="#2D6A58" style={{ fontSize: '16px' }} />
-                      ) : isError ? (
-                        /* icon-upload-danger */
-                        <Icon name="file_upload" color="#C62828" style={{ fontSize: '18px' }} />
-                      ) : (
+                      </button>
+                    )}
+
+                    {/* Upload button (idle) */}
+                    {!isSuccess && !isUploading && !isError && (
+                      <button
+                        type="button"
+                        onClick={() => fileRefs.current[doc.type]?.click()}
+                        className="w-9 h-9 bg-white border border-[#E2E8F0] rounded-lg flex items-center justify-center hover:border-[#2D6A58] transition-colors cursor-pointer"
+                      >
                         <UploadIcon />
-                      )}
-                    </button>
+                      </button>
+                    )}
+
+                    {/* Re-upload button (success) — uploads new file without deleting old */}
+                    {isSuccess && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const oldDoc = uploadedDocs.find((u) => u.docType === doc.type);
+                          if (oldDoc) pendingReuploadRef.current[doc.type] = oldDoc;
+                          fileRefs.current[doc.type]?.click();
+                        }}
+                        className="w-9 h-9 bg-white border border-[#E2E8F0] rounded-lg flex items-center justify-center hover:border-[#2D6A58] transition-colors cursor-pointer"
+                        title="อัปโหลดไฟล์ใหม่ (ไม่ลบไฟล์เดิม)"
+                      >
+                        <Icon name="file_upload" color="#2D6A58" style={{ fontSize: '18px' }} />
+                      </button>
+                    )}
+
+                    {/* Retry upload button (error) */}
+                    {isError && (
+                      <button
+                        type="button"
+                        onClick={() => fileRefs.current[doc.type]?.click()}
+                        className="w-[61px] h-9 bg-white border border-[#951E1E] rounded-lg flex items-center justify-center cursor-pointer"
+                      >
+                        <Icon name="file_upload" color="#C62828" style={{ fontSize: '18px' }} />
+                      </button>
+                    )}
 
                     {/* Delete/Trash Button */}
                     {(isSuccess || isError) && (
@@ -481,7 +560,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                         onClick={() => handleDelete(doc.type)}
                         className="w-9 h-9 bg-white border border-[#E2E8F0] rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors cursor-pointer"
                       >
-                         <Icon name="delete" color="#DC2626" style={{ fontSize: '18px' }} />
+                        <Icon name="delete" color="#DC2626" style={{ fontSize: '18px' }} />
                       </button>
                     )}
                   </div>
@@ -494,7 +573,15 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                     ref={(el) => { fileRefs.current[doc.type] = el; }}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) handleFileChange(doc.type, file);
+                      if (file) {
+                        const oldDoc = pendingReuploadRef.current[doc.type];
+                        pendingReuploadRef.current[doc.type] = null;
+                        if (oldDoc) {
+                          handleReupload(doc.type, file, oldDoc);
+                        } else {
+                          handleFileChange(doc.type, file);
+                        }
+                      }
                       e.target.value = '';
                     }}
                   />

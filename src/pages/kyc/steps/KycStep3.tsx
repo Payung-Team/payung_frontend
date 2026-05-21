@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@apollo/client/react';
 import { useKyc } from '../../../context/KycContext';
 import { useAuth } from '../../../context/AuthContext';
-import { SUBMIT_KYC, RESUBMIT_KYC } from '../../../graphql/queries';
+import { SUBMIT_KYC, RESUBMIT_KYC, DELETE_KYC_DOCUMENT } from '../../../graphql/queries';
 import Icon from '../../../components/ui/Icon';
 import Tooltip from '../../../components/ui/Tooltip';
 import { supabase } from '../../../lib/supabase';
@@ -51,12 +51,13 @@ function KycStepper({ current }: { current: number }) {
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function KycStep3({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
-  const { goToStep, step1Data, uploadedDocs, initialStep1Data, initialDocs } = useKyc();
+  const { goToStep, step1Data, uploadedDocs, initialStep1Data, initialDocs, pendingDeleteDocs, clearPendingDeleteDocs } = useKyc();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isConsented, setIsConsented] = useState(false);
   const [submitKyc, { loading: creating }] = useMutation(SUBMIT_KYC);
   const [resubmitKyc, { loading: updating }] = useMutation(RESUBMIT_KYC);
+  const [deleteDocMutation] = useMutation(DELETE_KYC_DOCUMENT);
   const loading = creating || updating;
   const [refreshedDocs, setRefreshedDocs] = useState(uploadedDocs);
 
@@ -134,6 +135,20 @@ export default function KycStep3({ mode = 'create' }: { mode?: 'create' | 'resub
         await resubmitKyc({
           variables: { input: kycInput },
         });
+
+        // Delete old docs from storage + DB (permanent cleanup on submit)
+        if (pendingDeleteDocs.length > 0) {
+          await Promise.allSettled(pendingDeleteDocs.map(async (doc) => {
+            const parts = doc.fileUrl.split('/kyc-documents/');
+            const path = parts.length > 1 ? parts[1].split('?')[0] : null;
+            if (path) {
+              await supabase.storage.from('kyc-documents').remove([decodeURIComponent(path)]);
+            }
+            await deleteDocMutation({ variables: { documentId: doc.docId } });
+          }));
+          clearPendingDeleteDocs();
+        }
+
         navigate('/kyc/status');
       } else {
         await submitKyc({

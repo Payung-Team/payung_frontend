@@ -26,10 +26,13 @@ interface KycContextType {
   uploadedDocs: UploadedDoc[];
   initialStep1Data: KycStep1Data | null;
   initialDocs: UploadedDoc[];
+  pendingDeleteDocs: UploadedDoc[];
   goToStep: (step: number) => void;
   saveStep1: (data: KycStep1Data) => void;
   saveDoc: (doc: UploadedDoc) => void;
   removeDoc: (docType: string) => void;
+  addPendingDeleteDoc: (doc: UploadedDoc) => void;
+  clearPendingDeleteDocs: () => void;
   setInitialData: (data: { step1: KycStep1Data; docs: UploadedDoc[] }) => void;
 }
 
@@ -41,6 +44,7 @@ export function KycProvider({ children }: { children: ReactNode }) {
   const [uploadedDocs, setUploadedDocs] = useState<UploadedDoc[]>([]);
   const [initialStep1Data, setInitialStep1Data] = useState<KycStep1Data | null>(null);
   const [initialDocs, setInitialDocs] = useState<UploadedDoc[]>([]);
+  const [pendingDeleteDocs, setPendingDeleteDocs] = useState<UploadedDoc[]>([]);
 
   function saveDoc(doc: UploadedDoc) {
     setUploadedDocs((prev) => {
@@ -53,11 +57,20 @@ export function KycProvider({ children }: { children: ReactNode }) {
     setUploadedDocs((prev) => prev.filter((d) => d.docType !== docType));
   }
 
+  function addPendingDeleteDoc(doc: UploadedDoc) {
+    setPendingDeleteDocs((prev) => [...prev, doc]);
+  }
+
+  function clearPendingDeleteDocs() {
+    setPendingDeleteDocs([]);
+  }
+
   function setInitialData(data: { step1: KycStep1Data; docs: UploadedDoc[] }) {
     setStep1Data(data.step1);
     setUploadedDocs(data.docs);
     setInitialStep1Data(data.step1);
     setInitialDocs(data.docs);
+    setPendingDeleteDocs([]);
   }
 
   return (
@@ -67,10 +80,13 @@ export function KycProvider({ children }: { children: ReactNode }) {
       uploadedDocs,
       initialStep1Data,
       initialDocs,
+      pendingDeleteDocs,
       goToStep: setStep,
       saveStep1: setStep1Data,
       saveDoc,
       removeDoc,
+      addPendingDeleteDoc,
+      clearPendingDeleteDocs,
       setInitialData,
     }}>
       {children}

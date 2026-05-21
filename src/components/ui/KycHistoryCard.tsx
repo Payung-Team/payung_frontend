@@ -78,20 +78,24 @@ export default function KycHistoryCard({
       license: 'ใบอนุญาต',
     };
 
+    // Build legacy resubmitDocMap: ใช้สำหรับ backward compat กับ document_upload logs เก่าใน DB
+    // (ใน format ใหม่ document changes จะอยู่ใน fieldChanges ของ resubmit log โดยตรงแล้ว)
     const sortedAsc = [...editHistory].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
-    const resubmitDocMap = new Map<string, Array<{ action: string; docLabel: string }>>();
-    let pendingDocChanges: Array<{ action: string; docLabel: string }> = [];
+    const resubmitDocMap = new Map<string, string[]>();
+    let pendingLegacyUploads: string[] = [];
     for (const log of sortedAsc) {
-      if (log.action === 'document_upload' || log.action === 'document_delete') {
+      if (log.action === 'document_upload') {
         const change = log.fieldChanges?.find((f) => f.field === 'document');
-        const rawType = change?.newValue || change?.oldValue || '';
+        const rawType = change?.newValue || '';
         const docLabel = DOC_TYPE_LABEL[rawType] || rawType;
-        if (docLabel) pendingDocChanges.push({ action: log.action, docLabel });
+        if (docLabel) pendingLegacyUploads.push(docLabel);
+      } else if (log.action === 'document_delete') {
+        // ไม่เก็บ delete logs — ไม่แสดงการลบใน history
       } else if (log.action === 'resubmit') {
-        resubmitDocMap.set(log.id, [...pendingDocChanges]);
-        pendingDocChanges = [];
+        resubmitDocMap.set(log.id, [...pendingLegacyUploads]);
+        pendingLegacyUploads = [];
       }
     }
 
@@ -130,46 +134,44 @@ export default function KycHistoryCard({
 
       if (log.action === 'first_submit') {
         logTitle = 'ส่งเอกสารยืนยันตัวตน';
-        logSubtitle = 'เหตุผล: -';
+        // แสดงเอกสารที่ submit จาก fieldChanges (format ใหม่)
+        const submittedDocs = (log.fieldChanges ?? [])
+          .filter((f) => f.field === 'document' && f.newValue)
+          .map((f) => DOC_TYPE_LABEL[f.newValue!] || f.newValue!);
+        logSubtitle = submittedDocs.length > 0 ? `เพิ่ม: ${submittedDocs.join(', ')}` : null;
         hasSubmitLog = true;
       } else if (log.action === 'resubmit') {
         logTitle = 'ส่งเอกสารยืนยันตัวตนใหม่';
         const parts: string[] = [];
 
-        // ── ส่วนที่ 1: Text field changes (จาก fieldChanges ของ resubmit log เอง) ──
-        if (log.fieldChanges && log.fieldChanges.length > 0) {
-          const FIELD_LABEL: Record<string, string> = {
-            phone: 'เบอร์โทร',
-            fullName: 'ชื่อ-นามสกุล',
-            bio: 'แนะนำตัว',
-            hourlyRate: 'อัตราค่าบริการ',
-            experienceYears: 'ประสบการณ์',
-            skills: 'ทักษะ',
-            address: 'ที่อยู่',
-            idCardNumber: 'เลขบัตรประชาชน',
-            gender: 'เพศ',
-            dateOfBirth: 'วันเกิด',
-          };
-          const changedFields = log.fieldChanges
-            .map((f) => FIELD_LABEL[f.field] || f.field)
-            .join(', ');
-          parts.push(`แก้ไข: ${changedFields}`);
-        }
+        const FIELD_LABEL: Record<string, string> = {
+          phone: 'เบอร์โทร',
+          fullName: 'ชื่อ-นามสกุล',
+          bio: 'แนะนำตัว',
+          hourlyRate: 'อัตราค่าบริการ',
+          experienceYears: 'ประสบการณ์',
+          skills: 'ทักษะ',
+          address: 'ที่อยู่',
+          idCardNumber: 'เลขบัตรประชาชน',
+          gender: 'เพศ',
+          dateOfBirth: 'วันเกิด',
+        };
 
-        // ── ส่วนที่ 2: Document changes (จาก resubmitDocMap) ──
-        const docChanges = resubmitDocMap.get(log.id) ?? [];
-        if (docChanges.length > 0) {
-          const uploads = docChanges
-            .filter((c) => c.action === 'document_upload')
-            .map((c) => c.docLabel);
-          const deletes = docChanges
-            .filter((c) => c.action === 'document_delete')
-            .map((c) => c.docLabel);
-          if (uploads.length > 0) parts.push(`เพิ่ม: ${uploads.join(', ')}`);
-          if (deletes.length > 0) parts.push(`ลบ: ${deletes.join(', ')}`);
-        }
+        // Text field changes (exclude 'document' entries)
+        const changedTextFields = (log.fieldChanges ?? [])
+          .filter((f) => f.field !== 'document')
+          .map((f) => FIELD_LABEL[f.field] || f.field);
+        if (changedTextFields.length > 0) parts.push(`แก้ไข: ${changedTextFields.join(', ')}`);
 
-        logSubtitle = parts.length > 0 ? parts.join(' | ') : 'เหตุผล: -';
+        // Document changes: ใหม่ → จาก fieldChanges โดยตรง; เก่า (legacy) → จาก resubmitDocMap
+        const docsFromFieldChanges = (log.fieldChanges ?? [])
+          .filter((f) => f.field === 'document' && f.newValue)
+          .map((f) => DOC_TYPE_LABEL[f.newValue!] || f.newValue!);
+        const docsFromLegacy = resubmitDocMap.get(log.id) ?? [];
+        const allUploadedDocs = [...new Set([...docsFromFieldChanges, ...docsFromLegacy])];
+        if (allUploadedDocs.length > 0) parts.push(`เพิ่ม: ${allUploadedDocs.join(', ')}`);
+
+        logSubtitle = parts.length > 0 ? parts.join(' | ') : null;
         hasSubmitLog = true;
 
       } else if (log.action === 'profile_edit') {
