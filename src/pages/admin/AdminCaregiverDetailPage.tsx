@@ -233,7 +233,7 @@ export default function AdminCaregiverDetailPage() {
   const [toggleFieldLockMutation, { loading: lockLoading }] = useMutation(TOGGLE_FIELD_LOCK_LOCAL);
 
   // 3. Fetch KYC Documents & Reviews using caregiver.id
-  const { data: kycDetailData, loading: kycDetailLoading } = useQuery(
+  const { data: kycDetailData, loading: kycDetailLoading, refetch: refetchKycDetail } = useQuery(
     ADMIN_KYC_DETAIL_LOCAL,
     {
       variables: { caregiverId: caregiver?.id },
@@ -324,6 +324,7 @@ export default function AdminCaregiverDetailPage() {
       setSavedOverrides(null);
       setSaveError(null);
       refetchUserDetail();
+      refetchKycDetail?.();
     } catch (err: unknown) {
       setSaveError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
     }
@@ -338,6 +339,7 @@ export default function AdminCaregiverDetailPage() {
     });
     if (caregiver?.id) {
       await relockSessionFields(caregiver.id);
+      refetchKycDetail?.();
     }
   };
 
@@ -369,6 +371,7 @@ export default function AdminCaregiverDetailPage() {
 
       setLockConfirmModal(null);
       await refetchLockedFields();
+      refetchKycDetail?.();
     } catch (err: unknown) {
       setSaveError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการเปลี่ยนสถานะล็อค');
       setLockConfirmModal(null);
@@ -497,7 +500,19 @@ export default function AdminCaregiverDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-gray-500">สถานะปัจจุบัน:</span>
+            <button
+              type="button"
+              onClick={() => navigate(`/admin/kyc/${caregiver.id}`)}
+              className="group relative text-sm font-semibold text-gray-500 cursor-pointer underline hover:text-gray-700 transition-colors focus:outline-none"
+            >
+              สถานะปัจจุบัน:
+              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover:flex flex-col items-center z-50">
+                <span className="h-1.5 w-1.5 rotate-45 bg-[#1F2937] -mb-1" />
+                <span className="relative rounded bg-[#1F2937] px-2.5 py-1 text-[11px] font-normal leading-4 text-white shadow-md whitespace-nowrap">
+                  กดเพื่อไปหน้าตรวจสอบเอกสาร
+                </span>
+              </span>
+            </button>
             <StatusBadge
               label={currentStatusMeta.label}
               badgeClass={`${currentStatusMeta.badgeClass} px-3 py-1 text-sm font-semibold`}
