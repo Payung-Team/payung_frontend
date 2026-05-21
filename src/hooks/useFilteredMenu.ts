@@ -25,7 +25,7 @@ interface UseFilteredMenuReturn {
  * @returns Object containing filtered menu, nav items, loading state, and errors
  */
 export function useFilteredMenu(
-  menuName: 'mainMenu' | 'profileMenu' | 'adminMenu',
+  menuName: 'mainMenu' | 'profileMenu' | 'adminMenu' | 'patientMenu' | 'caregiverMenu',
   userRole: number | null
 ): UseFilteredMenuReturn {
   const [template, setTemplate] = useState<DynamicMenuTemplate | null>(null);

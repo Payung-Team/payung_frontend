@@ -1,304 +1,519 @@
-import React, { useEffect } from 'react';
-import { useQuery } from '@apollo/client/react';
-import { useNavigate, Link } from 'react-router-dom';
-import { GET_USER, GET_CAREGIVER_PROFILE } from '../../graphql/queries';
+import React, { useState } from 'react';
+import { useQuery, useMutation } from '@apollo/client/react';
+import { Link } from 'react-router-dom';
+import {
+  GET_USER,
+  GET_CAREGIVER_PROFILE,
+  SET_CAREGIVER_SEARCHABLE,
+  GET_UNREAD_COUNT,
+} from '../../graphql/queries';
 import Skeleton from '../../components/ui/Skeleton';
-import ProfileCard from '../../components/ui/ProfileCard';
+import StatusBadge from '../../components/ui/StatusBadge';
 import { Icon } from '../../components/ui/Icon';
-import EditProfileModal from '../../components/layout/EditProfileModal';
+import { ToastContainer } from '../../components/ui/Toast';
+import { useToast } from '../../hooks/useToast';
 
 interface UserData {
   me: {
     id: string;
     email: string;
     displayName?: string;
-    phone?: string;
-    address?: string;
-    bio?: string;
-    avatarUrl?: string;
     role: number;
   };
 }
 
-interface CaregiverData {
-  myCaregiverProfile: {
-    id: string;
-    fullName?: string;
-    kycStatus: string;
-    isSearchable: boolean;
-    skills: string[];
-    experienceYears?: number;
-    hourlyRate?: number;
-  };
+interface CaregiverProfile {
+  id: string;
+  caregiverNumber?: string;
+  fullName?: string;
+  gender?: string;
+  dateOfBirth?: string;
+  phone?: string;
+  address?: string;
+  bio?: string;
+  hourlyRate?: number;
+  skills: string[];
+  experienceYears?: number;
+  kycStatus: string;
+  isSearchable: boolean;
+  updatedAt?: string;
 }
 
-const CaregiverHome: React.FC = () => {
-  const navigate = useNavigate();
-  const { data, loading, error } = useQuery<UserData>(GET_USER);
-  const { data: caregiverData, loading: caregiverLoading } = useQuery<CaregiverData>(GET_CAREGIVER_PROFILE);
-  const [isEditOpen, setIsEditOpen] = React.useState(false);
+interface CaregiverData {
+  myCaregiverProfile: CaregiverProfile;
+}
 
-  // Redirect to login if unauthenticated
-  useEffect(() => {
-    if (!loading && !data?.me) {
-      navigate('/login');
-    }
-  }, [data, loading, navigate]);
+interface UnreadCountData {
+  unreadCount: number;
+}
 
-  if (error) {
-    console.error('Error fetching user data:', error);
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
+function kycBadgeMeta(status: string) {
+  switch (status) {
+    case 'verified':
+      return { label: 'Verified', badgeClass: 'bg-green-100 text-green-700', dotClass: 'bg-green-500' };
+    case 'pending':
+      return { label: 'Pending', badgeClass: 'bg-orange-100 text-orange-700', dotClass: 'bg-orange-500' };
+    case 'rejected':
+      return { label: 'Rejected', badgeClass: 'bg-red-100 text-red-700', dotClass: 'bg-red-500' };
+    default:
+      return { label: 'Not Started', badgeClass: 'bg-gray-100 text-gray-600', dotClass: 'bg-gray-400' };
+  }
+}
+
+function calcCompleteness(profile: CaregiverProfile): number {
+  const checks: { weight: number; filled: boolean }[] = [
+    { weight: 15, filled: !!profile.fullName },
+    { weight: 10, filled: !!profile.bio },
+    { weight: 10, filled: !!profile.phone },
+    { weight: 10, filled: !!profile.address },
+    { weight: 15, filled: !!profile.hourlyRate },
+    { weight: 15, filled: (profile.skills?.length ?? 0) > 0 },
+    { weight: 15, filled: !!profile.experienceYears },
+    { weight: 5,  filled: !!profile.gender },
+    { weight: 5,  filled: !!profile.dateOfBirth },
+  ];
+  return checks.reduce((sum, c) => sum + (c.filled ? c.weight : 0), 0);
+}
+
+function formatUpdatedAt(iso?: string): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+const cardBase =
+  'bg-white rounded-2xl p-4 border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.05)] flex flex-col gap-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)]';
+
+// ─── Sub-components ───────────────────────────────────────────────────────
+
+interface HeroCardProps {
+  readonly displayName: string;
+  readonly caregiverNumber?: string;
+  readonly isSearchable: boolean;
+  readonly canToggle: boolean;
+  readonly onToggle: () => void;
+}
+
+function HeroCard({ displayName, caregiverNumber, isSearchable, canToggle, onToggle }: HeroCardProps) {
+  const initials = getInitials(displayName || 'C');
+
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
+      <div className="flex items-center gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#52B69A] to-[#168AAD] flex items-center justify-center flex-shrink-0">
+          <span className="text-white text-xl font-bold">{initials}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-[#8A8C8E]">Welcome back</p>
+          <h1 className="text-[18px] font-bold text-[#1A1A1A] leading-tight truncate">{displayName}</h1>
+          {caregiverNumber && (
+            <p className="text-[11px] text-[#8A8C8E] font-mono mt-0.5">#{caregiverNumber}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-semibold text-[#1A1A1A]">
+            {isSearchable ? 'Available for jobs' : 'Not accepting jobs'}
+          </p>
+          <p className="text-[11px] text-[#8A8C8E] mt-0.5">
+            {isSearchable
+              ? 'Patients can find and book you'
+              : canToggle
+                ? 'Toggle to start receiving requests'
+                : 'Complete KYC to enable availability'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          disabled={!canToggle}
+          aria-label={isSearchable ? 'Disable availability' : 'Enable availability'}
+          className={`relative w-12 h-6 rounded-full transition-colors duration-200 flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#52B69A] focus-visible:ring-offset-2 ${
+            isSearchable ? 'bg-[#52B69A]' : 'bg-gray-200'
+          } ${canToggle ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
+        >
+          <span
+            className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+              isSearchable ? 'translate-x-7' : 'translate-x-1'
+            }`}
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface StatsRowProps {
+  readonly profile: CaregiverProfile;
+}
+
+function StatsRow({ profile }: StatsRowProps) {
+  const skillCount = profile.skills?.length ?? 0;
+  const stats = [
+    {
+      icon: 'payments',
+      value: profile.hourlyRate ? `฿${profile.hourlyRate}` : '—',
+      label: 'per hour',
+      iconColor: 'text-[#52B69A]',
+      iconBg: 'bg-[#EEF9F5]',
+    },
+    {
+      icon: 'star',
+      value: profile.experienceYears
+        ? `${profile.experienceYears} yr${profile.experienceYears !== 1 ? 's' : ''}`
+        : '—',
+      label: 'experience',
+      iconColor: 'text-[#F08C00]',
+      iconBg: 'bg-[#FFF3E0]',
+    },
+    {
+      icon: 'medical_services',
+      value: skillCount > 0 ? String(skillCount) : '—',
+      label: `skill${skillCount !== 1 ? 's' : ''}`,
+      iconColor: 'text-[#3B5BDB]',
+      iconBg: 'bg-[#F0F4FF]',
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {stats.map((s) => (
+        <div
+          key={s.label}
+          className="bg-white rounded-2xl p-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] flex flex-col items-center gap-1.5 text-center"
+        >
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${s.iconBg}`}>
+            <Icon name={s.icon} size="medium" className={s.iconColor} color="currentColor" />
+          </div>
+          <span className="text-[15px] font-bold text-[#1A1A1A]">{s.value}</span>
+          <span className="text-[10px] text-[#8A8C8E]">{s.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface ProfileStatusCardProps {
+  readonly profile: CaregiverProfile;
+  readonly completeness: number;
+}
+
+function ProfileStatusCard({ profile, completeness }: ProfileStatusCardProps) {
+  const kyc = kycBadgeMeta(profile.kycStatus);
+  const barColor =
+    completeness >= 80
+      ? 'from-[#52B69A] to-[#76C893]'
+      : completeness >= 50
+        ? 'from-[#F08C00] to-[#FCC419]'
+        : 'from-[#FA5252] to-[#FF8787]';
+  const pctColor =
+    completeness >= 80
+      ? 'text-[#52B69A]'
+      : completeness >= 50
+        ? 'text-[#F08C00]'
+        : 'text-[#FA5252]';
+
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
+      <div className="flex justify-between items-center mb-1.5">
+        <span className="text-[13px] font-semibold text-[#1A1A1A]">Profile completeness</span>
+        <span className={`text-[13px] font-bold ${pctColor}`}>{completeness}%</span>
+      </div>
+      <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
+        <div
+          className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-500`}
+          style={{ width: `${completeness}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between">
+        <StatusBadge {...kyc} />
+        <p className="text-[11px] text-[#8A8C8E]">Updated {formatUpdatedAt(profile.updatedAt)}</p>
+      </div>
+    </div>
+  );
+}
+
+interface QuickActionsProps {
+  readonly unreadCount: number;
+  readonly kycStatus: string;
+}
+
+function QuickActionsGrid({ unreadCount, kycStatus }: QuickActionsProps) {
+  const kyc = kycBadgeMeta(kycStatus);
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <Link to="/jobs" className={`${cardBase} no-underline text-[#1A1A1A]`}>
+        <div className="w-10 h-10 rounded-xl bg-[#F0F4FF] text-[#3B5BDB] flex items-center justify-center">
+          <Icon name="work" size="large" color="currentColor" />
+        </div>
+        <div>
+          <div className="text-[13px] font-semibold leading-tight">My Jobs</div>
+          <div className="text-[11px] text-[#8A8C8E] mt-0.5">View job requests</div>
+        </div>
+      </Link>
+
+      <Link to="/caregiver/edit-profile" className={`${cardBase} no-underline text-[#1A1A1A]`}>
+        <div className="w-10 h-10 rounded-xl bg-[#EEF9F5] text-[#3A9A7E] flex items-center justify-center">
+          <Icon name="manage_accounts" size="large" color="currentColor" />
+        </div>
+        <div>
+          <div className="text-[13px] font-semibold leading-tight">Edit Profile</div>
+          <div className="text-[11px] text-[#8A8C8E] mt-0.5">Update your info</div>
+        </div>
+      </Link>
+
+      <Link to="/kyc/status" className={`${cardBase} no-underline text-[#1A1A1A]`}>
+        <div className="w-10 h-10 rounded-xl bg-[#F0F4FF] text-[#3B5BDB] flex items-center justify-center">
+          <Icon name="shield" size="large" color="currentColor" />
+        </div>
+        <div>
+          <div className="text-[13px] font-semibold leading-tight">KYC Status</div>
+          <div className="text-[11px] text-[#8A8C8E] mt-0.5 capitalize">{kyc.label}</div>
+        </div>
+      </Link>
+
+      <Link to="/notifications" className={`${cardBase} no-underline text-[#1A1A1A]`}>
+        <div className="w-10 h-10 rounded-xl bg-[#FFF3E0] text-[#F08C00] flex items-center justify-center relative">
+          <Icon name="notifications" size="large" color="currentColor" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </div>
+        <div>
+          <div className="text-[13px] font-semibold leading-tight">Notifications</div>
+          <div className="text-[11px] text-[#8A8C8E] mt-0.5">
+            {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+          </div>
+        </div>
+      </Link>
+    </div>
+  );
+}
+
+interface HintsProps {
+  readonly kycStatus: string;
+  readonly isVerified: boolean;
+  readonly isSearchable: boolean;
+  readonly completeness: number;
+  readonly canToggle: boolean;
+  readonly onToggle: () => void;
+}
+
+function ContextualHints({ kycStatus, isVerified, isSearchable, completeness, canToggle, onToggle }: HintsProps) {
+  const hints: React.ReactNode[] = [];
+
+  if (kycStatus === 'none') {
+    hints.push(
+      <div key="kyc-none" className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-4 flex gap-3 items-start">
+        <Icon name="warning" size="large" color="#d97706" />
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-amber-800 mb-1">
+            Start identity verification to receive jobs
+          </p>
+          <Link
+            to="/kyc"
+            className="inline-block mt-1 px-3 py-1.5 bg-amber-600 text-white text-xs font-semibold rounded-lg hover:bg-amber-700 transition-colors no-underline"
+          >
+            Start KYC
+          </Link>
+        </div>
+      </div>
+    );
   }
 
-  const availabilityBadge = (() => {
-    const profile = caregiverData?.myCaregiverProfile;
-    if (!profile) {
-      return null;
-    }
+  if (kycStatus === 'pending') {
+    hints.push(
+      <div key="kyc-pending" className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-4 flex gap-3 items-start">
+        <Icon name="schedule" size="large" color="#1d4ed8" />
+        <p className="text-sm text-blue-800">
+          Verification is under review. Please wait 1–3 business days.
+        </p>
+      </div>
+    );
+  }
 
-    if (profile.kycStatus === 'verified' && profile.isSearchable) {
-      return {
-        label: 'กำลังรับงาน',
-        classes: 'border-[#A7D8C2] bg-[#E7F5EE] text-[#228B55]',
-      };
-    }
+  if (isVerified && !isSearchable) {
+    hints.push(
+      <div key="enable-avail" className="bg-[#EEF9F5] border border-[#A7D8C2] rounded-2xl px-4 py-4 flex gap-3 items-start">
+        <Icon name="info" size="large" color="#228B55" />
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-[#1A5C3A] mb-1">
+            Enable availability so patients can find you
+          </p>
+          <button
+            type="button"
+            onClick={onToggle}
+            disabled={!canToggle}
+            className="mt-1 px-3 py-1.5 bg-[#52B69A] text-white text-xs font-semibold rounded-lg hover:bg-[#3A9A7E] transition-colors disabled:opacity-60"
+          >
+            Enable Now
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-    if (profile.kycStatus === 'verified' && !profile.isSearchable) {
-      return {
-        label: 'ไม่รับงาน',
-        classes: 'border-[#D1D5DB] bg-[#F3F4F6] text-[#6B7280]',
-      };
-    }
+  if (isVerified && isSearchable) {
+    hints.push(
+      <div key="ready" className="bg-[#EEF9F5] border border-[#A7D8C2] rounded-2xl px-4 py-4 flex gap-3 items-center">
+        <Icon name="check_circle" size="large" color="#228B55" />
+        <p className="text-sm font-semibold text-[#1A5C3A]">You are ready to receive jobs ✓</p>
+      </div>
+    );
+  }
 
-    if (profile.kycStatus === 'pending') {
-      return {
-        label: 'รอยืนยัน',
-        classes: 'border-[#E7B08A] bg-[#FDF1E7] text-[#C96E3A]',
-      };
-    }
+  if (completeness < 80) {
+    hints.push(
+      <div key="complete-profile" className="bg-purple-50 border border-purple-200 rounded-2xl px-4 py-4 flex gap-3 items-start">
+        <Icon name="person_add" size="large" color="#7c3aed" />
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-purple-800 mb-1">
+            Complete your profile to increase your chances of getting hired
+          </p>
+          <Link
+            to="/caregiver/edit-profile"
+            className="inline-block mt-1 px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 transition-colors no-underline"
+          >
+            Complete Profile
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
-    return {
-      label: 'ยังไม่ยืนยัน',
-      classes: 'border-[#FDBA74] bg-[#FFF7ED] text-[#9A3412]',
-    };
-  })();
+  if (hints.length === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="text-[15px] font-bold text-[#1A1A1A]">Tips</h2>
+      {hints}
+    </section>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────
+
+const CaregiverHome: React.FC = () => {
+  const { data, loading } = useQuery<UserData>(GET_USER);
+  const { data: caregiverData, loading: caregiverLoading } = useQuery<CaregiverData>(GET_CAREGIVER_PROFILE);
+  const { data: unreadData } = useQuery<UnreadCountData>(GET_UNREAD_COUNT, {
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 30_000,
+  });
+  const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
+
+  const [optimisticSearchable, setOptimisticSearchable] = useState<boolean | null>(null);
+  const [togglingAvail, setTogglingAvail] = useState(false);
+  const [setCaregiverSearchable] = useMutation(SET_CAREGIVER_SEARCHABLE);
+
+  const profile = caregiverData?.myCaregiverProfile;
+  const isSearchable = optimisticSearchable ?? profile?.isSearchable ?? false;
+  const kycStatus = profile?.kycStatus ?? 'none';
+  const isVerified = kycStatus === 'verified';
+  const completeness = profile ? calcCompleteness(profile) : 0;
+  const unreadCount = unreadData?.unreadCount ?? 0;
+  const canToggle = isVerified && !togglingAvail;
+  const displayName = data?.me?.displayName || profile?.fullName || 'Caregiver';
+  const isLoading = loading || caregiverLoading;
+
+  const handleToggleAvailability = async () => {
+    if (!canToggle) return;
+    const prev = isSearchable;
+    const next = !prev;
+    setOptimisticSearchable(next);
+    setTogglingAvail(true);
+    try {
+      await setCaregiverSearchable({
+        variables: { isSearchable: next },
+        refetchQueries: [{ query: GET_CAREGIVER_PROFILE }],
+        awaitRefetchQueries: true,
+      });
+      setOptimisticSearchable(null);
+      showSuccess(next ? 'You are now available for jobs' : 'You are now unavailable');
+    } catch {
+      setOptimisticSearchable(prev);
+      showError('Could not update availability. Please try again.');
+    } finally {
+      setTogglingAvail(false);
+    }
+  };
 
   return (
     <>
-      {/* ═══ ROOT ═══ */}
-      <div className="bg-[#F6FAF9] text-[#1A1A1A] min-h-screen antialiased" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+      <div className="min-h-screen bg-[#F6FAF9] text-[#1A1A1A] antialiased" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+        <main className="max-w-2xl mx-auto px-4 pt-6 pb-24 flex flex-col gap-4">
 
-        {/* ═══ BODY ═══ */}
-        <main className="max-w-[1000px] mx-auto px-6 pt-7 pb-[120px] grid grid-cols-1 md:grid-cols-[300px_1fr] gap-7 items-start">
+          {/* Hero card */}
+          {isLoading ? (
+            <Skeleton height={148} borderRadius={20} />
+          ) : (
+            <HeroCard
+              displayName={displayName}
+              caregiverNumber={profile?.caregiverNumber}
+              isSearchable={isSearchable}
+              canToggle={canToggle}
+              onToggle={handleToggleAvailability}
+            />
+          )}
 
-          {/* Profile card */}
-          <ProfileCard
-            user={data?.me ? { ...data.me, fullName: caregiverData?.myCaregiverProfile?.fullName } : undefined}
-            loading={loading || caregiverLoading}
-            onEditProfile={() => setIsEditOpen(true)}
-          />
-
-          {/* Main content column */}
-          <div className="flex flex-col gap-6">
-
-            {/* Greeting banner */}
-            {loading || caregiverLoading || !data?.me ? (
-              <Skeleton height={80} borderRadius={24} />
-            ) : (
-              <div
-                className="rounded-3xl px-7 py-7 text-white relative overflow-hidden"
-                style={{ background: 'linear-gradient(135deg,#52B69A 0%,#76C893 100%)' }}
-              >
-                <div className="absolute -top-8 -right-5 w-40 h-40 rounded-full bg-white/10 pointer-events-none" />
-                <h2 className="text-[22px] font-bold mb-1 relative z-10">
-                  สวัสดีค่ะ คุณ {caregiverData?.myCaregiverProfile?.fullName || data.me.displayName || 'ผู้ดูแล Payung'}
-                </h2>
-                <p className="text-sm opacity-80 relative z-10 flex items-center gap-1">
-                  {caregiverData?.myCaregiverProfile?.kycStatus === 'verified' ? (
-                    <>
-                      <Icon name="check_circle" style={{ fontSize: '16px' }} />
-                      บัญชีของคุณได้รับการยืนยันแล้ว
-                    </>
-                  ) : (
-                    <>
-                      <Icon name="warning" style={{ fontSize: '16px' }} />
-                      กรุณาทำการยืนยัน KYC เพื่อเริ่มรับการจอง
-                    </>
-                  )}
-                </p>
-
-                {availabilityBadge && (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/caregiver/availability')}
-                    className={`relative z-10 mt-4 inline-flex items-center rounded-full border px-3 py-1 text-[12px] font-semibold transition-colors hover:brightness-95 ${availabilityBadge.classes}`}
-                  >
-                    {availabilityBadge.label}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* KYC Status Alert */}
-            {!caregiverLoading && caregiverData?.myCaregiverProfile && (
-              <>
-                {caregiverData.myCaregiverProfile.kycStatus === 'none' && (
-                  <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg px-5 py-4">
-                    <div className="flex items-start gap-3">
-                      <div className="text-yellow-600 text-xl">⚠️</div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-yellow-800 mb-1">ยังไม่ได้ยืนยัน KYC</h3>
-                        <p className="text-sm text-yellow-700 mb-3">
-                          กรุณาจำหน่ายเอกสารเพื่อให้ลูกค้าสามารถจองบริการของคุณได้
-                        </p>
-                        <Link 
-                          to="/kyc" 
-                          className="inline-block px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm font-semibold hover:bg-yellow-700 transition-colors"
-                        >
-                          ไปยังการยืนยัน KYC
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {caregiverData.myCaregiverProfile.kycStatus === 'pending' && (
-                  <div className="bg-blue-50 border-l-4 border-blue-400 rounded-lg px-5 py-4">
-                    <div className="flex items-start gap-3">
-                      <div className="text-blue-600 text-xl">📋</div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-blue-800 mb-1">รออนุมัติการยืนยัน</h3>
-                        <p className="text-sm text-blue-700">
-                          เอกสารของคุณกำลังรอการตรวจสอบ โปรดรอสักครู่...
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {caregiverData.myCaregiverProfile.kycStatus === 'rejected' && (
-                  <div className="bg-red-50 border-l-4 border-red-400 rounded-lg px-5 py-4">
-                    <div className="flex items-start gap-3">
-                      <div className="text-red-600 text-xl">❌</div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-red-800 mb-1">การยืนยันถูกปฏิเสธ</h3>
-                        <p className="text-sm text-red-700 mb-3">
-                          เอกสารของคุณไม่ผ่านการตรวจสอบ กรุณาส่งใหม่อีกครั้ง
-                        </p>
-                        <Link 
-                          to="/kyc" 
-                          className="inline-block px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors"
-                        >
-                          ส่งใหม่
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Quick Actions */}
-            <div>
-              <div className="flex justify-between items-center mb-3.5">
-                <h2 className="text-[17px] font-bold text-[#1A1A1A]">ทางลัด</h2>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {loading || !data?.me ? (
-                  [0, 1, 2].map(i => <Skeleton key={i} height={110} borderRadius={16} />)
-                ) : (
-                  <>
-                    {/* Verification */}
-                    <Link to="/kyc" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
-                      <div className="w-12 h-12 rounded-xl bg-[#E6F5ED] text-[#3A9A7E] flex items-center justify-center mx-auto mb-2.5">
-                        <Icon name="verified_user" size="large" color="currentColor" />
-                      </div>
-                      <div className="text-[13px] font-semibold mb-0.5">การยืนยัน</div>
-                      <div className="text-[11px] text-[#8A8C8E] leading-snug">ยืนยัน KYC</div>
-                    </Link>
-
-                    {/* Messages */}
-                    <Link to="/messages" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
-                      <div className="w-12 h-12 rounded-xl bg-[#FFF3E0] text-[#FFA92C] flex items-center justify-center mx-auto mb-2.5">
-                        <Icon name="chat_bubble" size="large" color="currentColor" />
-                      </div>
-                      <div className="text-[13px] font-semibold mb-0.5">ข้อความ</div>
-                      <div className="text-[11px] text-[#8A8C8E] leading-snug">แชทกับลูกค้า</div>
-                    </Link>
-
-                    {/* Profile */}
-                    <Link to="/profile" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
-                      <div className="w-12 h-12 rounded-xl bg-[#F0F1F3] text-[#575859] flex items-center justify-center mx-auto mb-2.5">
-                        <Icon name="person" size="large" color="currentColor" />
-                      </div>
-                      <div className="text-[13px] font-semibold mb-0.5">โปรไฟล์</div>
-                      <div className="text-[11px] text-[#8A8C8E] leading-snug">แก้ไขข้อมูล</div>
-                    </Link>
-                  </>
-                )}
-              </div>
+          {/* Stats row */}
+          {isLoading ? (
+            <div className="grid grid-cols-3 gap-3">
+              {[0, 1, 2].map((i) => <Skeleton key={i} height={96} borderRadius={16} />)}
             </div>
+          ) : profile && (
+            <StatsRow profile={profile} />
+          )}
 
-            {/* Profile Stats */}
-            {!caregiverLoading && caregiverData?.myCaregiverProfile && (
-              <div>
-                <div className="flex justify-between items-center mb-3.5">
-                  <h2 className="text-[17px] font-bold text-[#1A1A1A]">ข้อมูลประวัติ</h2>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-white rounded-2xl px-4 py-5 text-center shadow-[0_1px_4px_rgba(0,0,0,0.03)] border border-transparent">
-                    <div className="text-2xl font-bold text-[#52B69A] mb-1">
-                      {caregiverData.myCaregiverProfile.experienceYears || 0}
-                    </div>
-                    <div className="text-xs text-[#8A8C8E]">ปีประสบการณ์</div>
-                  </div>
+          {/* Profile completeness + KYC status */}
+          {isLoading ? (
+            <Skeleton height={90} borderRadius={20} />
+          ) : profile && (
+            <ProfileStatusCard profile={profile} completeness={completeness} />
+          )}
 
-                  <div className="bg-white rounded-2xl px-4 py-5 text-center shadow-[0_1px_4px_rgba(0,0,0,0.03)] border border-transparent">
-                    <div className="text-2xl font-bold text-[#52B69A] mb-1">
-                      ฿{caregiverData.myCaregiverProfile.hourlyRate || 0}
-                    </div>
-                    <div className="text-xs text-[#8A8C8E]">/ชั่วโมง</div>
-                  </div>
-
-                  <div className="bg-white rounded-2xl px-4 py-5 text-center shadow-[0_1px_4px_rgba(0,0,0,0.03)] border border-transparent">
-                    <div className="text-2xl font-bold text-[#52B69A] mb-1">
-                      {caregiverData.myCaregiverProfile.skills?.length || 0}
-                    </div>
-                    <div className="text-xs text-[#8A8C8E]">ทักษะ</div>
-                  </div>
-                </div>
+          {/* Quick actions */}
+          <section>
+            <h2 className="text-[15px] font-bold text-[#1A1A1A] mb-3">Quick Actions</h2>
+            {isLoading ? (
+              <div className="grid grid-cols-2 gap-3">
+                {[0, 1, 2, 3].map((i) => <Skeleton key={i} height={110} borderRadius={16} />)}
               </div>
+            ) : (
+              <QuickActionsGrid unreadCount={unreadCount} kycStatus={kycStatus} />
             )}
+          </section>
 
-            {/* Empty State if no KYC verified */}
-            {!caregiverLoading && caregiverData?.myCaregiverProfile?.kycStatus !== 'verified' && (
-              <div>
-                <div className="text-center py-11 px-6 bg-white rounded-2xl shadow-[0_1px_4px_rgba(0,0,0,0.03)] border border-transparent">
-                  <div className="w-[72px] h-[72px] bg-[#F0F1F3] rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-[#C6C8CB]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
-                    </svg>
-                  </div>
-                  <div className="text-[15px] font-bold text-[#1A1A1A] mb-1">ยังคงต้องยืนยัน KYC</div>
-                  <div className="text-[13px] text-[#8A8C8E] leading-relaxed">
-                    กรุณาทำการยืนยัน KYC เพื่อเปิดใช้งาน<br />ความสามารถในการรับการจองจากลูกค้า
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Contextual hints */}
+          {!isLoading && profile && (
+            <ContextualHints
+              kycStatus={kycStatus}
+              isVerified={isVerified}
+              isSearchable={isSearchable}
+              completeness={completeness}
+              canToggle={canToggle}
+              onToggle={handleToggleAvailability}
+            />
+          )}
+
         </main>
       </div>
-
-      {/* Edit Profile Modal */}
-      <EditProfileModal
-        isOpen={isEditOpen}
-        onClose={() => setIsEditOpen(false)}
-        userEmail={data?.me?.email || ''}
-        currentDisplayName={data?.me?.displayName || ''}
-        currentPhone={data?.me?.phone || ''}
-        currentAddress={data?.me?.address || ''}
-        currentBio={data?.me?.bio || ''}
-      />
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </>
   );
 };

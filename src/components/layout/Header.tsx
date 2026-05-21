@@ -11,6 +11,7 @@ interface HeaderProps {
   readonly profileDropdown?: React.ReactNode;
   readonly isLoading?: boolean;
   readonly currentUserId?: string;
+  readonly homeRoute?: string;
 }
 
 export default function Header({
@@ -18,6 +19,7 @@ export default function Header({
   profileDropdown,
   isLoading = false,
   currentUserId,
+  homeRoute = '/',
 }: HeaderProps) {
   const location = useLocation();
 
@@ -26,7 +28,7 @@ export default function Header({
   return (
     <header className="h-[70px] border-b border-black/10 bg-white px-4 md:px-6 w-full flex items-center sticky top-0 z-40">
       <div className="flex items-center w-full gap-4 md:gap-8">
-        <Link to="/" className="flex items-center flex-shrink-0 hover:opacity-80 transition-opacity">
+        <Link to={homeRoute} className="flex items-center flex-shrink-0 hover:opacity-80 transition-opacity">
           <img src={logoImg} alt="Payung Logo" className="h-[36px] md:h-[44px] w-auto object-contain" />
         </Link>
 

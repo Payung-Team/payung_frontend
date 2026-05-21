@@ -1,12 +1,22 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+
+function getHomeRoute(role: number | null): string {
+  if (role === 2) return '/caregiver-home';
+  if (role === 3) return '/';
+  return '/patient-home';
+}
 
 export default function NotFound() {
+  const { userRole } = useAuth();
+  const homeRoute = getHomeRoute(userRole);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
       <h1 className="text-6xl font-bold text-gray-300">404</h1>
       <p className="mt-4 text-lg text-gray-600">Page not found</p>
       <Link
-        to="/"
+        to={homeRoute}
         className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
       >
         Go Home

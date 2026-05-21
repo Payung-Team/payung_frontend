@@ -4,7 +4,7 @@
 
 import type { DynamicMenuTemplate } from '../types/menu';
 
-type MenuTemplates = 'mainMenu' | 'profileMenu' | 'adminMenu';
+type MenuTemplates = 'mainMenu' | 'profileMenu' | 'adminMenu' | 'patientMenu' | 'caregiverMenu';
 
 const menuCache = new Map<string, DynamicMenuTemplate>();
 
