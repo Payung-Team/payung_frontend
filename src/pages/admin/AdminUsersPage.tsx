@@ -56,7 +56,7 @@ interface AdminUserListResponse {
 
 const PAGE_SIZE = 20;
 const TABLE_GRID_COLUMNS = 'minmax(160px,1.5fr) minmax(180px,2fr) 140px 200px 140px minmax(190px,auto)';
-const CAREGIVER_GRID_COLUMNS = '120px minmax(160px,1.5fr) minmax(180px,2fr) 100px 140px 130px 110px minmax(190px,auto)';
+const CAREGIVER_GRID_COLUMNS = '160px minmax(200px,1.8fr) minmax(180px,2fr) 80px 130px 110px minmax(190px,auto)';
 
 const ROLE_LABELS: Record<number, { label: string; badgeClass: string; textClass: string }> = {
   1: { label: 'ผู้ใช้', badgeClass: 'bg-gray-100', textClass: 'text-gray-600' },
@@ -151,7 +151,6 @@ function CaregiverTableSkeleton() {
         },
         { width: 140, height: 14 },
         { width: 60, height: 20, borderRadius: 999 },
-        { width: 90, height: 20, borderRadius: 999 },
         { width: 92, height: 20, borderRadius: 999 },
         { width: 55, height: 14 },
         { width: 100, height: 23, borderRadius: 6 },
@@ -1132,46 +1131,6 @@ export default function AdminUsersPage() {
             style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
           >
             {meta.label}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'status',
-      header: 'สถานะ',
-      render: (item) => {
-        const isActive = item.isActive && !item.isSuspended;
-        if (isActive) {
-          return (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#D1FAE5] px-2.5 py-0.5 text-xs font-semibold text-[#1B6B3A]"
-              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-[#059669]" aria-hidden="true"></span>
-              {'เปิดใช้งาน'}
-            </span>
-          );
-        }
-        if (item.scheduledDeleteAt) {
-          const days = daysUntil(item.scheduledDeleteAt);
-          return (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700"
-              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-              title={`กำหนดลบ: ${formatDate(item.scheduledDeleteAt)}`}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
-              {days > 0 ? `ลบใน ${days} วัน` : 'ลบวันนี้'}
-            </span>
-          );
-        }
-        return (
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-500"
-            style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-gray-400" aria-hidden="true"></span>
-            {'ถูกปิดใช้งาน'}
           </span>
         );
       },
