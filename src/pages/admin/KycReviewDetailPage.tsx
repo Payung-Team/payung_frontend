@@ -171,17 +171,21 @@ function Dropdown({
   value,
   onChange,
   options,
+  error,
 }: {
   value: string;
   onChange: (val: string) => void;
   options: string[];
+  error?: boolean;
 }) {
   return (
     <div className="relative shrink-0 flex items-center">
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="appearance-none pl-2 pr-5 w-[93px] h-[22px] border border-[#6B7280] rounded-[6px] bg-white cursor-pointer select-none text-[11px] font-semibold text-[#6B7280] outline-none truncate"
+        className={`appearance-none pl-2 pr-5 w-[93px] h-[22px] border rounded-[6px] bg-white cursor-pointer select-none text-[11px] font-semibold outline-none truncate ${
+          error ? 'border-red-500 text-red-500' : 'border-[#6B7280] text-[#6B7280]'
+        }`}
         style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
       >
         <option value="" disabled hidden>เลือกเอกสาร</option>
@@ -353,7 +357,9 @@ function RejectModal({
     .join('\n');
 
   const combinedReasonLength = combinedReasonString.length;
-  const isValid = hasActiveReasons && combinedReasonLength >= 10;
+  const allHaveDocType = activeReasons.every((row) => row.documentType !== '');
+  const allHaveDetail = activeReasons.every((row) => row.detail.trim() !== '');
+  const isValid = hasActiveReasons && combinedReasonLength >= 10 && allHaveDocType && allHaveDetail;
   const showPlusButton = rows.every((row) => !row.isCustom || row.title.trim() !== '');
 
   const handleConfirmClick = () => {
@@ -443,7 +449,7 @@ function RejectModal({
                         value={row.detail}
                         onChange={(e) => handleDetailChange(row.id, e.target.value)}
                         placeholder="โปรดระบุรายละเอียด"
-                        className="w-full text-[14px] font-normal leading-[14px] text-[#1F2937] placeholder-[#9CA3AF] bg-transparent border-none outline-none py-0"
+                        className={`w-full text-[14px] font-normal leading-[14px] text-[#1F2937] bg-transparent border-none outline-none py-0 ${row.detail.trim() === '' ? 'placeholder-red-400' : 'placeholder-[#9CA3AF]'}`}
                         style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                       />
                     </div>
@@ -461,7 +467,7 @@ function RejectModal({
                         value={row.detail}
                         onChange={(e) => handleDetailChange(row.id, e.target.value)}
                         placeholder="โปรดระบุรายละเอียด"
-                        className="w-full text-[14px] font-normal leading-[14px] text-[#1F2937] placeholder-[#9CA3AF] bg-transparent border-none outline-none py-0"
+                        className={`w-full text-[14px] font-normal leading-[14px] text-[#1F2937] bg-transparent border-none outline-none py-0 ${row.detail.trim() === '' ? 'placeholder-red-400' : 'placeholder-[#9CA3AF]'}`}
                         style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                       />
                     </div>
@@ -473,6 +479,7 @@ function RejectModal({
                   value={row.documentType}
                   onChange={(val) => handleDocTypeChange(row.id, val)}
                   options={DOC_OPTIONS}
+                  error={row.documentType === ''}
                 />
 
                 {/* Remove Button (X) */}
@@ -490,11 +497,21 @@ function RejectModal({
 
         {/* Footer Area (Counter & Buttons) */}
         <div className="flex flex-col w-full gap-2 mt-2">
-          {/* Character Count Instruction */}
-          <div className="h-[16px] flex items-center">
-            {!isValid && hasActiveReasons && (
+          {/* Validation Messages */}
+          <div className="flex flex-col gap-0.5 min-h-[16px]">
+            {hasActiveReasons && combinedReasonLength < 10 && (
               <span className="text-xs text-red-500 font-medium">
                 ต้องมีอย่างน้อย 10 ตัวอักษร (ปัจจุบันมี {combinedReasonLength} ตัวอักษร)
+              </span>
+            )}
+            {hasActiveReasons && !allHaveDocType && (
+              <span className="text-xs text-red-500 font-medium">
+                กรุณาเลือกประเภทเอกสารให้ครบทุกเหตุผล
+              </span>
+            )}
+            {hasActiveReasons && !allHaveDetail && (
+              <span className="text-xs text-red-500 font-medium">
+                กรุณาระบุรายละเอียดให้ครบทุกเหตุผล
               </span>
             )}
           </div>
