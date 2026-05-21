@@ -494,7 +494,11 @@ export const ADMIN_USER_LIST = gql`
         displayName
         role
         isActive
+        isSuspended
+        scheduledDeleteAt
         createdAt
+        caregiverNumber
+        kycStatus
       }
       total
       page

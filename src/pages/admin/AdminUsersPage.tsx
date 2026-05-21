@@ -34,6 +34,8 @@ interface UserSummary {
   isSuspended?: boolean | null;
   scheduledDeleteAt?: string | null;
   createdAt: string;
+  caregiverNumber?: string | null;
+  kycStatus?: string | null;
 }
 
 interface AdminUserListResponse {
@@ -54,12 +56,20 @@ interface AdminUserListResponse {
 
 const PAGE_SIZE = 20;
 const TABLE_GRID_COLUMNS = 'minmax(160px,1.5fr) minmax(180px,2fr) 140px 200px 140px minmax(190px,auto)';
+const CAREGIVER_GRID_COLUMNS = '120px minmax(160px,1.5fr) minmax(180px,2fr) 100px 140px 130px 110px minmax(190px,auto)';
 
 const ROLE_LABELS: Record<number, { label: string; badgeClass: string; textClass: string }> = {
   1: { label: 'ผู้ใช้', badgeClass: 'bg-gray-100', textClass: 'text-gray-600' },
   2: { label: 'ผู้ดูแล', badgeClass: 'bg-[#FEF3C7]', textClass: 'text-amber-700' },
   3: { label: 'Admin', badgeClass: 'bg-[#C8DBFF]', textClass: 'text-[#4472C4]' },
   4: { label: 'Super Admin', badgeClass: 'bg-[#E8D8FF]', textClass: 'text-[#793DCD]' },
+};
+
+const KYC_STATUS_META: Record<string, { label: string; badgeClass: string; dotClass: string }> = {
+  pending:  { label: 'รอตรวจสอบ', badgeClass: 'bg-[#FFF1E8] text-[#B4532A]', dotClass: 'bg-[#C65A3A]' },
+  verified: { label: 'อนุมัติแล้ว', badgeClass: 'bg-[#ECFDF5] text-[#0D9488]', dotClass: 'bg-[#0D9488]' },
+  rejected: { label: 'ปฏิเสธ',    badgeClass: 'bg-[#FEF2F2] text-[#DC2626]', dotClass: 'bg-[#DC2626]' },
+  none:     { label: 'ยังไม่ส่ง',  badgeClass: 'bg-gray-100 text-gray-500',   dotClass: 'bg-gray-400' },
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -118,6 +128,32 @@ function UsersTableSkeleton() {
         { width: 80, height: 20, borderRadius: 999 },
         { width: 90, height: 20, borderRadius: 999 },
         { width: 80, height: 14 },
+        { width: 100, height: 23, borderRadius: 6 },
+      ]}
+    />
+  );
+}
+
+function CaregiverTableSkeleton() {
+  return (
+    <DataTableSkeleton
+      rows={8}
+      gridTemplateColumns={CAREGIVER_GRID_COLUMNS}
+      cells={[
+        { width: 80, height: 14 },
+        {
+          content: (
+            <div className="flex items-center gap-3">
+              <Skeleton circle width={28} height={28} />
+              <Skeleton width={100} height={14} />
+            </div>
+          ),
+        },
+        { width: 140, height: 14 },
+        { width: 60, height: 20, borderRadius: 999 },
+        { width: 90, height: 20, borderRadius: 999 },
+        { width: 92, height: 20, borderRadius: 999 },
+        { width: 55, height: 14 },
         { width: 100, height: 23, borderRadius: 6 },
       ]}
     />
@@ -1057,6 +1093,173 @@ export default function AdminUsersPage() {
     },
   ], [viewerRole, actionLoading]);
 
+  const caregiverColumns = useMemo<DataTableColumn<UserSummary>[]>(() => [
+    {
+      key: 'caregiverNumber',
+      header: 'รหัสประจำตัวผู้ดูแล',
+      className: 'text-sm text-gray-700',
+      render: (item) => item.caregiverNumber || '-',
+    },
+    {
+      key: 'displayName',
+      header: 'ชื่อผู้ดูแล',
+      render: (item) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#D1FAE5] text-xs font-bold text-[#0D9488]">
+            {getInitial(item.displayName, item.email)}
+          </div>
+          <span className="truncate text-sm font-medium text-gray-900">
+            {item.displayName || '-'}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'email',
+      header: 'อีเมล',
+      className: 'truncate text-sm text-gray-500',
+      render: (item) => item.email,
+    },
+    {
+      key: 'role',
+      header: 'บทบาท',
+      render: (item) => {
+        const meta = ROLE_LABELS[item.role];
+        if (!meta) return <span className="text-xs text-gray-400">-</span>;
+        return (
+          <span
+            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${meta.badgeClass} ${meta.textClass}`}
+            style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+          >
+            {meta.label}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'status',
+      header: 'สถานะ',
+      render: (item) => {
+        const isActive = item.isActive && !item.isSuspended;
+        if (isActive) {
+          return (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#D1FAE5] px-2.5 py-0.5 text-xs font-semibold text-[#1B6B3A]"
+              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-[#059669]" aria-hidden="true"></span>
+              {'เปิดใช้งาน'}
+            </span>
+          );
+        }
+        if (item.scheduledDeleteAt) {
+          const days = daysUntil(item.scheduledDeleteAt);
+          return (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700"
+              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+              title={`กำหนดลบ: ${formatDate(item.scheduledDeleteAt)}`}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
+              {days > 0 ? `ลบใน ${days} วัน` : 'ลบวันนี้'}
+            </span>
+          );
+        }
+        return (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-500"
+            style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-gray-400" aria-hidden="true"></span>
+            {'ถูกปิดใช้งาน'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'kycStatus',
+      header: 'สถานะ KYC',
+      render: (item) => {
+        const meta = KYC_STATUS_META[item.kycStatus ?? 'none'] ?? KYC_STATUS_META.none;
+        return (
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${meta.badgeClass}`}
+            style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${meta.dotClass}`} aria-hidden="true"></span>
+            {meta.label}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'editRequests',
+      header: 'คำขอแก้ไข',
+      className: 'text-sm text-gray-400',
+      render: () => '-',
+    },
+    {
+      key: 'actions',
+      header: 'จัดการ',
+      render: (item) => {
+        const action = getActionType(viewerRole, item.role);
+        if (action === 'none') return <span className="text-xs text-gray-400">-</span>;
+
+        const isActive = item.isActive && !item.isSuspended;
+        return (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={actionLoading}
+              onClick={() => navigate(`/admin/users/${item.id}`)}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+            >
+              <span className="material-icons" style={{ fontSize: 13 }}>edit</span>
+              {'แก้ไข'}
+            </button>
+            {isActive ? (
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => setConfirmDeactivate(item)}
+                className="inline-flex items-center gap-1 rounded-md border border-[#F7C1C1] px-2.5 py-1 text-xs font-semibold text-red-500 hover:bg-red-50 disabled:opacity-50"
+                style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+              >
+                ปิดใช้งาน
+              </button>
+            ) : item.scheduledDeleteAt ? (
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => setConfirmActivate(item)}
+                className="inline-flex items-center gap-1 rounded-md border border-amber-300 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+              >
+                เปิดใช้งาน
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => setConfirmActivate(item)}
+                className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+              >
+                เปิดใช้งาน
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [viewerRole, actionLoading, navigate]);
+
+  const isCaregiverTab = activeFilter === 'caregiver';
+  const activeColumns = isCaregiverTab ? caregiverColumns : columns;
+  const activeGrid = isCaregiverTab ? CAREGIVER_GRID_COLUMNS : TABLE_GRID_COLUMNS;
+  const activeSkeleton = isCaregiverTab ? <CaregiverTableSkeleton /> : <UsersTableSkeleton />;
+
   return (
     <div className="bg-[#F9FAFB] text-gray-900">
       {/* Toast */}
@@ -1111,12 +1314,12 @@ export default function AdminUsersPage() {
         </div>
 
         <DataTable
-          columns={columns}
+          columns={activeColumns}
           items={items}
           getRowKey={(item) => item.id}
-          gridTemplateColumns={TABLE_GRID_COLUMNS}
+          gridTemplateColumns={activeGrid}
           loading={isLoading}
-          loadingContent={<UsersTableSkeleton />}
+          loadingContent={activeSkeleton}
           error={queryError}
           renderError={(err) => (
             <div className="flex min-h-80 flex-col items-center justify-center px-6 text-center">

@@ -120,13 +120,6 @@ function formatThaiDate(value?: string | null, options?: Intl.DateTimeFormatOpti
   }).format(date);
 }
 
-function formatThaiDateTime(value?: string | null) {
-  return formatThaiDate(value, {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 function getAge(dateOfBirth?: string | null) {
   if (!dateOfBirth) return '-';
   const birthDate = new Date(dateOfBirth);
