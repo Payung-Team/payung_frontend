@@ -177,7 +177,6 @@ export default function KycHistoryCard({
           includeLog = false;
         } else {
           if (log.fieldChanges && log.fieldChanges.length > 0) {
-            const firstField = log.fieldChanges[0].field;
             const fieldMap: Record<string, string> = {
               phone: 'เบอร์โทร',
               fullName: 'ชื่อ-นามสกุล',
@@ -188,8 +187,10 @@ export default function KycHistoryCard({
               address: 'ที่อยู่',
               idCardNumber: 'เลขบัตรประชาชน',
             };
-            const fieldThai = fieldMap[firstField] || firstField;
-            logTitle = `แก้ไข: ${fieldThai}`;
+            const changedFields = log.fieldChanges
+              .map((f) => fieldMap[f.field] || f.field)
+              .join(', ');
+            logTitle = `แก้ไข: ${changedFields}`;
           } else {
             logTitle = 'แก้ไขข้อมูลส่วนตัว';
           }
@@ -197,6 +198,48 @@ export default function KycHistoryCard({
       } else if (log.action === 'document_upload' || log.action === 'document_delete') {
         // แสดงผลใน subtitle ของ resubmit entry แล้ว — ไม่แสดงเป็น item แยก
         includeLog = false;
+      } else if (log.action === 'field_lock' || log.action === 'field_unlock') {
+        if (onlyKycLogs) {
+          includeLog = false;
+        } else {
+          const LOCK_FIELD_LABEL: Record<string, string> = {
+            firstName: 'ชื่อจริง',
+            lastName: 'นามสกุล',
+            fullName: 'ชื่อ-นามสกุล',
+            idCardNumber: 'เลขบัตรประชาชน',
+            email: 'อีเมล',
+            phone: 'เบอร์โทร',
+          };
+          const fieldName = log.fieldChanges?.[0]?.field ?? '';
+          const fieldThai = LOCK_FIELD_LABEL[fieldName] || fieldName;
+          logTitle = log.action === 'field_lock'
+            ? `ล็อคฟิลด์: ${fieldThai}`
+            : `ปลดล็อคฟิลด์: ${fieldThai}`;
+        }
+      } else if (log.action === 'admin_edit') {
+        if (onlyKycLogs) {
+          includeLog = false;
+        } else {
+          const ADMIN_FIELD_LABEL: Record<string, string> = {
+            firstName: 'ชื่อจริง',
+            lastName: 'นามสกุล',
+            fullName: 'ชื่อ-นามสกุล',
+            idCardNumber: 'เลขบัตรประชาชน',
+            email: 'อีเมล',
+            phone: 'เบอร์โทร',
+          };
+          if (log.fieldChanges && log.fieldChanges.length > 0) {
+            const parts = log.fieldChanges.map((f) => {
+              const label = ADMIN_FIELD_LABEL[f.field] || f.field;
+              if (f.oldValue && f.newValue) return `${label}: ${f.oldValue} → ${f.newValue}`;
+              return label;
+            });
+            logTitle = 'Admin แก้ไขข้อมูล';
+            logSubtitle = parts.join(' | ');
+          } else {
+            logTitle = 'Admin แก้ไขข้อมูล';
+          }
+        }
       } else {
         if (onlyKycLogs) {
           includeLog = false;
@@ -206,13 +249,16 @@ export default function KycHistoryCard({
       }
 
       if (includeLog) {
+        const isAdminAction = log.action === 'field_lock' || log.action === 'field_unlock' || log.action === 'admin_edit';
         items.push({
           id: `edit-${log.id}`,
           title: logTitle,
           subtitle: logSubtitle,
-          editor: `โดย ${caregiver.fullName || log.editorName || 'Caregiver'}`,
+          editor: isAdminAction
+            ? `โดย ${log.editorName || 'Admin'}`
+            : `โดย ${caregiver.fullName || log.editorName || 'Caregiver'}`,
           date: new Date(log.createdAt),
-          circleColorClass: 'bg-[#F59E0B]', // User/Caregiver -> Yellow
+          circleColorClass: isAdminAction ? 'bg-[#7C3AED]' : 'bg-[#F59E0B]',
         });
       }
     });

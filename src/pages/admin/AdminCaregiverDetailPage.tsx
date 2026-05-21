@@ -96,6 +96,7 @@ const GET_LOCKED_FIELDS_LOCAL = gql`
   query GetLockedFields($entityId: String!) {
     lockedFields(entityType: CAREGIVER_PROFILE, entityId: $entityId) {
       fieldName
+      locked
       lockedBy
       lockedAt
     }
@@ -206,7 +207,7 @@ export default function AdminCaregiverDetailPage() {
 
   // 2. Fetch locked fields from backend
   const { data: lockedFieldsData, refetch: refetchLockedFields } = useQuery<{
-    lockedFields: Array<{ fieldName: string; lockedBy: string; lockedAt: string }>;
+    lockedFields: Array<{ fieldName: string; locked: boolean; lockedBy: string; lockedAt: string }>;
   }>(
     GET_LOCKED_FIELDS_LOCAL,
     {
@@ -216,15 +217,16 @@ export default function AdminCaregiverDetailPage() {
     }
   );
 
-  const backendLockedFields: Array<{ fieldName: string; lockedBy: string; lockedAt: string }> =
+  const backendLockedFields: Array<{ fieldName: string; locked: boolean; lockedBy: string; lockedAt: string }> =
     lockedFieldsData?.lockedFields ?? [];
 
-  // A field is editable only when backend says it's not locked
-  // While lockedFieldsData hasn't loaded yet, default to locked (safe)
+  // A field is editable only when backend explicitly says it's not locked.
+  // Absence of a record defaults to locked (safe).
   const isFieldEditable = (fieldName: LockableField): boolean => {
     if (sessionUnlockedFields.has(fieldName)) return true;
     if (!lockedFieldsData) return false;
-    return !backendLockedFields.some(f => f.fieldName === fieldName);
+    const record = backendLockedFields.find(f => f.fieldName === fieldName);
+    return record ? !record.locked : false;
   };
 
   const [updateCaregiverInfo, { loading: saveLoading }] = useMutation(ADMIN_UPDATE_CAREGIVER_INFO);
@@ -252,15 +254,6 @@ export default function AdminCaregiverDetailPage() {
   const isSuspended = userDetailData?.adminUserDetail?.isSuspended;
   const editLogs = kycDetailData?.adminKycDetail?.editHistory ?? [];
   const isActive = user?.isActive && !isSuspended;
-
-  const nameParts = useMemo(() => {
-    if (!caregiver?.fullName) return { firstName: '-', lastName: '-' };
-    const parts = caregiver.fullName.trim().split(/\s+/);
-    return {
-      firstName: parts[0] || '-',
-      lastName: parts.slice(1).join(' ') || '-',
-    };
-  }, [caregiver?.fullName]);
 
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({
     firstName: '',
