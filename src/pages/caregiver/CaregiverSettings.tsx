@@ -17,7 +17,7 @@ interface SettingsMenuItemProps {
 const SettingsTab: React.FC<SettingsMenuItemProps> = ({ icon, label, isActive, onClick }) => (
   <button
     onClick={onClick}
-    className={`flex-shrink-0 md:w-full md:flex-shrink flex items-center gap-3 px-3 md:px-4 py-3 rounded-lg transition-colors text-left whitespace-nowrap ${
+    className={`flex-shrink-0 md:w-full md:flex-shrink flex items-center gap-3 px-3 md:px-4 py-3 rounded-lg transition-colors text-left whitespace-nowrap cursor-pointer ${
       isActive
         ? 'bg-[#E7F5EE] text-[#197A4A]'
         : 'text-[#0A0A0A] hover:bg-gray-100'
@@ -75,11 +75,11 @@ const CaregiverSettings: React.FC = () => {
 
   return (
     <div
-      className="min-h-screen bg-[#F6F8F9] flex flex-col md:flex-row"
+      className="min-h-screen md:min-h-0 md:h-[calc(100vh-70px)] bg-[#F6F8F9] flex flex-col md:flex-row md:overflow-hidden"
       style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
     >
       {/* ═══ Tab Navigation (Left Sidebar) ═══ */}
-      <div className="w-full md:w-[250px] bg-white border-b md:border-b-0 md:border-r border-gray-200 flex flex-col">
+      <div className="w-full md:w-[250px] bg-white border-b md:border-b-0 md:border-r border-gray-200 flex flex-col md:h-full">
         {/* Tab Header */}
         <div className="bg-gray-100 px-6 py-4">
           <h3 className="text-[16px] font-bold text-[#0A0A0A]">ตั้งค่าบัญชี</h3>
@@ -123,14 +123,15 @@ const CaregiverSettings: React.FC = () => {
 
         {/* Help Center at bottom */}
         <div className="border-t border-gray-200 px-3 hidden md:block">
-          <button className="w-full px-4 py-3 text-left text-[#0A0A0A] hover:bg-gray-100 transition-colors rounded-lg text-[14px] font-medium">
-            Help Center
+          <button className="w-full px-4 py-3 flex items-center gap-3 text-left text-[#737373] hover:text-[#0A0A0A] hover:bg-gray-100 transition-colors rounded-lg text-[14px] font-medium cursor-pointer">
+            <Icon name="help_outline" size="small" />
+            <span>Help Center</span>
           </button>
         </div>
       </div>
 
       {/* ═══ Main Content ═══ */}
-      <div className="flex-1 overflow-y-auto bg-[#F6F8F9]">
+      <div className="flex-1 overflow-y-auto bg-[#F6F8F9] md:h-full">
         <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-4 md:py-7">
           {activeMenu === 'account' && <AccountSettingsTab />}
           {activeMenu === 'jobReception' && <JobReceptionTab />}
