@@ -11,6 +11,7 @@ interface ToastProps {
   readonly duration?: number;
   readonly onClose?: () => void;
   readonly variant?: ToastVariant;
+  readonly isContainerChild?: boolean;
 }
 
 export function Toast({
@@ -19,6 +20,7 @@ export function Toast({
   duration = 3000,
   onClose,
   variant = 'default',
+  isContainerChild = false,
 }: ToastProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [isMounted, setIsMounted] = useState(true);
@@ -123,8 +125,15 @@ export function Toast({
     warning: <Icon name="warning" size="medium" color="currentColor" />,
   }[type];
 
+  const positionClass = isContainerChild
+    ? 'relative'
+    : 'fixed top-20 right-6 z-50';
+
   return (
-    <div className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg text-white shadow-lg transition-all duration-200 ${bgColor} ${fadeClass}`}>
+    <div
+      className={`${positionClass} flex items-center gap-3 px-4 py-3 rounded-lg text-white shadow-lg transition-all duration-200 ${bgColor} ${fadeClass}`}
+      style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+    >
       {icon}
       <span>{message}</span>
     </div>
@@ -145,9 +154,9 @@ export function ToastContainer({
 }) {
   const positionClass =
     position === 'top-center'
-      ? 'fixed top-6 left-1/2 -translate-x-1/2 z-50'
+      ? 'fixed top-20 left-1/2 -translate-x-1/2 z-50'
       : position === 'top-right'
-      ? 'fixed top-6 right-6 z-50'
+      ? 'fixed top-20 right-6 z-50'
       : 'fixed bottom-4 right-4 z-50';
 
   return (
@@ -160,6 +169,7 @@ export function ToastContainer({
           duration={toast.duration}
           variant={variant}
           onClose={() => onRemove(toast.id)}
+          isContainerChild={true}
         />
       ))}
     </div>
