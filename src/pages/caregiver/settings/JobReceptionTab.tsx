@@ -429,6 +429,29 @@ export const JobReceptionTab: React.FC = () => {
   return (
     <div className="w-full max-w-[880px] mx-auto bg-[#F6FAF9] px-6 py-7 pb-32 flex flex-col gap-6" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
 
+      {/* ═ KYC Status Banner ═ */}
+      {!isKycVerified && (
+        <div className="relative overflow-hidden rounded-xl border border-[#F2D2A4] bg-white p-5 shadow-[0px_1px_4px_rgba(0,0,0,0.03)] flex items-center justify-between gap-4">
+          <div className="absolute inset-y-0 left-0 w-2" />
+          <div className="flex items-start gap-3 pl-2">
+            <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#FFF6E8] text-[#E09721]">
+              <Icon name="warning" variant="outlined" size="medium" color="currentColor" />
+            </span>
+            <div>
+              <p className="text-[16px] font-bold text-[#0A0A0A]">ยืนยันตัวตน (KYC) ให้เสร็จสิ้นก่อน</p>
+              <p className="text-[13px] text-[#717182] mt-0.5">คุณต้องยืนยันตัวตนก่อนจึงจะสามารถเปิดใช้งานการรับงานและตั้งค่าเวลาว่างได้</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/kyc')}
+            className="rounded-lg bg-[#0D9488] px-5 py-2 text-[14px] font-bold text-white transition-colors hover:bg-[#0b7f74] cursor-pointer"
+          >
+            เริ่มยืนยันตัวตน
+          </button>
+        </div>
+      )}
+
       {/* ═ Header 1 ═ */}
       <h1 className="text-[22px] font-bold text-[#1A1A1A]">เปิดใช้งานการรับงาน</h1>
 
@@ -503,29 +526,6 @@ export const JobReceptionTab: React.FC = () => {
           <p className="text-[13px] text-[#8A8C8E] mt-1">ตั้งเวลาและพื้นที่ที่คุณรับงาน การเปลี่ยนแปลงจะแสดงบนหน้าโปรไฟล์ของคุณ</p>
         </div>
       </div>
-
-      {/* ═ KYC Status Banner ═ */}
-      {!isKycVerified && (
-        <div className="relative overflow-hidden rounded-xl border border-[#F2D2A4] bg-white p-5 shadow-[0px_1px_4px_rgba(0,0,0,0.03)] flex items-center justify-between gap-4">
-          <div className="absolute inset-y-0 left-0 w-2 bg-[#E09721]" />
-          <div className="flex items-start gap-3 pl-2">
-            <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#FFF6E8] text-[#E09721]">
-              <Icon name="warning" variant="outlined" size="medium" color="currentColor" />
-            </span>
-            <div>
-              <p className="text-[16px] font-bold text-[#0A0A0A]">ยืนยันตัวตน (KYC) ให้เสร็จสิ้นก่อน</p>
-              <p className="text-[13px] text-[#717182] mt-0.5">คุณต้องยืนยันตัวตนก่อนจึงจะสามารถเปิดใช้งานการรับงานและตั้งค่าเวลาว่างได้</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate('/kyc')}
-            className="rounded-lg bg-[#0D9488] px-5 py-2 text-[14px] font-bold text-white transition-colors hover:bg-[#0b7f74] cursor-pointer"
-          >
-            เริ่มยืนยันตัวตน
-          </button>
-        </div>
-      )}
 
       {/* ═ Not Searchable Banner ═ */}
       {isKycVerified && !isAcceptingJobsDynamic && (
