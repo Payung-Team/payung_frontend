@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { GET_CAREGIVER_PROFILE, SET_CAREGIVER_SEARCHABLE } from '../../../graphql/queries';
 import { Icon } from '../../../components/ui/Icon';
 import { useToast } from '../../../hooks/useToast';
+import { ToastContainer } from '../../../components/ui/Toast';
+import Skeleton from '../../../components/ui/Skeleton';
 import ThailandAddressSimple from 'thailand-address-simple';
 
 type JobReceptionChecklistKey = 'profileVisible' | 'jobAlerts' | 'pauseAnytime';
@@ -52,7 +54,9 @@ const SERVICE_TYPES = [
 
 export const JobReceptionTab: React.FC = () => {
   const navigate = useNavigate();
-  const { success: showSuccess, error: showError } = useToast();
+  const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  const [isJustSaved, setIsJustSaved] = useState(false);
 
   // --- Core Profile Queries & Mutations ---
   const { data: caregiverData, loading: caregiverLoading } = useQuery<{
@@ -380,22 +384,33 @@ export const JobReceptionTab: React.FC = () => {
 
   // Form Save & Reset Handlers
   const handleSave = () => {
-    const snapshot = {
-      weeklyAvailability,
-      serviceFormats,
-      selectedServiceTypes,
-      province,
-      selectedDistricts,
-      maxDistance,
-      selectedLanguages,
-      hourlyRate
-    };
-    setSavedSnapshot(snapshot);
-    showSuccess('บันทึกการเปลี่ยนแปลงแล้ว');
+    setIsSaving(true);
+    setIsJustSaved(false);
+
+    setTimeout(() => {
+      const snapshot = {
+        weeklyAvailability,
+        serviceFormats,
+        selectedServiceTypes,
+        province,
+        selectedDistricts,
+        maxDistance,
+        selectedLanguages,
+        hourlyRate
+      };
+      setSavedSnapshot(snapshot);
+      setIsSaving(false);
+      setIsJustSaved(true);
+      showSuccess('บันทึกการเปลี่ยนแปลงแล้ว');
+
+      setTimeout(() => {
+        setIsJustSaved(false);
+      }, 1200);
+    }, 700);
   };
 
   const handleReset = () => {
-    if (!savedSnapshot) return;
+    if (!savedSnapshot || isSaving || isJustSaved) return;
     setWeeklyAvailability(savedSnapshot.weeklyAvailability);
     setServiceFormats(savedSnapshot.serviceFormats);
     setSelectedServiceTypes(savedSnapshot.selectedServiceTypes);
@@ -416,8 +431,66 @@ export const JobReceptionTab: React.FC = () => {
 
   if (caregiverLoading) {
     return (
-      <div className="space-y-6">
-        <div className="h-40 bg-white rounded-lg animate-pulse" />
+      <div className="w-full max-w-[880px] mx-auto bg-[#F6FAF9] px-6 py-7 pb-32 flex flex-col gap-6" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+        {/* Title */}
+        <Skeleton width={200} height={28} borderRadius="8px" />
+
+        {/* Toggle Card */}
+        <div className="rounded-2xl border border-[#E0E2E5] bg-white p-5 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <Skeleton width={80} height={20} borderRadius="12px" />
+            <Skeleton width={48} height={24} borderRadius="12px" />
+          </div>
+          <Skeleton width={180} height={24} borderRadius="6px" />
+          <Skeleton width="100%" height={16} borderRadius="4px" />
+          <div className="mt-4 flex flex-col gap-2.5 pt-3 border-t border-gray-100">
+            <div className="flex items-center gap-2">
+              <Skeleton width={16} height={16} circle />
+              <Skeleton width={150} height={14} borderRadius="4px" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton width={16} height={16} circle />
+              <Skeleton width={180} height={14} borderRadius="4px" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton width={16} height={16} circle />
+              <Skeleton width={130} height={14} borderRadius="4px" />
+            </div>
+          </div>
+        </div>
+
+        {/* Form Header */}
+        <div className="border-t border-[#E0E2E5] pt-6 mt-2 flex flex-col gap-2">
+          <Skeleton width={240} height={24} borderRadius="6px" />
+          <Skeleton width={380} height={14} borderRadius="4px" />
+        </div>
+
+        {/* Card 1: Calendar Grid */}
+        <div className="bg-white border border-[#E0E2E5] rounded-[20px] p-6 flex flex-col gap-4">
+          <div className="flex gap-3">
+            <Skeleton width={36} height={36} borderRadius="12px" />
+            <div className="flex flex-col gap-1.5">
+              <Skeleton width={160} height={16} borderRadius="4px" />
+              <Skeleton width={280} height={12} borderRadius="4px" />
+            </div>
+          </div>
+          <Skeleton width="100%" height={180} borderRadius="12px" />
+        </div>
+
+        {/* Card 2: Services */}
+        <div className="bg-white border border-[#E0E2E5] rounded-[20px] p-6 flex flex-col gap-4">
+          <div className="flex gap-3">
+            <Skeleton width={36} height={36} borderRadius="12px" />
+            <div className="flex flex-col gap-1.5">
+              <Skeleton width={140} height={16} borderRadius="4px" />
+              <Skeleton width={220} height={12} borderRadius="4px" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+            <Skeleton height={60} borderRadius="12px" />
+            <Skeleton height={60} borderRadius="12px" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -1073,7 +1146,7 @@ export const JobReceptionTab: React.FC = () => {
       {/* ═ Floating Actions Bar ═ */}
       <div
         className={`fixed bottom-6 md:left-[calc(50%+125px)] left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] sm:w-[calc(100%-2rem)] max-w-[960px] z-50 bg-white/95 backdrop-blur-md border border-[#E0E2E5] rounded-2xl p-4 sm:p-5 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] flex flex-col sm:flex-row items-center justify-between gap-4 transition-all duration-300 ease-in-out ${
-          hasChanges && !isFormDisabled
+          (hasChanges || isSaving || isJustSaved) && !isFormDisabled
             ? 'translate-y-0 opacity-100 pointer-events-auto'
             : 'translate-y-20 opacity-0 pointer-events-none'
         }`}
@@ -1094,9 +1167,9 @@ export const JobReceptionTab: React.FC = () => {
           <button
             type="button"
             onClick={handleReset}
-            disabled={!hasChanges || isFormDisabled}
-            className={`flex-1 sm:flex-initial rounded-xl border px-5 py-2.5 text-[13px] font-bold transition-colors ${
-              !hasChanges || isFormDisabled
+            disabled={!hasChanges || isFormDisabled || isSaving || isJustSaved}
+            className={`flex-1 sm:flex-initial rounded-xl border px-5 py-2.5 text-[13px] font-bold transition-all duration-200 ${
+              !hasChanges || isFormDisabled || isSaving || isJustSaved
                 ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
                 : 'bg-white border-[#E0E2E5] text-[#575859] hover:bg-gray-50 cursor-pointer'
             }`}
@@ -1107,17 +1180,36 @@ export const JobReceptionTab: React.FC = () => {
           <button
             type="button"
             onClick={handleSave}
-            disabled={!hasChanges || isFormDisabled}
-            className={`flex-1 sm:flex-initial rounded-xl px-5 py-2.5 text-[13px] font-bold text-white transition-colors ${
-              !hasChanges || isFormDisabled
+            disabled={!hasChanges || isFormDisabled || isSaving || isJustSaved}
+            className={`flex-1 sm:flex-initial rounded-xl px-5 py-2.5 text-[13px] font-bold text-white transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-2 ${
+              isSaving
+                ? 'bg-[#0D9488]/80 cursor-wait'
+                : isJustSaved
+                ? 'bg-[#10B981] scale-105 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
+                : !hasChanges || isFormDisabled
                 ? 'bg-gray-300 cursor-not-allowed'
                 : 'bg-[#0D9488] hover:bg-[#0b7f74] cursor-pointer'
             }`}
           >
-            บันทึกการเปลี่ยนแปลง
+            {isSaving ? (
+              <>
+                <Icon name="refresh" className="animate-spin" color="currentColor" size="small" />
+                <span>กำลังบันทึก...</span>
+              </>
+            ) : isJustSaved ? (
+              <>
+                <Icon name="check" color="currentColor" size="small" />
+                <span>บันทึกสำเร็จ</span>
+              </>
+            ) : (
+              'บันทึกการเปลี่ยนแปลง'
+            )}
           </button>
         </div>
       </div>
+
+      {/* ═ Toast Notifications ═ */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />
 
     </div>
   );
