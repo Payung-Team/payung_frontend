@@ -80,7 +80,12 @@ function calcCompleteness(profile: CaregiverProfile): number {
 
 function formatUpdatedAt(iso?: string): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const date = new Date(iso);
+  const day = date.getDate();
+  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const month = months[date.getMonth()];
+  const year = date.getFullYear();
+  return `${day} ${month} ${year}`;
 }
 
 function getInitials(name: string): string {
@@ -115,7 +120,7 @@ function HeroCard({ displayName, caregiverNumber, isSearchable, canToggle, onTog
           <span className="text-white text-xl font-bold">{initials}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-[#8A8C8E]">Welcome back</p>
+          <p className="text-xs text-[#8A8C8E]">ยินดีต้อนรับกลับ</p>
           <h1 className="text-[18px] font-bold text-[#1A1A1A] leading-tight truncate">{displayName}</h1>
           {caregiverNumber && (
             <p className="text-[11px] text-[#8A8C8E] font-mono mt-0.5">#{caregiverNumber}</p>
@@ -126,21 +131,21 @@ function HeroCard({ displayName, caregiverNumber, isSearchable, canToggle, onTog
       <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-semibold text-[#1A1A1A]">
-            {isSearchable ? 'Available for jobs' : 'Not accepting jobs'}
+            {isSearchable ? 'พร้อมรับงาน' : 'ไม่พร้อมรับงาน'}
           </p>
           <p className="text-[11px] text-[#8A8C8E] mt-0.5">
             {isSearchable
-              ? 'Patients can find and book you'
+              ? 'ผู้ป่วยสามารถค้นหาและจองคุณได้'
               : canToggle
-                ? 'Toggle to start receiving requests'
-                : 'Complete KYC to enable availability'}
+                ? 'เปิดสวิตช์เพื่อเริ่มรับงาน'
+                : 'กรุณายืนยันตัวตนเพื่อเริ่มรับงาน'}
           </p>
         </div>
         <button
           type="button"
           onClick={onToggle}
           disabled={!canToggle}
-          aria-label={isSearchable ? 'Disable availability' : 'Enable availability'}
+          aria-label={isSearchable ? 'ปิดการรับงาน' : 'เปิดการรับงาน'}
           className={`relative w-12 h-6 rounded-full transition-colors duration-200 flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#52B69A] focus-visible:ring-offset-2 ${
             isSearchable ? 'bg-[#52B69A]' : 'bg-gray-200'
           } ${canToggle ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
@@ -166,23 +171,21 @@ function StatsRow({ profile }: StatsRowProps) {
     {
       icon: 'payments',
       value: profile.hourlyRate ? `฿${profile.hourlyRate}` : '—',
-      label: 'per hour',
+      label: 'ต่อชั่วโมง',
       iconColor: 'text-[#52B69A]',
       iconBg: 'bg-[#EEF9F5]',
     },
     {
       icon: 'star',
-      value: profile.experienceYears
-        ? `${profile.experienceYears} yr${profile.experienceYears !== 1 ? 's' : ''}`
-        : '—',
-      label: 'experience',
+      value: profile.experienceYears ? `${profile.experienceYears} ปี` : '—',
+      label: 'ประสบการณ์',
       iconColor: 'text-[#F08C00]',
       iconBg: 'bg-[#FFF3E0]',
     },
     {
       icon: 'medical_services',
       value: skillCount > 0 ? String(skillCount) : '—',
-      label: `skill${skillCount !== 1 ? 's' : ''}`,
+      label: 'ทักษะ',
       iconColor: 'text-[#3B5BDB]',
       iconBg: 'bg-[#F0F4FF]',
     },
@@ -229,7 +232,7 @@ function ProfileStatusCard({ profile, completeness }: ProfileStatusCardProps) {
   return (
     <div className="bg-white rounded-2xl p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
       <div className="flex justify-between items-center mb-1.5">
-        <span className="text-[13px] font-semibold text-[#1A1A1A]">Profile completeness</span>
+        <span className="text-[13px] font-semibold text-[#1A1A1A]">ความสมบูรณ์ของโปรไฟล์</span>
         <span className={`text-[13px] font-bold ${pctColor}`}>{completeness}%</span>
       </div>
       <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
@@ -244,14 +247,14 @@ function ProfileStatusCard({ profile, completeness }: ProfileStatusCardProps) {
           {profile.kycStatus !== 'verified' && profile.kycStatus !== 'pending' && (
             <Link
               to="/kyc"
-              className="text-[13px] font-bold text-[#0D9488] hover:text-[#0b7f74] underline flex items-center gap-0.5"
+              className="text-[13px] font-bold text-[#0D9488] hover:text-[#0b7f74] flex items-center gap-0.5 group"
             >
-              เริ่มยืนยันตัวตน
-              <Icon name="arrow_forward" size="small" className="text-[#0D9488]" color="currentColor" />
+              <span className="underline">เริ่มยืนยันตัวตน</span>
+              <Icon name="arrow_forward" size="small" className="text-[#0D9488] transition-transform duration-200 group-hover:translate-x-1" color="currentColor" />
             </Link>
           )}
         </div>
-        <p className="text-[11px] text-[#8A8C8E]">Updated {formatUpdatedAt(profile.updatedAt)}</p>
+        <p className="text-[11px] text-[#8A8C8E]">อัปเดตเมื่อ {formatUpdatedAt(profile.updatedAt)}</p>
       </div>
     </div>
   );
@@ -263,17 +266,28 @@ interface QuickActionsProps {
 }
 
 function QuickActionsGrid({ unreadCount, kycStatus }: QuickActionsProps) {
-  const kyc = kycBadgeMeta(kycStatus);
-
   return (
     <div className="grid grid-cols-2 gap-3">
       <Link to="/jobs" className={`${cardBase} no-underline text-[#1A1A1A]`}>
-        <div className="w-10 h-10 rounded-xl bg-[#F0F4FF] text-[#3B5BDB] flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-[#F0F4FF] text-[#3B5BDB] flex items-center justify-center relative">
           <Icon name="work" size="large" color="currentColor" />
+          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
+            3
+          </span>
         </div>
         <div>
-          <div className="text-[13px] font-semibold leading-tight">My Jobs</div>
-          <div className="text-[11px] text-[#8A8C8E] mt-0.5">View job requests</div>
+          <div className="text-[13px] font-semibold leading-tight">งานของฉัน</div>
+          <div className="text-[11px] text-[#8A8C8E] mt-0.5">3 คำขอใหม่</div>
+        </div>
+      </Link>
+
+      <Link to="/caregiver/settings/job-reception" className={`${cardBase} no-underline text-[#1A1A1A]`}>
+        <div className="w-10 h-10 rounded-xl bg-[#EEF9F5] text-[#3A9A7E] flex items-center justify-center">
+          <Icon name="tune" size="large" color="currentColor" />
+        </div>
+        <div>
+          <div className="text-[13px] font-semibold leading-tight">ตั้งค่างาน</div>
+          <div className="text-[11px] text-[#8A8C8E] mt-0.5">ตั้งเวลาว่างและอัตราค่าจ้าง</div>
         </div>
       </Link>
 
@@ -282,18 +296,8 @@ function QuickActionsGrid({ unreadCount, kycStatus }: QuickActionsProps) {
           <Icon name="manage_accounts" size="large" color="currentColor" />
         </div>
         <div>
-          <div className="text-[13px] font-semibold leading-tight">Edit Profile</div>
-          <div className="text-[11px] text-[#8A8C8E] mt-0.5">Update your info</div>
-        </div>
-      </Link>
-
-      <Link to="/kyc/status" className={`${cardBase} no-underline text-[#1A1A1A]`}>
-        <div className="w-10 h-10 rounded-xl bg-[#F0F4FF] text-[#3B5BDB] flex items-center justify-center">
-          <Icon name="shield" size="large" color="currentColor" />
-        </div>
-        <div>
-          <div className="text-[13px] font-semibold leading-tight">KYC Status</div>
-          <div className="text-[11px] text-[#8A8C8E] mt-0.5 capitalize">{kyc.label}</div>
+          <div className="text-[13px] font-semibold leading-tight">แก้ไขโปรไฟล์</div>
+          <div className="text-[11px] text-[#8A8C8E] mt-0.5">แก้ไขข้อมูลส่วนตัว</div>
         </div>
       </Link>
 
@@ -307,9 +311,9 @@ function QuickActionsGrid({ unreadCount, kycStatus }: QuickActionsProps) {
           )}
         </div>
         <div>
-          <div className="text-[13px] font-semibold leading-tight">Notifications</div>
+          <div className="text-[13px] font-semibold leading-tight">การแจ้งเตือน</div>
           <div className="text-[11px] text-[#8A8C8E] mt-0.5">
-            {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+            {unreadCount > 0 ? `${unreadCount} ยังไม่อ่าน` : 'ไม่มีการแจ้งเตือนใหม่'}
           </div>
         </div>
       </Link>
@@ -335,13 +339,13 @@ function ContextualHints({ kycStatus, isVerified, isSearchable, completeness, ca
         <Icon name="warning" size="large" color="#d97706" />
         <div className="flex-1">
           <p className="text-sm font-semibold text-amber-800 mb-1">
-            Start identity verification to receive jobs
+            เริ่มต้นยืนยันตัวตนเพื่อเริ่มรับงาน
           </p>
           <Link
             to="/kyc"
             className="inline-block mt-1 px-3 py-1.5 bg-amber-600 text-white text-xs font-semibold rounded-lg hover:bg-amber-700 transition-colors no-underline"
           >
-            Start KYC
+            เริ่มยืนยันตัวตน
           </Link>
         </div>
       </div>
@@ -353,7 +357,7 @@ function ContextualHints({ kycStatus, isVerified, isSearchable, completeness, ca
       <div key="kyc-pending" className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-4 flex gap-3 items-start">
         <Icon name="schedule" size="large" color="#1d4ed8" />
         <p className="text-sm text-blue-800">
-          Verification is under review. Please wait 1–3 business days.
+          กำลังตรวจสอบความถูกต้องของการยืนยันตัวตน โปรดรอประมาณ 1-3 วันทำการ
         </p>
       </div>
     );
@@ -365,7 +369,7 @@ function ContextualHints({ kycStatus, isVerified, isSearchable, completeness, ca
         <Icon name="info" size="large" color="#228B55" />
         <div className="flex-1">
           <p className="text-sm font-semibold text-[#1A5C3A] mb-1">
-            Enable availability so patients can find you
+            เปิดสถานะพร้อมรับงานเพื่อให้ผู้ป่วยค้นหาคุณพบ
           </p>
           <button
             type="button"
@@ -373,7 +377,7 @@ function ContextualHints({ kycStatus, isVerified, isSearchable, completeness, ca
             disabled={!canToggle}
             className="mt-1 px-3 py-1.5 bg-[#52B69A] text-white text-xs font-semibold rounded-lg hover:bg-[#3A9A7E] transition-colors disabled:opacity-60"
           >
-            Enable Now
+            เปิดใช้งานทันที
           </button>
         </div>
       </div>
@@ -384,7 +388,7 @@ function ContextualHints({ kycStatus, isVerified, isSearchable, completeness, ca
     hints.push(
       <div key="ready" className="bg-[#EEF9F5] border border-[#A7D8C2] rounded-2xl px-4 py-4 flex gap-3 items-center">
         <Icon name="check_circle" size="large" color="#228B55" />
-        <p className="text-sm font-semibold text-[#1A5C3A]">You are ready to receive jobs ✓</p>
+        <p className="text-sm font-semibold text-[#1A5C3A]">คุณพร้อมรับงานแล้ว ✓</p>
       </div>
     );
   }
@@ -395,13 +399,13 @@ function ContextualHints({ kycStatus, isVerified, isSearchable, completeness, ca
         <Icon name="person_add" size="large" color="#7c3aed" />
         <div className="flex-1">
           <p className="text-sm font-semibold text-purple-800 mb-1">
-            Complete your profile to increase your chances of getting hired
+            กรอกข้อมูลโปรไฟล์ให้สมบูรณ์เพื่อเพิ่มโอกาสในการได้งาน
           </p>
           <Link
             to="/caregiver/edit-profile"
             className="inline-block mt-1 px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 transition-colors no-underline"
           >
-            Complete Profile
+            แก้ไขโปรไฟล์
           </Link>
         </div>
       </div>
@@ -412,7 +416,7 @@ function ContextualHints({ kycStatus, isVerified, isSearchable, completeness, ca
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-[15px] font-bold text-[#1A1A1A]">Tips</h2>
+      <h2 className="text-[15px] font-bold text-[#1A1A1A]">คำแนะนำ</h2>
       {hints}
     </section>
   );
@@ -440,7 +444,7 @@ const CaregiverHome: React.FC = () => {
   const completeness = profile ? calcCompleteness(profile) : 0;
   const unreadCount = unreadData?.unreadCount ?? 0;
   const canToggle = isVerified && !togglingAvail;
-  const displayName = data?.me?.displayName || profile?.fullName || 'Caregiver';
+  const displayName = profile?.fullName || data?.me?.displayName || 'ผู้ดูแล';
   const isLoading = loading || caregiverLoading;
 
   const handleToggleAvailability = async () => {
@@ -456,10 +460,10 @@ const CaregiverHome: React.FC = () => {
         awaitRefetchQueries: true,
       });
       setOptimisticSearchable(null);
-      showSuccess(next ? 'You are now available for jobs' : 'You are now unavailable');
+      showSuccess(next ? 'เปิดสถานะพร้อมรับงานแล้ว' : 'ปิดสถานะพร้อมรับงานแล้ว');
     } catch {
       setOptimisticSearchable(prev);
-      showError('Could not update availability. Please try again.');
+      showError('ไม่สามารถอัปเดตสถานะการรับงานได้ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setTogglingAvail(false);
     }
@@ -501,7 +505,7 @@ const CaregiverHome: React.FC = () => {
 
           {/* Quick actions */}
           <section>
-            <h2 className="text-[15px] font-bold text-[#1A1A1A] mb-3">Quick Actions</h2>
+            <h2 className="text-[15px] font-bold text-[#1A1A1A] mb-3">ทางลัด</h2>
             {isLoading ? (
               <div className="grid grid-cols-2 gap-3">
                 {[0, 1, 2, 3].map((i) => <Skeleton key={i} height={110} borderRadius={16} />)}
