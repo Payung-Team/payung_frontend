@@ -52,15 +52,16 @@ interface UnreadCountData {
 function kycBadgeMeta(status: string) {
   switch (status) {
     case 'verified':
-      return { label: 'Verified', badgeClass: 'bg-green-100 text-green-700', dotClass: 'bg-green-500' };
+      return { label: 'ยืนยันแล้ว', badgeClass: 'bg-green-100 text-green-700', dotClass: 'bg-green-500' };
     case 'pending':
-      return { label: 'Pending', badgeClass: 'bg-orange-100 text-orange-700', dotClass: 'bg-orange-500' };
+      return { label: 'รอการตรวจสอบ', badgeClass: 'bg-orange-100 text-orange-700', dotClass: 'bg-orange-500' };
     case 'rejected':
-      return { label: 'Rejected', badgeClass: 'bg-red-100 text-red-700', dotClass: 'bg-red-500' };
+      return { label: 'เอกสารไม่ผ่าน', badgeClass: 'bg-red-100 text-red-700', dotClass: 'bg-red-500' };
     default:
-      return { label: 'Not Started', badgeClass: 'bg-gray-100 text-gray-600', dotClass: 'bg-gray-400' };
+      return { label: 'ยังไม่ยืนยัน', badgeClass: 'bg-gray-100 text-gray-600', dotClass: 'bg-gray-400' };
   }
 }
+
 
 function calcCompleteness(profile: CaregiverProfile): number {
   const checks: { weight: number; filled: boolean }[] = [
@@ -238,7 +239,18 @@ function ProfileStatusCard({ profile, completeness }: ProfileStatusCardProps) {
         />
       </div>
       <div className="flex items-center justify-between">
-        <StatusBadge {...kyc} />
+        <div className="flex items-center gap-3">
+          <StatusBadge {...kyc} />
+          {profile.kycStatus !== 'verified' && profile.kycStatus !== 'pending' && (
+            <Link
+              to="/kyc"
+              className="text-[13px] font-bold text-[#0D9488] hover:text-[#0b7f74] underline flex items-center gap-0.5"
+            >
+              เริ่มยืนยันตัวตน
+              <Icon name="arrow_forward" size="small" className="text-[#0D9488]" color="currentColor" />
+            </Link>
+          )}
+        </div>
         <p className="text-[11px] text-[#8A8C8E]">Updated {formatUpdatedAt(profile.updatedAt)}</p>
       </div>
     </div>
