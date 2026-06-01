@@ -16,7 +16,7 @@
       "type": "navigation",
       "label": "ค้นหาผู้ดูแล",
       "icon": "person-outline",
-      "route": "/search",
+      "route": "/booking/new",
       "allowedRoles": ["patient"]
     },
     {
