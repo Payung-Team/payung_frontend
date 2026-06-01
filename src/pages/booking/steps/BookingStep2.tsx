@@ -1,0 +1,36 @@
+import { useBooking } from '../../../context/BookingContext';
+
+export default function BookingStep2() {
+  const { goToStep } = useBooking();
+
+  return (
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-6">
+      <div className="text-center py-12 space-y-4">
+        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+          <span className="material-icons text-3xl text-gray-400">assignment_turned_in</span>
+        </div>
+        <h3 className="text-lg font-bold text-[#1A1A1A]">ขั้นตอนที่ 2: ระบุความต้องการ</h3>
+        <p className="text-sm text-gray-500 max-w-[400px] mx-auto leading-relaxed">
+          ส่วนสำหรับระบุรายละเอียดงานย่อย เช่น งานช่วยเหลือที่ต้องการ งานเพิ่มเติม กิจกรรมที่ระบุเอง และคำแนะนำพิเศษเพิ่มเติม (กำลังพัฒนาในรอบถัดไป)
+        </p>
+      </div>
+
+      <div className="flex justify-between pt-4 border-t border-gray-100">
+        <button
+          onClick={() => goToStep(1)}
+          className="px-6 py-3 border border-[#E0E2E5] text-[#575859] rounded-xl font-semibold shadow-sm hover:bg-gray-50 transition cursor-pointer flex items-center gap-1"
+        >
+          <span className="material-icons text-base">arrow_back</span>
+          ย้อนกลับ
+        </button>
+        <button
+          onClick={() => goToStep(3)}
+          className="px-6 py-3 bg-[#52B69A] text-white rounded-xl font-bold shadow-md hover:bg-[#52B69A]/95 transition cursor-pointer flex items-center gap-2"
+        >
+          ดำเนินการต่อ
+          <span className="material-icons text-base">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+  );
+}
