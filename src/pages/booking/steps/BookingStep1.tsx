@@ -1,32 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import ThailandAddressSimple from 'thailand-address-simple';
 import { useBooking } from '../../../context/BookingContext';
-import type { BookingRequest, Recipient } from '../../../context/BookingContext';
+import type { BookingRequest } from '../../../context/BookingContext';
 import { useToast } from '../../../hooks/useToast';
 import MapPicker from '../MapPicker';
 
-// Mock Hospitals for Accompany Outside
-const BANGKOK_HOSPITALS = [
-  'โรงพยาบาลศิริราช',
-  'โรงพยาบาลจุฬาลงกรณ์',
-  'โรงพยาบาลรามาธิบดี',
-  'โรงพยาบาลพระมงกุฎเกล้า',
-  'โรงพยาบาลบำรุงราษฎร์',
-  'โรงพยาบาลสมิติเวช สุขุมวิท',
-  'โรงพยาบาลกรุงเทพ',
-  'โรงพยาบาลเวชธานี',
-  'โรงพยาบาลลาดพร้าว'
-];
 
 const BUSY_SLOTS: string[] = [];
 const averageHourlyRate = 250;
+const PREDEFINED_CONDITIONS = ['เบาหวาน', 'ความดันสูง', 'โรคหัวใจ', 'สมองเสื่อม'];
 
-const PROVINCES = ['กรุงเทพมหานคร', 'นนทบุรี', 'ปทุมธานี', 'สมุทรปราการ'];
-const DISTRICTS: Record<string, string[]> = {
-  'กรุงเทพมหานคร': ['ลาดพร้าว', 'จตุจักร', 'บางกะปิ', 'ห้วยขวาง', 'วัฒนา', 'ดินแดง', 'พญาไท', 'ปทุมวัน'],
-  'นนทบุรี': ['เมืองนนทบุรี', 'ปากเกร็ด', 'บางบัวทอง', 'บางใหญ่'],
-  'ปทุมธานี': ['เมืองปทุมธานี', 'คลองหลวง', 'ธัญบุรี'],
-  'สมุทรปราการ': ['เมืองสมุทรปราการ', 'บางพลี', 'พระประแดง']
-};
+const thaiAddressDb = new ThailandAddressSimple();
 
 const SAVED_PROFILE = {
   name: 'สมศรี วงศ์ดี',
@@ -49,6 +33,12 @@ export default function BookingStep1() {
   const { bookingDraft, setBookingDraft, goToStep } = useBooking();
   const { success, error, warning } = useToast();
 
+  const [addressDbReady, setAddressDbReady] = useState(false);
+
+  useEffect(() => {
+    thaiAddressDb.init().then(() => setAddressDbReady(true));
+  }, []);
+
   // --- Step 1 States ---
   const [serviceLocation, setServiceLocation] = useState<('at_home' | 'accompany_outside')[]>(
     bookingDraft?.serviceLocation || ['at_home']
@@ -65,8 +55,28 @@ export default function BookingStep1() {
   const [endTime, setEndTime] = useState(bookingDraft?.dateTime?.endTime || '');
 
   // Address & Map Coordinates
-  const [province, setProvince] = useState('กรุงเทพมหานคร');
-  const [district, setDistrict] = useState('ลาดพร้าว');
+  const [province, setProvince] = useState(
+    bookingDraft?.locationDetails?.province || ''
+  );
+  const [district, setDistrict] = useState(
+    bookingDraft?.locationDetails?.district || ''
+  );
+
+  const provincesList = useMemo(() => {
+    if (!addressDbReady) return [];
+    return [...new Set(thaiAddressDb.address.map((a) => a.province))].sort();
+  }, [addressDbReady]);
+
+  const districtsList = useMemo(() => {
+    if (!addressDbReady || !province) return [];
+    return [
+      ...new Set(
+        thaiAddressDb.address
+          .filter((a) => a.province === province)
+          .map((a) => a.amphoe)
+      )
+    ].sort();
+  }, [addressDbReady, province]);
   const [address, setAddress] = useState(
     bookingDraft?.locationDetails?.at_home?.address || ''
   );
@@ -82,8 +92,20 @@ export default function BookingStep1() {
   const [meetingPoint, setMeetingPoint] = useState(
     bookingDraft?.locationDetails?.accompany_outside?.meetingPoint || ''
   );
-  const [latB, setLatB] = useState(13.756330);
-  const [lngB, setLngB] = useState(100.501765);
+  const [latB, setLatB] = useState(
+    bookingDraft?.locationDetails?.accompany_outside?.lat || 13.756330
+  );
+  const [lngB, setLngB] = useState(
+    bookingDraft?.locationDetails?.accompany_outside?.lng || 100.501765
+  );
+
+  const [destinationQuery, setDestinationQuery] = useState(
+    bookingDraft?.locationDetails?.accompany_outside?.hospitalName || ''
+  );
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   // Care Recipient Type
   const recipientType = 'self';
@@ -92,20 +114,39 @@ export default function BookingStep1() {
   const [patientName, setPatientName] = useState(bookingDraft?.recipient?.patientDetails?.name || '');
   const [patientAge, setPatientAge] = useState(bookingDraft?.recipient?.patientDetails?.age?.toString() || '');
   const [patientNickname, setPatientNickname] = useState(bookingDraft?.recipient?.patientDetails?.nickname || '');
-  const [patientGender, setPatientGender] = useState<'ชาย' | 'หญิง'>(
-    bookingDraft?.recipient?.patientDetails?.gender || 'หญิง'
+  const [patientGender, setPatientGender] = useState<'ชาย' | 'หญิง' | ''>(
+    bookingDraft?.recipient?.patientDetails?.gender || ''
   );
   const [patientWeight, setPatientWeight] = useState(bookingDraft?.recipient?.patientDetails?.weight?.toString() || '');
   const [patientHeight, setPatientHeight] = useState(bookingDraft?.recipient?.patientDetails?.height?.toString() || '');
   const [patientSupportLevel, setPatientSupportLevel] = useState(
     bookingDraft?.recipient?.patientDetails?.supportLevel || 'ช่วยเหลือตัวเองได้ดี'
   );
-  const [patientConditions, setPatientConditions] = useState<string[]>(
-    bookingDraft?.recipient?.patientDetails?.conditions || []
-  );
+  const [patientConditions, setPatientConditions] = useState<string[]>(() => {
+    const draftConds = bookingDraft?.recipient?.patientDetails?.conditions || [];
+    const hasOther = draftConds.some(c => !PREDEFINED_CONDITIONS.includes(c));
+    const result = draftConds.filter(c => PREDEFINED_CONDITIONS.includes(c));
+    if (hasOther) {
+      result.push('อื่นๆ');
+    }
+    return result;
+  });
+
+  const [otherCondition, setOtherCondition] = useState<string>(() => {
+    const draftConds = bookingDraft?.recipient?.patientDetails?.conditions || [];
+    return draftConds.find(c => !PREDEFINED_CONDITIONS.includes(c)) || '';
+  });
+
+  const finalConditions = useMemo(() => {
+    const conds = patientConditions.filter(c => c !== 'อื่นๆ');
+    if (patientConditions.includes('อื่นๆ') && otherCondition.trim()) {
+      conds.push(otherCondition.trim());
+    }
+    return conds;
+  }, [patientConditions, otherCondition]);
   const [patientMedicines, setPatientMedicines] = useState(bookingDraft?.recipient?.patientDetails?.medicines || '');
   const [patientAllergies, setPatientAllergies] = useState(bookingDraft?.recipient?.patientDetails?.allergies || '');
-  const [patientBloodGroup, setPatientBloodGroup] = useState(bookingDraft?.recipient?.patientDetails?.bloodGroup || 'O+');
+  const [patientBloodGroup, setPatientBloodGroup] = useState(bookingDraft?.recipient?.patientDetails?.bloodGroup || '');
   const [patientCareInstructions, setPatientCareInstructions] = useState(
     bookingDraft?.recipient?.patientDetails?.careInstructions || ''
   );
@@ -129,6 +170,59 @@ export default function BookingStep1() {
 
   // Validation Errors
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Geocoding Nominatim Search logic
+  useEffect(() => {
+    if (destinationQuery.trim().length < 3) {
+      setSuggestions([]);
+      return;
+    }
+
+    if (destinationQuery === hospitalName) {
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=th&q=${encodeURIComponent(
+            destinationQuery
+          )}`,
+          {
+            headers: {
+              'Accept-Language': 'th,en',
+              'User-Agent': 'PayungCaregiverApp/1.0'
+            }
+          }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setSuggestions(data);
+          setShowSuggestions(true);
+        }
+      } catch (err) {
+        console.error('Error fetching geocoding data:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [destinationQuery, hospitalName]);
+
+  // Click outside to close suggestions list
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Filter Service Types invalid based on Location Selection
   const isAccompanyOnly = serviceLocation.length === 1 && serviceLocation.includes('accompany_outside');
@@ -196,6 +290,7 @@ export default function BookingStep1() {
     setPatientHeight('155');
     setPatientSupportLevel('ช่วยเหลือตัวเองได้เล็กน้อย / ต้องการการช่วยพยุงเดิน');
     setPatientConditions(['เบาหวาน', 'ความดันสูง']);
+    setOtherCondition('');
     setPatientMedicines('ยาลดความดัน, ยาเบาหวาน');
     setPatientAllergies('แพ้ยาเพนิซิลิน');
     setPatientBloodGroup('B');
@@ -206,14 +301,40 @@ export default function BookingStep1() {
     if (!address) {
       setAddress('123/45 ซอยลาดพร้าว 101 ถนนลาดพร้าว แขวงคลองจั่น เขตบางกะปิ กรุงเทพมหานคร 10240');
     }
+    if (!province) {
+      setProvince('กรุงเทพมหานคร');
+    }
+    if (!district) {
+      setDistrict('บางกะปิ');
+    }
     success('ดึงข้อมูลโปรไฟล์ผู้ป่วยเรียบร้อยแล้ว');
   };
 
   const handleConditionCheckbox = (cond: string) => {
     if (patientConditions.includes(cond)) {
       setPatientConditions(prev => prev.filter(c => c !== cond));
+      if (cond === 'อื่นๆ') {
+        setOtherCondition('');
+      }
     } else {
       setPatientConditions(prev => [...prev, cond]);
+    }
+  };
+
+  const handleToAddOtherCondition = () => {
+    const val = otherCondition.trim();
+    if (!val) return;
+    setPatientConditions(prev => {
+      if (prev.includes(val)) return prev;
+      return [...prev.filter(c => c !== 'อื่นๆ'), val, 'อื่นๆ'];
+    });
+    setOtherCondition('');
+    if (errors.otherCondition) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next.otherCondition;
+        return next;
+      });
     }
   };
 
@@ -252,16 +373,30 @@ export default function BookingStep1() {
       errs.startTime = `เวลาเริ่มต้นต้องอยู่ใน ${slotLabels[slot]}`;
     }
 
+    if (serviceLocation.includes('at_home') || serviceLocation.includes('accompany_outside')) {
+      if (!province) errs.province = 'กรุณาเลือกจังหวัด';
+      if (!district) errs.district = 'กรุณาเลือกอำเภอ/เขต';
+    }
+
     if (serviceLocation.includes('at_home')) {
       if (!address.trim()) errs.address = 'กรุณากรอกที่อยู่รับบริการ';
     }
     if (serviceLocation.includes('accompany_outside')) {
+      if (!hospitalName.trim()) errs.hospitalName = 'กรุณาระบุสถานที่ปลายทาง';
       if (!meetingPoint.trim()) errs.meetingPoint = 'กรุณาระบุจุดนัดพบปลายทาง';
     }
 
     // Patient Form Validation
     if (!patientName.trim()) errs.patientName = 'กรุณากรอกชื่อ-นามสกุล คนไข้';
     if (!patientAge.trim()) errs.patientAge = 'กรุณากรอกอายุคนไข้';
+    if (!patientGender) errs.patientGender = 'กรุณาเลือกเพศคนไข้';
+    if (!patientWeight.trim()) errs.patientWeight = 'กรุณากรอกน้ำหนักคนไข้';
+    if (!patientHeight.trim()) errs.patientHeight = 'กรุณากรอกส่วนสูงคนไข้';
+    if (!patientSupportLevel) errs.patientSupportLevel = 'กรุณาเลือกระดับความสามารถในการช่วยเหลือตนเอง';
+    if (!patientBloodGroup) errs.patientBloodGroup = 'กรุณาเลือกกรุ๊ปเลือด';
+    if (patientConditions.includes('อื่นๆ') && !otherCondition.trim()) {
+      errs.otherCondition = 'กรุณาระบุรายละเอียดเพิ่มเติม';
+    }
 
     if (!contactName.trim()) errs.contactName = 'กรุณากรอกชื่อผู้ติดต่อ';
     if (!contactPhone.trim()) errs.contactPhone = 'กรุณากรอกเบอร์โทรศัพท์ผู้ติดต่อ';
@@ -279,8 +414,10 @@ export default function BookingStep1() {
       serviceLocation,
       serviceTypes: selectedServiceTypes,
       locationDetails: {
+        province,
+        district,
         at_home: serviceLocation.includes('at_home') ? { address, lat: latA, lng: lngA } : undefined,
-        accompany_outside: serviceLocation.includes('accompany_outside') ? { hospitalName, meetingPoint } : undefined
+        accompany_outside: serviceLocation.includes('accompany_outside') ? { hospitalName, meetingPoint, lat: latB, lng: lngB } : undefined
       },
       dateTime: {
         date,
@@ -299,7 +436,7 @@ export default function BookingStep1() {
           weight: patientWeight ? Number(patientWeight) : undefined,
           height: patientHeight ? Number(patientHeight) : undefined,
           supportLevel: patientSupportLevel,
-          conditions: patientConditions,
+          conditions: finalConditions,
           medicines: patientMedicines,
           allergies: patientAllergies,
           bloodGroup: patientBloodGroup,
@@ -338,7 +475,7 @@ export default function BookingStep1() {
     patientWeight === SAVED_PROFILE.weight &&
     patientHeight === SAVED_PROFILE.height &&
     patientSupportLevel === SAVED_PROFILE.supportLevel &&
-    JSON.stringify([...patientConditions].sort()) === JSON.stringify([...SAVED_PROFILE.conditions].sort()) &&
+    JSON.stringify([...finalConditions].sort()) === JSON.stringify([...SAVED_PROFILE.conditions].sort()) &&
     patientMedicines === SAVED_PROFILE.medicines &&
     patientAllergies === SAVED_PROFILE.allergies &&
     patientBloodGroup === SAVED_PROFILE.bloodGroup &&
@@ -476,25 +613,55 @@ export default function BookingStep1() {
           {/* Time Slot dropdown */}
           <div className="space-y-2">
             <label className="block text-sm font-bold text-[#575859]">ช่วงเวลานัดหมาย</label>
-            <select
-              value={slot}
-              onChange={(e) => setSlot(e.target.value)}
-              className="w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A]"
-            >
-              <option value="">-- เลือกช่วงเวลา --</option>
-              <option value="morning" disabled={BUSY_SLOTS.includes('morning')}>
-                ช่วงเช้า (08:00 - 12:00 น.) {BUSY_SLOTS.includes('morning') && '(ไม่ว่าง)'}
-              </option>
-              <option value="afternoon" disabled={BUSY_SLOTS.includes('afternoon')} className={BUSY_SLOTS.includes('afternoon') ? 'text-gray-300 bg-gray-50' : ''}>
-                ช่วงบ่าย (13:00 - 17:00 น.) {BUSY_SLOTS.includes('afternoon') && '(ไม่ว่าง)'}
-              </option>
-              <option value="evening" disabled={BUSY_SLOTS.includes('evening')}>
-                ช่วงเย็น (18:00 - 22:00 น.) {BUSY_SLOTS.includes('evening') && '(ไม่ว่าง)'}
-              </option>
-              <option value="night" disabled={BUSY_SLOTS.includes('night')} className={BUSY_SLOTS.includes('night') ? 'text-gray-300 bg-gray-50' : ''}>
-                ช่วงดึก (22:00 - 06:00 น.) {BUSY_SLOTS.includes('night') && '(ไม่ว่าง)'}
-              </option>
-            </select>
+            <div className="relative">
+              <select
+                value={slot}
+                onChange={(e) => {
+                  const newSlot = e.target.value;
+                  setSlot(newSlot);
+                  const slotDefaults: Record<string, string> = {
+                    morning: '08:00',
+                    afternoon: '13:00',
+                    evening: '18:00',
+                    night: '22:00',
+                  };
+                  if (newSlot && slotDefaults[newSlot]) {
+                    setStartTime(slotDefaults[newSlot]);
+                    setErrors(prev => {
+                      const next = { ...prev };
+                      delete next.startTime;
+                      delete next.slot;
+                      return next;
+                    });
+                  } else {
+                    setStartTime('');
+                    setErrors(prev => {
+                      const next = { ...prev };
+                      delete next.startTime;
+                      return next;
+                    });
+                  }
+                }}
+                className="w-full p-3 pr-10 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A] appearance-none"
+              >
+                <option value="">-- เลือกช่วงเวลา --</option>
+                <option value="morning" disabled={BUSY_SLOTS.includes('morning')}>
+                  ช่วงเช้า (08:00 - 12:00 น.) {BUSY_SLOTS.includes('morning') && '(ไม่ว่าง)'}
+                </option>
+                <option value="afternoon" disabled={BUSY_SLOTS.includes('afternoon')} className={BUSY_SLOTS.includes('afternoon') ? 'text-gray-300 bg-gray-50' : ''}>
+                  ช่วงบ่าย (13:00 - 17:00 น.) {BUSY_SLOTS.includes('afternoon') && '(ไม่ว่าง)'}
+                </option>
+                <option value="evening" disabled={BUSY_SLOTS.includes('evening')}>
+                  ช่วงเย็น (18:00 - 22:00 น.) {BUSY_SLOTS.includes('evening') && '(ไม่ว่าง)'}
+                </option>
+                <option value="night" disabled={BUSY_SLOTS.includes('night')} className={BUSY_SLOTS.includes('night') ? 'text-gray-300 bg-gray-50' : ''}>
+                  ช่วงดึก (22:00 - 06:00 น.) {BUSY_SLOTS.includes('night') && '(ไม่ว่าง)'}
+                </option>
+              </select>
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 material-icons text-[#AAB2BA] text-base pointer-events-none">
+                keyboard_arrow_down
+              </span>
+            </div>
             {errors.slot && <p className="text-red-500 text-xs">{errors.slot}</p>}
           </div>
         </div>
@@ -509,8 +676,44 @@ export default function BookingStep1() {
                 <input
                   type="time"
                   value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setStartTime(val);
+                    if (slot && val) {
+                      if (!isTimeInSlot(val, slot)) {
+                        const slotLabels: Record<string, string> = {
+                          morning: 'ช่วงเช้า (08:00 - 12:00 น.)',
+                          afternoon: 'ช่วงบ่าย (13:00 - 17:00 น.)',
+                          evening: 'ช่วงเย็น (18:00 - 22:00 น.)',
+                          night: 'ช่วงดึก (22:00 - 06:00 น.)'
+                        };
+                        setErrors(prev => ({
+                          ...prev,
+                          startTime: `เวลาเริ่มต้นต้องอยู่ใน ${slotLabels[slot]}`
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const next = { ...prev };
+                          delete next.startTime;
+                          return next;
+                        });
+                      }
+                    } else if (!val) {
+                      setErrors(prev => ({
+                        ...prev,
+                        startTime: 'กรุณาระบุเวลาเริ่ม'
+                      }));
+                    } else {
+                      setErrors(prev => {
+                        const next = { ...prev };
+                        delete next.startTime;
+                        return next;
+                      });
+                    }
+                  }}
+                  className={`w-full p-3 border rounded-xl text-sm bg-white focus:outline-none ${
+                    errors.startTime ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-[#E0E2E5] focus:ring-1 focus:ring-[#52B69A]'
+                  }`}
                 />
                 <span className="text-[11px] text-[#8A8C8E] block">ต้องมีเวลาทำบริการอย่างน้อย 2 ชม. ก่อนสิ้นสุดรอบ</span>
                 {errors.startTime && <p className="text-red-500 text-xs">{errors.startTime}</p>}
@@ -561,38 +764,77 @@ export default function BookingStep1() {
           {/* District & Province filters */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="block text-sm font-bold text-[#575859]">จังหวัด</label>
-              <select
-                value={province}
-                onChange={(e) => {
-                  setProvince(e.target.value);
-                  setDistrict(DISTRICTS[e.target.value]?.[0] || '');
-                }}
-                className="w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none"
-              >
-                {PROVINCES.map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
+              <label className="block text-sm font-bold text-[#575859]">จังหวัด <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <select
+                  value={province}
+                  disabled={!addressDbReady}
+                  onChange={(e) => {
+                    setProvince(e.target.value);
+                    setDistrict('');
+                  }}
+                  className={`w-full p-3 pr-10 border rounded-xl text-sm bg-white focus:outline-none appearance-none ${
+                    !addressDbReady ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed' :
+                    errors.province ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-[#E0E2E5] focus:ring-1 focus:ring-[#52B69A]'
+                  }`}
+                >
+                  <option value="">{addressDbReady ? '-- เลือกจังหวัด --' : 'กำลังโหลดข้อมูลจังหวัด...'}</option>
+                  {provincesList.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 material-icons text-[#AAB2BA] text-base pointer-events-none">
+                  keyboard_arrow_down
+                </span>
+              </div>
+              {errors.province && <p className="text-red-500 text-xs mt-1">{errors.province}</p>}
             </div>
             <div className="space-y-2">
-              <label className="block text-sm font-bold text-[#575859]">อำเภอ/เขต</label>
-              <select
-                value={district}
-                onChange={(e) => setDistrict(e.target.value)}
-                className="w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none"
-              >
-                {(DISTRICTS[province] || []).map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+              <label className="block text-sm font-bold text-[#575859]">อำเภอ/เขต <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <select
+                  value={district}
+                  onChange={(e) => setDistrict(e.target.value)}
+                  disabled={!province || !addressDbReady}
+                  className={`w-full p-3 pr-10 border rounded-xl text-sm bg-white focus:outline-none appearance-none ${
+                    (!province || !addressDbReady) ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed' :
+                    errors.district ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-[#E0E2E5] focus:ring-1 focus:ring-[#52B69A]'
+                  }`}
+                >
+                  <option value="">-- เลือกอำเภอ/เขต --</option>
+                  {districtsList.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 material-icons text-[#AAB2BA] text-base pointer-events-none">
+                  keyboard_arrow_down
+                </span>
+              </div>
+              {errors.district && <p className="text-red-500 text-xs mt-1">{errors.district}</p>}
             </div>
           </div>
 
           {/* At Home Location address field */}
           {serviceLocation.includes('at_home') && (
             <div className="space-y-2">
-              <label className="block text-sm font-bold text-[#575859]">สถานที่ดูแล (ที่บ้าน)</label>
+              <div className="flex justify-between items-center gap-2">
+                <label className="block text-sm font-bold text-[#575859]">สถานที่ดูแล (ที่บ้าน)</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddress(SAVED_PROFILE.address);
+                    setProvince('กรุงเทพมหานคร');
+                    setDistrict('บางกะปิ');
+                    setLatA(13.736717);
+                    setLngA(100.560543);
+                    success('ใช้ข้อมูลที่อยู่จากประวัติส่วนตัวเรียบร้อยแล้ว');
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-[#52B69A] text-[#52B69A] bg-white hover:bg-[#52B69A]/5 transition rounded-lg text-xs font-bold cursor-pointer"
+                >
+                  <span className="material-icons text-sm">home</span>
+                  ใช้ที่อยู่จากประวัติส่วนตัว
+                </button>
+              </div>
               <textarea
                 rows={3}
                 value={address}
@@ -609,25 +851,89 @@ export default function BookingStep1() {
             <div className="space-y-2">
               <label className="block text-sm font-bold text-[#575859]">จุดจัดส่ง / สถานที่ปลายทางภายนอก</label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <select
-                  value={hospitalName}
-                  onChange={(e) => setHospitalName(e.target.value)}
-                  className="w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A]"
-                >
-                  <option value="">-- เลือกปลายทางสถานพยาบาล (ถ้ามี) --</option>
-                  {BANGKOK_HOSPITALS.map((h, i) => (
-                    <option key={i} value={h}>{h}</option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  value={meetingPoint}
-                  onChange={(e) => setMeetingPoint(e.target.value)}
-                  placeholder="จุดนัดพบ หรือ สถานที่ปลายทางด้านนอกอย่างละเอียด"
-                  className="w-full p-3 border border-[#E0E2E5] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-[#52B69A]"
-                />
+                <div className="relative" ref={suggestionsRef}>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={destinationQuery}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDestinationQuery(val);
+                        setHospitalName(val);
+                        setShowSuggestions(true);
+                      }}
+                      onFocus={() => setShowSuggestions(true)}
+                      placeholder="พิมพ์ค้นหาสถานที่ปลายทางภายนอก..."
+                      className={`w-full p-3 pr-10 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
+                        errors.hospitalName ? 'border-red-500 focus:ring-red-500' : 'border-[#E0E2E5] focus:ring-[#52B69A]'
+                      }`}
+                    />
+                    {isSearching ? (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 material-icons text-[#52B69A] text-base animate-spin">
+                        sync
+                      </span>
+                    ) : (
+                      destinationQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDestinationQuery('');
+                            setHospitalName('');
+                            setSuggestions([]);
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 material-icons text-[#AAB2BA] text-base hover:text-gray-600 cursor-pointer animate-fadeIn"
+                        >
+                          clear
+                        </button>
+                      )
+                    )}
+                  </div>
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-[2000] max-h-[220px] overflow-y-auto divide-y divide-gray-100">
+                      {suggestions.map((item, i) => (
+                        <div
+                          key={i}
+                          onClick={() => {
+                            const lat = parseFloat(item.lat);
+                            const lng = parseFloat(item.lon);
+                            const name = item.display_name;
+                            setHospitalName(name);
+                            setDestinationQuery(name);
+                            setLatB(lat);
+                            setLngB(lng);
+                            setShowSuggestions(false);
+                          }}
+                          className="p-3 hover:bg-gray-50 cursor-pointer text-xs text-[#1A1A1A] transition flex items-start gap-2 text-left"
+                        >
+                          <span className="material-icons text-[#8A8C8E] text-sm mt-0.5">location_on</span>
+                          <div>
+                            <p className="font-semibold text-gray-800">{item.display_name.split(',')[0]}</p>
+                            <p className="text-[10px] text-gray-500 mt-0.5">{item.display_name}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {showSuggestions && suggestions.length === 0 && destinationQuery.trim().length >= 3 && !isSearching && (
+                    <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-[2000] p-4 text-center text-xs text-[#8A8C8E]">
+                      ไม่พบสถานที่นี้ ลองพิมพ์ค้นหาใหม่อีกครั้ง
+                    </div>
+                  )}
+                  {errors.hospitalName && <p className="text-red-500 text-xs mt-1">{errors.hospitalName}</p>}
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    value={meetingPoint}
+                    onChange={(e) => setMeetingPoint(e.target.value)}
+                    placeholder="จุดนัดพบ หรือ สถานที่ปลายทางด้านนอกอย่างละเอียด"
+                    className={`w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-1 ${
+                      errors.meetingPoint ? 'border-red-500 focus:ring-red-500' : 'border-[#E0E2E5] focus:ring-[#52B69A]'
+                    }`}
+                  />
+                  {errors.meetingPoint && <p className="text-red-500 text-xs mt-1">{errors.meetingPoint}</p>}
+                </div>
               </div>
-              {errors.meetingPoint && <p className="text-red-500 text-xs">{errors.meetingPoint}</p>}
             </div>
           )}
 
@@ -700,7 +1006,7 @@ export default function BookingStep1() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-[#575859] block">เพศคนไข้</label>
+              <label className="text-xs font-semibold text-[#575859] block">เพศคนไข้ <span className="text-red-500">*</span></label>
               <div className="flex gap-4 pt-1">
                 <label className="flex items-center gap-1.5 text-sm cursor-pointer font-semibold text-[#1A1A1A]">
                   <input
@@ -723,10 +1029,11 @@ export default function BookingStep1() {
                   หญิง
                 </label>
               </div>
+              {errors.patientGender && <p className="text-red-500 text-[11px]">{errors.patientGender}</p>}
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-[#575859]">น้ำหนัก (กิโลกรัม)</label>
+              <label className="text-xs font-semibold text-[#575859]">น้ำหนัก (กิโลกรัม) <span className="text-red-500">*</span></label>
               <input
                 type="number"
                 value={patientWeight}
@@ -734,10 +1041,11 @@ export default function BookingStep1() {
                 placeholder="เช่น 54"
                 className="w-full p-2.5 border border-[#E0E2E5] rounded-lg text-sm bg-white focus:outline-none"
               />
+              {errors.patientWeight && <p className="text-red-500 text-[11px]">{errors.patientWeight}</p>}
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-[#575859]">ส่วนสูง (เซนติเมตร)</label>
+              <label className="text-xs font-semibold text-[#575859]">ส่วนสูง (เซนติเมตร) <span className="text-red-500">*</span></label>
               <input
                 type="number"
                 value={patientHeight}
@@ -745,60 +1053,112 @@ export default function BookingStep1() {
                 placeholder="เช่น 155"
                 className="w-full p-2.5 border border-[#E0E2E5] rounded-lg text-sm bg-white focus:outline-none"
               />
+              {errors.patientHeight && <p className="text-red-500 text-[11px]">{errors.patientHeight}</p>}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100 pt-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-[#575859] block">ระดับความสามารถในการช่วยเหลือตนเอง</label>
-              <select
-                value={patientSupportLevel}
-                onChange={(e) => setPatientSupportLevel(e.target.value)}
-                className="w-full p-2.5 border border-[#E0E2E5] rounded-lg text-sm bg-white focus:outline-none"
-              >
-                <option value="ช่วยเหลือตัวเองได้ดี">ช่วยเหลือตัวเองได้ดี</option>
-                <option value="ช่วยเหลือตัวเองได้เล็กน้อย / ต้องการการช่วยพยุงเดิน">ช่วยเหลือตัวเองได้เล็กน้อย / ต้องการการช่วยพยุงเดิน</option>
-                <option value="ช่วยเหลือตัวเองไม่ได้ / ติดเตียง">ช่วยเหลือตัวเองไม่ได้ / ติดเตียง</option>
-              </select>
+              <label className="text-xs font-semibold text-[#575859] block">ระดับความสามารถในการช่วยเหลือตนเอง <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <select
+                  value={patientSupportLevel}
+                  onChange={(e) => setPatientSupportLevel(e.target.value)}
+                  className="w-full p-2.5 pr-10 border border-[#E0E2E5] rounded-lg text-sm bg-white focus:outline-none appearance-none"
+                >
+                  <option value="ช่วยเหลือตัวเองได้ดี">ช่วยเหลือตัวเองได้ดี</option>
+                  <option value="ช่วยเหลือตัวเองได้เล็กน้อย / ต้องการการช่วยพยุงเดิน">ช่วยเหลือตัวเองได้เล็กน้อย / ต้องการการช่วยพยุงเดิน</option>
+                  <option value="ช่วยเหลือตัวเองไม่ได้ / ติดเตียง">ช่วยเหลือตัวเองไม่ได้ / ติดเตียง</option>
+                </select>
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 material-icons text-[#AAB2BA] text-base pointer-events-none">
+                  keyboard_arrow_down
+                </span>
+              </div>
+              {errors.patientSupportLevel && <p className="text-red-500 text-[11px]">{errors.patientSupportLevel}</p>}
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-[#575859] block">กรุ๊ปเลือด</label>
-              <select
-                value={patientBloodGroup}
-                onChange={(e) => setPatientBloodGroup(e.target.value)}
-                className="w-full p-2.5 border border-[#E0E2E5] rounded-lg text-sm bg-white focus:outline-none"
-              >
-                <option value="A">กรุ๊ป A</option>
-                <option value="B">กรุ๊ป B</option>
-                <option value="AB">กรุ๊ป AB</option>
-                <option value="O">กรุ๊ป O</option>
-                <option value="A+">กรุ๊ป A+</option>
-                <option value="B+">กรุ๊ป B+</option>
-                <option value="AB+">กรุ๊ป AB+</option>
-                <option value="O+">กรุ๊ป O+</option>
-              </select>
+              <label className="text-xs font-semibold text-[#575859] block">กรุ๊ปเลือด <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <select
+                  value={patientBloodGroup}
+                  onChange={(e) => setPatientBloodGroup(e.target.value)}
+                  className="w-full p-2.5 pr-10 border border-[#E0E2E5] rounded-lg text-sm bg-white focus:outline-none appearance-none"
+                >
+                  <option value="">-- เลือกกรุ๊ปเลือด --</option>
+                  <option value="A">กรุ๊ป A</option>
+                  <option value="B">กรุ๊ป B</option>
+                  <option value="AB">กรุ๊ป AB</option>
+                  <option value="O">กรุ๊ป O</option>
+                  <option value="A+">กรุ๊ป A+</option>
+                  <option value="B+">กรุ๊ป B+</option>
+                  <option value="AB+">กรุ๊ป AB+</option>
+                  <option value="O+">กรุ๊ป O+</option>
+                </select>
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 material-icons text-[#AAB2BA] text-base pointer-events-none">
+                  keyboard_arrow_down
+                </span>
+              </div>
+              {errors.patientBloodGroup && <p className="text-red-500 text-[11px]">{errors.patientBloodGroup}</p>}
             </div>
           </div>
 
           <div className="space-y-2 border-t border-gray-100 pt-3">
             <label className="text-xs font-semibold text-[#575859] block">โรคประจำตัวหรือประเด็นสุขภาพหลัก</label>
             <div className="flex flex-wrap gap-2">
-              {['เบาหวาน', 'ความดันสูง', 'โรคหัวใจ', 'สมองเสื่อม', 'อื่นๆ'].map(cond => (
+              {[...PREDEFINED_CONDITIONS, ...patientConditions.filter(c => !PREDEFINED_CONDITIONS.includes(c) && c !== 'อื่นๆ'), 'อื่นๆ'].map(cond => (
                 <button
                   key={cond}
                   type="button"
                   onClick={() => handleConditionCheckbox(cond)}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition cursor-pointer ${
                     patientConditions.includes(cond)
-                      ? 'bg-[#FFF9F2] border-[#F8961E] text-[#F8961E]'
+                      ? 'bg-[#F0FAF4] border-[#52B69A] text-[#1B5C48]'
                       : 'bg-white border-[#E0E2E5] text-gray-500 hover:bg-gray-50'
                   }`}
                 >
-                  {cond}{patientConditions.includes(cond) ? ' ✓' : ''}
+                  {cond}
                 </button>
               ))}
             </div>
+            {patientConditions.includes('อื่นๆ') && (
+              <div>
+                <div className="mt-2 animate-fadeIn flex gap-2 w-full">
+                  <input
+                    type="text"
+                    value={otherCondition}
+                    onChange={(e) => {
+                      setOtherCondition(e.target.value);
+                      if (e.target.value.trim() && errors.otherCondition) {
+                        setErrors(prev => {
+                          const next = { ...prev };
+                          delete next.otherCondition;
+                          return next;
+                        });
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleToAddOtherCondition();
+                      }
+                    }}
+                    placeholder="โปรดระบุโรคประจำตัวหรือประเด็นสุขภาพอื่นๆ"
+                    className={`flex-1 p-2.5 border rounded-lg text-sm bg-white focus:outline-none focus:ring-1 ${
+                      errors.otherCondition ? 'border-red-500 focus:ring-red-500' : 'border-[#E0E2E5] focus:ring-[#52B69A]'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleToAddOtherCondition}
+                    className="px-4 py-2 bg-[#52B69A] text-white text-xs font-bold rounded-lg hover:bg-[#52B69A]/95 transition cursor-pointer"
+                  >
+                    เพิ่ม
+                  </button>
+                </div>
+                {errors.otherCondition && <p className="text-red-500 text-xs mt-1">{errors.otherCondition}</p>}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100 pt-3">
