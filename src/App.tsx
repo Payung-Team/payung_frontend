@@ -52,20 +52,15 @@ function KycFormGuard({ children }: { children: React.ReactNode }) {
 
 function CaregiverAvailabilityGuard() {
   const { data, loading } = useQuery<{
-    myCaregiverProfile?: { kycStatus: string; isSearchable: boolean };
+    myCaregiverProfile?: { kycStatus: string };
   }>(GET_CAREGIVER_PROFILE);
 
   if (loading) return <PageSkeleton />;
 
   const status = data?.myCaregiverProfile?.kycStatus;
-  const isSearchable = data?.myCaregiverProfile?.isSearchable;
 
   if (status !== 'verified') {
     return <Navigate to="/kyc" replace />;
-  }
-
-  if (!isSearchable) {
-    return <Navigate to="/caregiver-home" replace />;
   }
 
   return <CaregiverSettings />;
@@ -160,7 +155,7 @@ function App() {
           path="/caregiver/settings/job-reception"
           element={
             <RoleRoute requiredRole={2}>
-              <CaregiverSettings />
+              <CaregiverAvailabilityGuard />
             </RoleRoute>
           }
         />
@@ -188,16 +183,6 @@ function App() {
           element={
             <RoleRoute requiredRole={2}>
               <CaregiverSettings />
-            </RoleRoute>
-          }
-        />
-
-        {/* Caregiver availability */}
-        <Route
-          path="/caregiver/availability"
-          element={
-            <RoleRoute requiredRole={2}>
-              <CaregiverAvailabilityGuard />
             </RoleRoute>
           }
         />
