@@ -4,6 +4,8 @@ export interface BookingRequest {
   serviceLocation: ('at_home' | 'accompany_outside')[];
   serviceTypes: string[];
   locationDetails?: {
+    province?: string;
+    district?: string;
     at_home?: {
       address: string;
       lat: number;
@@ -12,6 +14,8 @@ export interface BookingRequest {
     accompany_outside?: {
       hospitalName: string;
       meetingPoint: string;
+      lat?: number;
+      lng?: number;
     };
   };
   dateTime?: {
@@ -28,7 +32,7 @@ export interface BookingRequest {
       name: string;
       age: number;
       nickname?: string;
-      gender: 'ชาย' | 'หญิง';
+      gender?: 'ชาย' | 'หญิง' | '';
       weight?: number;
       height?: number;
       supportLevel?: string;
