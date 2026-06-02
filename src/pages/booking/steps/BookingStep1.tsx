@@ -39,6 +39,20 @@ export default function BookingStep1() {
     thaiAddressDb.init().then(() => setAddressDbReady(true));
   }, []);
 
+  useEffect(() => {
+    const target = sessionStorage.getItem('scrollTarget');
+    if (target) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(target);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          sessionStorage.removeItem('scrollTarget');
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // --- Step 1 States ---
   const [serviceLocation, setServiceLocation] = useState<('at_home' | 'accompany_outside')[]>(
     bookingDraft?.serviceLocation || ['at_home']
@@ -591,7 +605,7 @@ export default function BookingStep1() {
       </div>
 
       {/* 3. Date & Time */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-6">
+      <div id="step1-datetime" className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-6">
         <h3 className="text-base font-bold text-[#1A1A1A]">วันและเวลาให้บริการ <span className="text-red-500">*</span></h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Date picker */}
@@ -962,7 +976,7 @@ export default function BookingStep1() {
       )}
 
       {/* 5. Care Recipient Section */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-6">
+      <div id="step1-patient" className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-6">
         <div className="flex justify-between items-center">
           <h3 className="text-base font-bold text-[#1A1A1A]">บุคคลผู้รับบริการ <span className="text-red-500">*</span></h3>
           <button
@@ -1224,7 +1238,7 @@ export default function BookingStep1() {
       </div>
 
       {/* 6. Emergency/On-day Contact Person */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+      <div id="step1-contact" className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
         <h3 className="text-base font-bold text-[#1A1A1A]">ผู้ติดต่อในวันนัดหมาย <span className="text-red-500">*</span></h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-1">
