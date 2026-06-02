@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useBooking } from '../../../context/BookingContext';
 
 const SUB_TASKS = [
@@ -21,6 +21,20 @@ export default function BookingStep2() {
   );
   const [notes, setNotes] = useState(bookingDraft?.jobDetails?.notes || '');
   const [customTaskInput, setCustomTaskInput] = useState('');
+
+  useEffect(() => {
+    const target = sessionStorage.getItem('scrollTarget');
+    if (target) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(target);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          sessionStorage.removeItem('scrollTarget');
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const handleToggleTask = (id: string) => {
     setSelectedTasks(prev => 
@@ -81,7 +95,7 @@ export default function BookingStep2() {
   return (
     <div className="space-y-6">
       {/* Card 1: ภารกิจย่อยหลักตามประเภทบริการ */}
-      <div className="bg-white p-[22px] rounded-2xl border border-gray-100 shadow-[0_1px_4px_rgba(0,0,0,0.03)] space-y-4">
+      <div id="step2-tasks" className="bg-white p-[22px] rounded-2xl border border-gray-100 shadow-[0_1px_4px_rgba(0,0,0,0.03)] space-y-4">
         <div>
           <h3 
             className="text-[15px] font-bold text-[#1A1A1A] leading-[22px]" 
