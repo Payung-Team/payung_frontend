@@ -625,3 +625,27 @@ export const ADMIN_EDIT_USER = gql`
     }
   }
 `;
+
+export const SEARCH_CAREGIVERS = gql`
+  query SearchCaregivers($input: SearchCaregiverInput!) {
+    searchCaregivers(input: $input) {
+      data {
+        id
+        fullName
+        avatarUrl
+        hourlyRate
+        avgRating
+        reviewCount
+        skills
+        province
+        district
+      }
+      pagination {
+        page
+        limit
+        total
+        totalPages
+      }
+    }
+  }
+`;
