@@ -25,6 +25,7 @@ import CaregiverHome from './pages/caregiver/CaregiverHome';
 import CaregiverSettings from './pages/caregiver/CaregiverSettings';
 import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
 import BookingsPage from './pages/profile/BookingsPage';
+import BookingRequestPage from './pages/booking/BookingRequestPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
 import GuestRoute from './components/GuestRoute';
@@ -102,6 +103,16 @@ function App() {
               <PayungHome />
             </RoleRoute>
           } 
+        />
+
+        {/* Booking Request */}
+        <Route
+          path="/booking/new"
+          element={
+            <RoleRoute requiredRole={1}>
+              <BookingRequestPage />
+            </RoleRoute>
+          }
         />
 
         {/* Caregiver home */}
