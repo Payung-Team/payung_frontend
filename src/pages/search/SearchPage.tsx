@@ -48,24 +48,24 @@ interface FilterState {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const JOB_TYPES = [
-  { id: 'general_care',          label: 'ดูแลทั่วไป' },
-  { id: 'physical_therapy',      label: 'กายภาพบำบัด' },
-  { id: 'bedridden_care',        label: 'ดูแลผู้ป่วยติดเตียง' },
+  { id: 'general_care', label: 'ดูแลทั่วไป' },
+  { id: 'physical_therapy', label: 'กายภาพบำบัด' },
+  { id: 'bedridden_care', label: 'ดูแลผู้ป่วยติดเตียง' },
   { id: 'medication_management', label: 'ช่วยจัดการยา' },
-  { id: 'companion',             label: 'เป็นเพื่อน/พูดคุย' },
+  { id: 'companion', label: 'เป็นเพื่อน/พูดคุย' },
 ];
 
 const SORT_OPTIONS = [
   { value: 'RATING_DESC', label: 'Rating สูงสุด' },
-  { value: 'PRICE_ASC',   label: 'ราคา: ต่ำ → สูง' },
-  { value: 'PRICE_DESC',  label: 'ราคา: สูง → ต่ำ' },
+  { value: 'PRICE_ASC', label: 'ราคา: ต่ำ → สูง' },
+  { value: 'PRICE_DESC', label: 'ราคา: สูง → ต่ำ' },
 ];
 
 const RATING_OPTIONS = [
-  { value: null,  label: 'ทั้งหมด' },
-  { value: 3,     label: '3★ ขึ้นไป' },
-  { value: 4,     label: '4★ ขึ้นไป' },
-  { value: 4.5,   label: '4.5★ ขึ้นไป' },
+  { value: null, label: 'ทั้งหมด' },
+  { value: 3, label: '3★ ขึ้นไป' },
+  { value: 4, label: '4★ ขึ้นไป' },
+  { value: 4.5, label: '4.5★ ขึ้นไป' },
 ];
 
 const PRICE_MIN = 0;
@@ -81,7 +81,7 @@ function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
     <span className="flex items-center gap-0.5" style={{ fontSize: size }}>
       {[1, 2, 3, 4, 5].map((s) => {
         const filled = rating >= s;
-        const half   = !filled && rating >= s - 0.5;
+        const half = !filled && rating >= s - 0.5;
         return (
           <span key={s} className={filled ? 'text-[#FFA92C]' : half ? 'text-[#FFA92C]' : 'text-[#E0E2E5]'}>
             {half ? '½' : '★'}
@@ -95,10 +95,10 @@ function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
 // ── Caregiver Card ─────────────────────────────────────────────────────────────
 
 function CaregiverCard({ cg }: { cg: CaregiverSummary }) {
-  const fullName    = cg.fullName;
-  const hasRating   = cg.avgRating != null && cg.reviewCount > 0;
+  const fullName = cg.fullName;
+  const hasRating = cg.avgRating != null && cg.reviewCount > 0;
   const visibleSkills = cg.skills.slice(0, 3);
-  const extraSkills   = cg.skills.length - 3;
+  const extraSkills = cg.skills.length - 3;
 
   return (
     <div
@@ -108,7 +108,7 @@ function CaregiverCard({ cg }: { cg: CaregiverSummary }) {
       {/* ── Top row: avatar + name + rate ── */}
       <div className="flex items-start gap-3">
         <Avatar
-          src={cg.avatar_url ?? undefined}
+          src={cg.avatarUrl ?? undefined}
           name={fullName}
           size={56}
           fallbackColor="#52B69A"
@@ -116,7 +116,7 @@ function CaregiverCard({ cg }: { cg: CaregiverSummary }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-bold text-[15px] text-[#1A1A1A] leading-tight truncate"
-                style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
               {fullName}
             </h3>
           </div>
@@ -264,7 +264,7 @@ function FilterSidebar({
       {/* Province */}
       <div>
         <label className="text-[13px] font-bold text-[#1A1A1A] mb-2 block"
-               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+          style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           จังหวัด
         </label>
         <div className="relative">
@@ -283,7 +283,7 @@ function FilterSidebar({
       {/* District */}
       <div>
         <label className="text-[13px] font-bold text-[#1A1A1A] mb-2 block"
-               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+          style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           เขต/อำเภอ
         </label>
         <div className="relative">
@@ -307,7 +307,7 @@ function FilterSidebar({
       {/* Job types */}
       <div>
         <label className="text-[13px] font-bold text-[#1A1A1A] mb-2.5 block"
-               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+          style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           ประเภทงาน
         </label>
         <div className="flex flex-wrap gap-2">
@@ -338,7 +338,7 @@ function FilterSidebar({
       {/* Price range */}
       <div>
         <label className="text-[13px] font-bold text-[#1A1A1A] mb-2.5 block"
-               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+          style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           ช่วงราคา (฿/ชม.)
         </label>
         <div className="flex items-center gap-2 mb-2">
@@ -390,7 +390,7 @@ function FilterSidebar({
       {/* Min rating */}
       <div>
         <label className="text-[13px] font-bold text-[#1A1A1A] mb-2.5 block"
-               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+          style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           Rating ขั้นต่ำ
         </label>
         <div className="flex flex-col gap-2">
@@ -441,11 +441,11 @@ function FilterSidebar({
       {/* Desktop sidebar */}
       <aside className="hidden lg:block w-[260px] flex-shrink-0">
         <div className="bg-white border border-[#E0E2E5] rounded-2xl p-5 sticky top-[86px]"
-             style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center gap-2 mb-5 pb-4 border-b border-[#F0F1F3]">
             <span className="material-icons text-[18px] text-[#52B69A]">tune</span>
             <h2 className="text-[15px] font-bold text-[#1A1A1A]"
-                style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
               ตัวกรอง
             </h2>
           </div>
@@ -469,7 +469,7 @@ function FilterSidebar({
                 <div className="flex items-center gap-2">
                   <span className="material-icons text-[18px] text-[#52B69A]">tune</span>
                   <h2 className="text-[15px] font-bold text-[#1A1A1A]"
-                      style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                    style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
                     ตัวกรอง
                   </h2>
                 </div>
@@ -557,11 +557,11 @@ function SearchPageContent() {
 
   // ── GraphQL Query ──
   const queryInput = useMemo(() => ({
-    province:  appliedFilters.province  || undefined,
-    district:  appliedFilters.district  || undefined,
-    jobType:   appliedFilters.jobTypes.length > 0 ? appliedFilters.jobTypes.join(',') : undefined,
-    minPrice:  appliedFilters.minPrice  > PRICE_MIN ? appliedFilters.minPrice  : undefined,
-    maxPrice:  appliedFilters.maxPrice  < PRICE_MAX ? appliedFilters.maxPrice  : undefined,
+    province: appliedFilters.province || undefined,
+    district: appliedFilters.district || undefined,
+    jobType: appliedFilters.jobTypes.length > 0 ? appliedFilters.jobTypes.join(',') : undefined,
+    minPrice: appliedFilters.minPrice > PRICE_MIN ? appliedFilters.minPrice : undefined,
+    maxPrice: appliedFilters.maxPrice < PRICE_MAX ? appliedFilters.maxPrice : undefined,
     minRating: appliedFilters.minRating ?? undefined,
     sortBy,
     page,
@@ -574,9 +574,9 @@ function SearchPageContent() {
     notifyOnNetworkStatusChange: true,
   });
 
-  const caregivers   = data?.searchCaregivers.data ?? [];
-  const pagination   = data?.searchCaregivers.pagination;
-  const totalPages   = pagination?.totalPages ?? 1;
+  const caregivers = data?.searchCaregivers.data ?? [];
+  const pagination = data?.searchCaregivers.pagination;
+  const totalPages = pagination?.totalPages ?? 1;
   const totalResults = pagination?.total ?? 0;
 
   const handleSortChange = (value: string) => {
@@ -587,12 +587,12 @@ function SearchPageContent() {
   // Active filter count badge
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (appliedFilters.province)            count++;
-    if (appliedFilters.district)            count++;
+    if (appliedFilters.province) count++;
+    if (appliedFilters.district) count++;
     if (appliedFilters.jobTypes.length > 0) count++;
     if (appliedFilters.minPrice > PRICE_MIN) count++;
     if (appliedFilters.maxPrice < PRICE_MAX) count++;
-    if (appliedFilters.minRating != null)   count++;
+    if (appliedFilters.minRating != null) count++;
     return count;
   }, [appliedFilters]);
 
@@ -614,7 +614,7 @@ function SearchPageContent() {
             </button>
           </div>
           <h1 className="text-[22px] font-bold text-[#1A1A1A] leading-tight"
-              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
             ค้นหาผู้ดูแล
           </h1>
           {(appliedFilters.province || appliedFilters.district) && (
@@ -750,7 +750,7 @@ function SearchPageContent() {
 
                 {/* Result summary */}
                 <p className="text-center text-[12px] text-[#C6C8CB] mt-3"
-                   style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                  style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
                   แสดง {Math.min((page - 1) * PAGE_LIMIT + 1, totalResults)}–{Math.min(page * PAGE_LIMIT, totalResults)} จาก {totalResults.toLocaleString()} รายการ
                 </p>
               </>
