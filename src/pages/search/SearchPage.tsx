@@ -20,6 +20,13 @@ interface CaregiverSummary {
   skills: string[];
   province: string;
   district: string;
+  // ── Newly surfaced to match the Patient page CGRow card. ──
+  // All optional: the card renders each only when the backend supplies it.
+  bio?: string | null;
+  experience?: number | null;       // years
+  gender?: 'male' | 'female' | null;
+  distance?: number | null;         // km
+  verified?: boolean;
 }
 
 interface SearchPagination {
@@ -74,133 +81,321 @@ const PAGE_LIMIT = 9;
 
 const db = new ThailandAddressSimple();
 
+// ── Mock Data (set USE_MOCK=false to disable) ──────────────────────────────────
+const USE_MOCK = true;
+
+const MOCK_CAREGIVERS: CaregiverSummary[] = [
+  {
+    id: 'mock-1',
+    fullName: 'สมหญิง ใจดี',
+    avatarUrl: null,
+    hourlyRate: 250,
+    avgRating: 4.9,
+    reviewCount: 132,
+    skills: ['ดูแลทั่วไป', 'ช่วยจัดการยา', 'เป็นเพื่อน/พูดคุย'],
+    province: 'กรุงเทพมหานคร',
+    district: 'พระโขนง',
+    gender: 'female',
+    experience: 5,
+    distance: 1.2,
+    verified: true,
+    bio: 'มีประสบการณ์ดูแลผู้สูงอายุที่บ้านมา 5 ปี เน้นความใส่ใจ ตรงต่อเวลา ดูแลทั้งกิจวัตรประจำวัน เช่น อาบน้ำ ป้อนอาหาร และพาเดิน',
+  },
+  {
+    id: 'mock-2',
+    fullName: 'วิไล พรรณราย',
+    avatarUrl: null,
+    hourlyRate: 300,
+    avgRating: 4.7,
+    reviewCount: 87,
+    skills: ['กายภาพบำบัด', 'ดูแลผู้ป่วยติดเตียง'],
+    province: 'กรุงเทพมหานคร',
+    district: 'ลาดพร้าว',
+    gender: 'female',
+    experience: 8,
+    distance: 2.8,
+    verified: true,
+    bio: 'นักกายภาพบำบัด ทำงานในรพ.เอกชน 8 ปี เชี่ยวชาญการฟื้นฟูผู้ป่วยหลังผ่าตัดสะโพกและเข่า',
+  },
+  {
+    id: 'mock-3',
+    fullName: 'นภา สว่างใจ',
+    avatarUrl: null,
+    hourlyRate: 200,
+    avgRating: 4.5,
+    reviewCount: 54,
+    skills: ['ดูแลทั่วไป', 'เป็นเพื่อน/พูดคุย'],
+    province: 'นนทบุรี',
+    district: 'ปากเกร็ด',
+    gender: 'female',
+    experience: 3,
+    distance: 4.5,
+    verified: true,
+    bio: 'ใจเย็น พูดคุยเก่ง อารมณ์ดี ช่วยให้ผู้สูงอายุไม่เหงา และดูแลกิจวัตรประจำวันได้ครบถ้วน',
+  },
+  {
+    id: 'mock-4',
+    fullName: 'ประภา เจริญสุข',
+    avatarUrl: null,
+    hourlyRate: 350,
+    avgRating: 5.0,
+    reviewCount: 210,
+    skills: ['กายภาพบำบัด', 'ช่วยจัดการยา', 'ดูแลผู้ป่วยติดเตียง', 'ดูแลทั่วไป'],
+    province: 'กรุงเทพมหานคร',
+    district: 'บึงกุ่ม',
+    gender: 'female',
+    experience: 12,
+    distance: 0.8,
+    verified: true,
+    bio: 'พยาบาลวิชาชีพ มีใบประกอบ ประสบการณ์ดูแลผู้ป่วยติดเตียงและฟอกไต ทำงานเป็นทีมกับทีมแพทย์ที่บ้าน',
+  },
+  {
+    id: 'mock-5',
+    fullName: 'มาลี รักษาดี',
+    avatarUrl: null,
+    hourlyRate: 180,
+    avgRating: null,
+    reviewCount: 0,
+    skills: ['ดูแลทั่วไป'],
+    province: 'ปทุมธานี',
+    district: 'ธัญบุรี',
+    gender: 'female',
+    experience: 1,
+    distance: 6.2,
+    verified: false,
+    bio: 'ผ่านการอบรมหลักสูตรดูแลผู้สูงอายุ พร้อมรับงานดูแลทั่วไปและช่วยพยุงเดิน',
+  },
+  {
+    id: 'mock-6',
+    fullName: 'อรทัย ชูแสง',
+    avatarUrl: null,
+    hourlyRate: 275,
+    avgRating: 4.2,
+    reviewCount: 31,
+    skills: ['ดูแลผู้ป่วยติดเตียง', 'ช่วยจัดการยา'],
+    province: 'กรุงเทพมหานคร',
+    district: 'มีนบุรี',
+    gender: 'female',
+    experience: 4,
+    distance: 3.9,
+    verified: true,
+    bio: 'เน้นความสะอาด ปลอดภัย เอาใจใส่ดูแลอย่างใกล้ชิด มีประสบการณ์จัดยาตามแพทย์สั่ง',
+  },
+  {
+    id: 'mock-7',
+    fullName: 'กัญญา ทองดี',
+    avatarUrl: null,
+    hourlyRate: 320,
+    avgRating: 4.8,
+    reviewCount: 99,
+    skills: ['กายภาพบำบัด', 'เป็นเพื่อน/พูดคุย', 'ดูแลทั่วไป'],
+    province: 'สมุทรปราการ',
+    district: 'เมืองสมุทรปราการ',
+    gender: 'female',
+    experience: 7,
+    distance: 3.4,
+    verified: true,
+    bio: 'จบสาธารณสุข ดูแลผู้สูงอายุระยะยาวเป็นหลัก เน้นการออกกำลังกายเบาๆ และเป็นเพื่อนพูดคุย',
+  },
+  {
+    id: 'mock-8',
+    fullName: 'สุนีย์ แก้วใส',
+    avatarUrl: null,
+    hourlyRate: 150,
+    avgRating: 3.8,
+    reviewCount: 12,
+    skills: ['เป็นเพื่อน/พูดคุย'],
+    province: 'กรุงเทพมหานคร',
+    district: 'บางเขน',
+    gender: 'female',
+    experience: 2,
+    distance: 5.6,
+    verified: false,
+    bio: 'ดูแลเอาใจใส่ประหนึ่งญาติมิตร เชี่ยวชาญการเป็นเพื่อนคุยและทำกิจกรรมนันทนาการ',
+  },
+  {
+    id: 'mock-9',
+    fullName: 'ธิดา มั่นคง',
+    avatarUrl: null,
+    hourlyRate: 400,
+    avgRating: 4.6,
+    reviewCount: 73,
+    skills: ['ดูแลผู้ป่วยติดเตียง', 'กายภาพบำบัด', 'ช่วยจัดการยา', 'ดูแลทั่วไป', 'เป็นเพื่อน/พูดคุย'],
+    province: 'กรุงเทพมหานคร',
+    district: 'วังทองหลาง',
+    gender: 'female',
+    experience: 9,
+    distance: 2.1,
+    verified: true,
+    bio: 'ผู้ช่วยพยาบาลวิชาชีพ ประสบการณ์ในหอผู้ป่วยวิกฤต เชี่ยวชาญการดูแลสายยาง ให้อาหารทางสาย และทำแผลกดทับ',
+  },
+];
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
+// Matches the Patient page <Stars/>: single filled star + numeric rating + (count).
+function StarRating({ rating, count, size = 16 }: { rating: number; count?: number; size?: number }) {
   return (
-    <span className="flex items-center gap-0.5" style={{ fontSize: size }}>
-      {[1, 2, 3, 4, 5].map((s) => {
-        const filled = rating >= s;
-        const half = !filled && rating >= s - 0.5;
-        return (
-          <span key={s} className={filled ? 'text-[#FFA92C]' : half ? 'text-[#FFA92C]' : 'text-[#E0E2E5]'}>
-            {half ? '½' : '★'}
-          </span>
-        );
-      })}
+    <span className="inline-flex items-center gap-1 num" style={{ color: '#F08C00', fontWeight: 700 }}>
+      <span className="material-icons" style={{ fontSize: size, color: '#FFA92C' }}>star</span>
+      <span style={{ fontSize: Math.max(11, size - 2) }}>{rating.toFixed(1)}</span>
+      {count != null && (
+        <span style={{ color: '#8A8C8E', fontWeight: 500, fontSize: Math.max(10, size - 3) }}>({count})</span>
+      )}
     </span>
   );
 }
 
-// ── Caregiver Card ─────────────────────────────────────────────────────────────
+// ── Caregiver Card (horizontal CGRow layout, mirrors Patient_Information.html) ───
 
-function CaregiverCard({ cg }: { cg: CaregiverSummary }) {
+function CaregiverCard({ cg, onSelect }: { cg: CaregiverSummary; onSelect?: (cg: CaregiverSummary) => void }) {
   const fullName = cg.fullName;
   const hasRating = cg.avgRating != null && cg.reviewCount > 0;
   const visibleSkills = cg.skills.slice(0, 3);
   const extraSkills = cg.skills.length - 3;
+  const hasMeta = cg.gender != null || cg.experience != null;
 
   return (
     <div
-      className="group bg-white border border-[#E0E2E5] rounded-2xl p-5 flex flex-col gap-4 transition-all duration-200 hover:shadow-[0_6px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 cursor-pointer"
-      style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+      className="group bg-white rounded-2xl p-5 border border-transparent transition-all duration-200
+                 hover:border-[#E6F5ED] hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)] cursor-pointer"
+      style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.03)' }}
+      onClick={() => onSelect?.(cg)}
     >
-      {/* ── Top row: avatar + name + rate ── */}
-      <div className="flex items-start gap-3">
-        <Avatar
-          src={cg.avatarUrl ?? undefined}
-          name={fullName}
-          size={56}
-          fallbackColor="#52B69A"
-        />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-bold text-[15px] text-[#1A1A1A] leading-tight truncate"
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-[18px] items-start">
+
+        {/* ── Avatar (120px) + verified badge ── */}
+        <div className="relative flex-shrink-0 mx-auto sm:mx-0">
+          <Avatar
+            src={cg.avatarUrl ?? undefined}
+            name={fullName}
+            size={120}
+            fallbackColor="#52B69A"
+          />
+          {cg.verified && (
+            <span
+              className="absolute -bottom-0.5 -right-0.5 w-[30px] h-[30px] rounded-full bg-[#52B69A]
+                         border-2 border-white flex items-center justify-center"
+              title="ยืนยันตัวตนแล้ว"
+            >
+              <span className="material-icons text-white text-[16px]">check</span>
+            </span>
+          )}
+        </div>
+
+        {/* ── Center content ── */}
+        <div className="flex-1 min-w-0 flex flex-col gap-1 w-full">
+
+          {/* Name + inline stars */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="text-[20px] font-bold text-[#1A1A1A] leading-tight"
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
               {fullName}
-            </h3>
+            </span>
+            {hasRating ? (
+              <StarRating rating={cg.avgRating!} count={cg.reviewCount} size={16} />
+            ) : (
+              <span className="text-[11px] text-[#C6C8CB] italic">ยังไม่มีรีวิว</span>
+            )}
           </div>
 
-          {/* Rating row */}
-          {hasRating ? (
-            <div className="flex items-center gap-1.5 mt-1">
-              <StarRating rating={cg.avgRating!} size={13} />
-              <span className="text-[12px] font-bold text-[#FFA92C] num">{cg.avgRating!.toFixed(1)}</span>
-              <span className="text-[11px] text-[#8A8C8E] num">({cg.reviewCount})</span>
-            </div>
-          ) : (
-            <div className="mt-1">
-              <span className="text-[11px] text-[#C6C8CB] italic">ยังไม่มีรีวิว</span>
+          {/* Location (blue) + distance */}
+          <div className="flex items-center gap-1.5 flex-wrap text-[12px] font-bold text-[#3B82F6]">
+            <span className="material-icons text-[14px] text-[#3B82F6]">location_on</span>
+            <span>{cg.province} / {cg.district}</span>
+            {cg.distance != null && (
+              <>
+                <span className="text-[#E0E2E5]">·</span>
+                <span className="text-[#8A8C8E] font-normal num">ห่างออกไป {cg.distance} กม.</span>
+              </>
+            )}
+          </div>
+
+          {/* Gender · experience */}
+          {hasMeta && (
+            <div className="flex items-center gap-2 flex-wrap text-[12px] text-[#8A8C8E] mt-0.5">
+              {cg.gender != null && <span>เพศ: {cg.gender === 'female' ? 'หญิง' : 'ชาย'}</span>}
+              {cg.gender != null && cg.experience != null && <span className="text-[#E0E2E5]">·</span>}
+              {cg.experience != null && <span>ประสบการณ์ {cg.experience} ปี</span>}
             </div>
           )}
 
-          {/* Location */}
-          <div className="flex items-center gap-1 mt-1.5 text-[11px] text-[#8A8C8E]">
-            <span className="material-icons text-[12px] text-[#52B69A]">place</span>
-            <span>{cg.district}, {cg.province}</span>
-          </div>
+          {/* Bio (2-line clamp) */}
+          {cg.bio && (
+            <p
+              className="text-[13px] text-[#575859] my-1.5 leading-relaxed overflow-hidden"
+              style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+            >
+              {cg.bio}
+            </p>
+          )}
+
+          {/* Skill chips (teal) */}
+          {cg.skills.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 items-center mt-1">
+              {visibleSkills.map((skill) => (
+                <span
+                  key={skill}
+                  className="inline-flex items-center h-8 px-3.5 rounded-full bg-[#E6F5ED] text-[#3A9A7E] text-[12px] font-semibold"
+                >
+                  {skill}
+                </span>
+              ))}
+              {extraSkills > 0 && (
+                <span className="inline-flex items-center h-8 px-3.5 rounded-full bg-[#F0F1F3] text-[#575859] text-[12px] font-semibold">
+                  +{extraSkills} เพิ่มเติม
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Hourly rate badge */}
-        <div className="flex-shrink-0 text-right">
-          <div className="bg-[#F0FAF4] border border-[#A7D8C2] rounded-xl px-3 py-1.5 inline-block">
-            <div className="text-[15px] font-bold text-[#1B5C48] num leading-tight">฿{cg.hourlyRate.toLocaleString()}</div>
-            <div className="text-[10px] text-[#52B69A] font-semibold">/ ชั่วโมง</div>
+        {/* ── Right: rate + CTA (centered column) ── */}
+        <div className="flex-shrink-0 self-stretch sm:self-center w-full sm:w-auto
+                        flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-3 sm:gap-2 sm:text-center
+                        pt-3 sm:pt-0 border-t border-[#F0F1F3] sm:border-t-0">
+          <div className="num text-[22px] font-bold text-[#1A1A1A] leading-none">
+            ฿{cg.hourlyRate.toLocaleString()}
+            <span className="text-[13px] text-[#8A8C8E] font-medium">/ชม.</span>
           </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onSelect?.(cg); }}
+            className="h-9 px-4 bg-[#52B69A] hover:bg-[#45A085] active:bg-[#3A9A7E]
+                       text-white text-[13px] font-bold rounded-lg transition-colors duration-150 whitespace-nowrap"
+            style={{ fontFamily: "'Bai Jamjuree', sans-serif", boxShadow: '0 4px 12px rgba(82,182,154,0.2)' }}
+          >
+            เลือกผู้ดูแลนี้
+          </button>
         </div>
       </div>
-
-      {/* ── Skills ── */}
-      {cg.skills.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {visibleSkills.map((skill) => (
-            <span
-              key={skill}
-              className="px-2.5 py-0.5 bg-[#EFF6FF] text-[#1D4ED8] text-[11px] font-semibold rounded-full border border-[#BFDBFE]"
-            >
-              {skill}
-            </span>
-          ))}
-          {extraSkills > 0 && (
-            <span className="px-2.5 py-0.5 bg-[#F0F1F3] text-[#8A8C8E] text-[11px] font-semibold rounded-full">
-              +{extraSkills}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* ── CTA button ── */}
-      <button
-        type="button"
-        className="w-full py-2.5 bg-[#52B69A] hover:bg-[#469e85] active:bg-[#3A9A7E] text-white text-[13px] font-bold rounded-xl transition-colors duration-150 cursor-pointer"
-        style={{ fontFamily: "'Bai Jamjuree', sans-serif", boxShadow: '0 2px 8px rgba(82,182,154,0.25)' }}
-      >
-        เลือกผู้ดูแลนี้
-      </button>
     </div>
   );
 }
 
-// ── Skeleton Card ──────────────────────────────────────────────────────────────
+// ── Skeleton Card (matches horizontal layout) ──────────────────────────────────
 
 function CaregiverCardSkeleton() {
   return (
-    <div className="bg-white border border-[#E0E2E5] rounded-2xl p-5 flex flex-col gap-4">
-      <div className="flex items-start gap-3">
-        <Skeleton circle width={56} height={56} />
-        <div className="flex-1 flex flex-col gap-2">
-          <Skeleton height={16} width="60%" borderRadius="6px" />
+    <div className="bg-white rounded-2xl p-5" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.03)' }}>
+      <div className="flex gap-[18px] items-start">
+        <Skeleton circle width={120} height={120} />
+        <div className="flex-1 flex flex-col gap-2.5 pt-1">
+          <Skeleton height={20} width="45%" borderRadius="6px" />
+          <Skeleton height={13} width="55%" borderRadius="6px" />
           <Skeleton height={12} width="40%" borderRadius="6px" />
-          <Skeleton height={11} width="50%" borderRadius="6px" />
+          <Skeleton height={36} width="90%" borderRadius="6px" />
+          <div className="flex gap-1.5 mt-1">
+            <Skeleton width={90} height={32} borderRadius="9999px" />
+            <Skeleton width={80} height={32} borderRadius="9999px" />
+            <Skeleton width={70} height={32} borderRadius="9999px" />
+          </div>
         </div>
-        <Skeleton width={72} height={48} borderRadius="12px" />
+        <div className="flex flex-col items-center gap-2 self-center">
+          <Skeleton width={70} height={26} borderRadius="6px" />
+          <Skeleton width={96} height={36} borderRadius="8px" />
+        </div>
       </div>
-      <div className="flex gap-1.5">
-        <Skeleton width={80} height={22} borderRadius="9999px" />
-        <Skeleton width={90} height={22} borderRadius="9999px" />
-        <Skeleton width={70} height={22} borderRadius="9999px" />
-      </div>
-      <Skeleton height={38} borderRadius="12px" />
     </div>
   );
 }
@@ -491,8 +686,8 @@ function FilterSidebar({
 const SearchPage: React.FC = () => {
   const { bookingDraft } = useBooking();
 
-  // ── Entry guard: must come from booking flow ──
-  if (!bookingDraft) {
+  // ── Entry guard: must come from booking flow (skipped in mock mode) ──
+  if (!USE_MOCK && !bookingDraft) {
     return <Navigate to="/booking/new" replace />;
   }
 
@@ -568,21 +763,30 @@ function SearchPageContent() {
     limit: PAGE_LIMIT,
   }), [appliedFilters, sortBy, page]);
 
-  const { data, loading, error } = useQuery<SearchResult>(SEARCH_CAREGIVERS, {
+  const { data, loading: gqlLoading, error: gqlError } = useQuery<SearchResult>(SEARCH_CAREGIVERS, {
     variables: { input: queryInput },
     fetchPolicy: 'cache-and-network',
     notifyOnNetworkStatusChange: true,
+    skip: USE_MOCK,
   });
 
-  const caregivers = data?.searchCaregivers.data ?? [];
-  const pagination = data?.searchCaregivers.pagination;
-  const totalPages = pagination?.totalPages ?? 1;
-  const totalResults = pagination?.total ?? 0;
+  const caregivers = USE_MOCK ? MOCK_CAREGIVERS : (data?.searchCaregivers.data ?? []);
+  const pagination = USE_MOCK ? undefined : data?.searchCaregivers.pagination;
+  const totalPages = USE_MOCK ? 1 : (pagination?.totalPages ?? 1);
+  const totalResults = USE_MOCK ? MOCK_CAREGIVERS.length : (pagination?.total ?? 0);
+  const loading = USE_MOCK ? false : gqlLoading;
+  const error = USE_MOCK ? undefined : gqlError;
 
   const handleSortChange = (value: string) => {
     setSortBy(value);
     setPage(1);
   };
+
+  // Hook up to your booking flow (navigate to profile / set selected caregiver, etc.)
+  const handleSelect = useCallback((cg: CaregiverSummary) => {
+    // TODO: e.g. navigate(`/caregivers/${cg.id}`) or setSelectedCaregiver(cg)
+    console.log('selected caregiver', cg.id);
+  }, []);
 
   // Active filter count badge
   const activeFilterCount = useMemo(() => {
@@ -719,21 +923,21 @@ function SearchPageContent() {
               </div>
             )}
 
-            {/* Loading skeleton grid */}
+            {/* Loading skeleton list */}
             {loading && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="flex flex-col gap-3">
                 {Array.from({ length: PAGE_LIMIT }).map((_, i) => (
                   <CaregiverCardSkeleton key={i} />
                 ))}
               </div>
             )}
 
-            {/* Results grid */}
+            {/* Results list (vertical stack — matches Patient page) */}
             {!loading && !error && caregivers.length > 0 && (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-3">
                   {caregivers.map((cg) => (
-                    <CaregiverCard key={cg.id} cg={cg} />
+                    <CaregiverCard key={cg.id} cg={cg} onSelect={handleSelect} />
                   ))}
                 </div>
 
