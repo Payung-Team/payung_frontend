@@ -882,12 +882,12 @@ function SearchPageContent() {
                 ) : (
                   <div>
                     <h1 className="text-[22px] font-bold text-[#1A1A1A] leading-tight mb-2"
-            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-            ผู้ดูแลที่เหมาะสมกับงานของคุณ
-          </h1>
+                      style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                      ผู้ดูแลที่เหมาะสมกับงานของคุณ
+                    </h1>
                    
                   <span>
-                    <span className="font-bold text-[#1A1A1A] num">{totalResults.toLocaleString()}</span> ผลลัพธ์ที่ตรงกับประเภทงานที่คุณเลือก
+                    {totalResults.toLocaleString()} ผลลัพธ์ที่ตรงกับประเภทงานที่คุณเลือก
                   </span>
                   </div>
                 )}
