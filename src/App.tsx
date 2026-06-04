@@ -1,4 +1,5 @@
-import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
+import { Routes, Route, Outlet, Navigate, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { GET_CAREGIVER_PROFILE } from './graphql/queries';
 import PageSkeleton from './components/ui/PageSkeleton';
@@ -31,6 +32,8 @@ import RoleRoute from './components/RoleRoute';
 import GuestRoute from './components/GuestRoute';
 import MustChangePasswordGuard from './components/MustChangePasswordGuard';
 import ChangePasswordPage from './pages/auth/ChangePasswordPage';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
 import MessagePage from './pages/profile/MessagePage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 
@@ -73,15 +76,32 @@ function HomeRedirect() {
   return <Navigate to={getPostLoginRedirect({ role: userRole, mustChangePassword: mustChangePassword ?? false })} replace />;
 }
 
+function AuthEffects() {
+  const navigate = useNavigate();
+  const { passwordRecoveryPending, clearPasswordRecovery } = useAuth();
+
+  useEffect(() => {
+    if (!passwordRecoveryPending) return;
+    clearPasswordRecovery();
+    navigate('/reset-password', { replace: true });
+  }, [passwordRecoveryPending, clearPasswordRecovery, navigate]);
+
+  return null;
+}
+
 function App() {
   return (
-    <Routes>
-      {/* Auth pages — redirect to / if already logged in */}
-      <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
-      <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+    <>
+      <AuthEffects />
+      <Routes>
+        {/* Auth pages — redirect to / if already logged in */}
+        <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+        <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* Change password — session required แต่ไม่ผ่าน MustChangePasswordGuard */}
-      <Route path="/change-password" element={<ProtectedRoute><ChangePasswordPage /></ProtectedRoute>} />
+        {/* Change password — session required แต่ไม่ผ่าน MustChangePasswordGuard */}
+        <Route path="/change-password" element={<ProtectedRoute><ChangePasswordPage /></ProtectedRoute>} />
 
       {/* Protected pages — wrapped in ProtectedRoute, MustChangePasswordGuard and AppLayout */}
       <Route
@@ -247,6 +267,7 @@ function App() {
       {/* 404 - Not Found (must be last) */}
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </>
   );
 }
 

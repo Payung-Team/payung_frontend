@@ -625,3 +625,21 @@ export const ADMIN_EDIT_USER = gql`
     }
   }
 `;
+
+export const REQUEST_PASSWORD_RESET = gql`
+  mutation RequestPasswordReset($email: String!) {
+    requestPasswordReset(input: { email: $email }) {
+      success
+      message
+    }
+  }
+`;
+
+export const UPDATE_PASSWORD = gql`
+  mutation UpdatePassword($newPassword: String!) {
+    updatePassword(input: { newPassword: $newPassword }) {
+      success
+      message
+    }
+  }
+`;
