@@ -64,7 +64,7 @@
       "type": "navigation",
       "label": "งานของฉัน",
       "icon": "calendar-outline",
-      "route": "/jobs",
+      "route": "/caregiver/bookings",
       "allowedRoles": ["caregiver"]
     },
     {

@@ -22,6 +22,7 @@ import AdminLayout from './components/layout/AdminLayout';
 import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
 import CaregiverHome from './pages/caregiver/CaregiverHome';
+import CaregiverBookings from './pages/caregiver/CaregiverBookings';
 import CaregiverSettings from './pages/caregiver/CaregiverSettings';
 import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
 import BookingsPage from './pages/profile/BookingsPage';
@@ -123,6 +124,16 @@ function App() {
               <CaregiverHome />
             </RoleRoute>
           } 
+        />
+
+        {/* Caregiver Bookings */}
+        <Route
+          path="/caregiver/bookings"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverBookings />
+            </RoleRoute>
+          }
         />
 
         {/* Admin home */}
