@@ -817,10 +817,7 @@ function SearchPageContent() {
               กลับไปที่การจอง
             </button>
           </div>
-          <h1 className="text-[22px] font-bold text-[#1A1A1A] leading-tight"
-            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-            ค้นหาผู้ดูแล
-          </h1>
+          
           {(appliedFilters.province || appliedFilters.district) && (
             <p className="text-[13px] text-[#8A8C8E] mt-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
               <span className="material-icons text-[13px] text-[#52B69A] align-middle mr-0.5">place</span>
@@ -883,9 +880,16 @@ function SearchPageContent() {
                 {loading ? (
                   <Skeleton width={120} height={16} borderRadius="6px" />
                 ) : (
+                  <div>
+                    <h1 className="text-[22px] font-bold text-[#1A1A1A] leading-tight mb-2"
+            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+            ผู้ดูแลที่เหมาะสมกับงานของคุณ
+          </h1>
+                   
                   <span>
-                    พบ <span className="font-bold text-[#1A1A1A] num">{totalResults.toLocaleString()}</span> ผู้ดูแล
+                    <span className="font-bold text-[#1A1A1A] num">{totalResults.toLocaleString()}</span> ผลลัพธ์ที่ตรงกับประเภทงานที่คุณเลือก
                   </span>
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-2">
