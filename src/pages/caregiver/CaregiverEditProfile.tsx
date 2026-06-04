@@ -482,9 +482,9 @@ const CaregiverEditProfile: React.FC = () => {
                                 const newSkills = (watchedValues.skills || []).filter((s) => s !== skill);
                                 setValue('skills', newSkills);
                               }}
-                              className="text-[14px] hover:opacity-70 transition-opacity"
+                              className="text-[14px] hover:opacity-70 transition-opacity flex items-center justify-center"
                             >
-                              ×
+                              <Icon name="close" className="text-sm" />
                             </button>
                           </div>
                         ))}
