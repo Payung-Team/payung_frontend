@@ -31,7 +31,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     return '/patient-home';
   })();
   const { navItems, isLoading: menuLoading, error: menuError } = useFilteredMenu(menuName, userRole);
-  const { data: userData } = useQuery<{ me: { id: string; role: number; displayName?: string; phone?: string; address?: string; bio?: string } } | undefined>(GET_USER);
+  const { data: userData } = useQuery<{ me: { id: string; role: number; displayName?: string; phone?: string; address?: string; bio?: string; avatarUrl?: string | null } } | undefined>(GET_USER);
   
   const [isViewProfileOpen, setIsViewProfileOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -133,6 +133,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             currentRole === 2 ? (
               <CaregiverProfileDropdown
                 avatarFallbackColor="#52B69A"
+                avatarUrl={userData?.me?.avatarUrl ?? undefined}
                 displayName={caregiverData?.myCaregiverProfile?.fullName || userData?.me?.displayName || ''}
                 kycStatus={caregiverData?.myCaregiverProfile?.kycStatus}
               />
@@ -141,6 +142,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 onViewProfileClick={() => setIsViewProfileOpen(true)}
                 onEditProfileClick={() => setIsEditProfileOpen(true)}
                 avatarFallbackColor="#52B69A"
+                avatarUrl={userData?.me?.avatarUrl ?? undefined}
                 displayName={userData?.me?.displayName || ''}
               />
             )

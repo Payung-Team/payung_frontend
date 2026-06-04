@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import AuthLayout from '../../components/layout/AuthLayout';
 import AuthInput from '../../components/ui/AuthInput';
 import Alert from '../../components/ui/AlertInvalid';
+import OrDivider from '../../components/ui/OrDivider';
+import GoogleAuthButton from '../../components/ui/GoogleAuthButton';
 import { useRegister } from '../../hooks/useRegister';
 import { Icon } from '../../components/ui/Icon';
+import { supabase } from '../../lib/supabase';
 
 // Icons
 const EmailIcon = <Icon name="email" size="small" color="currentColor" />;
@@ -234,6 +237,18 @@ export default function Register() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+    if (error) {
+      setFormError('สมัครด้วย Google ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+      setErrorCount(prev => prev + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const hasValidationError = submitted && Object.keys(errors).length > 0;
   const hasErrors = hasValidationError || formError;
   const pwStrength = getPasswordStrength(password);
@@ -251,6 +266,12 @@ export default function Register() {
         <p className="mt-2 text-lg leading-[27px] text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           กรอกข้อมูลด้านล่างเพื่อเริ่มต้นใช้งาน Payung
         </p>
+
+        {/* Google Sign Up */}
+        <div className="mt-6">
+          <GoogleAuthButton label="สมัครด้วย Google" onClick={handleGoogleSignIn} disabled={isSubmitting} />
+        </div>
+        <OrDivider />
 
         {/* Global Error Banner */}
         <Alert key={errorCount} message={formError || (hasValidationError ? 'กรุณากรอกข้อมูลให้ถูกต้องและครบถ้วน' : '')} id="register-error-banner" />

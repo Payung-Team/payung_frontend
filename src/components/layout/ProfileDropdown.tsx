@@ -9,12 +9,14 @@ interface ProfileDropdownProps {
   onViewProfileClick?: () => void;
   onEditProfileClick?: () => void;
   avatarFallbackColor?: string;
+  avatarUrl?: string;
   displayName?: string;
 }
 
 export default function ProfileDropdown({
   onViewProfileClick,
   avatarFallbackColor = '#52B69A',
+  avatarUrl,
   displayName,
 }: ProfileDropdownProps) {
   const navigate = useNavigate();
@@ -23,6 +25,7 @@ export default function ProfileDropdown({
   const [isOpen, setIsOpen] = useState(false);
 
   const displayUserName = displayName || user?.email?.split('@')[0] || 'User';
+  console.log('[ProfileDropdown] avatarUrl:', avatarUrl);
 
   const handleLogout = async () => {
     const result = await logout();
@@ -44,6 +47,7 @@ export default function ProfileDropdown({
         className="flex items-center hover:opacity-80 transition-opacity hover:cursor-pointer"
       >
         <Avatar
+          src={avatarUrl}
           name={displayUserName}
           size={36}
           fallbackColor={avatarFallbackColor}
