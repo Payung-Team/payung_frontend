@@ -11,6 +11,8 @@ interface AuthContextType {
   mustChangePassword: boolean | null;
   loading: boolean;
   error: AuthError | Error | null;
+  passwordRecoveryPending: boolean;
+  clearPasswordRecovery: () => void;
   login: (credentials: SignInWithPasswordCredentials) => Promise<{ data: any; error: any }>;
   register: (credentials: SignUpWithPasswordCredentials) => Promise<{ data: any; error: any }>;
   logout: () => Promise<{ error: any }>;
@@ -33,15 +35,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<AuthError | Error | null>(null);
+  const [passwordRecoveryPending, setPasswordRecoveryPending] = useState(false);
   const initialized = useRef(false);
   const apolloClient = useApolloClient();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, currentSession: Session | null) => {
+      (event: AuthChangeEvent, currentSession: Session | null) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setPasswordRecoveryPending(true);
+        }
+
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
-        
+
         // ถ้าไม่มี session ให้ลบ role และ mustChangePassword
         if (!currentSession) {
           setUserRole(null);
@@ -131,8 +138,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('mustChangePassword', value.toString());
   };
 
+  const clearPasswordRecovery = () => setPasswordRecoveryPending(false);
+
   return (
-    <AuthContext.Provider value={{ user, session, userRole, mustChangePassword, loading, error, login, register, logout, setUserRole: handleSetUserRole, setMustChangePassword: handleSetMustChangePassword }}>
+    <AuthContext.Provider value={{ user, session, userRole, mustChangePassword, loading, error, passwordRecoveryPending, clearPasswordRecovery, login, register, logout, setUserRole: handleSetUserRole, setMustChangePassword: handleSetMustChangePassword }}>
       {children}
     </AuthContext.Provider>
   );
