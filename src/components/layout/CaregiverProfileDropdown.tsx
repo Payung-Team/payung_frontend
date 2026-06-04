@@ -8,6 +8,7 @@ import { Icon } from '../ui/Icon';
 interface CaregiverProfileDropdownProps {
   onSettingsClick?: () => void;
   avatarFallbackColor?: string;
+  avatarUrl?: string;
   displayName?: string;
   kycStatus?: string;
 }
@@ -15,6 +16,7 @@ interface CaregiverProfileDropdownProps {
 export default function CaregiverProfileDropdown({
   onSettingsClick,
   avatarFallbackColor = '#52B69A',
+  avatarUrl,
   displayName,
   kycStatus,
 }: CaregiverProfileDropdownProps) {
@@ -45,6 +47,7 @@ export default function CaregiverProfileDropdown({
         className="flex items-center hover:opacity-80 transition-opacity hover:cursor-pointer"
       >
         <Avatar
+          src={avatarUrl}
           name={displayUserName}
           size={36}
           fallbackColor={avatarFallbackColor}
