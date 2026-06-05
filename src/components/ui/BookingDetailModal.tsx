@@ -143,7 +143,13 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
                     key={i}
                     className="w-full bg-[#F9FAFB] rounded-[10px] py-2.5 px-3.5 flex flex-row items-center gap-2.5 text-left"
                   >
-                    <div className="w-4 h-4 border border-gray-300 rounded flex-shrink-0 bg-white" />
+                    {booking.status === 'completed' ? (
+                      <div className="w-4 h-4 bg-[#52B69A] border border-[#52B69A] rounded flex-shrink-0 flex items-center justify-center">
+                        <Icon name="check" color="#FFFFFF" style={{ fontSize: '12px', fontWeight: 'bold' }} />
+                      </div>
+                    ) : (
+                      <div className="w-4 h-4 border border-gray-300 rounded flex-shrink-0 bg-white" />
+                    )}
                     <span className="font-['Bai_Jamjuree'] font-medium text-[13px] leading-5 text-[#1A1A1A]">
                       {task}
                     </span>
@@ -154,28 +160,30 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
           )}
 
           {/* Bottom Event Button */}
-          <div className="w-full flex flex-col items-start mt-4">
-            <button
-              type="button"
-              disabled
-              className="w-full h-11 bg-[#52B69A]/55 text-white font-bold text-sm rounded-lg flex flex-row justify-center items-center gap-2 shadow-[0px_4px_12px_rgba(82,182,154,0.2)] cursor-not-allowed"
-            >
-              <Icon name="event" color="#FFFFFF" style={{ fontSize: '16px' }} className="mt-0.5" />
-              <span>เริ่มนำส่งการดูแลได้เฉพาะในวันทำงานจริง ({getDaysUntil(booking.bookingDate)})</span>
-            </button>
-            {booking.status === 'accepted' && (
+          {!['completed', 'cancelled', 'declined'].includes(booking.status) && (
+            <div className="w-full flex flex-col items-start mt-4">
               <button
                 type="button"
-                onClick={() => {
-                  onClose();
-                  onCancelAcceptanceClick(booking.id);
-                }}
-                className="w-full text-center mt-3 text-red-500 hover:text-red-700 text-xs font-semibold underline cursor-pointer bg-transparent border-0 p-0"
+                disabled
+                className="w-full h-11 bg-[#52B69A]/55 text-white font-bold text-sm rounded-lg flex flex-row justify-center items-center gap-2 shadow-[0px_4px_12px_rgba(82,182,154,0.2)] cursor-not-allowed"
               >
-                ยกเลิกการตอบรับ
+                <Icon name="event" color="#FFFFFF" style={{ fontSize: '16px' }} className="mt-0.5" />
+                <span>เริ่มนำส่งการดูแลได้เฉพาะในวันทำงานจริง ({getDaysUntil(booking.bookingDate)})</span>
               </button>
-            )}
-          </div>
+              {booking.status === 'accepted' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onCancelAcceptanceClick(booking.id);
+                  }}
+                  className="w-full text-center mt-3 text-red-500 hover:text-red-700 text-xs font-semibold underline cursor-pointer bg-transparent border-0 p-0"
+                >
+                  ยกเลิกการตอบรับ
+                </button>
+              )}
+            </div>
+          )}
 
         </div>
 
