@@ -137,7 +137,75 @@ const initialBookings: Booking[] = [
     tasks: ['พาเดินทางไปคลินิก', 'ดูแลระหว่างรอแพทย์', 'ช่วยบันทึกคำแนะนำแพทย์']
   },
   {
-    id: 'REF-B4',
+    id: 'REF-H1',
+    bookingDate: '2026-06-05',
+    time: '09:00 - 13:00',
+    serviceType: 'ดูแลผู้สูงอายุระยะสั้น',
+    patientName: 'ปราณี พรหมใจ',
+    price: 1520,
+    notes: 'ผู้สูงอายุมีอาการปวดข้อเข่า ต้องการการดูแลและช่วยเดิน',
+    status: 'completed',
+    createdAt: '2026-05-28T09:00:00Z',
+    relation: 'สำหรับตัวเอง',
+    condition: 'โรคข้อเข่าเสื่อม',
+    locationName: 'ลาดพร้าว, กรุงเทพมหานคร',
+    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
+    durationText: '4 ชม.',
+    tasks: ['ช่วยพยุงเดิน', 'ประคบร้อน', 'เตือนทานยา', 'เตรียมอาหาร']
+  },
+  {
+    id: 'REF-H2',
+    bookingDate: '2026-05-18',
+    time: '10:00 - 14:00',
+    serviceType: 'ดูแลผู้สูงอายุระยะสั้น',
+    patientName: 'ปราณี พรหมใจ',
+    price: 1520,
+    notes: 'ต้องการพาไปโรงพยาบาลเพื่อตรวจร่างกายประจำปี',
+    status: 'completed',
+    createdAt: '2026-05-10T11:00:00Z',
+    relation: 'สำหรับตัวเอง',
+    condition: 'โรคข้อเข่าเสื่อม',
+    locationName: 'ลาดพร้าว, กรุงเทพมหานคร',
+    serviceFormat: 'ร่วมเดินทางภายนอก',
+    durationText: '4 ชม.',
+    tasks: ['ช่วยพยุงเดิน', 'บันทึกคำแนะนำแพทย์', 'ดูแลระหว่างรอ']
+  },
+  {
+    id: 'REF-H3',
+    bookingDate: '2026-05-10',
+    time: '09:00 - 13:00',
+    serviceType: 'กายภาพบำบัด',
+    patientName: 'สมศรี วงศ์ดี',
+    price: 1520,
+    notes: 'กายภาพบำบัดฟื้นฟูหลังผ่าตัดเข่า',
+    status: 'completed',
+    createdAt: '2026-05-01T08:00:00Z',
+    relation: 'สำหรับตัวเอง',
+    condition: 'ผ่าตัดเปลี่ยนเข่าขวา',
+    locationName: 'วัฒนา, กรุงเทพมหานคร',
+    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
+    durationText: '4 ชม.',
+    tasks: ['กายภาพบำบัดเบื้องต้น', 'ช่วยพยุงเดิน', 'ประคบเย็น']
+  },
+  {
+    id: 'REF-H4',
+    bookingDate: '2026-04-12',
+    time: '09:00 - 13:00',
+    serviceType: 'กายภาพบำบัด',
+    patientName: 'สมศรี วงศ์ดี',
+    price: 1520,
+    notes: 'กายภาพบำบัดครั้งแรกหลังผ่าตัด',
+    status: 'completed',
+    createdAt: '2026-04-05T09:00:00Z',
+    relation: 'สำหรับตัวเอง',
+    condition: 'ผ่าตัดเปลี่ยนเข่าขวา',
+    locationName: 'วัฒนา, กรุงเทพมหานคร',
+    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
+    durationText: '4 ชม.',
+    tasks: ['กายภาพบำบัดเบื้องต้น', 'ช่วยพยุงเดิน', 'ประคบเย็น', 'นวดผ่อนคลายกล้ามเนื้อ']
+  },
+  {
+    id: 'REF-H5',
     bookingDate: '2026-05-20',
     time: '09:00 - 17:00',
     serviceType: 'ดูแลผู้สูงอายุประจำวัน',
@@ -154,7 +222,7 @@ const initialBookings: Booking[] = [
     tasks: ['ป้อนข้าวเที่ยง', 'พาเดินออกกำลังกาย', 'เตือนกินยา']
   },
   {
-    id: 'REF-B5',
+    id: 'REF-H6',
     bookingDate: '2026-05-18',
     time: '10:00 - 12:00',
     serviceType: 'ร่วมเดินทางภายนอก',
@@ -170,6 +238,23 @@ const initialBookings: Booking[] = [
     serviceFormat: 'ร่วมเดินทางภายนอก',
     durationText: '2 ชม.',
     tasks: ['ช่วยพยุงช้อปปิ้ง', 'ช่วยสังเกตอาการภายนอก']
+  },
+  {
+    id: 'REF-H7',
+    bookingDate: '2026-05-15',
+    time: '13:00 - 16:00',
+    serviceType: 'ดูแลผู้สูงอายุระยะสั้น',
+    patientName: 'สมใจ รักสงบ',
+    price: 1140,
+    notes: 'ผู้ป่วยยกเลิกเนื่องจากติดธุระด่วนกับครอบครัว',
+    status: 'cancelled',
+    createdAt: '2026-05-12T10:00:00Z',
+    relation: 'สำหรับตัวเอง',
+    condition: 'ผ่าตัดสะโพกขวา',
+    locationName: 'ปทุมวัน, กรุงเทพมหานคร',
+    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
+    durationText: '3 ชม.',
+    tasks: ['ช่วยพยุงเดิน', 'เตรียมน้ำดื่มและยา']
   }
 ];
 
@@ -186,6 +271,10 @@ export const CaregiverBookings: React.FC = () => {
 
   // Cancel Acceptance Modal state
   const [cancelAcceptanceModalId, setCancelAcceptanceModalId] = useState<string | null>(null);
+
+  // History tab filter state
+  const [historySubFilter, setHistorySubFilter] = useState<'all' | 'completed' | 'cancelled' | 'declined'>('all');
+  const [historySortBy, setHistorySortBy] = useState<string>('newest');
 
   // Detail Modal state
   const [detailModalBooking, setDetailModalBooking] = useState<Booking | null>(null);
@@ -298,11 +387,14 @@ export const CaregiverBookings: React.FC = () => {
         list = bookings.filter(b => b.status === 'accepted');
       }
     } else {
-      list = bookings;
+      // History: completed, cancelled, declined only
+      list = bookings.filter(b => ['completed', 'cancelled', 'declined'].includes(b.status));
+      if (historySubFilter !== 'all') {
+        list = list.filter(b => b.status === historySubFilter);
+      }
     }
 
     if (activeTab === 'scheduled') {
-      // เรียงลำดับจากวันที่ booking ที่ใกล้สุดก่อน
       return [...list].sort((a, b) => {
         const diffA = Math.abs(new Date(a.bookingDate).getTime() - new Date().getTime());
         const diffB = Math.abs(new Date(b.bookingDate).getTime() - new Date().getTime());
@@ -310,7 +402,14 @@ export const CaregiverBookings: React.FC = () => {
       });
     }
 
-    // แท็บอื่นๆ (เช่น งานที่ต้องดำเนินการ, ประวัติงาน) เรียงลำดับจากสร้างล่าสุดไปเก่าสุด
+    if (activeTab === 'history') {
+      return [...list].sort((a, b) => {
+        const aTime = new Date(a.bookingDate).getTime();
+        const bTime = new Date(b.bookingDate).getTime();
+        return historySortBy === 'oldest' ? aTime - bTime : bTime - aTime;
+      });
+    }
+
     return [...list].sort((a, b) => {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
@@ -322,7 +421,7 @@ export const CaregiverBookings: React.FC = () => {
   const pendingCount = bookings.filter(b => b.status === 'pending' || b.status === 'accepted').length;
   const newRequestsCount = bookings.filter(b => b.status === 'pending').length;
   const waitingConfirmCount = bookings.filter(b => b.status === 'accepted').length;
-  const totalCount = bookings.length;
+  const historyCount = bookings.filter(b => ['completed', 'cancelled', 'declined'].includes(b.status)).length;
 
   // Style helper based on status badge
   const getStatusBadgeStyle = (status: Booking['status']) => {
@@ -357,9 +456,9 @@ export const CaregiverBookings: React.FC = () => {
         };
       case 'completed':
         return {
-          bg: 'bg-[#EFF6FF]',
-          dot: 'bg-[#3B82F6]',
-          text: 'text-[#1D4ED8]',
+          bg: 'bg-[#E6F5ED]',
+          dot: 'bg-[#52B69A]',
+          text: 'text-[#3A9A7E]',
           label: 'เสร็จสิ้น'
         };
       case 'cancelled':
@@ -402,10 +501,10 @@ export const CaregiverBookings: React.FC = () => {
           icon: 'history',
           iconColor: 'text-[#575859]',
           title: 'ประวัติงาน',
-          subtitle: 'ประวัติการรับงานทั้งหมดของผู้ดูแล',
+          subtitle: 'ประวัติการดูแลคนไข้เสร็จสิ้น การยกเลิก และปฏิเสธงาน',
           badgeBg: 'bg-[#F0F1F3]',
           badgeText: 'text-[#575859]',
-          countText: `${totalCount} งาน`
+          countText: `${historyCount} งาน`
         };
     }
   };
@@ -522,7 +621,7 @@ export const CaregiverBookings: React.FC = () => {
                           : 'bg-[#F0F1F3] text-[#575859]'
                         }`}
                     >
-                      {totalCount}
+                      {historyCount}
                     </span>
                   </button>
 
@@ -561,6 +660,51 @@ export const CaregiverBookings: React.FC = () => {
 
                 {/* Box Body List */}
                 <div className="w-full flex flex-col items-start p-6 gap-4 bg-[#FDFDFD] self-stretch min-h-[150px]">
+
+                  {/* History Sub-filters */}
+                  {activeTab === 'history' && (
+                    <div className="w-full pb-2 flex flex-row items-center justify-between gap-2 self-stretch">
+                      {/* Filter chips */}
+                      <div className="flex flex-row items-center gap-2">
+                        {(
+                          [
+                            { key: 'all', label: 'ทั้งหมด' },
+                            { key: 'completed', label: 'เสร็จสิ้น' },
+                            { key: 'cancelled', label: 'ยกเลิกแล้ว' },
+                            { key: 'declined', label: 'ปฏิเสธแล้ว' },
+                          ] as const
+                        ).map(({ key, label }) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setHistorySubFilter(key)}
+                            className={`h-8 px-3.5 flex flex-row items-center justify-center rounded-full text-xs font-semibold cursor-pointer transition-all duration-200 ${
+                              historySubFilter === key
+                                ? 'bg-[#52B69A] text-white shadow-sm'
+                                : 'bg-[#E6F5ED] text-[#3A9A7E] hover:bg-[#d5ecd1]'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Sort dropdown */}
+                      <div className="w-[140px] flex-shrink-0 relative">
+                        <select
+                          value={historySortBy}
+                          onChange={e => setHistorySortBy(e.target.value)}
+                          className="box-border h-9 w-full bg-white border-[0.8px] border-[#E0E2E5] rounded-lg text-xs text-[#575859] pl-3 pr-7 font-['Bai_Jamjuree'] cursor-pointer focus:outline-none appearance-none"
+                        >
+                          <option value="newest">ล่าสุดก่อน</option>
+                          <option value="oldest">เก่าสุดก่อน</option>
+                        </select>
+                        <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#AAB2BA] flex items-center">
+                          <span className="material-icons text-[20px]">expand_more</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Action Required Sub-filters (Chips) */}
                   {activeTab === 'action_required' && (
@@ -671,9 +815,11 @@ export const CaregiverBookings: React.FC = () => {
 
       <CancelAcceptanceModal
         isOpen={!!cancelAcceptanceModalId}
-        bookingId={cancelAcceptanceModalId}
+        booking={bookings.find(b => b.id === cancelAcceptanceModalId) || null}
         onClose={() => setCancelAcceptanceModalId(null)}
         onSubmit={(reason) => {
+          if (!cancelAcceptanceModalId) return;
+          const targetBooking = bookings.find(b => b.id === cancelAcceptanceModalId);
           setBookings(prev =>
             prev.map(b =>
               b.id === cancelAcceptanceModalId
@@ -682,7 +828,17 @@ export const CaregiverBookings: React.FC = () => {
             )
           );
           setCancelAcceptanceModalId(null);
-          showSuccess('ยกเลิกการตอบรับงานเรียบร้อยแล้ว');
+          
+          if (targetBooking) {
+            const msg = (
+              <>
+                ยกเลิกการตอบรับงานของ <strong className="font-bold">{targetBooking.patientName}</strong> แล้ว
+              </>
+            );
+            showSuccess(msg, 4000, 'cancel-toast');
+          } else {
+            showSuccess('ยกเลิกการตอบรับงานเรียบร้อยแล้ว');
+          }
         }}
       />
 
