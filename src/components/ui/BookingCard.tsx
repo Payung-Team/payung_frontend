@@ -49,7 +49,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
             </span>
           </div>
 
-          {/* Right-side status detail (Days countdown or received time text) */}
+          {/* Right-side status detail */}
           {booking.status === 'pending' ? (
             <span className="font-['Inter'] font-normal text-[11px] leading-4 text-[#8A8C8E]">
               {booking.receivedTimeText || 'ได้รับเมื่อ 1 ชม. ที่แล้ว'}
@@ -58,14 +58,16 @@ export const BookingCard: React.FC<BookingCardProps> = ({
             <span className="font-['Inter'] font-normal text-[11px] leading-4 text-[#8A8C8E]">
               {getAcceptedTimeText(booking)}
             </span>
+          ) : booking.status === 'confirmed' ? (
+            <div className="px-2 h-[20.5px] bg-[#EFF6FF] rounded flex items-center justify-center">
+              <span className="font-['Inter'] font-semibold text-[11px] leading-4 text-[#1D4ED8]">
+                {getDaysUntil(booking.bookingDate)}
+              </span>
+            </div>
           ) : (
-            booking.status === 'confirmed' && (
-              <div className="px-2 h-[20.5px] bg-[#EFF6FF] rounded flex items-center justify-center">
-                <span className="font-['Inter'] font-semibold text-[11px] leading-4 text-[#1D4ED8]">
-                  {getDaysUntil(booking.bookingDate)}
-                </span>
-              </div>
-            )
+            <span className="font-['Inter'] font-normal text-[11px] leading-4 text-[#8A8C8E]">
+              {formatThaiDate(booking.bookingDate)}
+            </span>
           )}
 
         </div>
