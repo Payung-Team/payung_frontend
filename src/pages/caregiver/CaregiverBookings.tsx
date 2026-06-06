@@ -514,19 +514,19 @@ export const CaregiverBookings: React.FC = () => {
   return (
     <>
       <div
-        className="min-h-screen bg-[#F6FAF9] text-[#1A1A1A] antialiased w-full max-w-[1534.4px] min-h-[564.4px] mx-auto flex flex-col items-center p-0"
+        className="min-h-screen bg-[#F6FAF9] text-[#1A1A1A] antialiased w-full max-w-[1534.4px] mx-auto flex flex-col items-center p-0"
         style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
       >
-        <div className="w-full max-w-[1100px] flex flex-col items-start px-5 pt-6 pb-[100px]">
+        <div className="w-full max-w-[1100px] flex flex-col items-start px-4 sm:px-5 pt-4 sm:pt-6 pb-[100px]">
 
           {/* Header section */}
-          <div className="w-full max-w-[1060px] self-stretch flex flex-row justify-between items-center p-0 h-[60px] mb-6">
-            <div className="flex flex-col items-start p-0 w-[365.49px] h-[60px]">
-              <div className="flex flex-col items-start p-0 self-stretch h-9">
-                <h1 className="font-bold text-2xl text-[#1A1A1A] leading-9 h-9">งานของฉัน</h1>
+          <div className="w-full max-w-[1060px] self-stretch flex flex-row justify-between items-center p-0 h-auto mb-6">
+            <div className="flex flex-col items-start p-0 w-auto max-w-full h-auto">
+              <div className="flex flex-col items-start p-0 self-stretch h-auto">
+                <h1 className="font-bold text-2xl text-[#1A1A1A] leading-9">งานของฉัน</h1>
               </div>
-              <div className="pt-1 self-stretch h-6 flex flex-col items-start">
-                <p className="font-normal text-[13px] text-[#8A8C8E] leading-5 h-5">
+              <div className="pt-1 self-stretch h-auto flex flex-col items-start">
+                <p className="font-normal text-[13px] text-[#8A8C8E] leading-5">
                   จัดการนัดหมาย ตอบรับคำขอจอง และดูประวัติการดูแลผู้ป่วย
                 </p>
               </div>
@@ -548,7 +548,7 @@ export const CaregiverBookings: React.FC = () => {
                       setActiveTab('scheduled');
                       setExpandedCardId(null);
                     }}
-                    className={`flex flex-row justify-center items-center py-3 px-4 gap-2 h-[45px] flex-1 rounded-lg font-semibold text-sm transition-all duration-200 cursor-pointer ${activeTab === 'scheduled'
+                    className={`flex flex-row justify-center items-center py-2.5 px-2 sm:py-3 sm:px-4 gap-1.5 h-[38px] sm:h-[45px] flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-200 cursor-pointer ${activeTab === 'scheduled'
                         ? 'bg-[#52B69A] shadow-[0px_4px_12px_rgba(82,182,154,0.25)] text-white'
                         : 'text-[#575859] hover:bg-gray-50'
                       }`}
@@ -558,9 +558,9 @@ export const CaregiverBookings: React.FC = () => {
                       className="text-[18px] flex-shrink-0"
                       color={activeTab === 'scheduled' ? '#FFFFFF' : '#575859'}
                     />
-                    <span>งานในกำหนดเวลา</span>
+                    <span className="hidden sm:inline">งานในกำหนดเวลา</span>
                     <span
-                      className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold font-['Inter'] min-w-[20.75px] h-[20.5px] flex items-center justify-center ${activeTab === 'scheduled'
+                      className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold font-['Inter'] min-w-[20px] h-[20px] flex items-center justify-center ${activeTab === 'scheduled'
                           ? 'bg-white/20 text-white'
                           : 'bg-[#E6F5ED] text-[#1B5C48]'
                         }`}
@@ -576,7 +576,7 @@ export const CaregiverBookings: React.FC = () => {
                       setActiveTab('action_required');
                       setExpandedCardId(null);
                     }}
-                    className={`flex flex-row justify-center items-center py-3 px-4 gap-2 h-[45px] flex-1 rounded-lg font-semibold text-sm transition-all duration-200 cursor-pointer ${activeTab === 'action_required'
+                    className={`flex flex-row justify-center items-center py-2.5 px-2 sm:py-3 sm:px-4 gap-1.5 h-[38px] sm:h-[45px] flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-200 cursor-pointer ${activeTab === 'action_required'
                         ? 'bg-[#52B69A] shadow-[0px_4px_12px_rgba(82,182,154,0.25)] text-white'
                         : 'text-[#575859] hover:bg-gray-50'
                       }`}
@@ -586,9 +586,9 @@ export const CaregiverBookings: React.FC = () => {
                       className="text-[18px] flex-shrink-0"
                       color={activeTab === 'action_required' ? '#FFFFFF' : '#575859'}
                     />
-                    <span>งานที่ต้องดำเนินการ</span>
+                    <span className="hidden sm:inline">งานที่ต้องดำเนินการ</span>
                     <span
-                      className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold font-['Inter'] min-w-[23.11px] h-[20.5px] flex items-center justify-center ${activeTab === 'action_required'
+                      className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold font-['Inter'] min-w-[20px] h-[20px] flex items-center justify-center ${activeTab === 'action_required'
                           ? 'bg-white/20 text-white'
                           : 'bg-[#FEF2F2] text-[#DC2626]'
                         }`}
@@ -604,7 +604,7 @@ export const CaregiverBookings: React.FC = () => {
                       setActiveTab('history');
                       setExpandedCardId(null);
                     }}
-                    className={`flex flex-row justify-center items-center py-3 px-4 gap-2 h-[45px] flex-1 rounded-lg font-semibold text-sm transition-all duration-200 cursor-pointer ${activeTab === 'history'
+                    className={`flex flex-row justify-center items-center py-2.5 px-2 sm:py-3 sm:px-4 gap-1.5 h-[38px] sm:h-[45px] flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-200 cursor-pointer ${activeTab === 'history'
                         ? 'bg-[#52B69A] shadow-[0px_4px_12px_rgba(82,182,154,0.25)] text-white'
                         : 'text-[#575859] hover:bg-gray-50'
                       }`}
@@ -614,9 +614,9 @@ export const CaregiverBookings: React.FC = () => {
                       className="text-[18px] flex-shrink-0"
                       color={activeTab === 'history' ? '#FFFFFF' : '#575859'}
                     />
-                    <span>ประวัติงาน</span>
+                    <span className="hidden sm:inline">ประวัติงาน</span>
                     <span
-                      className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold font-['Inter'] min-w-[23.45px] h-[20.5px] flex items-center justify-center ${activeTab === 'history'
+                      className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold font-['Inter'] min-w-[20px] h-[20px] flex items-center justify-center ${activeTab === 'history'
                           ? 'bg-white/20 text-white'
                           : 'bg-[#F0F1F3] text-[#575859]'
                         }`}
@@ -632,24 +632,24 @@ export const CaregiverBookings: React.FC = () => {
               <div className="box-border w-full max-w-[1060px] bg-white border-[0.8px] border-[#E5E7EB] shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.05)] rounded-[20px] flex flex-col items-start p-0 self-stretch overflow-hidden">
 
                 {/* Box Header */}
-                <div className="box-border w-full flex flex-row justify-between items-center px-6 py-[18px] bg-white border-b border-[#F0F1F3] self-stretch">
-                  <div className="flex flex-row items-center gap-3 w-auto h-[41px]">
+                <div className="box-border w-full flex flex-row justify-between items-center px-4 sm:px-6 py-[18px] bg-white border-b border-[#F0F1F3] self-stretch">
+                  <div className="flex flex-row items-center gap-3 w-auto h-auto">
                     <Icon
                       name={headerDetails.icon}
-                      className={`text-[22px] ${headerDetails.iconColor}`}
+                      className={`text-[22px] flex-shrink-0 ${headerDetails.iconColor}`}
                     />
-                    <div className="flex flex-col items-start p-0 w-auto h-[41px]">
-                      <span className="font-bold text-base leading-[22px] text-[#1A1A1A] h-[23px]">
+                    <div className="flex flex-col items-start p-0 w-auto h-auto">
+                      <span className="font-bold text-base leading-[22px] text-[#1A1A1A]">
                         {headerDetails.title}
                       </span>
-                      <span className="font-normal text-xs leading-[18px] text-[#8A8C8E] h-[18px]">
+                      <span className="font-normal text-xs leading-[18px] text-[#8A8C8E]">
                         {headerDetails.subtitle}
                       </span>
                     </div>
                   </div>
 
-                  <div className={`h-[22px] px-2.5 ${headerDetails.badgeBg} rounded-full flex flex-row items-center justify-center gap-1.5`}>
-                    <span className={`font-bold text-xs leading-[18px] ${headerDetails.badgeText}`}>
+                  <div className={`h-auto min-h-[22px] px-2.5 py-0.5 flex-shrink-0 ${headerDetails.badgeBg} rounded-full flex flex-row items-center justify-center gap-1.5`}>
+                    <span className={`font-bold text-xs leading-[18px] whitespace-nowrap ${headerDetails.badgeText}`}>
                       {headerDetails.countText}
                     </span>
                     {activeTab === 'action_required' && (
@@ -663,9 +663,9 @@ export const CaregiverBookings: React.FC = () => {
 
                   {/* History Sub-filters */}
                   {activeTab === 'history' && (
-                    <div className="w-full pb-2 flex flex-row items-center justify-between gap-2 self-stretch">
+                    <div className="w-full pb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 self-stretch">
                       {/* Filter chips */}
-                      <div className="flex flex-row items-center gap-2">
+                      <div className="flex flex-row flex-wrap items-center gap-2">
                         {(
                           [
                             { key: 'all', label: 'ทั้งหมด' },
@@ -690,7 +690,7 @@ export const CaregiverBookings: React.FC = () => {
                       </div>
 
                       {/* Sort dropdown */}
-                      <div className="w-[140px] flex-shrink-0 relative">
+                      <div className="w-full sm:w-[140px] flex-shrink-0 relative">
                         <select
                           value={historySortBy}
                           onChange={e => setHistorySortBy(e.target.value)}
@@ -708,7 +708,7 @@ export const CaregiverBookings: React.FC = () => {
 
                   {/* Action Required Sub-filters (Chips) */}
                   {activeTab === 'action_required' && (
-                    <div className="w-full pb-2 flex flex-row items-center gap-2 self-stretch">
+                    <div className="w-full pb-2 flex flex-row flex-wrap items-center gap-2 self-stretch">
                       <button
                         type="button"
                         onClick={() => setActionSubFilter('all')}

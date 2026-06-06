@@ -77,13 +77,13 @@ export const BookingCard: React.FC<BookingCardProps> = ({
 
           {/* Details Info Column */}
           <div className="flex flex-col items-start p-0 grow shrink-0 basis-auto w-full md:w-auto">
-            <div className="flex flex-col items-start p-0 w-full h-[27px]">
-              <h3 className="font-['Inter'] font-extrabold text-base md:text-lg leading-7 tracking-[0.5px] text-[#1A1A1A] h-[27px] truncate max-w-full">
+            <div className="flex flex-col items-start p-0 w-full h-auto">
+              <h3 className="font-['Inter'] font-extrabold text-base md:text-lg leading-7 tracking-[0.5px] text-[#1A1A1A] truncate max-w-full">
                 {booking.id} <span className="font-sans font-bold text-sm text-gray-500">· {booking.serviceType}</span>
               </h3>
             </div>
 
-            <div className="pt-1.5 w-full flex flex-col items-start h-6">
+            <div className="pt-1.5 w-full flex flex-col items-start h-auto">
               <div className="w-full flex flex-row items-center flex-wrap gap-x-3 gap-y-1 text-xs text-[#575859] h-auto">
 
                 {/* Patient Name */}
@@ -286,20 +286,20 @@ export const BookingCard: React.FC<BookingCardProps> = ({
             </div>
 
             {/* Container 3: Footer Actions */}
-            <div className="box-border w-full flex flex-row justify-end items-center px-4 py-3 gap-2 bg-white self-stretch h-[60px]">
+            <div className="box-border w-full flex flex-col sm:flex-row justify-end items-stretch sm:items-center px-4 py-3 gap-2 bg-white self-stretch">
               {booking.status === 'pending' ? (
                 <>
                   <button
                     type="button"
                     onClick={() => onDeclineClick(booking.id)}
-                    className="px-4 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold cursor-pointer transition-colors duration-200"
+                    className="w-full sm:w-auto px-4 py-2 sm:py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold cursor-pointer transition-colors duration-200"
                   >
                     ปฏิเสธการจอง
                   </button>
                   <button
                     type="button"
                     onClick={() => onAccept(booking.id)}
-                    className="px-4 py-1.5 bg-[#009265] hover:bg-[#087C58] text-white rounded-lg text-xs font-semibold cursor-pointer shadow-sm transition-colors duration-200"
+                    className="w-full sm:w-auto px-4 py-2 sm:py-1.5 bg-[#009265] hover:bg-[#087C58] text-white rounded-lg text-xs font-semibold cursor-pointer shadow-sm transition-colors duration-200"
                   >
                     ตอบรับการจอง
                   </button>

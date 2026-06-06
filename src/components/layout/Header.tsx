@@ -12,6 +12,7 @@ interface HeaderProps {
   readonly isLoading?: boolean;
   readonly currentUserId?: string;
   readonly homeRoute?: string;
+  readonly showSearchBar?: boolean;
 }
 
 export default function Header({
@@ -20,6 +21,7 @@ export default function Header({
   isLoading = false,
   currentUserId,
   homeRoute = '/',
+  showSearchBar = true,
 }: HeaderProps) {
   const location = useLocation();
 
@@ -72,25 +74,27 @@ export default function Header({
         )}
 
         {/* Search Bar */}
-        <div className="hidden md:flex flex-1 justify-center max-w-[600px] mx-auto">
-          <div className="relative w-full h-[36px] bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg flex items-center pl-4 pr-1.5">
-            <Icon name="search" size="small" className="text-[#717182] flex-shrink-0" />
-            <input 
-              type="text" 
-              placeholder="ค้นหา" 
-              className="flex-1 bg-transparent border-none outline-none ml-2 text-[14px] text-[#717182] placeholder:text-[#717182]"
-              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-            />
-            <button className="flex items-center justify-center h-[20px] px-2.5 bg-[#52B69A] border border-black/10 rounded overflow-hidden hover:bg-[#45a086] transition-colors flex-shrink-0 cursor-pointer">
-              <span 
-                className="text-[14px] leading-tight text-[#E8EBEF]"
+        {showSearchBar && (
+          <div className="hidden md:flex flex-1 justify-center max-w-150 mx-auto">
+            <div className="relative w-full h-[36px] bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg flex items-center pl-4 pr-1.5">
+              <Icon name="search" size="small" className="text-[#717182] flex-shrink-0" />
+              <input
+                type="text"
+                placeholder="ค้นหา"
+                className="flex-1 bg-transparent border-none outline-none ml-2 text-[14px] text-[#717182] placeholder:text-[#717182]"
                 style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-              >
-                ค้นหา
-              </span>
-            </button>
+              />
+              <button className="flex items-center justify-center h-[20px] px-2.5 bg-[#52B69A] border border-black/10 rounded overflow-hidden hover:bg-[#45a086] transition-colors flex-shrink-0 cursor-pointer">
+                <span
+                  className="text-[14px] leading-tight text-[#E8EBEF]"
+                  style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+                >
+                  ค้นหา
+                </span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Right Section - Notifications & Profile */}
         {(profileDropdown || isLoading) && (
