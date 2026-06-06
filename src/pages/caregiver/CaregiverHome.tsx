@@ -261,7 +261,7 @@ interface QuickActionsProps {
 function QuickActionsGrid({ unreadCount, kycStatus }: QuickActionsProps) {
   return (
     <div className="grid grid-cols-2 gap-3">
-      <Link to="/jobs" className={`${cardBase} no-underline text-[#1A1A1A]`}>
+      <Link to="/caregiver/bookings" className={`${cardBase} no-underline text-[#1A1A1A]`}>
         <div className="w-10 h-10 rounded-xl bg-[#F0F4FF] text-[#3B5BDB] flex items-center justify-center relative">
           <Icon name="work" size="large" color="currentColor" />
           <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">

@@ -40,7 +40,7 @@
       "type": "navigation",
       "label": "ค้นหาผู้ดูแล",
       "icon": "person-outline",
-      "route": "/search",
+      "route": "/booking/new",
       "allowedRoles": ["patient"]
     },
     {
@@ -64,7 +64,7 @@
       "type": "navigation",
       "label": "งานของฉัน",
       "icon": "calendar-outline",
-      "route": "/jobs",
+      "route": "/caregiver/bookings",
       "allowedRoles": ["caregiver"]
     },
     {

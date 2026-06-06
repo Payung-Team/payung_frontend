@@ -22,9 +22,11 @@ import AdminLayout from './components/layout/AdminLayout';
 import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
 import CaregiverHome from './pages/caregiver/CaregiverHome';
+import CaregiverBookings from './pages/caregiver/CaregiverBookings';
 import CaregiverSettings from './pages/caregiver/CaregiverSettings';
 import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
 import BookingsPage from './pages/profile/BookingsPage';
+import BookingRequestPage from './pages/booking/BookingRequestPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
 import GuestRoute from './components/GuestRoute';
@@ -52,20 +54,15 @@ function KycFormGuard({ children }: { children: React.ReactNode }) {
 
 function CaregiverAvailabilityGuard() {
   const { data, loading } = useQuery<{
-    myCaregiverProfile?: { kycStatus: string; isSearchable: boolean };
+    myCaregiverProfile?: { kycStatus: string };
   }>(GET_CAREGIVER_PROFILE);
 
   if (loading) return <PageSkeleton />;
 
   const status = data?.myCaregiverProfile?.kycStatus;
-  const isSearchable = data?.myCaregiverProfile?.isSearchable;
 
   if (status !== 'verified') {
     return <Navigate to="/kyc" replace />;
-  }
-
-  if (!isSearchable) {
-    return <Navigate to="/caregiver-home" replace />;
   }
 
   return <CaregiverSettings />;
@@ -109,6 +106,16 @@ function App() {
           } 
         />
 
+        {/* Booking Request */}
+        <Route
+          path="/booking/new"
+          element={
+            <RoleRoute requiredRole={1}>
+              <BookingRequestPage />
+            </RoleRoute>
+          }
+        />
+
         {/* Caregiver home */}
         <Route 
           path="/caregiver-home" 
@@ -117,6 +124,16 @@ function App() {
               <CaregiverHome />
             </RoleRoute>
           } 
+        />
+
+        {/* Caregiver Bookings */}
+        <Route
+          path="/caregiver/bookings"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverBookings />
+            </RoleRoute>
+          }
         />
 
         {/* Admin home */}
@@ -160,7 +177,7 @@ function App() {
           path="/caregiver/settings/job-reception"
           element={
             <RoleRoute requiredRole={2}>
-              <CaregiverSettings />
+              <CaregiverAvailabilityGuard />
             </RoleRoute>
           }
         />
@@ -188,16 +205,6 @@ function App() {
           element={
             <RoleRoute requiredRole={2}>
               <CaregiverSettings />
-            </RoleRoute>
-          }
-        />
-
-        {/* Caregiver availability */}
-        <Route
-          path="/caregiver/availability"
-          element={
-            <RoleRoute requiredRole={2}>
-              <CaregiverAvailabilityGuard />
             </RoleRoute>
           }
         />
