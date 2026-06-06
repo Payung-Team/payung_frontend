@@ -238,7 +238,7 @@ const CaregiverEditProfile: React.FC = () => {
         <div className="bg-white border-b border-gray-200 px-8 py-4">
           <Skeleton width="200px" height="32px" />
         </div>
-        <div className="flex-1 flex overflow-hidden px-8 py-7">
+        <div className="flex-1 flex overflow-hidden px-4 sm:px-8 py-7">
           <div className="flex-1 max-w-[700px] space-y-6">
             <Skeleton width="100%" height="200px" />
             <Skeleton width="100%" height="300px" />
@@ -274,34 +274,35 @@ const CaregiverEditProfile: React.FC = () => {
 
       {/* ═══ Sub Header ═══ */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-full px-8 py-4 flex items-center justify-between">
-          <h1 className="text-[24px] font-semibold text-[#0A0A0A]">โปรไฟล์ของฉัน</h1>
-          <div className="flex items-center gap-3">
+        <div className="max-w-full px-4 sm:px-8 py-4 flex items-center justify-between gap-2">
+          <h1 className="text-[18px] sm:text-[24px] font-semibold text-[#0A0A0A]">โปรไฟล์ของฉัน</h1>
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               onClick={handleCancel}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-[14px] font-medium text-[#0A0A0A] hover:bg-gray-50 transition-colors"
+              className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg text-[13px] sm:text-[14px] font-medium text-[#0A0A0A] hover:bg-gray-50 transition-colors"
             >
               ยกเลิก
             </button>
             <button
               onClick={handleSubmit(onSubmit)}
               disabled={!isDirty || updateLoading}
-              className={`px-4 py-2 rounded-lg text-[14px] font-medium text-white transition-colors ${
+              className={`px-3 sm:px-4 py-2 rounded-lg text-[13px] sm:text-[14px] font-medium text-white transition-colors ${
                 isDirty && !updateLoading
                   ? 'bg-[#52B69A] hover:bg-[#409E82]'
                   : 'bg-gray-400 cursor-not-allowed'
               }`}
             >
-              {updateLoading ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง'}
+              <span className="hidden sm:inline">{updateLoading ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง'}</span>
+              <span className="sm:hidden">{updateLoading ? 'บันทึก...' : 'บันทึก'}</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* ═══ Main Content ═══ */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* ═══ Center Edit Form ═══ */}
-        <div className="flex-1 overflow-y-auto bg-[#F6FAF9] px-8 py-7 flex justify-center">
+        <div className="flex-1 overflow-y-auto bg-[#F6FAF9] px-4 sm:px-6 lg:px-8 py-6 lg:py-7 flex justify-center">
           <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-[700px] space-y-6">
             {/* Personal Info Card - Read Only */}
             <div className="bg-white rounded-xl border border-[rgba(0,0,0,0.1)] p-6">
@@ -353,15 +354,15 @@ const CaregiverEditProfile: React.FC = () => {
                         </span>
                       </Tooltip>
                     </label>
-                    <div className="flex items-center gap-3 px-3 py-2 bg-[#F3F3F5] rounded-lg border border-gray-300">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-[#F3F3F5] rounded-lg border border-gray-300 overflow-hidden">
                       <input
                         id="email"
                         type="email"
                         value={user?.email || ''}
                         readOnly
-                        className="flex-1 bg-transparent text-[14px] text-[rgba(0,0,0,0.5)] outline-none"
+                        className="flex-1 min-w-0 bg-transparent text-[14px] text-[rgba(0,0,0,0.5)] outline-none"
                       />
-                      <Icon name="lock" size="small" color="currentColor" />
+                      <Icon name="lock" size="small" color="currentColor" className="shrink-0" />
                     </div>
                   </div>
                 </div>
@@ -562,7 +563,7 @@ const CaregiverEditProfile: React.FC = () => {
         </div>
 
         {/* ═══ Right Profile Preview ═══ */}
-        <div className="w-[500px] overflow-y-auto border-l border-gray-200">
+        <div className="hidden lg:block w-105 xl:w-125 shrink-0 overflow-y-auto border-l border-gray-200">
           <div className="p-6">
             {/* Preview Header */}
             <div className="flex items-center gap-2 mb-6">

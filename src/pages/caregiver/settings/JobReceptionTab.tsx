@@ -5,6 +5,7 @@ import { GET_CAREGIVER_PROFILE, SET_CAREGIVER_SEARCHABLE } from '../../../graphq
 import { Icon } from '../../../components/ui/Icon';
 import { useToast } from '../../../hooks/useToast';
 import { ToastContainer } from '../../../components/ui/Toast';
+import { ToggleSwitch } from '../../../components/ui/ToggleSwitch';
 import Skeleton from '../../../components/ui/Skeleton';
 import ThailandAddressSimple from 'thailand-address-simple';
 
@@ -241,12 +242,6 @@ export const JobReceptionTab: React.FC = () => {
       ? 'bg-[#E0E2E5] text-[#8A8C8E] border border-transparent'
       : 'bg-[#E0E2E5] text-white'
     : 'bg-[#E0E2E5] text-white';
-
-  const receptionToggleClass = isKycVerified
-    ? isAcceptingJobsDynamic
-      ? 'bg-[#52B69A] cursor-pointer'
-      : 'bg-[#E0E2E5] cursor-pointer'
-    : 'cursor-not-allowed bg-[#E0E2E5]';
 
   const receptionStatusLabel = isKycVerified
     ? isAcceptingJobsDynamic
@@ -537,18 +532,12 @@ export const JobReceptionTab: React.FC = () => {
             {receptionStatusLabel}
           </div>
 
-          <button
-            type="button"
-            onClick={handleToggleReception}
+          <ToggleSwitch
+            checked={isAcceptingJobsDynamic}
+            onChange={handleToggleReception}
             disabled={!isKycVerified || updatingSearchable}
-            aria-label="สลับสถานะการรับงาน"
-            className={`relative h-6 w-12 rounded-full transition-colors ${receptionToggleClass}`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all ${isKycVerified && isAcceptingJobsDynamic ? 'left-6.5' : 'left-0.5'
-                }`}
-            />
-          </button>
+            ariaLabel="สลับสถานะการรับงาน"
+          />
         </div>
 
         <h2 className="text-[20px] font-bold text-[#1A1A1A]">{receptionTitle}</h2>
@@ -1209,7 +1198,7 @@ export const JobReceptionTab: React.FC = () => {
       </div>
 
       {/* ═ Toast Notifications ═ */}
-      <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />
+      <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" variant="admin-toast" />
 
     </div>
   );

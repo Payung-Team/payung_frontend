@@ -33,14 +33,14 @@ const ProfileFormFields: React.FC<ProfileFormFieldsProps> = ({
           label
         )}
       </label>
-      <div className="flex items-center gap-3 px-3 py-2 bg-[#F3F3F5] rounded-lg">
+      <div className="flex items-center gap-2 px-3 py-2 bg-[#F3F3F5] rounded-lg overflow-hidden">
         <input
           type="text"
           value={value || '-'}
           readOnly
-          className="flex-1 bg-transparent text-[14px] text-[rgba(0,0,0,0.5)] outline-none"
+          className="flex-1 min-w-0 bg-transparent text-[14px] text-[rgba(0,0,0,0.5)] outline-none"
         />
-        <Icon name="lock" size="small" color="currentColor" />
+        <Icon name="lock" size="small" color="currentColor" className="shrink-0" />
       </div>
     </div>
   );
@@ -53,7 +53,7 @@ const ProfileFormFields: React.FC<ProfileFormFieldsProps> = ({
         'หมายเลขประจำตัวผู้ดูแลถูกกำหนดโดยระบบ ไม่สามารถแก้ไขได้',
       )}
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-3 sm:gap-6">
         {fieldWithLock(
           'ชื่อ',
           firstName || 'สมหญิง',
