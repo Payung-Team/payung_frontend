@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { Outlet, useLocation, useNavigate, NavLink } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { useAuth } from '../../context/AuthContext';
 import { GET_USER, ADMIN_PENDING_COUNT } from '../../graphql/queries';
@@ -31,11 +31,29 @@ function getPageInfo(pathname: string): { title: string; breadcrumb: string } {
   return { title: 'Admin', breadcrumb: 'หน้าหลัก / Admin' };
 }
 
+const BOTTOM_NAV_ITEMS = [
+  { to: '/admin',       label: 'Dashboard',    icon: 'dashboard',            end: true  },
+  { to: '/admin/kyc',   label: 'KYC Review',   icon: 'fact_check',           end: false },
+  { to: '/admin/users', label: 'จัดการผู้ใช้',  icon: 'admin_panel_settings', end: false },
+];
+
 export default function AdminLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('admin-sidebar-collapsed') === 'true',
   );
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    function handleOutside(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [profileOpen]);
 
   const toggleCollapse = () => {
     setCollapsed(prev => {
@@ -76,24 +94,12 @@ export default function AdminLayout() {
         fontFamily: 'Inter,sans-serif',
       }}
     >
-      {/* Mobile backdrop */}
-      {sidebarOpen && (
-        <button
-          type="button"
-          aria-label="Close sidebar"
-          className="fixed inset-0 z-40 w-full bg-black/40 lg:hidden"
-          style={{ border: 'none', cursor: 'default', padding: 0 }}
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar — drawer on mobile, static on desktop */}
-      <div className={`fixed inset-y-0 left-0 z-50 lg:static lg:z-auto transition-transform duration-200 ease-in-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      {/* Sidebar — desktop only */}
+      <div className="hidden lg:flex lg:flex-col lg:shrink-0">
         <AdminSidebar
           pendingKyc={pendingKyc}
           displayName={displayName}
           onLogout={handleLogout}
-          onClose={() => setSidebarOpen(false)}
           collapsed={collapsed}
         />
       </div>
@@ -115,7 +121,7 @@ export default function AdminLayout() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Hamburger — opens drawer on mobile, toggles collapse on desktop */}
+            {/* Desktop hamburger — toggles sidebar collapse */}
             <button
               type="button"
               className="hidden lg:flex"
@@ -155,23 +161,106 @@ export default function AdminLayout() {
               }} />
             </div>
 
-            {/* Avatar */}
-            <div style={{
-              width: 36, height: 36, borderRadius: '50%',
-              background: '#A7F3D0',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <span style={{ color: '#064E3B', fontWeight: 700, fontSize: 14 }}>{initial}</span>
+            {/* Avatar + profile dropdown */}
+            <div ref={profileRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => setProfileOpen(prev => !prev)}
+                style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: '#A7F3D0',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: 'none', cursor: 'pointer', padding: 0,
+                }}
+              >
+                <span style={{ color: '#064E3B', fontWeight: 700, fontSize: 14 }}>{initial}</span>
+              </button>
+
+              {profileOpen && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                  background: 'white', borderRadius: 10,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+                  border: '1px solid #E5E7EB',
+                  minWidth: 200, zIndex: 100,
+                  overflow: 'hidden',
+                }}>
+                  {/* Profile info */}
+                  <div style={{ padding: '12px 16px', borderBottom: '1px solid #F3F4F6' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{displayName}</div>
+                    <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>Administrator</div>
+                  </div>
+
+                  {/* Logout */}
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    style={{
+                      width: '100%', textAlign: 'left',
+                      padding: '10px 16px',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      color: '#DC2626', fontSize: 13,
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#FEF2F2')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >
+                    <span className="material-icons" style={{ fontSize: 16 }}>logout</span>{' '}
+                    ออกจากระบบ
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
 
-        {/* Scrollable page content */}
-        <div style={{ flex: 1, overflowY: 'auto', background: '#F9FAFB' }}>
+        {/* Scrollable page content — pb-16 on mobile to clear bottom nav */}
+        <div style={{ flex: 1, overflowY: 'auto', background: '#F9FAFB' }} className="pb-16 lg:pb-0">
           <Outlet />
         </div>
 
       </div>
+
+      {/* Mobile bottom nav — lg:hidden */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white border-t border-gray-200">
+        <div className="flex items-stretch">
+          {BOTTOM_NAV_ITEMS.map(item => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                `flex flex-col items-center justify-center flex-1 py-2 px-1 gap-0.5 transition-colors ${
+                  isActive ? 'text-[#059669]' : 'text-gray-500'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <div className="relative">
+                    <span className="material-icons" style={{ fontSize: 22 }}>{item.icon}</span>
+                    {item.to === '/admin/kyc' && pendingKyc > 0 && (
+                      <span style={{
+                        position: 'absolute', top: -4, right: -6,
+                        background: '#F59E0B', color: 'white',
+                        fontSize: 9, fontWeight: 700,
+                        borderRadius: 99, padding: '0 4px',
+                        minWidth: 14, textAlign: 'center',
+                        lineHeight: '14px',
+                      }}>
+                        {pendingKyc > 99 ? '99+' : pendingKyc}
+                      </span>
+                    )}
+                  </div>
+                  <span className={`text-xs ${isActive ? 'font-semibold' : ''}`}>
+                    {item.label}
+                  </span>
+                </>
+              )}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
     </div>
   );
 }
