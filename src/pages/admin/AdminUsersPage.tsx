@@ -56,7 +56,7 @@ interface AdminUserListResponse {
 
 const PAGE_SIZE = 20;
 const TABLE_GRID_COLUMNS = 'minmax(160px,1.5fr) minmax(180px,2fr) 140px 200px 140px minmax(190px,auto)';
-const CAREGIVER_GRID_COLUMNS = '160px minmax(200px,1.8fr) minmax(180px,2fr) 80px 130px 110px minmax(190px,auto)';
+const CAREGIVER_GRID_COLUMNS = '160px minmax(200px,1.8fr) minmax(180px,2fr) 80px 130px 160px minmax(190px,auto)';
 
 const ROLE_LABELS: Record<number, { label: string; badgeClass: string; textClass: string }> = {
   1: { label: 'ผู้ใช้', badgeClass: 'bg-gray-100', textClass: 'text-gray-600' },
@@ -152,7 +152,7 @@ function CaregiverTableSkeleton() {
         { width: 140, height: 14 },
         { width: 60, height: 20, borderRadius: 999 },
         { width: 92, height: 20, borderRadius: 999 },
-        { width: 55, height: 14 },
+        { width: 90, height: 20, borderRadius: 999 },
         { width: 100, height: 23, borderRadius: 6 },
       ]}
     />
@@ -667,8 +667,8 @@ function ConfirmDeactivateModal({ user, isAdminTarget, onClose, onConfirm, loadi
           </h2>
           <p style={{ fontFamily: 'Bai Jamjuree, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '24px', color: '#717182', margin: 0, textAlign: 'center' }}>
             {isAdminTarget
-              ? 'บัญชีจะถูกระงับทันทีและจะถูกลบถาวรภายใน 7 วัน หากไม่มีการเปิดใช้งาน'
-              : 'บัญชีของผู้ใช้นี้จะถูกระงับทันที'}
+              ? 'บัญชี Admin จะถูกระงับทันทีและถูกลบถาวรภายใน 7 วัน หากไม่มีการเปิดใช้งาน'
+              : 'บัญชีจะถูกระงับทันทีและจะถูกลบถาวรภายใน 7 วัน หากไม่มีการเปิดใช้งาน'}
           </p>
         </div>
 
@@ -845,6 +845,43 @@ function ConfirmActivateModal({ user, onClose, onConfirm, loading }: Readonly<Co
   );
 }
 
+// ─── Shared render helpers ─────────────────────────────────────────────────
+
+function AccountStatusCell({ item }: Readonly<{ item: UserSummary }>) {
+  const isActive = item.isActive && !item.isSuspended;
+  if (isActive) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 rounded-full bg-[#D1FAE5] px-2.5 py-0.5 text-xs font-semibold text-[#1B6B3A]"
+        style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-[#059669]" aria-hidden="true" />
+        เปิดใช้งาน
+      </span>
+    );
+  }
+  return (
+    <div className="inline-flex flex-col items-start gap-1" style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}>
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-500 ring-1 ring-inset ring-red-200">
+        <span className="h-1.5 w-1.5 rounded-full bg-red-400" aria-hidden="true" />
+        ถูกปิดใช้งาน
+      </span>
+      {item.scheduledDeleteAt && (() => {
+        const days = daysUntil(item.scheduledDeleteAt);
+        return (
+          <span
+            className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200"
+            title={`กำหนดลบ: ${formatDate(item.scheduledDeleteAt)}`}
+          >
+            <span className="material-icons" style={{ fontSize: 11 }}>schedule</span>
+            {days > 0 ? `ลบใน ${days} วัน` : 'ลบวันนี้'}
+          </span>
+        );
+      })()}
+    </div>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────
 
 export default function AdminUsersPage() {
@@ -885,28 +922,66 @@ export default function AdminUsersPage() {
   }
 
   const [scheduleDelete, { loading: scheduleDeleteLoading }] = useMutation(SCHEDULE_DELETE_ADMIN, {
+    update(cache, { data }) {
+      const payload = data?.scheduleDeleteAdmin;
+      if (!payload) return;
+      cache.modify({
+        id: cache.identify({ __typename: 'UserSummary', id: payload.user.id }),
+        fields: {
+          isActive: () => false,
+          isSuspended: () => true,
+          scheduledDeleteAt: () => payload.scheduledDeleteAt as string,
+        },
+      });
+    },
     onCompleted: () => { showToast('ปิดการใช้งานและกำหนดลบบัญชีเรียบร้อย', 'success'); setConfirmDeactivate(null); refetch(); },
     onError: (err) => { showToast(err.message, 'error'); setConfirmDeactivate(null); },
   });
 
   const [cancelDelete, { loading: cancelLoading }] = useMutation(CANCEL_SCHEDULED_DELETE, {
-    onCompleted: () => { showToast('เปิดใช้งานบัญชีเรียบร้อย', 'success'); refetch(); },
-    onError: (err) => { showToast(err.message, 'error'); },
+    update(cache, { data }) {
+      const user = data?.cancelScheduledDelete?.user;
+      if (!user) return;
+      cache.modify({
+        id: cache.identify({ __typename: 'UserSummary', id: user.id }),
+        fields: {
+          isActive: () => true,
+          isSuspended: () => false,
+          scheduledDeleteAt: () => null,
+        },
+      });
+    },
+    onCompleted: () => { showToast('เปิดใช้งานบัญชีเรียบร้อย', 'success'); setConfirmActivate(null); refetch(); },
+    onError: (err) => { showToast(err.message, 'error'); setConfirmActivate(null); },
   });
 
   const [suspendUser, { loading: suspendLoading }] = useMutation(SUSPEND_USER, {
+    update(cache, { data }) {
+      if (!data?.suspendUser) return;
+      const { id } = data.suspendUser;
+      const in7Days = new Date();
+      in7Days.setDate(in7Days.getDate() + 7);
+      cache.modify({
+        id: cache.identify({ __typename: 'UserSummary', id }),
+        fields: {
+          isActive: () => false,
+          isSuspended: () => true,
+          scheduledDeleteAt: () => in7Days.toISOString(),
+        },
+      });
+    },
     onCompleted: () => { showToast('ปิดการใช้งานบัญชีเรียบร้อย', 'success'); setConfirmDeactivate(null); refetch(); },
     onError: (err) => { showToast(err.message, 'error'); setConfirmDeactivate(null); },
   });
 
   const [activateUser, { loading: activateLoading }] = useMutation(ACTIVATE_USER, {
-    onCompleted: () => { showToast('เปิดใช้งานบัญชีเรียบร้อย', 'success'); refetch(); },
-    onError: (err) => { showToast(err.message, 'error'); },
+    onCompleted: () => { showToast('เปิดใช้งานบัญชีเรียบร้อย', 'success'); setConfirmActivate(null); refetch(); },
+    onError: (err) => { showToast(err.message, 'error'); setConfirmActivate(null); },
   });
 
   const [toggleStatus, { loading: toggleLoading }] = useMutation(TOGGLE_ADMIN_STATUS, {
-    onCompleted: () => { showToast('เปิดใช้งานบัญชีเรียบร้อย', 'success'); refetch(); },
-    onError: (err) => { showToast(err.message, 'error'); },
+    onCompleted: () => { showToast('เปิดใช้งานบัญชีเรียบร้อย', 'success'); setConfirmActivate(null); refetch(); },
+    onError: (err) => { showToast(err.message, 'error'); setConfirmActivate(null); },
   });
 
   const handleDeactivate = useCallback((target: UserSummary) => {
@@ -986,42 +1061,7 @@ export default function AdminUsersPage() {
     {
       key: 'status',
       header: 'สถานะ',
-      render: (item) => {
-        const isActive = item.isActive && !item.isSuspended;
-        if (isActive) {
-          return (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#D1FAE5] px-2.5 py-0.5 text-xs font-semibold text-[#1B6B3A]"
-              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-[#059669]" aria-hidden="true"></span>
-              {'เปิดใช้งาน'}
-            </span>
-          );
-        }
-        if (item.scheduledDeleteAt) {
-          const days = daysUntil(item.scheduledDeleteAt);
-          return (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700"
-              style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-              title={`กำหนดลบ: ${formatDate(item.scheduledDeleteAt)}`}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
-              {days > 0 ? `ลบใน ${days} วัน` : 'ลบวันนี้'}
-            </span>
-          );
-        }
-        return (
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-500"
-            style={{ fontFamily: 'Bai Jamjuree, sans-serif' }}
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-gray-400" aria-hidden="true"></span>
-            {'ถูกปิดใช้งาน'}
-          </span>
-        );
-      },
+      render: (item) => <AccountStatusCell item={item} />,
     },
     {
       key: 'createdAt',
@@ -1152,10 +1192,9 @@ export default function AdminUsersPage() {
       },
     },
     {
-      key: 'editRequests',
-      header: 'คำขอแก้ไข',
-      className: 'text-sm text-gray-400',
-      render: () => '-',
+      key: 'status',
+      header: 'สถานะ',
+      render: (item) => <AccountStatusCell item={item} />,
     },
     {
       key: 'actions',
@@ -1351,7 +1390,7 @@ export default function AdminUsersPage() {
         <ConfirmActivateModal
           user={confirmActivate}
           onClose={() => setConfirmActivate(null)}
-          onConfirm={() => { handleActivate(confirmActivate); setConfirmActivate(null); }}
+          onConfirm={() => handleActivate(confirmActivate)}
           loading={actionLoading}
         />
       )}

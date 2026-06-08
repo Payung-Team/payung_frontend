@@ -26,6 +26,7 @@ const iconMap: { [key: string]: string } = {
   'settings-outline': 'settings',
   'document-text-outline': 'description',
   'sliders-outline': 'tune',
+  'inbox-outline': 'inbox',
 };
 
 /**

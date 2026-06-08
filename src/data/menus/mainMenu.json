@@ -44,14 +44,6 @@
       "allowedRoles": ["patient"]
     },
     {
-      "id": "search_jobs",
-      "type": "navigation",
-      "label": "ค้นหางาน",
-      "icon": "document-text-outline",
-      "route": "/search",
-      "allowedRoles": ["caregiver"]
-    },
-    {
       "id": "bookings",
       "type": "navigation",
       "label": "นัดหมาย",
@@ -64,7 +56,7 @@
       "type": "navigation",
       "label": "งานของฉัน",
       "icon": "calendar-outline",
-      "route": "/jobs",
+      "route": "/caregiver/bookings",
       "allowedRoles": ["caregiver"]
     },
     {

@@ -122,6 +122,7 @@ export const GET_CAREGIVER_PROFILE = gql`
       kycVerifiedAt
       resubmitCount
       isSearchable
+      languages
       createdAt
       updatedAt
     }
@@ -138,6 +139,7 @@ export const UPDATE_CAREGIVER_PROFILE = gql`
       experienceYears
       phone
       address
+      languages
       updatedAt
     }
   }
@@ -626,6 +628,71 @@ export const ADMIN_EDIT_USER = gql`
   }
 `;
 
+export const GET_WORK_CONDITION = gql`
+  query GetWorkCondition {
+    myWorkCondition {
+      availability {
+        dayOfWeek
+        timeSlot
+        isActive
+      }
+      serviceLocations
+      jobTypes
+      serviceArea {
+        province
+        district
+      }
+    }
+  }
+`;
+
+export const UPDATE_WORK_CONDITION = gql`
+  mutation UpdateWorkCondition($input: UpdateWorkConditionInput!) {
+    updateWorkCondition(input: $input) {
+      availability {
+        dayOfWeek
+        timeSlot
+        isActive
+      }
+      serviceLocations
+      jobTypes
+      serviceArea {
+        province
+        district
+      }
+    }
+  }
+`;
+
+const CAREGIVER_BOOKING_SUMMARY_FIELDS = `
+  id
+  status
+  serviceType
+  serviceLocations
+  timeSlot
+  bookingDate
+  startTime
+  durationHours
+  estimatedCost
+  locationAddress
+  patient {
+    id
+    displayName
+    avatarUrl
+  }
+  careRecipientName
+  acceptedAt
+  confirmedAt
+  rejectionReason
+  createdAt
+`;
+
+export const GET_CAREGIVER_BOOKINGS = gql`
+  query GetCaregiverBookings($input: CaregiverBookingsInput!) {
+    caregiverBookings(input: $input) {
+      data {
+        ${CAREGIVER_BOOKING_SUMMARY_FIELDS}
+      }
 export const SEARCH_CAREGIVERS = gql`
   query SearchCaregivers($input: SearchCaregiverInput!) {
     searchCaregivers(input: $input) {
@@ -650,6 +717,18 @@ export const SEARCH_CAREGIVERS = gql`
   }
 `;
 
+export const GET_CAREGIVER_BOOKING_HISTORY = gql`
+  query GetCaregiverBookingHistory($input: CaregiverBookingHistoryInput) {
+    caregiverBookingHistory(input: $input) {
+      data {
+        ${CAREGIVER_BOOKING_SUMMARY_FIELDS}
+      }
+      pagination {
+        page
+        limit
+        total
+        totalPages
+      }
 export const REQUEST_PASSWORD_RESET = gql`
   mutation RequestPasswordReset($email: String!) {
     requestPasswordReset(input: { email: $email }) {
@@ -659,6 +738,32 @@ export const REQUEST_PASSWORD_RESET = gql`
   }
 `;
 
+export const ACCEPT_BOOKING = gql`
+  mutation AcceptBooking($bookingId: ID!) {
+    acceptBooking(bookingId: $bookingId) {
+      id
+      status
+      acceptedAt
+    }
+  }
+`;
+
+export const DECLINE_BOOKING = gql`
+  mutation DeclineBooking($input: DeclineBookingInput!) {
+    declineBooking(input: $input) {
+      id
+      status
+      rejectionReason
+    }
+  }
+`;
+
+export const CANCEL_ACCEPTANCE = gql`
+  mutation CancelAcceptance($input: CancelAcceptanceInput!) {
+    cancelAcceptance(input: $input) {
+      id
+      status
+      rejectionReason
 export const UPDATE_PASSWORD = gql`
   mutation UpdatePassword($newPassword: String!) {
     updatePassword(input: { newPassword: $newPassword }) {

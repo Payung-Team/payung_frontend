@@ -3,10 +3,10 @@ import { Icon } from './Icon';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 type ToastPosition = 'bottom-right' | 'top-center' | 'top-right';
-type ToastVariant = 'default' | 'soft-card' | 'admin-toast';
+export type ToastVariant = 'default' | 'soft-card' | 'admin-toast' | 'booking-toast' | 'decline-toast';
 
 interface ToastProps {
-  readonly message: string;
+  readonly message: React.ReactNode;
   readonly type?: ToastType;
   readonly duration?: number;
   readonly onClose?: () => void;
@@ -52,6 +52,86 @@ export function Toast({
   const fadeClass = isClosing
     ? 'opacity-0 -translate-y-1'
     : 'opacity-100 translate-y-0';
+
+  if (variant === 'booking-toast') {
+    return (
+      <div
+        className={`flex w-[340px] max-w-[90vw] items-start gap-4 rounded-[20px] bg-[#E6F5ED] border border-[#D1FAE5] px-6 py-5 text-[#1A1A1A] shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.08),0px_10px_10px_-5px_rgba(0,0,0,0.03)] transition-all duration-200 ${fadeClass} relative`}
+        style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+      >
+        {/* Circle Check Icon */}
+        <span className="inline-flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-full bg-[#005C3E] text-white">
+          <Icon name="check" style={{ fontSize: '14px', fontWeight: 'bold' }} color="#FFFFFF" />
+        </span>
+
+        {/* Content */}
+        <div className="flex flex-col items-start gap-1 pr-4">
+          <span className="text-[14px] font-bold leading-[24px] text-[#004D36]">
+            แจ้งเตือนจากระบบ
+          </span>
+          <span className="text-[12px] font-normal leading-[19px] text-[#1A1A1A] whitespace-pre-line">
+            {message}
+          </span>
+        </div>
+
+        {/* Close Button */}
+        {onClose && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="absolute top-5 right-5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#52B69A] hover:text-[#005C3E] transition-all cursor-pointer bg-transparent border-0 p-0"
+            aria-label="Close"
+          >
+            <Icon name="close" style={{ fontSize: '20px' }} />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (variant === 'decline-toast') {
+    return (
+      <div
+        className={`flex w-[340px] max-w-[90vw] items-start gap-4 rounded-[20px] bg-[#FFF5F5] border border-[#FEE2E2] px-6 py-5 text-[#8C1D1D] shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.08),0px_10px_10px_-5px_rgba(0,0,0,0.03)] transition-all duration-200 ${fadeClass} relative`}
+        style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+      >
+        {/* Info Icon with white background representing cutout */}
+        <Icon
+          name="info"
+          className="text-[24px] text-[#8C1D1D] bg-white rounded-full shrink-0"
+          style={{ fontSize: '24px' }}
+        />
+
+        {/* Content */}
+        <div className="flex flex-col items-start gap-1 pr-4">
+          <span className="text-[14px] font-bold leading-[24px] text-[#8C1D1D]">
+            แจ้งเตือนจากระบบ
+          </span>
+          <span className="text-[12px] font-normal leading-[19px] text-[#8C1D1D] whitespace-pre-line">
+            {message}
+          </span>
+        </div>
+
+        {/* Close Button */}
+        {onClose && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="absolute top-5 right-5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#C94A4A] hover:text-[#8C1D1D] transition-all cursor-pointer bg-transparent border-0 p-0"
+            aria-label="Close"
+          >
+            <Icon name="close" style={{ fontSize: '20px' }} />
+          </button>
+        )}
+      </div>
+    );
+  }
 
   if (variant === 'soft-card') {
     const iconWrapClass = {
@@ -156,8 +236,8 @@ export function ToastContainer({
     position === 'top-center'
       ? 'fixed top-20 left-1/2 -translate-x-1/2 z-50'
       : position === 'top-right'
-      ? 'fixed top-20 right-6 z-50'
-      : 'fixed bottom-4 right-4 z-50';
+        ? 'fixed top-20 right-6 z-50'
+        : 'fixed bottom-4 right-4 z-50';
 
   return (
     <div className={`${positionClass} flex flex-col gap-2`}>
@@ -167,7 +247,7 @@ export function ToastContainer({
           message={toast.message}
           type={toast.type}
           duration={toast.duration}
-          variant={variant}
+          variant={toast.variant ?? variant}
           onClose={() => onRemove(toast.id)}
           isContainerChild={true}
         />

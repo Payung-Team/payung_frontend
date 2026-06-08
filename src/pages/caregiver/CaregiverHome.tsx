@@ -12,6 +12,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import { Icon } from '../../components/ui/Icon';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
+import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
 
 interface UserData {
   me: {
@@ -141,21 +142,13 @@ function HeroCard({ displayName, caregiverNumber, isSearchable, canToggle, onTog
                 : 'กรุณายืนยันตัวตนเพื่อเริ่มรับงาน'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onToggle}
+        <ToggleSwitch
+          checked={isSearchable}
+          onChange={onToggle}
           disabled={!canToggle}
-          aria-label={isSearchable ? 'ปิดการรับงาน' : 'เปิดการรับงาน'}
-          className={`relative w-12 h-6 rounded-full transition-colors duration-200 flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#52B69A] focus-visible:ring-offset-2 ${
-            isSearchable ? 'bg-[#52B69A]' : 'bg-gray-200'
-          } ${canToggle ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
-        >
-          <span
-            className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-              isSearchable ? 'translate-x-7' : 'translate-x-1'
-            }`}
-          />
-        </button>
+          ariaLabel={isSearchable ? 'ปิดการรับงาน' : 'เปิดการรับงาน'}
+          className="shrink-0"
+        />
       </div>
     </div>
   );
@@ -268,7 +261,7 @@ interface QuickActionsProps {
 function QuickActionsGrid({ unreadCount, kycStatus }: QuickActionsProps) {
   return (
     <div className="grid grid-cols-2 gap-3">
-      <Link to="/jobs" className={`${cardBase} no-underline text-[#1A1A1A]`}>
+      <Link to="/caregiver/bookings" className={`${cardBase} no-underline text-[#1A1A1A]`}>
         <div className="w-10 h-10 rounded-xl bg-[#F0F4FF] text-[#3B5BDB] flex items-center justify-center relative">
           <Icon name="work" size="large" color="currentColor" />
           <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
@@ -529,7 +522,7 @@ const CaregiverHome: React.FC = () => {
 
         </main>
       </div>
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" variant="admin-toast" />
     </>
   );
 };

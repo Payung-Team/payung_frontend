@@ -10,6 +10,10 @@ import KycDocumentsPreview from '../../components/ui/KycDocumentsPreview';
 import KycHistoryCard from '../../components/ui/KycHistoryCard';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 
+function daysUntil(dateStr: string): number {
+  return Math.max(0, Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000));
+}
+
 // ─── GraphQL Queries ────────────────────────────────────────────────────────
 
 const ADMIN_KYC_DETAIL_LOCAL = gql`
@@ -86,7 +90,7 @@ const GET_ADMIN_CAREGIVER_DETAIL = gql`
         createdAt
         updatedAt
       }
-      isSuspended
+      scheduledDeleteAt
       kycStatus
     }
   }
@@ -251,9 +255,10 @@ export default function AdminCaregiverDetailPage() {
     ? (statusMeta[caregiver.kycStatus as keyof typeof statusMeta] ?? statusMeta.none)
     : statusMeta.none;
 
-  const isSuspended = userDetailData?.adminUserDetail?.isSuspended;
+  const scheduledDeleteAt = userDetailData?.adminUserDetail?.scheduledDeleteAt;
   const editLogs = kycDetailData?.adminKycDetail?.editHistory ?? [];
-  const isActive = user?.isActive && !isSuspended;
+  const isActive = user?.isActive ?? false;
+  const daysUntilDelete = scheduledDeleteAt ? daysUntil(scheduledDeleteAt) : null;
 
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({
     firstName: '',
@@ -550,10 +555,28 @@ export default function AdminCaregiverDetailPage() {
               </div>
               <div>
                 <span className="text-xs font-medium text-gray-400 block">สถานะการใช้งาน</span>
-                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold mt-1 ${isActive ? 'bg-[#ECFDF5] text-[#047857]' : 'bg-gray-100 text-gray-500'}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-[#059669]' : 'bg-gray-400'}`} />
-                  {isActive ? 'เปิดใช้งาน' : 'ระงับการใช้งาน'}
-                </span>
+                {isActive ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold mt-1 bg-[#ECFDF5] text-[#047857]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#059669]" />
+                    เปิดใช้งาน
+                  </span>
+                ) : (
+                  <div className="inline-flex flex-col items-start gap-1 mt-1">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-500 ring-1 ring-inset ring-red-200">
+                      <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                      ระงับการใช้งาน
+                    </span>
+                    {daysUntilDelete !== null && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200"
+                        title={`กำหนดลบ: ${new Date(scheduledDeleteAt!).toLocaleDateString('th-TH')}`}
+                      >
+                        <span className="material-icons" style={{ fontSize: 11 }}>schedule</span>
+                        {daysUntilDelete > 0 ? `ลบใน ${daysUntilDelete} วัน` : 'ลบวันนี้'}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -583,7 +606,7 @@ export default function AdminCaregiverDetailPage() {
             </button>
           </div>
 
-          <div className="rounded-xl border border-[#E5E7EB] bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)] min-h-[400px]">
+          <div className="rounded-xl border border-[#E5E7EB] bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)] min-h-100">
             {activeTab === 'general' && (
               <div className="space-y-8">
                 {/* Card 1: ข้อมูลที่ล็อค */}

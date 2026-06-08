@@ -278,7 +278,7 @@ export default function KycReviewListPage() {
           loadingContent={<KycReviewTableSkeleton />}
           error={error}
           renderError={(tableError) => (
-            <div className="flex min-h-[320px] min-w-[1000px] flex-col items-center justify-center px-6 text-center">
+            <div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
                 <Icon name="error" variant="outlined" />
               </div>
@@ -287,7 +287,7 @@ export default function KycReviewListPage() {
             </div>
           )}
           renderEmpty={
-            <div className="flex min-h-[320px] min-w-[1000px] flex-col items-center justify-center px-6 text-center">
+            <div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-[#0D9488]">
                 <Icon name="verified_user" variant="outlined" />
               </div>

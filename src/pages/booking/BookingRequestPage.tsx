@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
 import { useToast } from '../../hooks/useToast';
+import { supabase } from '../../lib/supabase';
 import BookingStep1 from './steps/BookingStep1';
 import BookingStep2 from './steps/BookingStep2';
 import BookingStep3 from './steps/BookingStep3';
@@ -88,7 +89,7 @@ function SearchingLoadingScreen() {
 export default function BookingRequestPage() {
   const navigate = useNavigate();
   const { step, goToStep, bookingDraft } = useBooking();
-  const { success } = useToast();
+  const { success, error } = useToast();
   const [isSearching, setIsSearching] = useState(false);
 
   // Helper values for sidebar cost estimation
@@ -98,15 +99,81 @@ export default function BookingRequestPage() {
   const platformFee = Math.round(rawCost * 0.1);
   const totalEstimated = rawCost + platformFee;
 
-  useEffect(() => {
-    if (!isSearching) return;
-    const timer = setTimeout(() => {
+  const handleStartSearch = async () => {
+    if (!bookingDraft) return;
+
+    setIsSearching(true);
+
+    try {
+      // 1. Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      // 2. Map booking details for CreateBookingDto
+      const tasksList = [
+        ...(bookingDraft.jobDetails?.tasks?.map(t => t.name) || []),
+        ...(bookingDraft.jobDetails?.customTasks?.map(t => t.name) || [])
+      ];
+
+      const serviceLocs = bookingDraft.serviceLocation || [];
+      const atHomeAddress = bookingDraft.locationDetails?.at_home?.address || '';
+      const hospitalName = bookingDraft.locationDetails?.accompany_outside?.hospitalName || '';
+      const meetingPoint = bookingDraft.locationDetails?.accompany_outside?.meetingPoint || '';
+
+      const displayAddressParts = [];
+      if (serviceLocs.includes('at_home') && atHomeAddress) {
+        displayAddressParts.push(atHomeAddress);
+      }
+      if (serviceLocs.includes('accompany_outside') && hospitalName) {
+        displayAddressParts.push(`ปลายทาง: ${hospitalName}${meetingPoint ? ` (จุดนัดพบ: ${meetingPoint})` : ''}`);
+      }
+      const displayAddress = displayAddressParts.length > 0 ? displayAddressParts.join(' / ') : '-';
+
+      const payload = {
+        tasks: tasksList,
+        serviceLocations: serviceLocs,
+        serviceType: 'elderly_care', // Default serviceType for this flow
+        timeSlot: bookingDraft.dateTime?.slot || '',
+        startTime: bookingDraft.dateTime?.startTime ? `${bookingDraft.dateTime.startTime}:00` : '',
+        durationHours: bookingDraft.dateTime?.duration || 4,
+        locationAddress: displayAddress,
+        bookingDate: bookingDraft.dateTime?.date || '',
+        dayOfContactName: bookingDraft.contactPerson?.name || undefined,
+        dayOfContactPhone: bookingDraft.contactPerson?.phone || undefined,
+        dayOfContactRelationship: bookingDraft.contactPerson?.relationship || undefined,
+        careRecipientId: bookingDraft.recipient?.type === 'member' ? bookingDraft.recipient.selectedMemberId : undefined
+      };
+
+      // 3. REST API call to backend
+      const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:3000/graphql';
+      const restBaseUrl = graphqlUrl.replace('/graphql', '/api/v1');
+
+      const response = await fetch(`${restBaseUrl}/bookings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      // Add a slight delay for smooth transition and display of the search animation
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      success('สร้างคำขอจองบริการและจับคู่ผู้ดูแลเสร็จสิ้น');
       setIsSearching(false);
-      success('ค้นหาผู้ดูแลเสร็จสิ้น');
       navigate('/search');
-    }, 4000); // 4 seconds delay
-    return () => clearTimeout(timer);
-  }, [isSearching, navigate, success]);
+    } catch (err: any) {
+      console.error('Failed to create booking:', err);
+      error(err.message || 'เกิดข้อผิดพลาดในการส่งข้อมูลการจอง');
+      setIsSearching(false);
+    }
+  };
 
   if (isSearching) {
     return <SearchingLoadingScreen />;
@@ -174,7 +241,7 @@ export default function BookingRequestPage() {
           <div className={`${step === 3 ? 'lg:col-span-3 max-w-[800px] mx-auto w-full' : 'lg:col-span-2'} space-y-6`}>
             {step === 1 && <BookingStep1 />}
             {step === 2 && <BookingStep2 />}
-            {step === 3 && <BookingStep3 onStartSearch={() => setIsSearching(true)} />}
+            {step === 3 && <BookingStep3 onStartSearch={handleStartSearch} />}
           </div>
 
           {/* Right Sidebar: Cost Estimator */}

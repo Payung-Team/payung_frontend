@@ -12,19 +12,11 @@
       "allowedRoles": ["caregiver"]
     },
     {
-      "id": "search_jobs",
-      "type": "navigation",
-      "label": "ค้นหางาน",
-      "icon": "document-text-outline",
-      "route": "/search",
-      "allowedRoles": ["caregiver"]
-    },
-    {
       "id": "my_jobs",
       "type": "navigation",
       "label": "งานของฉัน",
-      "icon": "calendar-outline",
-      "route": "/jobs",
+      "icon": "inbox-outline",
+      "route": "/caregiver/bookings",
       "allowedRoles": ["caregiver"]
     }
   ],

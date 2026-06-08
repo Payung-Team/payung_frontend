@@ -1,20 +1,21 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { useNavigate } from 'react-router-dom';
-import { GET_CAREGIVER_PROFILE, SET_CAREGIVER_SEARCHABLE } from '../../../graphql/queries';
+import { GET_CAREGIVER_PROFILE,SET_CAREGIVER_SEARCHABLE,GET_WORK_CONDITION,UPDATE_WORK_CONDITION,UPDATE_CAREGIVER_PROFILE,} from '../../../graphql/queries';
 import { Icon } from '../../../components/ui/Icon';
 import { useToast } from '../../../hooks/useToast';
 import { ToastContainer } from '../../../components/ui/Toast';
+import { ToggleSwitch } from '../../../components/ui/ToggleSwitch';
 import Skeleton from '../../../components/ui/Skeleton';
 import ThailandAddressSimple from 'thailand-address-simple';
 
-type JobReceptionChecklistKey = 'profileVisible' | 'jobAlerts' | 'pauseAnytime';
+
 type SlotType = 'morning' | 'afternoon' | 'evening';
 type WeeklyAvailability = Record<number, Record<SlotType, boolean>>; // 0 = Mon, ..., 6 = Sun
 
 interface ServiceFormats {
-  homeCare: boolean;
-  travelCare: boolean;
+  at_home: boolean;
+  accompany_outside: boolean;
 }
 
 const LANGUAGES_LIST = [
@@ -44,12 +45,17 @@ const SLOTS: Array<{ key: SlotType; label: string; time: string }> = [
   { key: 'evening', label: 'เย็น', time: '18:00–22:00' }
 ];
 
+const SERVICE_LOCATIONS = [
+  { key: 'at_home', title: 'ที่บ้านผู้ป่วย', desc: 'ฉันเดินทางไปดูแลที่บ้านผู้ป่วย', icon: 'home' },
+  { key: 'accompany_outside', title: 'พาออกนอกบ้าน', desc: 'ฉันพาผู้ป่วยออกนอกบ้าน เช่น พบแพทย์ ทำธุระ', icon: 'directions_walk' }
+];
+
 const SERVICE_TYPES = [
-  { id: 'general', label: 'ดูแลทั่วไป', desc: 'พยุง / ทานข้าว / กิจวัตรประจำวัน' },
-  { id: 'bedridden', label: 'ดูแลผู้ป่วยติดเตียง', desc: 'ดูแลผู้ป่วยช่วยเหลือตัวเองไม่ได้' },
-  { id: 'physical', label: 'กายภาพบำบัด', desc: 'ช่วยออกกำลังกาย / กายภาพฟื้นฟู' },
-  { id: 'medicine', label: 'ช่วยจัดยา/เวชภัณฑ์', desc: 'ช่วยเตือน / จัดยาตามแพทย์สั่ง' },
-  { id: 'nursing', label: 'เฝ้าไข้/พยุงช่วยเหลือ', desc: 'ช่วยเหลือฟื้นฟูเบื้องต้น' }
+  { id: 'general_care', label: 'ดูแลทั่วไป', desc: 'พยุง / ทานข้าว / กิจวัตรประจำวัน' },
+  { id: 'bedridden_care', label: 'ดูแลผู้ป่วยติดเตียง', desc: 'ดูแลผู้ป่วยช่วยเหลือตัวเองไม่ได้' },
+  { id: 'physiotherapy', label: 'กายภาพบำบัด', desc: 'ช่วยออกกำลังกาย / กายภาพฟื้นฟู' },
+  { id: 'medication', label: 'ช่วยจัดยา/เวชภัณฑ์', desc: 'ช่วยเตือน / จัดยาตามแพทย์สั่ง' },
+  { id: 'companion', label: 'เป็นเพื่อน/พูดคุย', desc: 'พูดคุยเป็นเพื่อน ดูแลสภาพจิตใจผู้สูงอายุ' }
 ];
 
 export const JobReceptionTab: React.FC = () => {
@@ -64,17 +70,30 @@ export const JobReceptionTab: React.FC = () => {
       id: string;
       kycStatus: string;
       isSearchable: boolean;
+      hourlyRate: number;
+      languages: string[];
     };
   }>(GET_CAREGIVER_PROFILE);
+
+  const { data: workConditionData, loading: workConditionLoading } = useQuery<{
+    myWorkCondition: {
+      availability: { dayOfWeek: number; timeSlot: string; isActive: boolean }[];
+      serviceLocations: string[];
+      jobTypes: string[];
+      serviceArea: { province: string | null; district: string | null };
+    };
+  }>(GET_WORK_CONDITION);
 
   const [setCaregiverSearchable, { loading: updatingSearchable }] = useMutation(
     SET_CAREGIVER_SEARCHABLE,
   );
 
+  const [updateCaregiverProfile] = useMutation(UPDATE_CAREGIVER_PROFILE);
+  const [updateWorkCondition] = useMutation(UPDATE_WORK_CONDITION);
+
   const caregiver = caregiverData?.myCaregiverProfile;
   const serverIsSearchable = Boolean(caregiver?.isSearchable);
   const isKycVerified = caregiver?.kycStatus === 'verified';
-  const isAcceptingJobs = Boolean(serverIsSearchable && isKycVerified);
 
   // --- Address Database (thailand-address-simple) ---
   const [addressDb, setAddressDb] = useState<ThailandAddressSimple | null>(null);
@@ -121,16 +140,15 @@ export const JobReceptionTab: React.FC = () => {
   });
 
   const [serviceFormats, setServiceFormats] = useState<ServiceFormats>({
-    homeCare: false,
-    travelCare: false
+    at_home: false,
+    accompany_outside: false
   });
 
   const [selectedServiceTypes, setSelectedServiceTypes] = useState<string[]>([]);
   const [province, setProvince] = useState('');
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
-  const [maxDistance, setMaxDistance] = useState<number>(0);
 
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(['thai']);
 
   const [hourlyRate, setHourlyRate] = useState<number>(0);
 
@@ -141,26 +159,77 @@ export const JobReceptionTab: React.FC = () => {
     selectedServiceTypes: string[];
     province: string;
     selectedDistricts: string[];
-    maxDistance: number;
     selectedLanguages: string[];
     hourlyRate: number;
   } | null>(null);
 
-  // Initialize Snapshot
+  // Initialize Snapshot & local states from GraphQL Data
   useEffect(() => {
-    if (savedSnapshot === null) {
+    if (caregiverData?.myCaregiverProfile && workConditionData?.myWorkCondition) {
+      const caregiverProfile = caregiverData.myCaregiverProfile;
+      const workCond = workConditionData.myWorkCondition;
+
+      const rate = caregiverProfile.hourlyRate || 0;
+      setHourlyRate(rate);
+
+      const initialAvailability: WeeklyAvailability = {
+        0: { morning: false, afternoon: false, evening: false },
+        1: { morning: false, afternoon: false, evening: false },
+        2: { morning: false, afternoon: false, evening: false },
+        3: { morning: false, afternoon: false, evening: false },
+        4: { morning: false, afternoon: false, evening: false },
+        5: { morning: false, afternoon: false, evening: false },
+        6: { morning: false, afternoon: false, evening: false }
+      };
+
+      if (workCond.availability) {
+        workCond.availability.forEach((slot) => {
+          // dayOfWeek: 0 = Sun, 1 = Mon ... 6 = Sat
+          // dayId: 0 = Mon ... 6 = Sun
+          const dayId = (slot.dayOfWeek + 6) % 7;
+          if (slot.timeSlot === 'morning' || slot.timeSlot === 'afternoon' || slot.timeSlot === 'evening') {
+            initialAvailability[dayId][slot.timeSlot as SlotType] = slot.isActive;
+          }
+        });
+      }
+      setWeeklyAvailability(initialAvailability);
+
+      const formats: ServiceFormats = {
+        at_home: false,
+        accompany_outside: false
+      };
+      if (workCond.serviceLocations) {
+        workCond.serviceLocations.forEach((loc) => {
+          if (loc === 'at_home' || loc === 'accompany_outside') {
+            formats[loc] = true;
+          }
+        });
+      }
+      const serviceTypes: string[] = workCond.jobTypes ? [...workCond.jobTypes] : [];
+      setServiceFormats(formats);
+      setSelectedServiceTypes(serviceTypes);
+
+      const prov = workCond.serviceArea?.province || '';
+      setProvince(prov);
+
+      const distStr = workCond.serviceArea?.district || '';
+      const dists = distStr ? distStr.split(',') : [];
+      setSelectedDistricts(dists);
+
+      const langs = caregiverProfile.languages || ['thai'];
+      setSelectedLanguages(langs);
+
       setSavedSnapshot({
-        weeklyAvailability,
-        serviceFormats,
-        selectedServiceTypes,
-        province,
-        selectedDistricts,
-        maxDistance,
-        selectedLanguages,
-        hourlyRate
+        weeklyAvailability: initialAvailability,
+        serviceFormats: formats,
+        selectedServiceTypes: serviceTypes,
+        province: prov,
+        selectedDistricts: dists,
+        selectedLanguages: langs,
+        hourlyRate: rate
       });
     }
-  }, []);
+  }, [caregiverData, workConditionData]);
 
   // Check if there are unsaved changes
   const hasChanges = useMemo(() => {
@@ -168,11 +237,10 @@ export const JobReceptionTab: React.FC = () => {
     return (
       JSON.stringify(weeklyAvailability) !== JSON.stringify(savedSnapshot.weeklyAvailability) ||
       JSON.stringify(serviceFormats) !== JSON.stringify(savedSnapshot.serviceFormats) ||
-      JSON.stringify(selectedServiceTypes.sort()) !== JSON.stringify(savedSnapshot.selectedServiceTypes.sort()) ||
+      JSON.stringify([...selectedServiceTypes].sort()) !== JSON.stringify([...savedSnapshot.selectedServiceTypes].sort()) ||
       province !== savedSnapshot.province ||
-      JSON.stringify(selectedDistricts.sort()) !== JSON.stringify(savedSnapshot.selectedDistricts.sort()) ||
-      maxDistance !== savedSnapshot.maxDistance ||
-      JSON.stringify(selectedLanguages.sort()) !== JSON.stringify(savedSnapshot.selectedLanguages.sort()) ||
+      JSON.stringify([...selectedDistricts].sort()) !== JSON.stringify([...savedSnapshot.selectedDistricts].sort()) ||
+      JSON.stringify([...selectedLanguages].sort()) !== JSON.stringify([...savedSnapshot.selectedLanguages].sort()) ||
       hourlyRate !== savedSnapshot.hourlyRate
     );
   }, [
@@ -181,7 +249,6 @@ export const JobReceptionTab: React.FC = () => {
     selectedServiceTypes,
     province,
     selectedDistricts,
-    maxDistance,
     selectedLanguages,
     hourlyRate,
     savedSnapshot
@@ -215,13 +282,7 @@ export const JobReceptionTab: React.FC = () => {
     }
   };
 
-  const [jobReceptionChecklist, setJobReceptionChecklist] = useState<
-    Record<JobReceptionChecklistKey, boolean>
-  >({
-    profileVisible: true,
-    jobAlerts: true,
-    pauseAnytime: true,
-  });
+
 
   const [jobReceptionError, setJobReceptionError] = useState<string | null>(null);
   const [optimisticIsSearchable, setOptimisticIsSearchable] = useState<boolean | null>(null);
@@ -236,17 +297,6 @@ export const JobReceptionTab: React.FC = () => {
       : 'border-[#E0E2E5] bg-[#F9FAFB]'
     : 'border-[#E0E2E5] bg-[#F9FAFB]';
 
-  const receptionBadgeClass = isKycVerified
-    ? isAcceptingJobsDynamic
-      ? 'bg-[#E0E2E5] text-[#8A8C8E] border border-transparent'
-      : 'bg-[#E0E2E5] text-white'
-    : 'bg-[#E0E2E5] text-white';
-
-  const receptionToggleClass = isKycVerified
-    ? isAcceptingJobsDynamic
-      ? 'bg-[#52B69A] cursor-pointer'
-      : 'bg-[#E0E2E5] cursor-pointer'
-    : 'cursor-not-allowed bg-[#E0E2E5]';
 
   const receptionStatusLabel = isKycVerified
     ? isAcceptingJobsDynamic
@@ -295,15 +345,7 @@ export const JobReceptionTab: React.FC = () => {
     }
   };
 
-  const toggleJobReceptionChecklist = (key: JobReceptionChecklistKey) => {
-    if (!isAcceptingJobsDynamic) {
-      return;
-    }
-    setJobReceptionChecklist((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  };
+
 
   // --- Work Condition Actions ---
 
@@ -340,7 +382,7 @@ export const JobReceptionTab: React.FC = () => {
     setServiceFormats(prev => {
       const next = { ...prev, [key]: !prev[key] };
       // Ensure at least one is selected
-      if (!next.homeCare && !next.travelCare) {
+      if (!next.at_home && !next.accompany_outside) {
         return prev;
       }
       return next;
@@ -383,18 +425,75 @@ export const JobReceptionTab: React.FC = () => {
   const netEarnings = Math.max(0, hourlyRate - platformFee);
 
   // Form Save & Reset Handlers
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
     setIsJustSaved(false);
 
-    setTimeout(() => {
+    try {
+      // 1. Prepare Availability for backend
+      // Backend expects availability: [AvailabilitySlotInput!]
+      // and dayOfWeek 0=Sunday, 1=Monday ... 6=Saturday
+      const availabilityInput: { dayOfWeek: number; timeSlot: string; isActive: boolean }[] = [];
+      Object.keys(weeklyAvailability).forEach((dayStr) => {
+        const dayId = parseInt(dayStr);
+        // Map FE dayId (0 = Mon, ..., 6 = Sun) to BE dayOfWeek (0 = Sun, 1 = Mon, ..., 6 = Sat)
+        const dayOfWeek = (dayId + 1) % 7;
+        const daySlots = weeklyAvailability[dayId];
+
+        // Send only the active slots
+        if (daySlots.morning) {
+          availabilityInput.push({ dayOfWeek, timeSlot: 'morning', isActive: true });
+        }
+        if (daySlots.afternoon) {
+          availabilityInput.push({ dayOfWeek, timeSlot: 'afternoon', isActive: true });
+        }
+        if (daySlots.evening) {
+          availabilityInput.push({ dayOfWeek, timeSlot: 'evening', isActive: true });
+        }
+      });
+
+      // 2. Prepare ServiceLocations & JobTypes (sent as separate fields per backend spec)
+      const serviceLocationsInput = (['at_home', 'accompany_outside'] as const)
+        .filter((k) => serviceFormats[k]);
+
+      const jobTypesInput: string[] = [...selectedServiceTypes];
+
+      // 3. Prepare ServiceArea (district is stored as comma-separated string)
+      const serviceAreaInput = {
+        province,
+        district: selectedDistricts.length > 0 ? selectedDistricts.join(',') : null
+      };
+
+      // Run mutations
+      await Promise.all([
+        updateCaregiverProfile({
+          variables: {
+            input: {
+              hourlyRate: parseFloat(hourlyRate.toString()),
+              languages: selectedLanguages
+            }
+          },
+          refetchQueries: [{ query: GET_CAREGIVER_PROFILE }]
+        }),
+        updateWorkCondition({
+          variables: {
+            input: {
+              availability: availabilityInput,
+              serviceLocations: serviceLocationsInput,
+              jobTypes: jobTypesInput,
+              serviceArea: serviceAreaInput
+            }
+          },
+          refetchQueries: [{ query: GET_WORK_CONDITION }]
+        })
+      ]);
+
       const snapshot = {
         weeklyAvailability,
         serviceFormats,
         selectedServiceTypes,
         province,
         selectedDistricts,
-        maxDistance,
         selectedLanguages,
         hourlyRate
       };
@@ -406,7 +505,12 @@ export const JobReceptionTab: React.FC = () => {
       setTimeout(() => {
         setIsJustSaved(false);
       }, 1200);
-    }, 700);
+    } catch (error) {
+      setIsSaving(false);
+      const fallbackMessage = 'ไม่สามารถบันทึกการตั้งค่าได้';
+      const errorMessage = error instanceof Error ? error.message : fallbackMessage;
+      showError(errorMessage);
+    }
   };
 
   const handleReset = () => {
@@ -416,7 +520,6 @@ export const JobReceptionTab: React.FC = () => {
     setSelectedServiceTypes(savedSnapshot.selectedServiceTypes);
     setProvince(savedSnapshot.province);
     setSelectedDistricts(savedSnapshot.selectedDistricts);
-    setMaxDistance(savedSnapshot.maxDistance);
     setSelectedLanguages(savedSnapshot.selectedLanguages);
     setHourlyRate(savedSnapshot.hourlyRate);
     showSuccess('ล้างการเปลี่ยนแปลงการตั้งค่าแล้ว');
@@ -429,7 +532,7 @@ export const JobReceptionTab: React.FC = () => {
     );
   }, [districtsInProvince, districtSearch]);
 
-  if (caregiverLoading) {
+  if (caregiverLoading || workConditionLoading) {
     return (
       <div className="w-full max-w-[880px] mx-auto bg-[#F6FAF9] px-6 py-7 pb-32 flex flex-col gap-6" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
         {/* Title */}
@@ -537,18 +640,12 @@ export const JobReceptionTab: React.FC = () => {
             {receptionStatusLabel}
           </div>
 
-          <button
-            type="button"
-            onClick={handleToggleReception}
+          <ToggleSwitch
+            checked={isAcceptingJobsDynamic}
+            onChange={handleToggleReception}
             disabled={!isKycVerified || updatingSearchable}
-            aria-label="สลับสถานะการรับงาน"
-            className={`relative h-6 w-12 rounded-full transition-colors ${receptionToggleClass}`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all ${isKycVerified && isAcceptingJobsDynamic ? 'left-6.5' : 'left-0.5'
-                }`}
-            />
-          </button>
+            ariaLabel="สลับสถานะการรับงาน"
+          />
         </div>
 
         <h2 className="text-[20px] font-bold text-[#1A1A1A]">{receptionTitle}</h2>
@@ -557,19 +654,19 @@ export const JobReceptionTab: React.FC = () => {
         {isKycVerified && (
           <div className="mt-4 flex flex-col gap-2.5 pt-3 border-t border-[#E0E2E5]">
             {[
-              { key: 'profileVisible' as const, label: 'โปรไฟล์แสดงในหน้าค้นหา' },
-              { key: 'jobAlerts' as const, label: 'รับการแจ้งเตือนเมื่อมีงาน' },
-              { key: 'pauseAnytime' as const, label: 'ปิดรับงานได้ทุกเมื่อ' },
+              { key: 'profileVisible', label: 'โปรไฟล์แสดงในหน้าค้นหา' },
+              { key: 'jobAlerts', label: 'รับการแจ้งเตือนเมื่อมีงาน' },
+              { key: 'pauseAnytime', label: 'ปิดรับงานได้ทุกเมื่อ' },
             ].map((item) => (
               <div key={item.key} className="flex items-center gap-2">
                 <span className="text-[#DDDDDD] flex items-center">
                   <Icon
-                    name={jobReceptionChecklist[item.key] && isAcceptingJobsDynamic ? 'check_circle' : 'check_circle'}
+                    name="check_circle"
                     size="small"
-                    color={jobReceptionChecklist[item.key] && isAcceptingJobsDynamic ? '#3A9A7E' : '#DDDDDD'}
+                    color={isAcceptingJobsDynamic ? '#3A9A7E' : '#DDDDDD'}
                   />
                 </span>
-                <span className={`text-[13px] font-medium ${jobReceptionChecklist[item.key] && isAcceptingJobsDynamic ? 'text-[#1A1A1A]' : 'text-[#8A8C8E]'}`}>
+                <span className={`text-[13px] font-medium ${isAcceptingJobsDynamic ? 'text-[#1A1A1A]' : 'text-[#8A8C8E]'}`}>
                   {item.label}
                 </span>
               </div>
@@ -722,26 +819,13 @@ export const JobReceptionTab: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-              {[
-                {
-                  key: 'homeCare' as const,
-                  title: 'ที่บ้านผู้ป่วย',
-                  desc: 'ฉันเดินทางไปดูแลที่บ้านผู้ป่วย',
-                  icon: 'home'
-                },
-                {
-                  key: 'travelCare' as const,
-                  title: 'พาออกนอกบ้าน',
-                  desc: 'ฉันพาผู้ป่วยออกนอกบ้าน เช่น พบแพทย์ ทำธุระ',
-                  icon: 'directions_walk'
-                }
-              ].map(format => {
-                const active = serviceFormats[format.key];
+              {SERVICE_LOCATIONS.map(format => {
+                const active = serviceFormats[format.key as keyof ServiceFormats];
                 return (
                   <button
                     type="button"
                     key={format.key}
-                    onClick={() => toggleFormat(format.key)}
+                    onClick={() => toggleFormat(format.key as keyof ServiceFormats)}
                     className={`flex items-start gap-3 p-3.5 rounded-xl border text-left transition-all cursor-pointer ${active
                         ? 'bg-[#E8F5F1] border-[#3A9A7E] shadow-sm'
                         : 'bg-white border-[#E0E2E5] hover:bg-gray-50'
@@ -840,46 +924,25 @@ export const JobReceptionTab: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-
+          <div className="flex flex-col mt-2 max-w-md">
             {/* Province selector */}
-            <div className="flex flex-col">
-              <label htmlFor="select-province" className="text-[13px] font-bold text-[#1A1A1A] mb-1.5">จังหวัด</label>
-              <div className="relative">
-                <select
-                  id="select-province"
-                  value={province}
-                  onChange={(e) => handleProvinceChange(e.target.value)}
-                  className="w-full appearance-none bg-white border border-[#E0E2E5] rounded-xl px-3 py-2.5 pr-9 text-[13px] text-[#1A1A1A] font-medium focus:outline-none focus:ring-2 focus:ring-[#3A9A7E] cursor-pointer"
-                >
-                  <option value="">— กรุณาเลือกจังหวัด —</option>
-                  {provinces.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                  ▼
-                </span>
-              </div>
+            <label htmlFor="select-province" className="text-[13px] font-bold text-[#1A1A1A] mb-1.5">จังหวัด</label>
+            <div className="relative">
+              <select
+                id="select-province"
+                value={province}
+                onChange={(e) => handleProvinceChange(e.target.value)}
+                className="w-full appearance-none bg-white border border-[#E0E2E5] rounded-xl px-3 py-2.5 pr-9 text-[13px] text-[#1A1A1A] font-medium focus:outline-none focus:ring-2 focus:ring-[#3A9A7E] cursor-pointer"
+              >
+                <option value="">— กรุณาเลือกจังหวัด —</option>
+                {provinces.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                ▼
+              </span>
             </div>
-
-            {/* Max distance travel input */}
-            <div className="flex flex-col">
-              <label htmlFor="max-distance" className="text-[13px] font-bold text-[#1A1A1A] mb-1.5">ระยะทางเดินทางสูงสุด</label>
-              <div className="relative flex items-center">
-                <input
-                  id="max-distance"
-                  type="number"
-                  value={maxDistance}
-                  onChange={(e) => setMaxDistance(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="w-full bg-white border border-[#E0E2E5] rounded-xl px-3.5 py-2.5 pr-20 text-[13px] text-[#1A1A1A] font-semibold focus:outline-none focus:ring-2 focus:ring-[#3A9A7E]"
-                />
-                <span className="absolute right-3.5 text-[11px] font-bold text-[#8A8C8E] pointer-events-none">
-                  กิโลเมตร
-                </span>
-              </div>
-            </div>
-
           </div>
 
           {/* District multi-select with tags */}
@@ -897,10 +960,10 @@ export const JobReceptionTab: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => toggleDistrict(dist)}
-                    className="text-[#3A9A7E] hover:text-[#1A5C3A] font-bold cursor-pointer"
+                    className="text-[#3A9A7E] hover:text-[#1A5C3A] font-bold cursor-pointer flex items-center justify-center"
                     aria-label={`ลบเขต ${dist}`}
                   >
-                    ✕
+                    <Icon name="close" size="small" />
                   </button>
                 </span>
               ))}
@@ -1000,10 +1063,10 @@ export const JobReceptionTab: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => toggleLanguage(langId)}
-                      className="text-[#3A9A7E] hover:text-[#1A5C3A] font-bold cursor-pointer"
+                      className="text-[#3A9A7E] hover:text-[#1A5C3A] font-bold cursor-pointer flex items-center justify-center"
                       aria-label={`ลบภาษา ${lang.label}`}
                     >
-                      ✕
+                      <Icon name="close" size="small" />
                     </button>
                   </span>
                 );
@@ -1209,7 +1272,7 @@ export const JobReceptionTab: React.FC = () => {
       </div>
 
       {/* ═ Toast Notifications ═ */}
-      <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />
+      <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" variant="admin-toast" />
 
     </div>
   );
