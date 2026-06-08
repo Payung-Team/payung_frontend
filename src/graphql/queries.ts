@@ -122,6 +122,7 @@ export const GET_CAREGIVER_PROFILE = gql`
       kycVerifiedAt
       resubmitCount
       isSearchable
+      languages
       createdAt
       updatedAt
     }
@@ -138,6 +139,7 @@ export const UPDATE_CAREGIVER_PROFILE = gql`
       experienceYears
       phone
       address
+      languages
       updatedAt
     }
   }
@@ -622,6 +624,42 @@ export const ADMIN_EDIT_USER = gql`
       phone
       address
       bio
+    }
+  }
+`;
+
+export const GET_WORK_CONDITION = gql`
+  query GetWorkCondition {
+    myWorkCondition {
+      availability {
+        dayOfWeek
+        timeSlot
+        isActive
+      }
+      serviceLocations
+      jobTypes
+      serviceArea {
+        province
+        district
+      }
+    }
+  }
+`;
+
+export const UPDATE_WORK_CONDITION = gql`
+  mutation UpdateWorkCondition($input: UpdateWorkConditionInput!) {
+    updateWorkCondition(input: $input) {
+      availability {
+        dayOfWeek
+        timeSlot
+        isActive
+      }
+      serviceLocations
+      jobTypes
+      serviceArea {
+        province
+        district
+      }
     }
   }
 `;
