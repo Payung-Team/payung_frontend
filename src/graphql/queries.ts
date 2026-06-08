@@ -693,6 +693,16 @@ export const GET_CAREGIVER_BOOKINGS = gql`
       data {
         ${CAREGIVER_BOOKING_SUMMARY_FIELDS}
       }
+      pagination {
+        page
+        limit
+        total
+        totalPages
+      }
+    }
+  }
+`;
+
 export const SEARCH_CAREGIVERS = gql`
   query SearchCaregivers($input: SearchCaregiverInput!) {
     searchCaregivers(input: $input) {
@@ -729,6 +739,10 @@ export const GET_CAREGIVER_BOOKING_HISTORY = gql`
         total
         totalPages
       }
+    }
+  }
+`;
+
 export const REQUEST_PASSWORD_RESET = gql`
   mutation RequestPasswordReset($email: String!) {
     requestPasswordReset(input: { email: $email }) {
@@ -764,6 +778,10 @@ export const CANCEL_ACCEPTANCE = gql`
       id
       status
       rejectionReason
+    }
+  }
+`;
+
 export const UPDATE_PASSWORD = gql`
   mutation UpdatePassword($newPassword: String!) {
     updatePassword(input: { newPassword: $newPassword }) {

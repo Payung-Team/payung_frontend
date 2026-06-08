@@ -129,10 +129,21 @@ export default function BookingRequestPage() {
       }
       const displayAddress = displayAddressParts.length > 0 ? displayAddressParts.join(' / ') : '-';
 
+      // Map serviceType from Thai label to database enum string
+      const serviceTypeMap: Record<string, string> = {
+        'ดูแลทั่วไป': 'general_care',
+        'ดูแลผู้ป่วยติดเตียง': 'bedridden_care',
+        'กายภาพบำบัด': 'physiotherapy',
+        'ช่วยจัดการยา': 'medication',
+        'เป็นเพื่อน/พูดคุย': 'companion'
+      };
+      const selectedThaiServiceType = bookingDraft.serviceTypes?.[0] || '';
+      const mappedServiceType = serviceTypeMap[selectedThaiServiceType] || 'general_care';
+
       const payload = {
         tasks: tasksList,
         serviceLocations: serviceLocs,
-        serviceType: 'elderly_care', // Default serviceType for this flow
+        serviceType: mappedServiceType,
         timeSlot: bookingDraft.dateTime?.slot || '',
         startTime: bookingDraft.dateTime?.startTime ? `${bookingDraft.dateTime.startTime}:00` : '',
         durationHours: bookingDraft.dateTime?.duration || 4,
