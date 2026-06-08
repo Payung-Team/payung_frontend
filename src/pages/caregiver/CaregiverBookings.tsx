@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useQuery, useMutation } from '@apollo/client/react';
 import Icon from '../../components/ui/Icon';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
@@ -7,6 +8,14 @@ import { DeclineModal } from '../../components/ui/DeclineModal';
 import { CancelAcceptanceModal } from '../../components/ui/CancelAcceptanceModal';
 import { BookingDetailModal } from '../../components/ui/BookingDetailModal';
 import { AcceptBookingModal } from '../../components/ui/AcceptBookingModal';
+import Skeleton from '../../components/ui/Skeleton';
+import {
+  GET_CAREGIVER_BOOKINGS,
+  GET_CAREGIVER_BOOKING_HISTORY,
+  ACCEPT_BOOKING,
+  DECLINE_BOOKING,
+  CANCEL_ACCEPTANCE,
+} from '../../graphql/queries';
 
 export interface Booking {
   id: string;
@@ -15,251 +24,115 @@ export interface Booking {
   serviceType: string;
   patientName: string;
   price: number;
-  notes?: string;
+  notes?: string; // TODO: No backend source yet
   status: 'pending' | 'accepted' | 'confirmed' | 'declined' | 'completed' | 'cancelled';
   declineReason?: string;
   createdAt: string;
   relation?: string;
-  condition?: string;
+  condition?: string; // TODO: No backend source yet
   locationName?: string;
-  serviceFormat?: string;
+  serviceFormat?: string; // TODO: No backend source yet
   durationText?: string;
-  tasks?: string[];
+  tasks?: string[]; // TODO: No backend source yet
   receivedTimeText?: string;
 }
 
 type TabType = 'scheduled' | 'action_required' | 'history';
 
-const initialBookings: Booking[] = [
-  {
-    id: 'REF-B1',
-    bookingDate: '2026-06-12',
-    time: '09:00 - 12:00',
-    serviceType: 'กายภาพบำบัด',
-    patientName: 'สมศรี วงศ์ดี',
-    price: 1140,
-    notes: 'กายภาพบำบัดฟื้นฟูหลังผ่าตัดเข่า คอยช่วยพยุงและประคบเย็นตามแผนการรักษา',
-    status: 'confirmed',
-    createdAt: '2026-06-01T10:00:00Z',
-    relation: 'สำหรับตัวเอง',
-    condition: 'ผ่าตัดเปลี่ยนเข่าขวา',
-    locationName: 'วัฒนา, กรุงเทพมหานคร',
-    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
-    durationText: '3 ชม.',
-    tasks: ['กายภาพบำบัดเบื้องต้น', 'ช่วยพยุงเดิน', 'ประคบเย็น']
-  },
-  {
-    id: 'REF-J1',
-    bookingDate: '2026-06-15',
-    time: '09:00 - 12:00',
-    serviceType: 'กายภาพบำบัด',
-    patientName: 'สมศรี วงศ์ดี',
-    price: 1140,
-    notes: 'กายภาพบำบัดฟื้นฟูหลังผ่าตัดเข่า คอยช่วยพยุงและประคบเย็นตามแผนการรักษา',
-    status: 'pending',
-    createdAt: '2026-06-03T08:00:00Z',
-    relation: 'สำหรับตัวเอง',
-    condition: 'ผ่าตัดเปลี่ยนเข่าขวา',
-    locationName: 'วัฒนา, กรุงเทพมหานคร',
-    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
-    durationText: '3 ชม.',
-    tasks: ['กายภาพบำบัดเบื้องต้น', 'ช่วยพยุงเดิน', 'ประคบเย็น'],
-    receivedTimeText: 'ได้รับเมื่อ 1 ชม. ที่แล้ว'
-  },
-  {
-    id: 'REF-J2',
-    bookingDate: '2026-06-18',
-    time: '08:00 - 16:00',
-    serviceType: 'ดูแลผู้ป่วยและผู้สูงอายุระยะยาว',
-    patientName: 'นัทธวรรณ เจริญกุล',
-    price: 3420,
-    notes: 'ต้องการคนดูแลอย่างใกล้ชิดและจัดเตรียมอาหารเตือนทานยาตามเวลา',
-    status: 'pending',
-    createdAt: '2026-06-03T08:15:00Z',
-    relation: 'สำหรับมารดา',
-    condition: 'โรคสมองเสื่อมระยะกลาง',
-    locationName: 'ห้วยขวาง, กรุงเทพมหานคร',
-    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
-    durationText: '8 ชม.',
-    tasks: ['เตรียมอาหาร', 'เตือนทานยา', 'ช่วยพยุงเดิน', 'ทำความสะอาดที่นอน'],
-    receivedTimeText: 'ได้รับเมื่อ 1 ชม. ที่แล้ว'
-  },
-  {
-    id: 'REF-J3',
-    bookingDate: '2026-06-20',
-    time: '13:00 - 17:00',
-    serviceType: 'ดูแลผู้สูงอายุระยะสั้น',
-    patientName: 'ธีระ บุญพร',
-    price: 1520,
-    notes: 'ช่วยพยุงออกกำลังกายเบื้องต้นและดูแลเวลาเดินไปห้องน้ำ',
-    status: 'pending',
-    createdAt: '2026-06-03T08:30:00Z',
-    relation: 'สำหรับบิดา',
-    condition: 'โรคพาร์กินสันระยะแรก',
-    locationName: 'พญาไท, กรุงเทพมหานคร',
-    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
-    durationText: '4 ชม.',
-    tasks: ['ช่วยพยุงเดิน', 'เตรียมของว่าง', 'เตือนทานยา'],
-    receivedTimeText: 'ได้รับเมื่อ 1 ชม. ที่แล้ว'
-  },
-  {
-    id: 'REF-A1',
-    bookingDate: '2026-06-22',
-    time: '08:00 - 12:00',
-    serviceType: 'กายภาพบำบัด',
-    patientName: 'มนัสชัย แก้วตา',
-    price: 1520,
-    notes: 'ขอคนดูแลที่เข้าใจผู้สูงอายุที่มีปัญหาการพูดและเคลื่อนไหวช้า',
-    status: 'accepted',
-    createdAt: '2026-06-02T11:00:00Z',
-    relation: 'สำหรับตัวเอง',
-    condition: 'โรคหลอดเลือดสมองระยะฟื้นตัว',
-    locationName: 'ดินแดง, กรุงเทพมหานคร',
-    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
-    durationText: '4 ชม.',
-    tasks: ['ทำกายภาพบำบัดตามกำหนด', 'ช่วยฝึกพูดเบื้องต้น', 'ดูแลเรื่องความปลอดภัย']
-  },
-  {
-    id: 'REF-A2',
-    bookingDate: '2026-06-25',
-    time: '13:00 - 18:00',
-    serviceType: 'ร่วมเดินทางภายนอก',
-    patientName: 'วิชุดา สุขสันต์',
-    price: 2000,
-    notes: 'พาไปตรวจสายตาและตัดแว่นที่คลินิกตามแพทย์นัด',
-    status: 'accepted',
-    createdAt: '2026-06-03T14:30:00Z',
-    relation: 'สำหรับมารดา',
-    condition: 'ผู้สูงอายุสายตาเลือนราง',
-    locationName: 'พญาไท, กรุงเทพมหานคร',
-    serviceFormat: 'ร่วมเดินทางภายนอก',
-    durationText: '5 ชม.',
-    tasks: ['พาเดินทางไปคลินิก', 'ดูแลระหว่างรอแพทย์', 'ช่วยบันทึกคำแนะนำแพทย์']
-  },
-  {
-    id: 'REF-H1',
-    bookingDate: '2026-06-05',
-    time: '09:00 - 13:00',
-    serviceType: 'ดูแลผู้สูงอายุระยะสั้น',
-    patientName: 'ปราณี พรหมใจ',
-    price: 1520,
-    notes: 'ผู้สูงอายุมีอาการปวดข้อเข่า ต้องการการดูแลและช่วยเดิน',
-    status: 'completed',
-    createdAt: '2026-05-28T09:00:00Z',
-    relation: 'สำหรับตัวเอง',
-    condition: 'โรคข้อเข่าเสื่อม',
-    locationName: 'ลาดพร้าว, กรุงเทพมหานคร',
-    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
-    durationText: '4 ชม.',
-    tasks: ['ช่วยพยุงเดิน', 'ประคบร้อน', 'เตือนทานยา', 'เตรียมอาหาร']
-  },
-  {
-    id: 'REF-H2',
-    bookingDate: '2026-05-18',
-    time: '10:00 - 14:00',
-    serviceType: 'ดูแลผู้สูงอายุระยะสั้น',
-    patientName: 'ปราณี พรหมใจ',
-    price: 1520,
-    notes: 'ต้องการพาไปโรงพยาบาลเพื่อตรวจร่างกายประจำปี',
-    status: 'completed',
-    createdAt: '2026-05-10T11:00:00Z',
-    relation: 'สำหรับตัวเอง',
-    condition: 'โรคข้อเข่าเสื่อม',
-    locationName: 'ลาดพร้าว, กรุงเทพมหานคร',
-    serviceFormat: 'ร่วมเดินทางภายนอก',
-    durationText: '4 ชม.',
-    tasks: ['ช่วยพยุงเดิน', 'บันทึกคำแนะนำแพทย์', 'ดูแลระหว่างรอ']
-  },
-  {
-    id: 'REF-H3',
-    bookingDate: '2026-05-10',
-    time: '09:00 - 13:00',
-    serviceType: 'กายภาพบำบัด',
-    patientName: 'สมศรี วงศ์ดี',
-    price: 1520,
-    notes: 'กายภาพบำบัดฟื้นฟูหลังผ่าตัดเข่า',
-    status: 'completed',
-    createdAt: '2026-05-01T08:00:00Z',
-    relation: 'สำหรับตัวเอง',
-    condition: 'ผ่าตัดเปลี่ยนเข่าขวา',
-    locationName: 'วัฒนา, กรุงเทพมหานคร',
-    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
-    durationText: '4 ชม.',
-    tasks: ['กายภาพบำบัดเบื้องต้น', 'ช่วยพยุงเดิน', 'ประคบเย็น']
-  },
-  {
-    id: 'REF-H4',
-    bookingDate: '2026-04-12',
-    time: '09:00 - 13:00',
-    serviceType: 'กายภาพบำบัด',
-    patientName: 'สมศรี วงศ์ดี',
-    price: 1520,
-    notes: 'กายภาพบำบัดครั้งแรกหลังผ่าตัด',
-    status: 'completed',
-    createdAt: '2026-04-05T09:00:00Z',
-    relation: 'สำหรับตัวเอง',
-    condition: 'ผ่าตัดเปลี่ยนเข่าขวา',
-    locationName: 'วัฒนา, กรุงเทพมหานคร',
-    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
-    durationText: '4 ชม.',
-    tasks: ['กายภาพบำบัดเบื้องต้น', 'ช่วยพยุงเดิน', 'ประคบเย็น', 'นวดผ่อนคลายกล้ามเนื้อ']
-  },
-  {
-    id: 'REF-H5',
-    bookingDate: '2026-05-20',
-    time: '09:00 - 17:00',
-    serviceType: 'ดูแลผู้สูงอายุประจำวัน',
-    patientName: 'วิชัย ใจงาม',
-    price: 2000,
-    notes: 'ดูแลพาเดินรับลมช่วงเย็น ป้อนข้าวเที่ยง และเตือนกินยาตามแพทย์สั่ง',
-    status: 'completed',
-    createdAt: '2026-05-15T08:00:00Z',
-    relation: 'สำหรับบิดา',
-    condition: 'สมองเสื่อมระยะแรก',
-    locationName: 'บางนา, กรุงเทพมหานคร',
-    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
-    durationText: '8 ชม.',
-    tasks: ['ป้อนข้าวเที่ยง', 'พาเดินออกกำลังกาย', 'เตือนกินยา']
-  },
-  {
-    id: 'REF-H6',
-    bookingDate: '2026-05-18',
-    time: '10:00 - 12:00',
-    serviceType: 'ร่วมเดินทางภายนอก',
-    patientName: 'นารี มีสุข',
-    price: 800,
-    notes: 'ช่วยพาไปซื้อของใช้ส่วนตัวที่ห้างสรรพสินค้าใกล้บ้าน',
-    status: 'declined',
-    declineReason: 'ติดภารกิจดูแลผู้ป่วยรายอื่นในช่วงเวลาดังกล่าว',
-    createdAt: '2026-05-14T14:20:00Z',
-    relation: 'สำหรับตัวเอง',
-    condition: 'ปกติ/เพื่อความอุ่นใจ',
-    locationName: 'ห้วยขวาง, กรุงเทพมหานคร',
-    serviceFormat: 'ร่วมเดินทางภายนอก',
-    durationText: '2 ชม.',
-    tasks: ['ช่วยพยุงช้อปปิ้ง', 'ช่วยสังเกตอาการภายนอก']
-  },
-  {
-    id: 'REF-H7',
-    bookingDate: '2026-05-15',
-    time: '13:00 - 16:00',
-    serviceType: 'ดูแลผู้สูงอายุระยะสั้น',
-    patientName: 'สมใจ รักสงบ',
-    price: 1140,
-    notes: 'ผู้ป่วยยกเลิกเนื่องจากติดธุระด่วนกับครอบครัว',
-    status: 'cancelled',
-    createdAt: '2026-05-12T10:00:00Z',
-    relation: 'สำหรับตัวเอง',
-    condition: 'ผ่าตัดสะโพกขวา',
-    locationName: 'ปทุมวัน, กรุงเทพมหานคร',
-    serviceFormat: 'ดูแลที่บ้านผู้ป่วย',
-    durationText: '3 ชม.',
-    tasks: ['ช่วยพยุงเดิน', 'เตรียมน้ำดื่มและยา']
+// Helper to convert backend booking summary to frontend Booking model
+function mapToBooking(summary: any): Booking {
+  const durationHours = summary.durationHours;
+  const startTime = summary.startTime; // "HH:mm"
+  
+  let time = startTime || '';
+  if (startTime && durationHours) {
+    try {
+      const [sh, sm] = startTime.split(':').map(Number);
+      const startMinutes = sh * 60 + sm;
+      const endMinutes = startMinutes + Math.round(durationHours * 60);
+      const eh = Math.floor(endMinutes / 60) % 24;
+      const em = endMinutes % 60;
+      const ehStr = String(eh).padStart(2, '0');
+      const emStr = String(em).padStart(2, '0');
+      time = `${startTime} - ${ehStr}:${emStr}`;
+    } catch (e) {
+      time = startTime;
+    }
   }
-];
+
+  // receivedTimeText relative time helper
+  let receivedTimeText = undefined;
+  if (summary.createdAt) {
+    try {
+      const created = new Date(summary.createdAt);
+      const now = new Date();
+      const diffMs = now.getTime() - created.getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      if (diffHours >= 24) {
+        const diffDays = Math.floor(diffHours / 24);
+        receivedTimeText = `ได้รับเมื่อ ${diffDays} วันที่แล้ว`;
+      } else if (diffHours <= 0) {
+        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+        receivedTimeText = diffMinutes <= 1 ? 'ได้รับเมื่อสักครู่' : `ได้รับเมื่อ ${diffMinutes} นาทีที่แล้ว`;
+      } else {
+        receivedTimeText = `ได้รับเมื่อ ${diffHours} ชม. ที่แล้ว`;
+      }
+    } catch {
+      receivedTimeText = undefined;
+    }
+  }
+
+  const statusLower = (summary.status || '').toLowerCase();
+  const status = statusLower === 'rejected' ? 'declined' : statusLower;
+
+  return {
+    id: summary.id,
+    bookingDate: summary.bookingDate,
+    time,
+    serviceType: summary.serviceType,
+    patientName: summary.patient?.displayName ?? 'ผู้ใช้บริการ',
+    price: summary.estimatedCost ?? 0,
+    status: status as any,
+    declineReason: summary.rejectionReason ?? undefined,
+    createdAt: summary.createdAt,
+    relation: summary.careRecipientName ? `สำหรับ: ${summary.careRecipientName}` : 'สำหรับตัวเอง',
+    condition: undefined, // TODO: No backend source yet
+    locationName: summary.locationAddress || (summary.serviceLocations ? summary.serviceLocations.join(', ') : undefined),
+    serviceFormat: undefined, // TODO: No backend source yet
+    durationText: `${durationHours} ชม.`,
+    tasks: undefined, // TODO: No backend source yet
+    receivedTimeText,
+    notes: undefined, // TODO: No backend source yet
+  };
+}
+
+
+interface CaregiverBookingsData {
+  caregiverBookings: {
+    data: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  };
+}
+
+interface CaregiverBookingHistoryData {
+  caregiverBookingHistory: {
+    data: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  };
+}
+
 
 export const CaregiverBookings: React.FC = () => {
-  const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [activeTab, setActiveTab] = useState<TabType>('scheduled');
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
 
@@ -282,35 +155,120 @@ export const CaregiverBookings: React.FC = () => {
   // Accept Booking Modal state
   const [acceptModalBooking, setAcceptModalBooking] = useState<Booking | null>(null);
 
-  const { toasts, removeToast, success: showSuccess } = useToast();
+  const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
+
+  // Parallel Apollo Queries
+  const {
+    data: pendingData,
+    loading: pendingLoading,
+    error: pendingError,
+    refetch: refetchPending,
+  } = useQuery<CaregiverBookingsData>(GET_CAREGIVER_BOOKINGS, {
+    variables: { input: { status: 'PENDING', limit: 50 } },
+  });
+
+  const {
+    data: acceptedData,
+    loading: acceptedLoading,
+    error: acceptedError,
+    refetch: refetchAccepted,
+  } = useQuery<CaregiverBookingsData>(GET_CAREGIVER_BOOKINGS, {
+    variables: { input: { status: 'ACCEPTED', limit: 50 } },
+  });
+
+  const {
+    data: confirmedData,
+    loading: confirmedLoading,
+    error: confirmedError,
+    refetch: refetchConfirmed,
+  } = useQuery<CaregiverBookingsData>(GET_CAREGIVER_BOOKINGS, {
+    variables: { input: { status: 'CONFIRMED', upcoming: true, limit: 50 } },
+  });
+
+  // History tab variables
+  const [historyPage] = useState(1);
+  const historyLimit = 50;
+
+  const mappedHistoryStatus =
+    historySubFilter === 'all'
+      ? undefined
+      : historySubFilter === 'declined'
+      ? 'REJECTED'
+      : historySubFilter.toUpperCase();
+
+  const {
+    data: historyData,
+    loading: historyLoading,
+    error: historyError,
+    refetch: refetchHistory,
+  } = useQuery<CaregiverBookingHistoryData>(GET_CAREGIVER_BOOKING_HISTORY, {
+    variables: {
+      input: {
+        status: mappedHistoryStatus,
+        page: historyPage,
+        limit: historyLimit,
+      },
+    },
+    skip: activeTab !== 'history',
+  });
+
+  // Apollo Mutations
+  const [acceptBooking] = useMutation(ACCEPT_BOOKING);
+  const [declineBooking] = useMutation(DECLINE_BOOKING);
+  const [cancelAcceptance] = useMutation(CANCEL_ACCEPTANCE);
+
+  // Lists mapped through adapter
+  const pendingList = pendingData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
+  const acceptedList = acceptedData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
+  const confirmedList = confirmedData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
+  const historyList = historyData?.caregiverBookingHistory?.data?.map(mapToBooking) ?? [];
+
+  const findBookingById = (id: string): Booking | null => {
+    return (
+      (pendingList as Booking[]).find((b: Booking) => b.id === id) ||
+      (acceptedList as Booking[]).find((b: Booking) => b.id === id) ||
+      (confirmedList as Booking[]).find((b: Booking) => b.id === id) ||
+      (historyList as Booking[]).find((b: Booking) => b.id === id) ||
+      null
+    );
+  };
 
   const handleToggleExpand = (id: string) => {
     setExpandedCardId(expandedCardId === id ? null : id);
   };
 
   const handleAccept = (id: string) => {
-    const booking = bookings.find(b => b.id === id);
+    const booking = findBookingById(id);
     if (booking) {
       setAcceptModalBooking(booking);
     }
   };
 
-  const handleConfirmAccept = () => {
+  const handleConfirmAccept = async () => {
     if (!acceptModalBooking) return;
     const booking = acceptModalBooking;
-    setBookings(prev =>
-      prev.map(b => (b.id === booking.id ? { ...b, status: 'accepted' } : b))
-    );
     setAcceptModalBooking(null);
-    
-    // Show system toast notifications with bold patient name and multi-line message
-    const msg = (
-      <>
-        ยอมรับคำขอของ <strong className="font-bold text-[#1A1A1A]">{booking.patientName}</strong> แล้ว{"\n"}
-        ส่งตารางเวลาให้ผู้ป่วยยืนยันขั้นตอนต่อไป
-      </>
-    );
-    showSuccess(msg, 4000, 'booking-toast');
+
+    try {
+      await acceptBooking({
+        variables: { bookingId: booking.id },
+        refetchQueries: [
+          { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'PENDING', limit: 50 } } },
+          { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'ACCEPTED', limit: 50 } } },
+        ],
+        awaitRefetchQueries: true,
+      });
+
+      const msg = (
+        <>
+          ยอมรับคำขอของ <strong className="font-bold text-[#1A1A1A]">{booking.patientName}</strong> แล้ว{"\n"}
+          ส่งตารางเวลาให้ผู้ป่วยยืนยันขั้นตอนต่อไป
+        </>
+      );
+      showSuccess(msg, 4000, 'booking-toast');
+    } catch (err) {
+      showError('ไม่สามารถยอมรับการจองได้ กรุณาลองใหม่อีกครั้ง');
+    }
   };
 
   const handleDeclineClick = (id: string) => {
@@ -377,21 +335,18 @@ export const CaregiverBookings: React.FC = () => {
   const getFilteredBookings = () => {
     let list: Booking[] = [];
     if (activeTab === 'scheduled') {
-      list = bookings.filter(b => b.status === 'confirmed');
+      list = confirmedList;
     } else if (activeTab === 'action_required') {
       if (actionSubFilter === 'all') {
-        list = bookings.filter(b => b.status === 'pending' || b.status === 'accepted');
+        list = [...pendingList, ...acceptedList];
       } else if (actionSubFilter === 'new') {
-        list = bookings.filter(b => b.status === 'pending');
+        list = pendingList;
       } else if (actionSubFilter === 'waiting') {
-        list = bookings.filter(b => b.status === 'accepted');
+        list = acceptedList;
       }
     } else {
-      // History: completed, cancelled, declined only
-      list = bookings.filter(b => ['completed', 'cancelled', 'declined'].includes(b.status));
-      if (historySubFilter !== 'all') {
-        list = list.filter(b => b.status === historySubFilter);
-      }
+      // History List is already pre-filtered by query variables, but we keep the fallback filter
+      list = historyList;
     }
 
     if (activeTab === 'scheduled') {
@@ -417,11 +372,14 @@ export const CaregiverBookings: React.FC = () => {
 
   const filteredBookings = getFilteredBookings();
 
-  const scheduledCount = bookings.filter(b => b.status === 'confirmed').length;
-  const pendingCount = bookings.filter(b => b.status === 'pending' || b.status === 'accepted').length;
-  const newRequestsCount = bookings.filter(b => b.status === 'pending').length;
-  const waitingConfirmCount = bookings.filter(b => b.status === 'accepted').length;
-  const historyCount = bookings.filter(b => ['completed', 'cancelled', 'declined'].includes(b.status)).length;
+  const scheduledCount = confirmedData?.caregiverBookings?.pagination?.total ?? confirmedList.length;
+  const newRequestsCount = pendingData?.caregiverBookings?.pagination?.total ?? pendingList.length;
+  const waitingConfirmCount = acceptedData?.caregiverBookings?.pagination?.total ?? acceptedList.length;
+  const pendingCount = newRequestsCount + waitingConfirmCount;
+  const historyCount = historyData?.caregiverBookingHistory?.pagination?.total ?? historyList.length;
+
+  const isLoading = pendingLoading || acceptedLoading || confirmedLoading || (activeTab === 'history' && historyLoading);
+  const isError = !!(pendingError || acceptedError || confirmedError || (activeTab === 'history' && historyError));
 
   // Style helper based on status badge
   const getStatusBadgeStyle = (status: Booking['status']) => {
@@ -742,7 +700,30 @@ export const CaregiverBookings: React.FC = () => {
                     </div>
                   )}
 
-                  {filteredBookings.length === 0 ? (
+                  {isLoading ? (
+                    <div className="w-full flex flex-col gap-4">
+                      <Skeleton height={140} borderRadius={16} className="w-full" />
+                      <Skeleton height={140} borderRadius={16} className="w-full" />
+                      <Skeleton height={140} borderRadius={16} className="w-full" />
+                    </div>
+                  ) : isError ? (
+                    <div className="w-full py-12 flex flex-col items-center justify-center text-center">
+                      <Icon name="error" className="text-5xl text-red-500 mb-3" />
+                      <p className="text-red-700 font-semibold">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          refetchPending();
+                          refetchAccepted();
+                          refetchConfirmed();
+                          if (activeTab === 'history') refetchHistory();
+                        }}
+                        className="mt-4 px-4 py-2 bg-[#52B69A] text-white text-sm font-semibold rounded-lg hover:bg-[#3A9A7E] transition-colors"
+                      >
+                        ลองใหม่อีกครั้ง
+                      </button>
+                    </div>
+                  ) : filteredBookings.length === 0 ? (
                     <div className="w-full py-12 flex flex-col items-center justify-center text-center">
                       <Icon name="work_off" className="text-5xl text-gray-300 mb-3" />
                       <p className="text-gray-500 font-semibold">ไม่มีรายการนัดหมายในหน้านี้</p>
@@ -786,58 +767,78 @@ export const CaregiverBookings: React.FC = () => {
 
       <DeclineModal
         isOpen={!!declineModalId}
-        booking={bookings.find(b => b.id === declineModalId) || null}
+        booking={declineModalId ? findBookingById(declineModalId) : null}
         onClose={() => setDeclineModalId(null)}
-        onSubmit={(reason) => {
+        onSubmit={async (reason) => {
           if (!declineModalId) return;
-          const targetBooking = bookings.find(b => b.id === declineModalId);
-          setBookings(prev =>
-            prev.map(b =>
-              b.id === declineModalId
-                ? { ...b, status: 'declined', declineReason: reason }
-                : b
-            )
-          );
+          const targetBooking = findBookingById(declineModalId);
           setDeclineModalId(null);
-          
-          if (targetBooking) {
-            const msg = (
-              <>
-                ปฏิเสธคำขอจองของ <strong className="font-bold">{targetBooking.patientName}</strong> แล้ว
-              </>
-            );
-            showSuccess(msg, 4000, 'decline-toast');
-          } else {
-            showSuccess('ปฏิเสธการจองนัดหมายเรียบร้อยแล้ว');
+          try {
+            await declineBooking({
+              variables: {
+                input: {
+                  bookingId: declineModalId,
+                  reason,
+                },
+              },
+              refetchQueries: [
+                { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'PENDING', limit: 50 } } },
+                { query: GET_CAREGIVER_BOOKING_HISTORY, variables: { input: { status: mappedHistoryStatus, page: historyPage, limit: historyLimit } } },
+              ],
+              awaitRefetchQueries: true,
+            });
+
+            if (targetBooking) {
+              const msg = (
+                <>
+                  ปฏิเสธคำขอจองของ <strong className="font-bold">{targetBooking.patientName}</strong> แล้ว
+                </>
+              );
+              showSuccess(msg, 4000, 'decline-toast');
+            } else {
+              showSuccess('ปฏิเสธการจองนัดหมายเรียบร้อยแล้ว');
+            }
+          } catch (err) {
+            showError('ไม่สามารถปฏิเสธคำขอจองได้ กรุณาลองใหม่อีกครั้ง');
           }
         }}
       />
 
       <CancelAcceptanceModal
         isOpen={!!cancelAcceptanceModalId}
-        booking={bookings.find(b => b.id === cancelAcceptanceModalId) || null}
+        booking={cancelAcceptanceModalId ? findBookingById(cancelAcceptanceModalId) : null}
         onClose={() => setCancelAcceptanceModalId(null)}
-        onSubmit={(reason) => {
+        onSubmit={async (reason) => {
           if (!cancelAcceptanceModalId) return;
-          const targetBooking = bookings.find(b => b.id === cancelAcceptanceModalId);
-          setBookings(prev =>
-            prev.map(b =>
-              b.id === cancelAcceptanceModalId
-                ? { ...b, status: 'declined', declineReason: `ยกเลิกการตอบรับ: ${reason}` }
-                : b
-            )
-          );
+          const targetBooking = findBookingById(cancelAcceptanceModalId);
           setCancelAcceptanceModalId(null);
-          
-          if (targetBooking) {
-            const msg = (
-              <>
-                ยกเลิกการตอบรับงานของ <strong className="font-bold">{targetBooking.patientName}</strong> แล้ว
-              </>
-            );
-            showSuccess(msg, 4000, 'cancel-toast');
-          } else {
-            showSuccess('ยกเลิกการตอบรับงานเรียบร้อยแล้ว');
+          try {
+            await cancelAcceptance({
+              variables: {
+                input: {
+                  bookingId: cancelAcceptanceModalId,
+                  reason,
+                },
+              },
+              refetchQueries: [
+                { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'ACCEPTED', limit: 50 } } },
+                { query: GET_CAREGIVER_BOOKING_HISTORY, variables: { input: { status: mappedHistoryStatus, page: historyPage, limit: historyLimit } } },
+              ],
+              awaitRefetchQueries: true,
+            });
+
+            if (targetBooking) {
+              const msg = (
+                <>
+                  ยกเลิกการตอบรับงานของ <strong className="font-bold">{targetBooking.patientName}</strong> แล้ว
+                </>
+              );
+              showSuccess(msg, 4000, 'decline-toast');
+            } else {
+              showSuccess('ยกเลิกการตอบรับงานเรียบร้อยแล้ว');
+            }
+          } catch (err) {
+            showError('ไม่สามารถยกเลิกการตอบรับงานได้ กรุณาลองใหม่อีกครั้ง');
           }
         }}
       />

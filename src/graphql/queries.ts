@@ -663,3 +663,88 @@ export const UPDATE_WORK_CONDITION = gql`
     }
   }
 `;
+
+const CAREGIVER_BOOKING_SUMMARY_FIELDS = `
+  id
+  status
+  serviceType
+  serviceLocations
+  timeSlot
+  bookingDate
+  startTime
+  durationHours
+  estimatedCost
+  locationAddress
+  patient {
+    id
+    displayName
+    avatarUrl
+  }
+  careRecipientName
+  acceptedAt
+  confirmedAt
+  rejectionReason
+  createdAt
+`;
+
+export const GET_CAREGIVER_BOOKINGS = gql`
+  query GetCaregiverBookings($input: CaregiverBookingsInput!) {
+    caregiverBookings(input: $input) {
+      data {
+        ${CAREGIVER_BOOKING_SUMMARY_FIELDS}
+      }
+      pagination {
+        page
+        limit
+        total
+        totalPages
+      }
+    }
+  }
+`;
+
+export const GET_CAREGIVER_BOOKING_HISTORY = gql`
+  query GetCaregiverBookingHistory($input: CaregiverBookingHistoryInput) {
+    caregiverBookingHistory(input: $input) {
+      data {
+        ${CAREGIVER_BOOKING_SUMMARY_FIELDS}
+      }
+      pagination {
+        page
+        limit
+        total
+        totalPages
+      }
+    }
+  }
+`;
+
+export const ACCEPT_BOOKING = gql`
+  mutation AcceptBooking($bookingId: ID!) {
+    acceptBooking(bookingId: $bookingId) {
+      id
+      status
+      acceptedAt
+    }
+  }
+`;
+
+export const DECLINE_BOOKING = gql`
+  mutation DeclineBooking($input: DeclineBookingInput!) {
+    declineBooking(input: $input) {
+      id
+      status
+      rejectionReason
+    }
+  }
+`;
+
+export const CANCEL_ACCEPTANCE = gql`
+  mutation CancelAcceptance($input: CancelAcceptanceInput!) {
+    cancelAcceptance(input: $input) {
+      id
+      status
+      rejectionReason
+    }
+  }
+`;
