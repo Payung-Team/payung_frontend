@@ -56,11 +56,34 @@ interface FilterState {
 
 const JOB_TYPES = [
   { id: 'general_care', label: 'ดูแลทั่วไป' },
-  { id: 'physical_therapy', label: 'กายภาพบำบัด' },
+  { id: 'physiotherapy', label: 'กายภาพบำบัด' },
   { id: 'bedridden_care', label: 'ดูแลผู้ป่วยติดเตียง' },
-  { id: 'medication_management', label: 'ช่วยจัดการยา' },
+  { id: 'medication', label: 'ช่วยจัดการยา' },
   { id: 'companion', label: 'เป็นเพื่อน/พูดคุย' },
 ];
+
+const SERVICE_TYPE_MAP: Record<string, string> = {
+  'ดูแลทั่วไป': 'general_care',
+  'กายภาพบำบัด': 'physiotherapy',
+  'ดูแลผู้ป่วยติดเตียง': 'bedridden_care',
+  'ช่วยจัดการยา': 'medication',
+  'เป็นเพื่อน/พูดคุย': 'companion',
+};
+
+const SKILL_TRANSLATIONS: Record<string, string> = {
+  mobility: 'ช่วยเคลื่อนไหว',
+  medication: 'ดูแลยา',
+  bathing: 'อาบน้ำ / สุขอนามัย',
+  cooking: 'ทำอาหาร',
+  companionship: 'เป็นเพื่อนคุย',
+  wound_care: 'ดูแลแผล',
+  physical_therapy: 'กายภาพบำบัด',
+  physiotherapy: 'กายภาพบำบัด',
+  dementia_care: 'ดูแลสมองเสื่อม',
+  general_care: 'ดูแลทั่วไป',
+  bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
+  companion: 'เป็นเพื่อน/พูดคุย',
+};
 
 const SORT_OPTIONS = [
   { value: 'RATING_DESC', label: 'Rating สูงสุด' },
@@ -80,156 +103,6 @@ const PRICE_MAX = 1000;
 const PAGE_LIMIT = 9;
 
 const db = new ThailandAddressSimple();
-
-// ── Mock Data (set USE_MOCK=false to disable) ──────────────────────────────────
-const USE_MOCK = true;
-
-const MOCK_CAREGIVERS: CaregiverSummary[] = [
-  {
-    id: 'mock-1',
-    fullName: 'สมหญิง ใจดี',
-    avatarUrl: null,
-    hourlyRate: 250,
-    avgRating: 4.9,
-    reviewCount: 132,
-    skills: ['ดูแลทั่วไป', 'ช่วยจัดการยา', 'เป็นเพื่อน/พูดคุย'],
-    province: 'กรุงเทพมหานคร',
-    district: 'พระโขนง',
-    gender: 'female',
-    experience: 5,
-    distance: 1.2,
-    verified: true,
-    bio: 'มีประสบการณ์ดูแลผู้สูงอายุที่บ้านมา 5 ปี เน้นความใส่ใจ ตรงต่อเวลา ดูแลทั้งกิจวัตรประจำวัน เช่น อาบน้ำ ป้อนอาหาร และพาเดิน',
-  },
-  {
-    id: 'mock-2',
-    fullName: 'วิไล พรรณราย',
-    avatarUrl: null,
-    hourlyRate: 300,
-    avgRating: 4.7,
-    reviewCount: 87,
-    skills: ['กายภาพบำบัด', 'ดูแลผู้ป่วยติดเตียง'],
-    province: 'กรุงเทพมหานคร',
-    district: 'ลาดพร้าว',
-    gender: 'female',
-    experience: 8,
-    distance: 2.8,
-    verified: true,
-    bio: 'นักกายภาพบำบัด ทำงานในรพ.เอกชน 8 ปี เชี่ยวชาญการฟื้นฟูผู้ป่วยหลังผ่าตัดสะโพกและเข่า',
-  },
-  {
-    id: 'mock-3',
-    fullName: 'นภา สว่างใจ',
-    avatarUrl: null,
-    hourlyRate: 200,
-    avgRating: 4.5,
-    reviewCount: 54,
-    skills: ['ดูแลทั่วไป', 'เป็นเพื่อน/พูดคุย'],
-    province: 'นนทบุรี',
-    district: 'ปากเกร็ด',
-    gender: 'female',
-    experience: 3,
-    distance: 4.5,
-    verified: true,
-    bio: 'ใจเย็น พูดคุยเก่ง อารมณ์ดี ช่วยให้ผู้สูงอายุไม่เหงา และดูแลกิจวัตรประจำวันได้ครบถ้วน',
-  },
-  {
-    id: 'mock-4',
-    fullName: 'ประภา เจริญสุข',
-    avatarUrl: null,
-    hourlyRate: 350,
-    avgRating: 5.0,
-    reviewCount: 210,
-    skills: ['กายภาพบำบัด', 'ช่วยจัดการยา', 'ดูแลผู้ป่วยติดเตียง', 'ดูแลทั่วไป'],
-    province: 'กรุงเทพมหานคร',
-    district: 'บึงกุ่ม',
-    gender: 'female',
-    experience: 12,
-    distance: 0.8,
-    verified: true,
-    bio: 'พยาบาลวิชาชีพ มีใบประกอบ ประสบการณ์ดูแลผู้ป่วยติดเตียงและฟอกไต ทำงานเป็นทีมกับทีมแพทย์ที่บ้าน',
-  },
-  {
-    id: 'mock-5',
-    fullName: 'มาลี รักษาดี',
-    avatarUrl: null,
-    hourlyRate: 180,
-    avgRating: null,
-    reviewCount: 0,
-    skills: ['ดูแลทั่วไป'],
-    province: 'ปทุมธานี',
-    district: 'ธัญบุรี',
-    gender: 'female',
-    experience: 1,
-    distance: 6.2,
-    verified: false,
-    bio: 'ผ่านการอบรมหลักสูตรดูแลผู้สูงอายุ พร้อมรับงานดูแลทั่วไปและช่วยพยุงเดิน',
-  },
-  {
-    id: 'mock-6',
-    fullName: 'อรทัย ชูแสง',
-    avatarUrl: null,
-    hourlyRate: 275,
-    avgRating: 4.2,
-    reviewCount: 31,
-    skills: ['ดูแลผู้ป่วยติดเตียง', 'ช่วยจัดการยา'],
-    province: 'กรุงเทพมหานคร',
-    district: 'มีนบุรี',
-    gender: 'female',
-    experience: 4,
-    distance: 3.9,
-    verified: true,
-    bio: 'เน้นความสะอาด ปลอดภัย เอาใจใส่ดูแลอย่างใกล้ชิด มีประสบการณ์จัดยาตามแพทย์สั่ง',
-  },
-  {
-    id: 'mock-7',
-    fullName: 'กัญญา ทองดี',
-    avatarUrl: null,
-    hourlyRate: 320,
-    avgRating: 4.8,
-    reviewCount: 99,
-    skills: ['กายภาพบำบัด', 'เป็นเพื่อน/พูดคุย', 'ดูแลทั่วไป'],
-    province: 'สมุทรปราการ',
-    district: 'เมืองสมุทรปราการ',
-    gender: 'female',
-    experience: 7,
-    distance: 3.4,
-    verified: true,
-    bio: 'จบสาธารณสุข ดูแลผู้สูงอายุระยะยาวเป็นหลัก เน้นการออกกำลังกายเบาๆ และเป็นเพื่อนพูดคุย',
-  },
-  {
-    id: 'mock-8',
-    fullName: 'สุนีย์ แก้วใส',
-    avatarUrl: null,
-    hourlyRate: 150,
-    avgRating: 3.8,
-    reviewCount: 12,
-    skills: ['เป็นเพื่อน/พูดคุย'],
-    province: 'กรุงเทพมหานคร',
-    district: 'บางเขน',
-    gender: 'female',
-    experience: 2,
-    distance: 5.6,
-    verified: false,
-    bio: 'ดูแลเอาใจใส่ประหนึ่งญาติมิตร เชี่ยวชาญการเป็นเพื่อนคุยและทำกิจกรรมนันทนาการ',
-  },
-  {
-    id: 'mock-9',
-    fullName: 'ธิดา มั่นคง',
-    avatarUrl: null,
-    hourlyRate: 400,
-    avgRating: 4.6,
-    reviewCount: 73,
-    skills: ['ดูแลผู้ป่วยติดเตียง', 'กายภาพบำบัด', 'ช่วยจัดการยา', 'ดูแลทั่วไป', 'เป็นเพื่อน/พูดคุย'],
-    province: 'กรุงเทพมหานคร',
-    district: 'วังทองหลาง',
-    gender: 'female',
-    experience: 9,
-    distance: 2.1,
-    verified: true,
-    bio: 'ผู้ช่วยพยาบาลวิชาชีพ ประสบการณ์ในหอผู้ป่วยวิกฤต เชี่ยวชาญการดูแลสายยาง ให้อาหารทางสาย และทำแผลกดทับ',
-  },
-];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -251,8 +124,9 @@ function StarRating({ rating, count, size = 16 }: { rating: number; count?: numb
 function CaregiverCard({ cg, onSelect }: { cg: CaregiverSummary; onSelect?: (cg: CaregiverSummary) => void }) {
   const fullName = cg.fullName;
   const hasRating = cg.avgRating != null && cg.reviewCount > 0;
-  const visibleSkills = cg.skills.slice(0, 3);
-  const extraSkills = cg.skills.length - 3;
+  const translatedSkills = cg.skills.map((skill) => SKILL_TRANSLATIONS[skill] || skill);
+  const visibleSkills = translatedSkills.slice(0, 3);
+  const extraSkills = translatedSkills.length - 3;
   const hasMeta = cg.gender != null || cg.experience != null;
 
   return (
@@ -351,22 +225,33 @@ function CaregiverCard({ cg, onSelect }: { cg: CaregiverSummary; onSelect?: (cg:
         </div>
 
         {/* ── Right: rate + CTA (centered column) ── */}
-        <div className="flex-shrink-0 self-stretch sm:self-center w-full sm:w-auto
+        <div className="flex-shrink-0 self-stretch sm:self-center w-full sm:w-[120px]
                         flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-3 sm:gap-2 sm:text-center
                         pt-3 sm:pt-0 border-t border-[#F0F1F3] sm:border-t-0">
-          <div className="num text-[22px] font-bold text-[#1A1A1A] leading-none">
+          <div className="num text-[24px] font-bold text-[#1A1A1A] leading-none mb-1">
             ฿{cg.hourlyRate.toLocaleString()}
             <span className="text-[13px] text-[#8A8C8E] font-medium">/ชม.</span>
           </div>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onSelect?.(cg); }}
-            className="h-9 px-4 bg-[#52B69A] hover:bg-[#45A085] active:bg-[#3A9A7E]
-                       text-white text-[13px] font-bold rounded-lg transition-colors duration-150 whitespace-nowrap"
-            style={{ fontFamily: "'Bai Jamjuree', sans-serif", boxShadow: '0 4px 12px rgba(82,182,154,0.2)' }}
-          >
-            เลือกผู้ดูแลนี้
-          </button>
+          <div className="flex flex-row sm:flex-col gap-2 w-full">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onSelect?.(cg); }}
+              className="h-9 w-full bg-[#52B69A] hover:bg-[#45A085] active:bg-[#3A9A7E]
+                         text-white text-[13px] font-bold rounded-lg transition-colors duration-150 whitespace-nowrap cursor-pointer"
+              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+            >
+              จอง
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); console.log('view caregiver profile', cg.id); }}
+              className="h-9 w-full bg-white border border-[#E0E2E5] hover:bg-gray-50 active:bg-gray-100
+                         text-[#575859] text-[13px] font-bold rounded-lg transition-colors duration-150 whitespace-nowrap cursor-pointer"
+              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+            >
+              ดูโปรไฟล์
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -686,8 +571,8 @@ function FilterSidebar({
 const SearchPage: React.FC = () => {
   const { bookingDraft } = useBooking();
 
-  // ── Entry guard: must come from booking flow (skipped in mock mode) ──
-  if (!USE_MOCK && !bookingDraft) {
+  // ── Entry guard: must come from booking flow ──
+  if (!bookingDraft) {
     return <Navigate to="/booking/new" replace />;
   }
 
@@ -719,14 +604,19 @@ function SearchPageContent() {
   }, [dbReady]);
 
   // ── Initial filters pre-filled from booking draft ──
-  const initialFilters: FilterState = useMemo(() => ({
-    province: bookingDraft?.locationDetails?.province ?? '',
-    district: bookingDraft?.locationDetails?.district ?? '',
-    jobTypes: [],
-    minPrice: PRICE_MIN,
-    maxPrice: PRICE_MAX,
-    minRating: null,
-  }), []);
+  const initialFilters: FilterState = useMemo(() => {
+    const draftJobTypes = bookingDraft?.serviceTypes
+      ? bookingDraft.serviceTypes.map(st => SERVICE_TYPE_MAP[st]).filter(Boolean)
+      : [];
+    return {
+      province: bookingDraft?.locationDetails?.province ?? '',
+      district: bookingDraft?.locationDetails?.district ?? '',
+      jobTypes: draftJobTypes,
+      minPrice: PRICE_MIN,
+      maxPrice: PRICE_MAX,
+      minRating: null,
+    };
+  }, [bookingDraft]);
 
   const [pendingFilters, setPendingFilters] = useState<FilterState>(initialFilters);
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(initialFilters);
@@ -767,15 +657,14 @@ function SearchPageContent() {
     variables: { input: queryInput },
     fetchPolicy: 'cache-and-network',
     notifyOnNetworkStatusChange: true,
-    skip: USE_MOCK,
   });
 
-  const caregivers = USE_MOCK ? MOCK_CAREGIVERS : (data?.searchCaregivers.data ?? []);
-  const pagination = USE_MOCK ? undefined : data?.searchCaregivers.pagination;
-  const totalPages = USE_MOCK ? 1 : (pagination?.totalPages ?? 1);
-  const totalResults = USE_MOCK ? MOCK_CAREGIVERS.length : (pagination?.total ?? 0);
-  const loading = USE_MOCK ? false : gqlLoading;
-  const error = USE_MOCK ? undefined : gqlError;
+  const caregivers = data?.searchCaregivers.data ?? [];
+  const pagination = data?.searchCaregivers.pagination;
+  const totalPages = pagination?.totalPages ?? 1;
+  const totalResults = pagination?.total ?? 0;
+  const loading = gqlLoading;
+  const error = gqlError;
 
   const handleSortChange = (value: string) => {
     setSortBy(value);
@@ -806,7 +695,7 @@ function SearchPageContent() {
 
         {/* ── Page Header ── */}
         <div className="mb-6">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2">
             <span className="material-icons text-[18px] text-[#52B69A]">arrow_back</span>
             <button
               type="button"
@@ -817,13 +706,6 @@ function SearchPageContent() {
               กลับไปที่การจอง
             </button>
           </div>
-          
-          {(appliedFilters.province || appliedFilters.district) && (
-            <p className="text-[13px] text-[#8A8C8E] mt-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-              <span className="material-icons text-[13px] text-[#52B69A] align-middle mr-0.5">place</span>
-              {[appliedFilters.district, appliedFilters.province].filter(Boolean).join(', ')}
-            </p>
-          )}
         </div>
 
         {/* ── Mobile filter trigger ── */}
@@ -881,14 +763,22 @@ function SearchPageContent() {
                   <Skeleton width={120} height={16} borderRadius="6px" />
                 ) : (
                   <div>
-                    <h1 className="text-[22px] font-bold text-[#1A1A1A] leading-tight mb-2"
-                      style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                      ผู้ดูแลที่เหมาะสมกับงานของคุณ
-                    </h1>
+                    <div className="flex items-baseline gap-3 flex-wrap mb-2">
+                      <h1 className="text-[22px] font-bold text-[#1A1A1A] leading-tight"
+                        style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                        ผู้ดูแลที่เหมาะสมกับงานของคุณ
+                      </h1>
+                      {(appliedFilters.province || appliedFilters.district) && (
+                        <span className="text-[13px] text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                          <span className="material-icons text-[11px] text-[#52B69A] align-middle mr-0.5">place</span>
+                          {[appliedFilters.district, appliedFilters.province].filter(Boolean).join(', ')}
+                        </span>
+                      )}
+                    </div>
                    
-                  <span>
-                    {totalResults.toLocaleString()} ผลลัพธ์ที่ตรงกับประเภทงานที่คุณเลือก
-                  </span>
+                    <span>
+                      {totalResults.toLocaleString()} ผลลัพธ์ที่ตรงกับประเภทงานที่คุณเลือก
+                    </span>
                   </div>
                 )}
               </div>
