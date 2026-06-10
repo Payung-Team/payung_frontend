@@ -55,6 +55,11 @@ export default function OnboardingPage() {
   const navigate = useNavigate();
   const { user, userRole, mustChangePassword } = useAuth();
 
+  // ลบ flag is_registering ที่ GuestRoute เซ็ตไว้ (ทำใน effect เพื่อความปลอดภัยกับ StrictMode)
+  useEffect(() => {
+    localStorage.removeItem('is_registering');
+  }, []);
+
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [subDistrict, setSubDistrict] = useState('');

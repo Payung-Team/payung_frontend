@@ -66,10 +66,18 @@ export default function AuthCallback() {
       setUserRole(role);
       setMustChangePassword(false); // Google OAuth users never have temp passwords
 
-      const targetPath =
-        role === ROLE_PATIENT && !userData.phone
-          ? '/onboarding'
-          : getPostLoginRedirect({ role, mustChangePassword: false });
+      // เช็ค flag is_registering ที่เซ็ตไว้ตอนกด "สมัครด้วย Google" ในหน้า Register
+      // ถ้ามี → user ใหม่ (เพิ่งสมัคร) → ส่งไป onboarding/kyc
+      // ถ้าไม่มี → user เดิม (ล็อกอิน) → ส่งไป dashboard ปกติ
+      const isRegistering = localStorage.getItem('is_registering') === 'true';
+      localStorage.removeItem('is_registering');
+
+      let targetPath: string;
+      if (isRegistering) {
+        targetPath = role === ROLE_PATIENT ? '/onboarding' : '/kyc';
+      } else {
+        targetPath = getPostLoginRedirect({ role, mustChangePassword: false });
+      }
 
       console.log('[AuthCallback] navigating to:', targetPath);
       navigate(targetPath, { replace: true });

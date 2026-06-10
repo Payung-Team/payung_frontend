@@ -33,7 +33,8 @@ const GuestRoute: React.FC<GuestRouteProps> = ({ children }) => {
 
     const isRegistering = localStorage.getItem('is_registering') === 'true';
     if (isRegistering) {
-      localStorage.removeItem('is_registering');
+      // ห้ามลบ flag ตรงนี้ — render อาจถูกเรียกซ้ำ (React 18 StrictMode)
+      // ให้หน้าปลายทาง (OnboardingPage / KYC) เป็นคนลบแทน
       return <Navigate to={role === 2 ? '/kyc' : '/onboarding'} replace />;
     }
 
