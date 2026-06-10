@@ -61,6 +61,10 @@ export const GET_USER = gql`
       displayName
       phone
       address
+      subDistrict
+      district
+      province
+      postalCode
       bio
       avatarUrl
       role
@@ -147,11 +151,25 @@ export const UPDATE_CAREGIVER_PROFILE = gql`
 `;
 
 export const UPDATE_PROFILE = gql`
-  mutation UpdateProfile($displayName: String, $phone: String, $address: String, $bio: String, $avatarUrl: String) {
+  mutation UpdateProfile(
+    $displayName: String
+    $phone: String
+    $address: String
+    $subDistrict: String
+    $district: String
+    $province: String
+    $postalCode: String
+    $bio: String
+    $avatarUrl: String
+  ) {
     updateProfile(input: {
       displayName: $displayName
       phone: $phone
       address: $address
+      subDistrict: $subDistrict
+      district: $district
+      province: $province
+      postalCode: $postalCode
       bio: $bio
       avatarUrl: $avatarUrl
     }) {
@@ -160,6 +178,10 @@ export const UPDATE_PROFILE = gql`
       displayName
       phone
       address
+      subDistrict
+      district
+      province
+      postalCode
       bio
       avatarUrl
       role

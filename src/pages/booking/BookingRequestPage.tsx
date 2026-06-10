@@ -117,12 +117,20 @@ export default function BookingRequestPage() {
 
       const serviceLocs = bookingDraft.serviceLocation || [];
       const atHomeAddress = bookingDraft.locationDetails?.at_home?.address || '';
+      const subDist = bookingDraft.locationDetails?.subDistrict || '';
+      const dist = bookingDraft.locationDetails?.district || '';
+      const prov = bookingDraft.locationDetails?.province || '';
+      const post = bookingDraft.locationDetails?.postalCode || '';
+
+      const fullAtHomeAddress = atHomeAddress ? 
+        `${atHomeAddress} ตำบล/แขวง${subDist} อำเภอ/เขต${dist} จังหวัด${prov} ${post}`.trim() : '';
+
       const hospitalName = bookingDraft.locationDetails?.accompany_outside?.hospitalName || '';
       const meetingPoint = bookingDraft.locationDetails?.accompany_outside?.meetingPoint || '';
 
       const displayAddressParts = [];
-      if (serviceLocs.includes('at_home') && atHomeAddress) {
-        displayAddressParts.push(atHomeAddress);
+      if (serviceLocs.includes('at_home') && fullAtHomeAddress) {
+        displayAddressParts.push(fullAtHomeAddress);
       }
       if (serviceLocs.includes('accompany_outside') && hospitalName) {
         displayAddressParts.push(`ปลายทาง: ${hospitalName}${meetingPoint ? ` (จุดนัดพบ: ${meetingPoint})` : ''}`);

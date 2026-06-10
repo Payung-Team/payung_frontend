@@ -22,6 +22,10 @@ interface MeData {
     id: string;
     phone: string | null;
     address: string | null;
+    subDistrict: string | null;
+    district: string | null;
+    province: string | null;
+    postalCode: string | null;
     avatarUrl: string | null;
     displayName: string | null;
   };
@@ -38,7 +42,7 @@ interface FormErrors {
 
 const PHONE_DIGITS_REGEX = /^0[0-9]{9}$/;
 const POSTAL_CODE_REGEX = /^[0-9]{5}$/;
-const ADDRESS_MAX_LENGTH = 200;
+// const ADDRESS_MAX_LENGTH = 200;
 
 function formatPhone(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 10);
@@ -78,6 +82,11 @@ export default function OnboardingPage() {
     if (me.phone) setPhone(formatPhone(me.phone));
     if (me.avatarUrl) setAvatarPreview(me.avatarUrl);
     if (me.displayName) setDisplayName(me.displayName);
+    if (me.address) setAddress(me.address);
+    if (me.subDistrict) setSubDistrict(me.subDistrict);
+    if (me.district) setDistrict(me.district);
+    if (me.province) setProvince(me.province);
+    if (me.postalCode) setPostalCode(me.postalCode);
   }, [meData]);
 
   const [updateProfile] = useMutation(UPDATE_PROFILE);
@@ -157,14 +166,14 @@ export default function OnboardingPage() {
         avatarUrl = `${publicData.publicUrl}?t=${Date.now()}`;
       }
 
-      const combinedAddress = `${address.trim()} ตำบล/แขวง${subDistrict.trim()} อำเภอ/เขต${district.trim()} จังหวัด${province.trim()} ${postalCode.trim()}`
-        .trim()
-        .slice(0, ADDRESS_MAX_LENGTH);
-
       await updateProfile({
         variables: {
           phone: phone.replace(/-/g, ''),
-          address: combinedAddress,
+          address: address.trim(),
+          subDistrict: subDistrict.trim(),
+          district: district.trim(),
+          province: province.trim(),
+          postalCode: postalCode.trim(),
           ...(avatarUrl ? { avatarUrl } : {}),
         },
       });

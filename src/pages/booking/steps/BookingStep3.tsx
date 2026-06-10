@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../../../context/BookingContext';
-import { useToast } from '../../../hooks/useToast';
+
 
 const PLATFORM_FEE_PERCENT = 10;
 
@@ -9,9 +9,8 @@ interface BookingStep3Props {
 }
 
 export default function BookingStep3({ onStartSearch }: BookingStep3Props) {
-  const navigate = useNavigate();
+  
   const { bookingDraft, goToStep } = useBooking();
-  const { success } = useToast();
 
   const handleFinish = () => {
     onStartSearch();
@@ -52,7 +51,12 @@ export default function BookingStep3({ onStartSearch }: BookingStep3Props) {
 
   const displayAddressParts = [];
   if (serviceLocs.includes('at_home') && atHomeAddress) {
-    displayAddressParts.push(`${atHomeAddress}`);
+    const subDist = bookingDraft?.locationDetails?.subDistrict || '';
+    const dist = bookingDraft?.locationDetails?.district || '';
+    const prov = bookingDraft?.locationDetails?.province || '';
+    const post = bookingDraft?.locationDetails?.postalCode || '';
+    const fullAddr = `${atHomeAddress} ตำบล/แขวง${subDist} อำเภอ/เขต${dist} จังหวัด${prov} ${post}`.trim();
+    displayAddressParts.push(fullAddr);
   }
   if (serviceLocs.includes('accompany_outside') && hospitalName) {
     displayAddressParts.push(`ปลายทาง: ${hospitalName}${meetingPoint ? ` (จุดนัดพบ: ${meetingPoint})` : ''}`);

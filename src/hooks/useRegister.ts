@@ -38,17 +38,18 @@ export function useRegister() {
       if (registerData) {
         const { accessToken, refreshToken, user } = registerData;
         if (accessToken && refreshToken) {
+          // set flag ก่อน setSession เพื่อป้องกัน race condition
+          // (GuestRoute อาจ re-render จาก onAuthStateChange ก่อนที่ flag จะถูก set)
+          if (user) {
+            localStorage.setItem('is_registering', 'true');
+            setUserRole(user.role);
+          }
+
           // เซ็ต session ใน Supabase
           await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken
           });
-          
-          // เก็บ role ไว้ใน auth context
-          if (user) {
-            setUserRole(user.role);
-            localStorage.setItem('is_registering', 'true');
-          }
         }
       }
       console.log('Registration Mutation Response:', response);

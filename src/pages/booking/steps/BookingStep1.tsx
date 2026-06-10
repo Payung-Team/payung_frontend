@@ -6,6 +6,7 @@ import type { BookingRequest } from '../../../context/BookingContext';
 import { useToast } from '../../../hooks/useToast';
 import MapPicker from '../MapPicker';
 import { GET_USER } from '../../../graphql/queries';
+import ThaiAddressSelector from '../../../components/ui/ThaiAddressSelector';
 
 
 const BUSY_SLOTS: string[] = [];
@@ -37,24 +38,24 @@ export default function BookingStep1() {
 
   const { data: userData } = useQuery<any>(GET_USER);
 
-  const [addressDbReady, setAddressDbReady] = useState(false);
+  // const [addressDbReady, setAddressDbReady] = useState(false);
 
-  const detectProvinceAndDistrict = (fullAddress: string) => {
-    if (!fullAddress || !addressDbReady) return { province: '', district: '' };
-    const matchedProvince = provincesList.find(p => fullAddress.includes(p)) || '';
-    let matchedDistrict = '';
-    if (matchedProvince) {
-      const districtsForProvince = [
-        ...new Set(
-          thaiAddressDb.address
-            .filter((a) => a.province === matchedProvince)
-            .map((a) => a.amphoe)
-        )
-      ];
-      matchedDistrict = districtsForProvince.find(d => fullAddress.includes(d)) || '';
-    }
-    return { province: matchedProvince, district: matchedDistrict };
-  };
+  // const detectProvinceAndDistrict = (fullAddress: string) => {
+  //   if (!fullAddress || !addressDbReady) return { province: '', district: '' };
+  //   const matchedProvince = provincesList.find(p => fullAddress.includes(p)) || '';
+  //   let matchedDistrict = '';
+  //   if (matchedProvince) {
+  //     const districtsForProvince = [
+  //       ...new Set(
+  //         thaiAddressDb.address
+  //           .filter((a) => a.province === matchedProvince)
+  //           .map((a) => a.amphoe)
+  //       )
+  //     ];
+  //     matchedDistrict = districtsForProvince.find(d => fullAddress.includes(d)) || '';
+  //   }
+  //   return { province: matchedProvince, district: matchedDistrict };
+  // };
 
   const geocodeAddress = async (addrStr: string) => {
     try {
@@ -84,7 +85,7 @@ export default function BookingStep1() {
   };
 
   useEffect(() => {
-    thaiAddressDb.init().then(() => setAddressDbReady(true));
+    thaiAddressDb.init(); // .then(() => setAddressDbReady(true));
   }, []);
 
   useEffect(() => {
@@ -120,25 +121,31 @@ export default function BookingStep1() {
   const [province, setProvince] = useState(
     bookingDraft?.locationDetails?.province || ''
   );
+  const [subDistrict, setSubDistrict] = useState(
+    bookingDraft?.locationDetails?.subDistrict || ''
+  );
+  const [postalCode, setPostalCode] = useState(
+    bookingDraft?.locationDetails?.postalCode || ''
+  );
   const [district, setDistrict] = useState(
     bookingDraft?.locationDetails?.district || ''
   );
 
-  const provincesList = useMemo(() => {
-    if (!addressDbReady) return [];
-    return [...new Set(thaiAddressDb.address.map((a) => a.province))].sort();
-  }, [addressDbReady]);
+  // const provincesList = useMemo(() => {
+  //   if (!addressDbReady) return [];
+  //   return [...new Set(thaiAddressDb.address.map((a) => a.province))].sort();
+  // }, [addressDbReady]);
 
-  const districtsList = useMemo(() => {
-    if (!addressDbReady || !province) return [];
-    return [
-      ...new Set(
-        thaiAddressDb.address
-          .filter((a) => a.province === province)
-          .map((a) => a.amphoe)
-      )
-    ].sort();
-  }, [addressDbReady, province]);
+  // const districtsList = useMemo(() => {
+  //   if (!addressDbReady || !province) return [];
+  //   return [
+  //     ...new Set(
+  //       thaiAddressDb.address
+  //         .filter((a) => a.province === province)
+  //         .map((a) => a.amphoe)
+  //     )
+  //   ].sort();
+  // }, [addressDbReady, province]);
   const [address, setAddress] = useState(
     bookingDraft?.locationDetails?.at_home?.address || ''
   );
@@ -364,11 +371,22 @@ export default function BookingStep1() {
     
     // Auto fill address if empty
     if (realAddress) {
+      const me = userData?.me;
       setAddress(realAddress);
-      const { province: p, district: d } = detectProvinceAndDistrict(realAddress);
-      if (p) setProvince(p);
-      if (d) setDistrict(d);
-      geocodeAddress(realAddress);
+      if (me?.province) setProvince(me.province);
+      if (me?.district) setDistrict(me.district);
+      if (me?.subDistrict) setSubDistrict(me.subDistrict);
+      if (me?.postalCode) setPostalCode(me.postalCode);
+      
+      const fullAddressStr = [
+        realAddress,
+        me?.subDistrict ? `ตำบล/แขวง${me.subDistrict}` : '',
+        me?.district ? `อำเภอ/เขต${me.district}` : '',
+        me?.province ? `จังหวัด${me.province}` : '',
+        me?.postalCode || ''
+      ].filter(Boolean).join(' ');
+      
+      geocodeAddress(fullAddressStr);
     } else {
       if (!address) {
         setAddress('123/45 ซอยลาดพร้าว 101 ถนนลาดพร้าว แขวงคลองจั่น เขตบางกะปิ กรุงเทพมหานคร 10240');
@@ -449,6 +467,8 @@ export default function BookingStep1() {
     if (serviceLocation.includes('at_home') || serviceLocation.includes('accompany_outside')) {
       if (!province) errs.province = 'กรุณาเลือกจังหวัด';
       if (!district) errs.district = 'กรุณาเลือกอำเภอ/เขต';
+      if (!subDistrict) errs.subDistrict = 'กรุณาเลือกตำบล/แขวง';
+      if (!postalCode) errs.postalCode = 'กรุณากรอกรหัสไปรษณีย์';
     }
 
     if (serviceLocation.includes('at_home')) {
@@ -489,6 +509,8 @@ export default function BookingStep1() {
       locationDetails: {
         province,
         district,
+        subDistrict,
+        postalCode,
         at_home: serviceLocation.includes('at_home') ? { address, lat: latA, lng: lngA } : undefined,
         accompany_outside: serviceLocation.includes('accompany_outside') ? { hospitalName, meetingPoint, lat: latB, lng: lngB } : undefined
       },
@@ -834,57 +856,35 @@ export default function BookingStep1() {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-6">
           <h3 className="text-base font-bold text-[#1A1A1A]">ที่อยู่ดูแลและจุดนัดพบภายนอก <span className="text-red-500">*</span></h3>
 
-          {/* District & Province filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="block text-sm font-bold text-[#575859]">จังหวัด <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <select
-                  value={province}
-                  disabled={!addressDbReady}
-                  onChange={(e) => {
-                    setProvince(e.target.value);
-                    setDistrict('');
-                  }}
-                  className={`w-full p-3 pr-10 border rounded-xl text-sm bg-white focus:outline-none appearance-none ${
-                    !addressDbReady ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed' :
-                    errors.province ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-[#E0E2E5] focus:ring-1 focus:ring-[#52B69A]'
-                  }`}
-                >
-                  <option value="">{addressDbReady ? '-- เลือกจังหวัด --' : 'กำลังโหลดข้อมูลจังหวัด...'}</option>
-                  {provincesList.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 material-icons text-[#AAB2BA] text-base pointer-events-none">
-                  keyboard_arrow_down
-                </span>
-              </div>
-              {errors.province && <p className="text-red-500 text-xs mt-1">{errors.province}</p>}
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-bold text-[#575859]">อำเภอ/เขต <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <select
-                  value={district}
-                  onChange={(e) => setDistrict(e.target.value)}
-                  disabled={!province || !addressDbReady}
-                  className={`w-full p-3 pr-10 border rounded-xl text-sm bg-white focus:outline-none appearance-none ${
-                    (!province || !addressDbReady) ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed' :
-                    errors.district ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-[#E0E2E5] focus:ring-1 focus:ring-[#52B69A]'
-                  }`}
-                >
-                  <option value="">-- เลือกอำเภอ/เขต --</option>
-                  {districtsList.map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 material-icons text-[#AAB2BA] text-base pointer-events-none">
-                  keyboard_arrow_down
-                </span>
-              </div>
-              {errors.district && <p className="text-red-500 text-xs mt-1">{errors.district}</p>}
-            </div>
+          {/* cascading dropdowns */}
+          <div className="mt-4">
+            <ThaiAddressSelector
+              provinceValue={province}
+              amphoeValue={district}
+              districtValue={subDistrict}
+              onProvinceChange={setProvince}
+              onAmphoeChange={setDistrict}
+              onDistrictChange={setSubDistrict}
+              onZipcodeChange={setPostalCode}
+              error={{
+                province: errors.province,
+                amphoe: errors.district,
+                district: errors.subDistrict,
+              }}
+            />
+          </div>
+
+          {/* Postal Code (auto-filled) */}
+          <div className="space-y-2 mt-4">
+            <label className="block text-sm font-bold text-[#575859]">รหัสไปรษณีย์</label>
+            <input
+              type="text"
+              value={postalCode}
+              readOnly
+              placeholder="กรอกอัตโนมัติเมื่อเลือกตำบล"
+              className="w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-gray-50 text-gray-500 focus:outline-none cursor-not-allowed"
+            />
+            {errors.postalCode && <p className="text-red-500 text-xs mt-1">{errors.postalCode}</p>}
           </div>
 
           {/* At Home Location address field */}
@@ -895,17 +895,28 @@ export default function BookingStep1() {
                 <button
                   type="button"
                   onClick={async () => {
-                    const realAddress = userData?.me?.address;
+                    const me = userData?.me;
+                    const realAddress = me?.address;
                     if (!realAddress) {
                       warning('ไม่พบข้อมูลที่อยู่ในประวัติส่วนตัวของคุณ กรุณากรอกที่อยู่ด้วยตนเอง');
                       return;
                     }
                     setAddress(realAddress);
-                    const { province: p, district: d } = detectProvinceAndDistrict(realAddress);
-                    if (p) setProvince(p);
-                    if (d) setDistrict(d);
+                    if (me.province) setProvince(me.province);
+                    if (me.district) setDistrict(me.district);
+                    if (me.subDistrict) setSubDistrict(me.subDistrict);
+                    if (me.postalCode) setPostalCode(me.postalCode);
                     success('ใช้ข้อมูลที่อยู่จากประวัติส่วนตัวเรียบร้อยแล้ว');
-                    await geocodeAddress(realAddress);
+                    
+                    const fullAddressStr = [
+                      realAddress,
+                      me.subDistrict ? `ตำบล/แขวง${me.subDistrict}` : '',
+                      me.district ? `อำเภอ/เขต${me.district}` : '',
+                      me.province ? `จังหวัด${me.province}` : '',
+                      me.postalCode || ''
+                    ].filter(Boolean).join(' ');
+                    
+                    await geocodeAddress(fullAddressStr);
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 border border-[#52B69A] text-[#52B69A] bg-white hover:bg-[#52B69A]/5 transition rounded-lg text-xs font-bold cursor-pointer"
                 >
