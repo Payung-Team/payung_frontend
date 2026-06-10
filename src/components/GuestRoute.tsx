@@ -9,7 +9,7 @@ interface GuestRouteProps {
 }
 
 const GuestRoute: React.FC<GuestRouteProps> = ({ children }) => {
-  const { session, loading, userRole, mustChangePassword } = useAuth();
+  const { session, loading, userRole } = useAuth();
 
   if (loading) {
     return (
@@ -28,9 +28,16 @@ const GuestRoute: React.FC<GuestRouteProps> = ({ children }) => {
   if (session) {
     const savedRole = localStorage.getItem('userRole');
     const savedMustChange = localStorage.getItem('mustChangePassword');
-    const role = savedRole ? parseInt(savedRole, 10) : 1;
-    const mustChangePassword = savedMustChange === 'true';
-    return <Navigate to={getPostLoginRedirect({ role, mustChangePassword })} replace />;
+    const role = savedRole ? parseInt(savedRole, 10) : (userRole ?? 1);
+    const mustChange = savedMustChange === 'true';
+
+    const isRegistering = localStorage.getItem('is_registering') === 'true';
+    if (isRegistering) {
+      localStorage.removeItem('is_registering');
+      return <Navigate to={role === 2 ? '/kyc' : '/onboarding'} replace />;
+    }
+
+    return <Navigate to={getPostLoginRedirect({ role, mustChangePassword: mustChange })} replace />;
   }
 
   return <>{children}</>;

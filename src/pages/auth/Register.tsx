@@ -229,7 +229,7 @@ export default function Register() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         // Success -> redirect immediately
-        navigate(selectedRole === 'caregiver' ? '/kyc' : '/');
+        navigate(selectedRole === 'caregiver' ? '/kyc' : '/onboarding');
       }
     } else {
       setErrorCount(prev => prev + 1);

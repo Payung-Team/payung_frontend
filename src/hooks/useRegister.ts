@@ -47,6 +47,7 @@ export function useRegister() {
           // เก็บ role ไว้ใน auth context
           if (user) {
             setUserRole(user.role);
+            localStorage.setItem('is_registering', 'true');
           }
         }
       }

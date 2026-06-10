@@ -1,7 +1,7 @@
 import { Routes, Route, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useQuery } from '@apollo/client/react';
-import { GET_CAREGIVER_PROFILE } from './graphql/queries';
+import { GET_CAREGIVER_PROFILE, GET_USER } from './graphql/queries';
 import PageSkeleton from './components/ui/PageSkeleton';
 import { useAuth } from './context/AuthContext';
 import { getPostLoginRedirect } from './utils/getRedirectPath';
@@ -38,6 +38,7 @@ import ResetPassword from './pages/auth/ResetPassword';
 import AuthCallback from './pages/auth/AuthCallback';
 import MessagePage from './pages/profile/MessagePage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
+import OnboardingPage from './pages/auth/OnboardingPage';
 
 function KycFormGuard({ children }: { children: React.ReactNode }) {
   const { data, loading } = useQuery<{ myCaregiverProfile?: { kycStatus: string } }>(GET_CAREGIVER_PROFILE);
@@ -51,6 +52,18 @@ function KycFormGuard({ children }: { children: React.ReactNode }) {
   }
   if (status === 'verified') {
     return <Navigate to="/caregiver-home" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function OnboardingGuard({ children }: { children: React.ReactNode }) {
+  const { data, loading } = useQuery<{ me?: { phone: string | null } }>(GET_USER);
+
+  if (loading) return <PageSkeleton />;
+
+  if (data?.me?.phone) {
+    return <Navigate to="/patient-home" replace />;
   }
 
   return <>{children}</>;
@@ -105,6 +118,20 @@ function App() {
 
         {/* Change password — session required แต่ไม่ผ่าน MustChangePasswordGuard */}
         <Route path="/change-password" element={<ProtectedRoute><ChangePasswordPage /></ProtectedRoute>} />
+
+        {/* Onboarding — patient only, after register/first OAuth login */}
+        <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute>
+              <RoleRoute requiredRole={1}>
+                <OnboardingGuard>
+                  <OnboardingPage />
+                </OnboardingGuard>
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
 
       {/* Protected pages — wrapped in ProtectedRoute, MustChangePasswordGuard and AppLayout */}
       <Route

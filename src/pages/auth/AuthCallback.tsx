@@ -15,6 +15,8 @@ interface MeResult {
   };
 }
 
+const ROLE_PATIENT = 1;
+
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export default function AuthCallback() {
@@ -64,8 +66,10 @@ export default function AuthCallback() {
       setUserRole(role);
       setMustChangePassword(false); // Google OAuth users never have temp passwords
 
-      // TODO: เปลี่ยนกลับเป็น '/onboarding' เมื่อหน้า onboarding พร้อม
-      const targetPath = getPostLoginRedirect({ role, mustChangePassword: false });
+      const targetPath =
+        role === ROLE_PATIENT && !userData.phone
+          ? '/onboarding'
+          : getPostLoginRedirect({ role, mustChangePassword: false });
 
       console.log('[AuthCallback] navigating to:', targetPath);
       navigate(targetPath, { replace: true });

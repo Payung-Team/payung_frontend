@@ -14,6 +14,7 @@ export const LOGIN_USER = gql`
         role
         isActive
         mustChangePassword
+        phone
       }
     }
   }
@@ -146,12 +147,13 @@ export const UPDATE_CAREGIVER_PROFILE = gql`
 `;
 
 export const UPDATE_PROFILE = gql`
-  mutation UpdateProfile($displayName: String, $phone: String, $address: String, $bio: String) {
+  mutation UpdateProfile($displayName: String, $phone: String, $address: String, $bio: String, $avatarUrl: String) {
     updateProfile(input: {
       displayName: $displayName
       phone: $phone
       address: $address
       bio: $bio
+      avatarUrl: $avatarUrl
     }) {
       id
       email

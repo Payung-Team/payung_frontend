@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import ThailandAddressSimple from 'thailand-address-simple';
+import { useQuery } from '@apollo/client/react';
 import { useBooking } from '../../../context/BookingContext';
 import type { BookingRequest } from '../../../context/BookingContext';
 import { useToast } from '../../../hooks/useToast';
 import MapPicker from '../MapPicker';
+import { GET_USER } from '../../../graphql/queries';
 
 
 const BUSY_SLOTS: string[] = [];
@@ -33,7 +35,53 @@ export default function BookingStep1() {
   const { bookingDraft, setBookingDraft, goToStep } = useBooking();
   const { success, error, warning } = useToast();
 
+  const { data: userData } = useQuery<any>(GET_USER);
+
   const [addressDbReady, setAddressDbReady] = useState(false);
+
+  const detectProvinceAndDistrict = (fullAddress: string) => {
+    if (!fullAddress || !addressDbReady) return { province: '', district: '' };
+    const matchedProvince = provincesList.find(p => fullAddress.includes(p)) || '';
+    let matchedDistrict = '';
+    if (matchedProvince) {
+      const districtsForProvince = [
+        ...new Set(
+          thaiAddressDb.address
+            .filter((a) => a.province === matchedProvince)
+            .map((a) => a.amphoe)
+        )
+      ];
+      matchedDistrict = districtsForProvince.find(d => fullAddress.includes(d)) || '';
+    }
+    return { province: matchedProvince, district: matchedDistrict };
+  };
+
+  const geocodeAddress = async (addrStr: string) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=th&q=${encodeURIComponent(
+          addrStr
+        )}`,
+        {
+          headers: {
+            'Accept-Language': 'th,en',
+            'User-Agent': 'PayungCaregiverApp/1.0'
+          }
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lng = parseFloat(data[0].lon);
+          setLatA(lat);
+          setLngA(lng);
+        }
+      }
+    } catch (err) {
+      console.error('Error geocoding user address:', err);
+    }
+  };
 
   useEffect(() => {
     thaiAddressDb.init().then(() => setAddressDbReady(true));
@@ -296,7 +344,10 @@ export default function BookingStep1() {
 
   // Populate mock patient data
   const handleFetchProfileData = () => {
-    setPatientName('สมศรี วงศ์ดี');
+    const realName = userData?.me?.displayName || '';
+    const realAddress = userData?.me?.address || '';
+
+    setPatientName(realName || 'สมศรี วงศ์ดี');
     setPatientAge('65');
     setPatientNickname('คุณแม่');
     setPatientGender('หญิง');
@@ -312,14 +363,22 @@ export default function BookingStep1() {
     setPatientRegularHospital('รพ.รามาธิบดี');
     
     // Auto fill address if empty
-    if (!address) {
-      setAddress('123/45 ซอยลาดพร้าว 101 ถนนลาดพร้าว แขวงคลองจั่น เขตบางกะปิ กรุงเทพมหานคร 10240');
-    }
-    if (!province) {
-      setProvince('กรุงเทพมหานคร');
-    }
-    if (!district) {
-      setDistrict('บางกะปิ');
+    if (realAddress) {
+      setAddress(realAddress);
+      const { province: p, district: d } = detectProvinceAndDistrict(realAddress);
+      if (p) setProvince(p);
+      if (d) setDistrict(d);
+      geocodeAddress(realAddress);
+    } else {
+      if (!address) {
+        setAddress('123/45 ซอยลาดพร้าว 101 ถนนลาดพร้าว แขวงคลองจั่น เขตบางกะปิ กรุงเทพมหานคร 10240');
+      }
+      if (!province) {
+        setProvince('กรุงเทพมหานคร');
+      }
+      if (!district) {
+        setDistrict('บางกะปิ');
+      }
     }
     success('ดึงข้อมูลโปรไฟล์ผู้ป่วยเรียบร้อยแล้ว');
   };
@@ -483,7 +542,7 @@ export default function BookingStep1() {
   // Helper setter to handle recipient mapping relationship (removed)
 
   const isSameAsSaved = 
-    patientName === SAVED_PROFILE.name &&
+    patientName === (userData?.me?.displayName || SAVED_PROFILE.name) &&
     patientAge === SAVED_PROFILE.age &&
     patientGender === SAVED_PROFILE.gender &&
     patientWeight === SAVED_PROFILE.weight &&
@@ -495,7 +554,7 @@ export default function BookingStep1() {
     patientBloodGroup === SAVED_PROFILE.bloodGroup &&
     patientCareInstructions === SAVED_PROFILE.careInstructions &&
     patientRegularHospital === SAVED_PROFILE.regularHospital &&
-    address === SAVED_PROFILE.address;
+    address === (userData?.me?.address || SAVED_PROFILE.address);
 
   const isFormBlank = 
     !patientName && 
@@ -835,13 +894,18 @@ export default function BookingStep1() {
                 <label className="block text-sm font-bold text-[#575859]">สถานที่ดูแล (ที่บ้าน)</label>
                 <button
                   type="button"
-                  onClick={() => {
-                    setAddress(SAVED_PROFILE.address);
-                    setProvince('กรุงเทพมหานคร');
-                    setDistrict('บางกะปิ');
-                    setLatA(13.736717);
-                    setLngA(100.560543);
+                  onClick={async () => {
+                    const realAddress = userData?.me?.address;
+                    if (!realAddress) {
+                      warning('ไม่พบข้อมูลที่อยู่ในประวัติส่วนตัวของคุณ กรุณากรอกที่อยู่ด้วยตนเอง');
+                      return;
+                    }
+                    setAddress(realAddress);
+                    const { province: p, district: d } = detectProvinceAndDistrict(realAddress);
+                    if (p) setProvince(p);
+                    if (d) setDistrict(d);
                     success('ใช้ข้อมูลที่อยู่จากประวัติส่วนตัวเรียบร้อยแล้ว');
+                    await geocodeAddress(realAddress);
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 border border-[#52B69A] text-[#52B69A] bg-white hover:bg-[#52B69A]/5 transition rounded-lg text-xs font-bold cursor-pointer"
                 >
