@@ -96,9 +96,9 @@ const HomePage: React.FC = () => {
               <div className="flex justify-between items-center mb-3.5">
                 <h2 className="text-[17px] font-bold text-[#1A1A1A]">ทางลัด</h2>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 {loading || !data?.me ? (
-                  [0, 1, 2].map(i => <Skeleton key={i} height={110} borderRadius={16} />)
+                  [0, 1].map(i => <Skeleton key={i} height={110} borderRadius={16} />)
                 ) : (
                   <>
                     {/* Search */}
@@ -109,14 +109,7 @@ const HomePage: React.FC = () => {
                       <div className="text-[13px] font-semibold mb-0.5">ค้นหาผู้ดูแล</div>
                       <div className="text-[11px] text-[#8A8C8E] leading-snug">หาผู้ดูแลใกล้ฉัน</div>
                     </Link>
-                    {/* Book */}
-                    <Link to="/bookings" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
-                      <div className="w-12 h-12 rounded-xl bg-[#FFF3E0] text-[#FFA92C] flex items-center justify-center mx-auto mb-2.5">
-                        <Icon name="calendar_today" size="large" color="currentColor" />
-                      </div>
-                      <div className="text-[13px] font-semibold mb-0.5">จองนัดหมาย</div>
-                      <div className="text-[11px] text-[#8A8C8E] leading-snug">สร้างนัดหมายล่วงหน้า</div>
-                    </Link>
+
                     {/* Chat */}
                     <Link to="/messages" className="bg-white rounded-2xl px-3.5 py-[22px] text-center border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.03)] no-underline text-[#1A1A1A] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-[#E6F5ED]">
                       <div className="w-12 h-12 rounded-xl bg-[#F0F1F3] text-[#575859] flex items-center justify-center mx-auto mb-2.5">
