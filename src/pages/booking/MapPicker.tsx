@@ -1,13 +1,34 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { loadGoogleMaps, reverseGeocode } from '../../lib/googleMaps';
 
-interface MapPickerProps {
+export interface MapPickerProps {
   latA: number;
   lngA: number;
-  onChangeA: (lat: number, lng: number) => void;
+  onChangeA: (lat: number, lng: number, address?: string, province?: string, district?: string) => void;
   latB?: number;
   lngB?: number;
-  onChangeB?: (lat: number, lng: number) => void;
+  onChangeB?: (lat: number, lng: number, address?: string, province?: string, district?: string) => void;
   showPinB?: boolean;
+}
+
+// Haversine kept only as fallback when Directions API fails
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function syncMarkerPosition(markerRef: { current: any }, lat: number, lng: number) {
+  const pos = markerRef.current?.getPosition();
+  if (pos && (Math.abs(pos.lat() - lat) > 0.00001 || Math.abs(pos.lng() - lng) > 0.00001)) {
+    markerRef.current.setPosition({ lat, lng });
+  }
 }
 
 const MapPicker: React.FC<MapPickerProps> = ({
@@ -17,181 +38,164 @@ const MapPicker: React.FC<MapPickerProps> = ({
   latB = 13.736717,
   lngB = 100.560543,
   onChangeB,
-  showPinB = false
+  showPinB = false,
 }) => {
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markerAInstanceRef = useRef<any>(null);
-  const markerBInstanceRef = useRef<any>(null);
-  const polylineInstanceRef = useRef<any>(null);
-  const [leafletLoaded, setLeafletLoaded] = useState(false);
-  const [activePin, setActivePin] = useState<'A' | 'B'>('A');
+  const mapDivRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  const markerARef = useRef<any>(null);
+  const markerBRef = useRef<any>(null);
+  const directionsServiceRef = useRef<any>(null);
+  const directionsRendererRef = useRef<any>(null);
+  const activePinRef = useRef<'A' | 'B'>('A');
 
-  // Poll for window.L loading
+  const [activePin, setActivePin] = useState<'A' | 'B'>('A');
+  const [loaded, setLoaded] = useState(false);
+  const [routeDistance, setRouteDistance] = useState<number | null>(null);
+  const [routeDuration, setRouteDuration] = useState<string | null>(null);
+  const [routeFallback, setRouteFallback] = useState(false);
+
+  const onChangeARef = useRef(onChangeA);
+  const onChangeBRef = useRef(onChangeB);
+  useEffect(() => { onChangeARef.current = onChangeA; }, [onChangeA]);
+  useEffect(() => { onChangeBRef.current = onChangeB; }, [onChangeB]);
+  useEffect(() => { activePinRef.current = activePin; }, [activePin]);
+
   useEffect(() => {
-    const checkLeaflet = () => {
-      if ((window as any).L) {
-        setLeafletLoaded(true);
-      } else {
-        setTimeout(checkLeaflet, 200);
-      }
-    };
-    checkLeaflet();
+    loadGoogleMaps().then(() => setLoaded(true)).catch(console.error);
   }, []);
 
-  // Update Map & Markers
+  // ---------- helpers used inside the main effect ----------
+
+  function ensureDirectionsRenderer(g: any) {
+    if (directionsRendererRef.current) return;
+    directionsRendererRef.current = new g.maps.DirectionsRenderer({
+      suppressMarkers: true,
+      polylineOptions: { strokeColor: '#52B69A', strokeWeight: 4, strokeOpacity: 0.85 },
+      map: mapRef.current,
+    });
+  }
+
+  function fetchRoute(g: any, aLat: number, aLng: number, bLat: number, bLng: number) {
+    ensureDirectionsRenderer(g);
+    directionsServiceRef.current.route(
+      { origin: { lat: aLat, lng: aLng }, destination: { lat: bLat, lng: bLng }, travelMode: g.maps.TravelMode.DRIVING, region: 'TH' },
+      (result: any, status: string) => {
+        const leg = result?.routes?.[0]?.legs?.[0];
+        if (status === 'OK' && leg) {
+          directionsRendererRef.current?.setDirections(result);
+          setRouteDistance(leg.distance.value / 1000);
+          setRouteDuration(leg.duration.text);
+          setRouteFallback(false);
+        } else {
+          directionsRendererRef.current?.setDirections({ routes: [] });
+          setRouteDistance(haversineKm(aLat, aLng, bLat, bLng));
+          setRouteDuration(null);
+          setRouteFallback(true);
+        }
+      }
+    );
+  }
+
+  function clearPinB() {
+    markerBRef.current?.setMap(null);
+    markerBRef.current = null;
+    directionsRendererRef.current?.setMap(null);
+    directionsRendererRef.current = null;
+    setRouteDistance(null);
+    setRouteDuration(null);
+    setRouteFallback(false);
+  }
+
+  function ensureMarkerB(g: any) {
+    if (markerBRef.current) return;
+    markerBRef.current = new g.maps.Marker({
+      position: { lat: latB, lng: lngB },
+      map: mapRef.current,
+      draggable: true,
+      title: 'จุดปลายทาง',
+      icon: { url: 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png' },
+    });
+    markerBRef.current.addListener('dragend', async () => {
+      const pos = markerBRef.current.getPosition();
+      const { address, province, district } = await reverseGeocode(pos.lat(), pos.lng());
+      onChangeBRef.current?.(pos.lat(), pos.lng(), address, province, district);
+    });
+  }
+
+  // ---------- main effect ----------
+
   useEffect(() => {
-    if (!leafletLoaded) return;
-    const L = (window as any).L;
-    if (!L || !mapContainerRef.current) return;
+    if (!loaded || !mapDivRef.current) return;
+    const g = (globalThis as any).google;
 
-    // Custom Icons
-    const greenIcon = new L.Icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41]
-    });
+    if (!mapRef.current) {
+      mapRef.current = new g.maps.Map(mapDivRef.current, {
+        center: { lat: latA, lng: lngA },
+        zoom: 15,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        zoomControlOptions: { position: g.maps.ControlPosition.RIGHT_BOTTOM },
+      });
 
-    const orangeIcon = new L.Icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41]
-    });
-
-    // Initialize Map
-    if (!mapInstanceRef.current) {
-      mapInstanceRef.current = L.map(mapContainerRef.current).setView([latA, lngA], 14);
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(mapInstanceRef.current);
-
-      // Marker A
-      markerAInstanceRef.current = L.marker([latA, lngA], {
+      markerARef.current = new g.maps.Marker({
+        position: { lat: latA, lng: lngA },
+        map: mapRef.current,
         draggable: true,
-        icon: greenIcon
-      }).addTo(mapInstanceRef.current);
-
-      markerAInstanceRef.current.on('dragend', () => {
-        const pos = markerAInstanceRef.current.getLatLng();
-        onChangeA(pos.lat, pos.lng);
+        title: 'ที่อยู่บ้าน',
+        icon: { url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' },
       });
 
-      // Map Click Handler to update active pin
-      mapInstanceRef.current.on('click', (e: any) => {
-        const { lat: clickLat, lng: clickLng } = e.latlng;
-        if (activePin === 'A') {
-          markerAInstanceRef.current.setLatLng([clickLat, clickLng]);
-          onChangeA(clickLat, clickLng);
-        } else if (activePin === 'B' && showPinB && onChangeB) {
-          if (!markerBInstanceRef.current) {
-            markerBInstanceRef.current = L.marker([clickLat, clickLng], {
-              draggable: true,
-              icon: orangeIcon
-            }).addTo(mapInstanceRef.current);
+      markerARef.current.addListener('dragend', async () => {
+        const pos = markerARef.current.getPosition();
+        const { address, province, district } = await reverseGeocode(pos.lat(), pos.lng());
+        onChangeARef.current(pos.lat(), pos.lng(), address, province, district);
+      });
 
-            markerBInstanceRef.current.on('dragend', () => {
-              const pos = markerBInstanceRef.current.getLatLng();
-              onChangeB(pos.lat, pos.lng);
-            });
-          } else {
-            markerBInstanceRef.current.setLatLng([clickLat, clickLng]);
-          }
-          onChangeB(clickLat, clickLng);
+      mapRef.current.addListener('click', async (e: any) => {
+        const lat = e.latLng.lat();
+        const lng = e.latLng.lng();
+        const { address, province, district } = await reverseGeocode(lat, lng);
+        if (activePinRef.current === 'A') {
+          markerARef.current.setPosition({ lat, lng });
+          onChangeARef.current(lat, lng, address, province, district);
+        } else if (activePinRef.current === 'B' && markerBRef.current) {
+          markerBRef.current.setPosition({ lat, lng });
+          onChangeBRef.current?.(lat, lng, address, province, district);
         }
       });
 
-      setTimeout(() => {
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.invalidateSize();
-        }
-      }, 500);
-    } else {
-      // Update Marker A externally
-      const posA = markerAInstanceRef.current.getLatLng();
-      if (posA.lat !== latA || posA.lng !== lngA) {
-        markerAInstanceRef.current.setLatLng([latA, lngA]);
-      }
+      directionsServiceRef.current = new g.maps.DirectionsService();
     }
 
-    // Handle Marker B visibility
+    syncMarkerPosition(markerARef, latA, lngA);
+
     if (showPinB && onChangeB) {
-      if (!markerBInstanceRef.current) {
-        markerBInstanceRef.current = L.marker([latB, lngB], {
-          draggable: true,
-          icon: orangeIcon
-        }).addTo(mapInstanceRef.current);
+      ensureMarkerB(g);
+      syncMarkerPosition(markerBRef, latB, lngB);
+      fetchRoute(g, latA, lngA, latB, lngB);
 
-        markerBInstanceRef.current.on('dragend', () => {
-          const pos = markerBInstanceRef.current.getLatLng();
-          onChangeB(pos.lat, pos.lng);
-        });
-      } else {
-        const posB = markerBInstanceRef.current.getLatLng();
-        if (posB.lat !== latB || posB.lng !== lngB) {
-          markerBInstanceRef.current.setLatLng([latB, lngB]);
-        }
-      }
+      const bounds = new g.maps.LatLngBounds();
+      bounds.extend({ lat: latA, lng: lngA });
+      bounds.extend({ lat: latB, lng: lngB });
+      mapRef.current.fitBounds(bounds, 60);
     } else {
-      if (markerBInstanceRef.current) {
-        mapInstanceRef.current.removeLayer(markerBInstanceRef.current);
-        markerBInstanceRef.current = null;
-      }
+      clearPinB();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, latA, lngA, latB, lngB, showPinB]);
 
-    // Polyline
-    if (showPinB && markerBInstanceRef.current) {
-      const latlngs = [
-        [latA, lngA],
-        [latB, lngB]
-      ];
-      if (!polylineInstanceRef.current) {
-        polylineInstanceRef.current = L.polyline(latlngs, { color: '#52B69A', weight: 4, dashArray: '6, 6' }).addTo(mapInstanceRef.current);
-      } else {
-        polylineInstanceRef.current.setLatLngs(latlngs);
-      }
-
-      // Auto fit bounds
-      const bounds = L.latLngBounds([latA, lngA], [latB, lngB]);
-      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
-    } else {
-      if (polylineInstanceRef.current) {
-        mapInstanceRef.current.removeLayer(polylineInstanceRef.current);
-        polylineInstanceRef.current = null;
-      }
-    }
-
-  }, [leafletLoaded, latA, lngA, latB, lngB, showPinB, activePin, onChangeA, onChangeB]);
-
-  // Clean up
   useEffect(() => {
     return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
+      markerARef.current?.setMap?.(null);
+      markerBRef.current?.setMap?.(null);
+      directionsRendererRef.current?.setMap?.(null);
     };
   }, []);
-
-  // Distance Calculation
-  let distance = 0;
-  if (leafletLoaded && showPinB) {
-    const L = (window as any).L;
-    if (L) {
-      distance = L.latLng(latA, lngA).distanceTo(L.latLng(latB, lngB)) / 1000;
-    }
-  }
 
   return (
     <div className="space-y-3">
-      {/* Control Buttons */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap items-center">
         <button
           type="button"
           onClick={() => setActivePin('A')}
@@ -201,9 +205,10 @@ const MapPicker: React.FC<MapPickerProps> = ({
               : 'border-[#E0E2E5] text-[#575859] hover:bg-gray-50'
           }`}
         >
-          <span className="w-2.5 h-2.5 rounded-full bg-green-400 border border-white" />
-          ปักหมุดบ้านฉัน (A)
+          <span className="w-2.5 h-2.5 rounded-full bg-green-500 border border-white shrink-0" />
+          ปักหมุดบ้าน (A)
         </button>
+
         {showPinB && (
           <button
             type="button"
@@ -214,28 +219,34 @@ const MapPicker: React.FC<MapPickerProps> = ({
                 : 'border-[#E0E2E5] text-[#575859] hover:bg-gray-50'
             }`}
           >
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-400 border border-white" />
-            ปักหมุดจุดปลายทาง (B)
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-400 border border-white shrink-0" />
+            ปักหมุดปลายทาง (B)
           </button>
         )}
+
+        <span className="text-[11px] text-[#8A8C8E]">
+          คลิกแผนที่หรือลากหมุดเพื่อระบุตำแหน่ง
+        </span>
       </div>
 
-      {/* Map Container */}
-      <div className="relative w-full h-[250px] border border-[#E0E2E5] rounded-xl overflow-hidden z-10 shadow-inner">
-        <div ref={mapContainerRef} className="w-full h-full" style={{ minHeight: '250px' }} />
-        
-        {/* Distance Badge */}
-        {showPinB && distance > 0 && (
-          <div className="absolute top-3 left-3 bg-white p-2 rounded-lg border border-[#E0E2E5] shadow-md z-[1000] text-xs font-bold text-[#1A1A1A] flex items-center gap-1">
-            <span className="material-icons text-[#52B69A] text-sm">navigation</span>
-            ระยะทางการทำงาน {distance.toFixed(2)} กิโลเมตร
+      <div className="relative w-full h-[300px] border border-[#E0E2E5] rounded-xl overflow-hidden shadow-sm">
+        <div ref={mapDivRef} className="w-full h-full" />
+
+        {!loaded && (
+          <div className="absolute inset-0 bg-gray-50 flex flex-col items-center justify-center gap-2 z-10">
+            <span className="material-icons animate-spin text-[#52B69A] text-3xl">refresh</span>
+            <span className="text-xs text-[#8A8C8E] font-semibold">กำลังโหลด Google Maps...</span>
           </div>
         )}
 
-        {!leafletLoaded && (
-          <div className="absolute inset-0 bg-gray-50 flex flex-col items-center justify-center gap-2 z-[1000]">
-            <span className="material-icons animate-spin text-[#52B69A]">refresh</span>
-            <span className="text-xs text-[#8A8C8E] font-semibold">กำลังโหลดแผนที่สักครู่...</span>
+        {showPinB && routeDistance !== null && (
+          <div className="absolute top-3 left-3 bg-white px-3 py-1.5 rounded-lg border border-[#E0E2E5] shadow text-xs font-bold text-[#1A1A1A] flex items-center gap-1.5 pointer-events-none z-[1]">
+            <span className="material-icons text-[#52B69A] text-base">directions_car</span>
+            <span>
+              {routeDistance.toFixed(2)} กม.
+              {routeDuration && <span className="font-normal text-[#575859] ml-1">· {routeDuration}</span>}
+              {routeFallback && <span className="font-normal text-[#8A8C8E] ml-1">(เส้นตรง)</span>}
+            </span>
           </div>
         )}
       </div>

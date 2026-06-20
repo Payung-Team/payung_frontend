@@ -669,22 +669,86 @@ const CAREGIVER_BOOKING_SUMMARY_FIELDS = `
   status
   serviceType
   serviceLocations
+  tasks
   timeSlot
   bookingDate
   startTime
   durationHours
   estimatedCost
   locationAddress
+  notes
   patient {
     id
     displayName
     avatarUrl
   }
   careRecipientName
-  acceptedAt
   confirmedAt
   rejectionReason
   createdAt
+`;
+
+export const GET_MY_BOOKING = gql`
+  query GetMyBooking($id: ID!) {
+    myBooking(id: $id) {
+      id
+      status
+      serviceType
+      timeSlot
+      startTime
+      durationHours
+      tasks
+      serviceLocations
+      bookingDate
+      locationAddress
+      notes
+      estimatedCost
+      careRecipientName
+      confirmedAt
+      createdAt
+      caregiver {
+        id
+        fullName
+        avatarUrl
+        hourlyRate
+      }
+    }
+  }
+`;
+
+export const GET_MY_BOOKING_HISTORY = gql`
+  query GetMyBookingHistory($input: BookingHistoryInput) {
+    myBookingHistory(input: $input) {
+      data {
+        id
+        status
+        serviceType
+        timeSlot
+        startTime
+        durationHours
+        tasks
+        serviceLocations
+        bookingDate
+        locationAddress
+        estimatedCost
+        careRecipientName
+        confirmedAt
+        createdAt
+        caregiver {
+          id
+          fullName
+          avatarUrl
+          hourlyRate
+        }
+      }
+      pagination {
+        page
+        limit
+        total
+        totalPages
+      }
+    }
+  }
 `;
 
 export const GET_CAREGIVER_BOOKINGS = gql`
@@ -748,6 +812,15 @@ export const REQUEST_PASSWORD_RESET = gql`
     requestPasswordReset(input: { email: $email }) {
       success
       message
+    }
+  }
+`;
+
+export const COMPLETE_BOOKING = gql`
+  mutation CompleteBooking($bookingId: ID!) {
+    completeBooking(bookingId: $bookingId) {
+      id
+      status
     }
   }
 `;

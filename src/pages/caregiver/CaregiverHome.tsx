@@ -6,6 +6,7 @@ import {
   GET_CAREGIVER_PROFILE,
   SET_CAREGIVER_SEARCHABLE,
   GET_UNREAD_COUNT,
+  GET_CAREGIVER_BOOKINGS,
 } from '../../graphql/queries';
 import Skeleton from '../../components/ui/Skeleton';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -256,21 +257,26 @@ function ProfileStatusCard({ profile, completeness }: ProfileStatusCardProps) {
 interface QuickActionsProps {
   readonly unreadCount: number;
   readonly kycStatus: string;
+  readonly actionRequiredCount: number;
 }
 
-function QuickActionsGrid({ unreadCount, kycStatus }: QuickActionsProps) {
+function QuickActionsGrid({ unreadCount, kycStatus, actionRequiredCount }: QuickActionsProps) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <Link to="/caregiver/bookings" className={`${cardBase} no-underline text-[#1A1A1A]`}>
         <div className="w-10 h-10 rounded-xl bg-[#F0F4FF] text-[#3B5BDB] flex items-center justify-center relative">
           <Icon name="work" size="large" color="currentColor" />
-          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
-            3
-          </span>
+          {actionRequiredCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
+              {actionRequiredCount > 99 ? '99+' : actionRequiredCount}
+            </span>
+          )}
         </div>
         <div>
           <div className="text-[13px] font-semibold leading-tight">งานของฉัน</div>
-          <div className="text-[11px] text-[#8A8C8E] mt-0.5">3 คำขอใหม่</div>
+          <div className="text-[11px] text-[#8A8C8E] mt-0.5">
+            {actionRequiredCount > 0 ? `${actionRequiredCount} รายการรอดำเนินการ` : 'ไม่มีรายการรอดำเนินการ'}
+          </div>
         </div>
       </Link>
 
@@ -424,6 +430,18 @@ const CaregiverHome: React.FC = () => {
     fetchPolicy: 'cache-and-network',
     pollInterval: 30_000,
   });
+
+  const { data: pendingBookingsData } = useQuery(GET_CAREGIVER_BOOKINGS, {
+    variables: { input: { status: 'PENDING', limit: 1 } },
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 30_000,
+  });
+
+  const { data: acceptedBookingsData } = useQuery(GET_CAREGIVER_BOOKINGS, {
+    variables: { input: { status: 'ACCEPTED', limit: 1 } },
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 30_000,
+  });
   const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
 
   const [optimisticSearchable, setOptimisticSearchable] = useState<boolean | null>(null);
@@ -436,6 +454,9 @@ const CaregiverHome: React.FC = () => {
   const isVerified = kycStatus === 'verified';
   const completeness = profile ? calcCompleteness(profile) : 0;
   const unreadCount = unreadData?.unreadCount ?? 0;
+  const pendingCount = pendingBookingsData?.caregiverBookings?.pagination?.total ?? 0;
+  const acceptedCount = acceptedBookingsData?.caregiverBookings?.pagination?.total ?? 0;
+  const actionRequiredCount = pendingCount + acceptedCount;
   const canToggle = isVerified && !togglingAvail;
   const displayName = profile?.fullName || data?.me?.displayName || 'ผู้ดูแล';
   const isLoading = loading || caregiverLoading;
@@ -504,7 +525,7 @@ const CaregiverHome: React.FC = () => {
                 {[0, 1, 2, 3].map((i) => <Skeleton key={i} height={110} borderRadius={16} />)}
               </div>
             ) : (
-              <QuickActionsGrid unreadCount={unreadCount} kycStatus={kycStatus} />
+              <QuickActionsGrid unreadCount={unreadCount} kycStatus={kycStatus} actionRequiredCount={actionRequiredCount} />
             )}
           </section>
 

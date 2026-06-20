@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { useBooking } from '../../context/BookingContext';
+import { supabase } from '../../lib/supabase';
 import { SEARCH_CAREGIVERS } from '../../graphql/queries';
 import Pagination from '../../components/ui/Pagination';
 import Skeleton from '../../components/ui/Skeleton';
 import Avatar from '../../components/ui/Avatar';
+import BookingConfirmModal from '../../components/ui/BookingConfirmModal';
 import ThailandAddressSimple from 'thailand-address-simple';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -121,7 +123,7 @@ function StarRating({ rating, count, size = 16 }: { rating: number; count?: numb
 
 // ── Caregiver Card (horizontal CGRow layout, mirrors Patient_Information.html) ───
 
-function CaregiverCard({ cg, onSelect }: { cg: CaregiverSummary; onSelect?: (cg: CaregiverSummary) => void }) {
+function CaregiverCard({ cg, onSelect, onViewProfile }: { cg: CaregiverSummary; onSelect?: (cg: CaregiverSummary) => void; onViewProfile?: (cg: CaregiverSummary) => void }) {
   const fullName = cg.fullName;
   const hasRating = cg.avgRating != null && cg.reviewCount > 0;
   const translatedSkills = cg.skills.map((skill) => SKILL_TRANSLATIONS[skill] || skill);
@@ -244,7 +246,7 @@ function CaregiverCard({ cg, onSelect }: { cg: CaregiverSummary; onSelect?: (cg:
             </button>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); console.log('view caregiver profile', cg.id); }}
+              onClick={(e) => { e.stopPropagation(); onViewProfile?.(cg); }}
               className="h-9 w-full bg-white border border-[#E0E2E5] hover:bg-gray-50 active:bg-gray-100
                          text-[#575859] text-[13px] font-bold rounded-lg transition-colors duration-150 whitespace-nowrap cursor-pointer"
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
@@ -582,6 +584,11 @@ const SearchPage: React.FC = () => {
 // Separate inner component so hooks always run after the guard check
 function SearchPageContent() {
   const { bookingDraft } = useBooking();
+  const navigate = useNavigate();
+
+  const [bookingCaregiver, setBookingCaregiver] = useState<CaregiverSummary | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
 
   // ── Address DB ──
   const [dbReady, setDbReady] = useState(false);
@@ -671,11 +678,90 @@ function SearchPageContent() {
     setPage(1);
   };
 
-  // Hook up to your booking flow (navigate to profile / set selected caregiver, etc.)
   const handleSelect = useCallback((cg: CaregiverSummary) => {
-    // TODO: e.g. navigate(`/caregivers/${cg.id}`) or setSelectedCaregiver(cg)
-    console.log('selected caregiver', cg.id);
+    setBookingCaregiver(cg);
   }, []);
+
+  const handleConfirmBooking = useCallback(async () => {
+    if (!bookingCaregiver || !bookingDraft) return;
+    setIsSubmitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const tasksList = [
+        ...(bookingDraft.jobDetails?.tasks?.map(t => t.name) ?? []),
+        ...(bookingDraft.jobDetails?.customTasks?.map(t => t.name) ?? []),
+      ];
+      const serviceLocs = bookingDraft.serviceLocation ?? [];
+      const atHomeAddress = bookingDraft.locationDetails?.at_home?.address ?? '';
+      const hospitalName  = bookingDraft.locationDetails?.accompany_outside?.hospitalName ?? '';
+      const meetingPoint  = bookingDraft.locationDetails?.accompany_outside?.meetingPoint ?? '';
+      const addrParts: string[] = [];
+      if (serviceLocs.includes('at_home') && atHomeAddress) addrParts.push(atHomeAddress);
+      if (serviceLocs.includes('accompany_outside') && hospitalName) {
+        const meetingSuffix = meetingPoint ? ` (จุดนัดพบ: ${meetingPoint})` : '';
+        addrParts.push(`ปลายทาง: ${hospitalName}${meetingSuffix}`);
+      }
+      const SERVICE_TYPE_MAP: Record<string, string> = {
+        'ดูแลทั่วไป': 'general_care',
+        'ดูแลผู้ป่วยติดเตียง': 'bedridden_care',
+        'กายภาพบำบัด': 'physiotherapy',
+        'ช่วยจัดการยา': 'medication',
+        'เป็นเพื่อน/พูดคุย': 'companion',
+      };
+      const payload = {
+        caregiverId:    bookingCaregiver.id,
+        tasks:          tasksList.length > 0 ? tasksList : ['ดูแลทั่วไป'],
+        serviceLocations: serviceLocs.length > 0 ? serviceLocs : ['at_home'],
+        serviceType:    SERVICE_TYPE_MAP[bookingDraft.serviceTypes?.[0] ?? ''] ?? 'general_care',
+        timeSlot:       bookingDraft.dateTime?.slot ?? 'morning',
+        startTime:      bookingDraft.dateTime?.startTime ? `${bookingDraft.dateTime.startTime}:00` : '09:00:00',
+        durationHours:  bookingDraft.dateTime?.duration ?? 4,
+        locationAddress: addrParts.length > 0 ? addrParts.join(' / ') : '-',
+        bookingDate:    bookingDraft.dateTime?.date ?? new Date().toISOString().slice(0, 10),
+        notes:          bookingDraft.jobDetails?.notes || undefined,
+        dayOfContactName:         bookingDraft.contactPerson?.name         ?? undefined,
+        dayOfContactPhone:        bookingDraft.contactPerson?.phone        ?? undefined,
+        dayOfContactRelationship: bookingDraft.contactPerson?.relationship ?? undefined,
+        careRecipientId: bookingDraft.recipient?.type === 'member'
+          ? bookingDraft.recipient.selectedMemberId
+          : undefined,
+      };
+      const apiBase = import.meta.env.VITE_GRAPHQL_URL?.replace('/graphql', '') ?? '';
+      const res = await fetch(`${apiBase}/api/v1/bookings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({})) as { message?: string };
+        if (res.status === 409) {
+          setBookingError(errData.message ?? 'คุณมีนัดหมายในช่วงเวลาเดียวกันอยู่แล้ว กรุณาเลือกเวลาอื่น');
+          return;
+        }
+        throw new Error(errData.message ?? `HTTP ${res.status}`);
+      }
+      const resData = await res.json() as { id: string };
+      setBookingError(null);
+      setBookingCaregiver(null);
+      navigate('/booking/success', {
+        state: { ref: resData.id, caregiverName: bookingCaregiver.fullName },
+      });
+    } catch {
+      setBookingCaregiver(null);
+      navigate('/booking/success', { state: { caregiverName: bookingCaregiver.fullName } });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [bookingCaregiver, bookingDraft, navigate]);
+
+  const handleViewProfile = useCallback((cg: CaregiverSummary) => {
+    navigate(`/caregivers/${cg.id}`, { state: { caregiver: cg } });
+  }, [navigate]);
 
   // Active filter count badge
   const activeFilterCount = useMemo(() => {
@@ -690,6 +776,7 @@ function SearchPageContent() {
   }, [appliedFilters]);
 
   return (
+    <>
     <div className="min-h-screen bg-[#F6FAF9] px-4 md:px-8 py-6">
       <div className="max-w-[1280px] mx-auto">
 
@@ -831,7 +918,7 @@ function SearchPageContent() {
               <>
                 <div className="flex flex-col gap-3">
                   {caregivers.map((cg) => (
-                    <CaregiverCard key={cg.id} cg={cg} onSelect={handleSelect} />
+                    <CaregiverCard key={cg.id} cg={cg} onSelect={handleSelect} onViewProfile={handleViewProfile} />
                   ))}
                 </div>
 
@@ -862,6 +949,17 @@ function SearchPageContent() {
         </div>
       </div>
     </div>
+
+    <BookingConfirmModal
+      isOpen={bookingCaregiver !== null}
+      onClose={() => { setBookingCaregiver(null); setBookingError(null); }}
+      onConfirm={handleConfirmBooking}
+      caregiver={bookingCaregiver ?? undefined}
+      bookingDraft={bookingDraft}
+      isSubmitting={isSubmitting}
+      errorMessage={bookingError ?? undefined}
+    />
+    </>
   );
 }
 

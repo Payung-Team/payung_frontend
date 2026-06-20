@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import ThailandAddressSimple from 'thailand-address-simple';
 import { useBooking } from '../../../context/BookingContext';
 import type { BookingRequest } from '../../../context/BookingContext';
 import { useToast } from '../../../hooks/useToast';
 import MapPicker from '../MapPicker';
+import { loadGoogleMaps } from '../../../lib/googleMaps';
 
 
 const BUSY_SLOTS: string[] = [];
@@ -113,13 +114,8 @@ export default function BookingStep1() {
     bookingDraft?.locationDetails?.accompany_outside?.lng || 100.501765
   );
 
-  const [destinationQuery, setDestinationQuery] = useState(
-    bookingDraft?.locationDetails?.accompany_outside?.hospitalName || ''
-  );
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const atHomeAcRef = useRef<any>(null);
+  const outsideDestAcRef = useRef<any>(null);
 
   // Care Recipient Type
   const recipientType = 'self';
@@ -167,8 +163,6 @@ export default function BookingStep1() {
   const [patientRegularHospital, setPatientRegularHospital] = useState(
     bookingDraft?.recipient?.patientDetails?.regularHospital || ''
   );
-  const [saveForLater, setSaveForLater] = useState(true);
-
   // Inline Recipient Form for adding family member (removed)
 
   // Contact Person
@@ -185,57 +179,48 @@ export default function BookingStep1() {
   // Validation Errors
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Geocoding Nominatim Search logic
-  useEffect(() => {
-    if (destinationQuery.trim().length < 3) {
-      setSuggestions([]);
-      return;
-    }
+  // Google Places Autocomplete — ที่อยู่บ้าน (Pin A)
+  const atHomeInputRef = useCallback((el: HTMLInputElement | null) => {
+    if (!el) { atHomeAcRef.current = null; return; }
+    if (atHomeAcRef.current) return;
+    loadGoogleMaps().then(() => {
+      const g = (window as any).google;
+      const ac = new g.maps.places.Autocomplete(el, {
+        componentRestrictions: { country: 'th' },
+        fields: ['formatted_address', 'geometry', 'name'],
+      });
+      ac.addListener('place_changed', () => {
+        const place = ac.getPlace();
+        if (!place.geometry?.location) return;
+        setAddress(place.formatted_address ?? place.name ?? '');
+        setLatA(place.geometry.location.lat());
+        setLngA(place.geometry.location.lng());
+        setErrors(prev => { const n = { ...prev }; delete n.address; return n; });
+      });
+      atHomeAcRef.current = ac;
+    });
+  }, []);
 
-    if (destinationQuery === hospitalName) {
-      return;
-    }
-
-    const delayDebounceFn = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=th&q=${encodeURIComponent(
-            destinationQuery
-          )}`,
-          {
-            headers: {
-              'Accept-Language': 'th,en',
-              'User-Agent': 'PayungCaregiverApp/1.0'
-            }
-          }
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setSuggestions(data);
-          setShowSuggestions(true);
-        }
-      } catch (err) {
-        console.error('Error fetching geocoding data:', err);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 500);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [destinationQuery, hospitalName]);
-
-  // Click outside to close suggestions list
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+  // Google Places Autocomplete — ปลายทางภายนอก (Pin B)
+  const outsideDestInputRef = useCallback((el: HTMLInputElement | null) => {
+    if (!el) { outsideDestAcRef.current = null; return; }
+    if (outsideDestAcRef.current) return;
+    loadGoogleMaps().then(() => {
+      const g = (window as any).google;
+      const ac = new g.maps.places.Autocomplete(el, {
+        componentRestrictions: { country: 'th' },
+        fields: ['formatted_address', 'geometry', 'name'],
+      });
+      ac.addListener('place_changed', () => {
+        const place = ac.getPlace();
+        if (!place.geometry?.location) return;
+        setHospitalName(place.name ?? place.formatted_address ?? '');
+        setLatB(place.geometry.location.lat());
+        setLngB(place.geometry.location.lng());
+        setErrors(prev => { const n = { ...prev }; delete n.hospitalName; return n; });
+      });
+      outsideDestAcRef.current = ac;
+    });
   }, []);
 
   // Filter Service Types invalid based on Location Selection
@@ -481,34 +466,6 @@ export default function BookingStep1() {
   };
 
   // Helper setter to handle recipient mapping relationship (removed)
-
-  const isSameAsSaved = 
-    patientName === SAVED_PROFILE.name &&
-    patientAge === SAVED_PROFILE.age &&
-    patientGender === SAVED_PROFILE.gender &&
-    patientWeight === SAVED_PROFILE.weight &&
-    patientHeight === SAVED_PROFILE.height &&
-    patientSupportLevel === SAVED_PROFILE.supportLevel &&
-    JSON.stringify([...finalConditions].sort()) === JSON.stringify([...SAVED_PROFILE.conditions].sort()) &&
-    patientMedicines === SAVED_PROFILE.medicines &&
-    patientAllergies === SAVED_PROFILE.allergies &&
-    patientBloodGroup === SAVED_PROFILE.bloodGroup &&
-    patientCareInstructions === SAVED_PROFILE.careInstructions &&
-    patientRegularHospital === SAVED_PROFILE.regularHospital &&
-    address === SAVED_PROFILE.address;
-
-  const isFormBlank = 
-    !patientName && 
-    !patientAge && 
-    !patientWeight && 
-    !patientHeight && 
-    !patientCareInstructions && 
-    !patientMedicines && 
-    !patientAllergies && 
-    !patientRegularHospital && 
-    !address;
-
-  const showSaveCheckbox = !isSameAsSaved && !isFormBlank;
 
   return (
     <div className="space-y-6">
@@ -828,11 +785,11 @@ export default function BookingStep1() {
             </div>
           </div>
 
-          {/* At Home Location address field */}
+          {/* At Home Location — Google Places Autocomplete */}
           {serviceLocation.includes('at_home') && (
             <div className="space-y-2">
               <div className="flex justify-between items-center gap-2">
-                <label className="block text-sm font-bold text-[#575859]">สถานที่ดูแล (ที่บ้าน)</label>
+                <label className="block text-sm font-bold text-[#575859]">สถานที่ดูแล (ที่บ้าน) <span className="text-red-500">*</span></label>
                 <button
                   type="button"
                   onClick={() => {
@@ -849,125 +806,101 @@ export default function BookingStep1() {
                   ใช้ที่อยู่จากประวัติส่วนตัว
                 </button>
               </div>
-              <textarea
-                rows={3}
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="รายละเอียดที่อยู่ เช่น เลขที่บ้าน ซอย ถนน แขวง เขต รหัสไปรษณีย์ ประเทศไทย"
-                className="w-full p-3 border border-[#E0E2E5] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-[#52B69A]"
-              />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 material-icons text-[#AAB2BA] text-base pointer-events-none">search</span>
+                <input
+                  ref={atHomeInputRef}
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="พิมพ์ที่อยู่หรือค้นหาสถานที่บน Google Maps..."
+                  className={`w-full p-3 pl-10 border rounded-xl text-sm focus:outline-none focus:ring-1 ${
+                    errors.address ? 'border-red-500 focus:ring-red-500' : 'border-[#E0E2E5] focus:ring-[#52B69A]'
+                  }`}
+                />
+              </div>
+              <p className="text-[11px] text-[#8A8C8E]">
+                พิมพ์แล้วเลือกจากรายการที่แนะนำ หรือคลิก / ลากหมุดสีเขียวบนแผนที่เพื่อกรอกที่อยู่อัตโนมัติ
+              </p>
               {errors.address && <p className="text-red-500 text-xs">{errors.address}</p>}
             </div>
           )}
 
-          {/* Accompany Outside Location Destination address field */}
+          {/* Accompany Outside — Google Places Autocomplete + meeting point */}
           {serviceLocation.includes('accompany_outside') && (
-            <div className="space-y-2">
-              <label className="block text-sm font-bold text-[#575859]">จุดจัดส่ง / สถานที่ปลายทางภายนอก</label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative" ref={suggestionsRef}>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={destinationQuery}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setDestinationQuery(val);
-                        setHospitalName(val);
-                        setShowSuggestions(true);
-                      }}
-                      onFocus={() => setShowSuggestions(true)}
-                      placeholder="พิมพ์ค้นหาสถานที่ปลายทางภายนอก..."
-                      className={`w-full p-3 pr-10 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
-                        errors.hospitalName ? 'border-red-500 focus:ring-red-500' : 'border-[#E0E2E5] focus:ring-[#52B69A]'
-                      }`}
-                    />
-                    {isSearching ? (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 material-icons text-[#52B69A] text-base animate-spin">
-                        sync
-                      </span>
-                    ) : (
-                      destinationQuery && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDestinationQuery('');
-                            setHospitalName('');
-                            setSuggestions([]);
-                          }}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 material-icons text-[#AAB2BA] text-base hover:text-gray-600 cursor-pointer animate-fadeIn"
-                        >
-                          clear
-                        </button>
-                      )
-                    )}
-                  </div>
-                  {showSuggestions && suggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-[2000] max-h-[220px] overflow-y-auto divide-y divide-gray-100">
-                      {suggestions.map((item, i) => (
-                        <div
-                          key={i}
-                          onClick={() => {
-                            const lat = parseFloat(item.lat);
-                            const lng = parseFloat(item.lon);
-                            const name = item.display_name;
-                            setHospitalName(name);
-                            setDestinationQuery(name);
-                            setLatB(lat);
-                            setLngB(lng);
-                            setShowSuggestions(false);
-                          }}
-                          className="p-3 hover:bg-gray-50 cursor-pointer text-xs text-[#1A1A1A] transition flex items-start gap-2 text-left"
-                        >
-                          <span className="material-icons text-[#8A8C8E] text-sm mt-0.5">location_on</span>
-                          <div>
-                            <p className="font-semibold text-gray-800">{item.display_name.split(',')[0]}</p>
-                            <p className="text-[10px] text-gray-500 mt-0.5">{item.display_name}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {showSuggestions && suggestions.length === 0 && destinationQuery.trim().length >= 3 && !isSearching && (
-                    <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-[2000] p-4 text-center text-xs text-[#8A8C8E]">
-                      ไม่พบสถานที่นี้ ลองพิมพ์ค้นหาใหม่อีกครั้ง
-                    </div>
-                  )}
-                  {errors.hospitalName && <p className="text-red-500 text-xs mt-1">{errors.hospitalName}</p>}
-                </div>
-                <div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-bold text-[#575859]">สถานที่ปลายทาง <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 material-icons text-[#AAB2BA] text-base pointer-events-none">search</span>
                   <input
+                    ref={outsideDestInputRef}
                     type="text"
-                    value={meetingPoint}
-                    onChange={(e) => setMeetingPoint(e.target.value)}
-                    placeholder="จุดนัดพบ หรือ สถานที่ปลายทางด้านนอกอย่างละเอียด"
-                    className={`w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-1 ${
-                      errors.meetingPoint ? 'border-red-500 focus:ring-red-500' : 'border-[#E0E2E5] focus:ring-[#52B69A]'
+                    value={hospitalName}
+                    onChange={(e) => setHospitalName(e.target.value)}
+                    placeholder="ค้นหาโรงพยาบาล คลินิก หรือสถานที่..."
+                    className={`w-full p-3 pl-10 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
+                      errors.hospitalName ? 'border-red-500 focus:ring-red-500' : 'border-[#E0E2E5] focus:ring-[#52B69A]'
                     }`}
                   />
-                  {errors.meetingPoint && <p className="text-red-500 text-xs mt-1">{errors.meetingPoint}</p>}
                 </div>
+                <p className="text-[11px] text-[#8A8C8E]">
+                  พิมพ์แล้วเลือกจากรายการ หรือลากหมุดสีส้มบนแผนที่เพื่อกรอกอัตโนมัติ
+                </p>
+                {errors.hospitalName && <p className="text-red-500 text-xs">{errors.hospitalName}</p>}
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-bold text-[#575859]">จุดนัดพบ / รายละเอียดเพิ่มเติม <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={meetingPoint}
+                  onChange={(e) => setMeetingPoint(e.target.value)}
+                  placeholder="เช่น ประตูหน้า อาคาร A ชั้น 1 ลานจอดรถ..."
+                  className={`w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-1 ${
+                    errors.meetingPoint ? 'border-red-500 focus:ring-red-500' : 'border-[#E0E2E5] focus:ring-[#52B69A]'
+                  }`}
+                />
+                {errors.meetingPoint && <p className="text-red-500 text-xs mt-1">{errors.meetingPoint}</p>}
               </div>
             </div>
           )}
 
-          {/* Map coordination */}
+          {/* Google Map — two-way binding with form fields above */}
           <div className="space-y-2">
-            <span className="text-xs font-semibold text-[#8A8C8E] block">
-              ระบุพิกัดสถานที่ในแผนที่ (สามารถลากตัวปักหมุดเพื่อระบุตำแหน่งที่แน่นอนได้)
-            </span>
             <MapPicker
               latA={latA}
               lngA={lngA}
-              onChangeA={(newLat, newLng) => {
-                setLatA(newLat);
-                setLngA(newLng);
+              onChangeA={(lat, lng, addr, prov, dist) => {
+                setLatA(lat);
+                setLngA(lng);
+                if (addr) {
+                  setAddress(addr);
+                  setErrors(prev => { const n = { ...prev }; delete n.address; return n; });
+                }
+                if (prov && provincesList.includes(prov)) {
+                  setProvince(prov);
+                  setDistrict('');
+                  setErrors(prev => { const n = { ...prev }; delete n.province; return n; });
+                }
+                if (dist) {
+                  const validDistricts = addressDbReady
+                    ? [...new Set(thaiAddressDb.address.filter((a: any) => a.province === (prov ?? province)).map((a: any) => a.amphoe))]
+                    : [];
+                  if (validDistricts.includes(dist)) {
+                    setDistrict(dist);
+                    setErrors(prev => { const n = { ...prev }; delete n.district; return n; });
+                  }
+                }
               }}
               latB={latB}
               lngB={lngB}
-              onChangeB={(newLat, newLng) => {
-                setLatB(newLat);
-                setLngB(newLng);
+              onChangeB={(lat, lng, addr) => {
+                setLatB(lat);
+                setLngB(lng);
+                if (addr) {
+                  setHospitalName(addr);
+                  setErrors(prev => { const n = { ...prev }; delete n.hospitalName; return n; });
+                }
               }}
               showPinB={serviceLocation.includes('accompany_outside')}
             />
@@ -1220,20 +1153,6 @@ export default function BookingStep1() {
             />
           </div>
 
-          {showSaveCheckbox && (
-            <div className="flex items-center gap-2 p-4 border border-[#52B69A]/20 bg-[#52B69A]/5 rounded-xl">
-              <input
-                type="checkbox"
-                id="saveForLater"
-                checked={saveForLater}
-                onChange={(e) => setSaveForLater(e.target.checked)}
-                className="w-4 h-4 text-[#52B69A] border-gray-300 rounded focus:ring-[#52B69A] cursor-pointer"
-              />
-              <label htmlFor="saveForLater" className="text-xs font-semibold text-[#2D6A4F] cursor-pointer">
-                บันทึกข้อมูลสมาชิกนี้ไว้ใช้ในคราวหน้า
-              </label>
-            </div>
-          )}
         </div>
       </div>
 
@@ -1256,10 +1175,11 @@ export default function BookingStep1() {
           <div className="space-y-1">
             <label className="text-xs font-semibold text-[#575859]">เบอร์โทรศัพท์ติดต่อ</label>
             <input
-              type="text"
+              type="tel"
               value={contactPhone}
-              onChange={(e) => setContactPhone(e.target.value)}
+              onChange={(e) => setContactPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
               placeholder="เช่น 089xxxxxxx"
+              maxLength={10}
               className="w-full p-3 border border-[#E0E2E5] rounded-xl text-sm focus:outline-none"
             />
             {errors.contactPhone && <p className="text-red-500 text-xs">{errors.contactPhone}</p>}

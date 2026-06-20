@@ -1,0 +1,447 @@
+import React, { useState, useRef, useMemo } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import { useQuery } from '@apollo/client/react';
+import { supabase } from '../../lib/supabase';
+import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
+import { GET_MY_BOOKING } from '../../graphql/queries';
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function formatThaiDate(dateStr: string): string {
+  if (!dateStr) return '—';
+  try {
+    return new Date(dateStr).toLocaleDateString('th-TH', {
+      day: 'numeric', month: 'short', year: 'numeric',
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+const SERVICE_TYPE_LABELS: Record<string, string> = {
+  general_care: 'ดูแลทั่วไป',
+  bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
+  physiotherapy: 'กายภาพบำบัด',
+  medication: 'ช่วยจัดการยา',
+  companion: 'เป็นเพื่อน/พูดคุย',
+  nursing: 'พยาบาลวิชาชีพ',
+  basic_care: 'ดูแลเบื้องต้น',
+  elderly_care: 'ดูแลผู้สูงอายุ',
+  home_health: 'สุขภาพที่บ้าน',
+  patient_transport: 'รับส่งผู้ป่วย',
+  post_surgery: 'หลังผ่าตัด',
+};
+
+const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: string; bg: string; text: string }> = {
+  pending:   { label: 'รอผู้ดูแลตอบรับ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
+  accepted:  { label: 'ยืนยันแล้ว',      dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
+  rejected:  { label: 'ปฏิเสธแล้ว',      dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
+  cancelled: { label: 'ยกเลิกแล้ว',      dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280' },
+  completed: { label: 'เสร็จสิ้น',       dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
+};
+
+const STATUS_BANNER: Record<ConfirmedBooking['status'], { icon: string; iconColor: string; bg: string; border: string; textColor: string; message: (name: string) => string }> = {
+  pending:   { icon: 'info', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: (n) => `ส่งคำขอของคุณไปยัง ${n} เรียบร้อยแล้ว ขณะนี้รอการตอบรับ` },
+  accepted:  { icon: 'check_circle', iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: (n) => `${n} ได้ตอบรับการจองของคุณแล้ว กรุณายืนยันการนัดหมาย` },
+  rejected:  { icon: 'cancel', iconColor: '#DC2626', bg: '#FEF2F2', border: '#FECACA', textColor: '#991B1B', message: (n) => `${n} ไม่สามารถรับงานนี้ได้ คุณสามารถค้นหาผู้ดูแลท่านอื่น` },
+  cancelled: { icon: 'do_not_disturb_on', iconColor: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', textColor: '#374151', message: () => `การจองนี้ถูกยกเลิกแล้ว` },
+  completed: { icon: 'task_alt', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: () => `การนัดหมายเสร็จสิ้นเรียบร้อยแล้ว` },
+};
+
+const CANCELLABLE_STATUSES: ConfirmedBooking['status'][] = ['pending', 'accepted'];
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function Divider() {
+  return <div style={{ height: '0.8px', background: '#F0F1F3', margin: '18px 0' }} />;
+}
+
+function SectionTitle({ children }: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#8A8C8E', margin: '0 0 10px', lineHeight: '20px' }}>
+      {children}
+    </p>
+  );
+}
+
+function InfoRow({ label, value, valueFont = 'inter' }: Readonly<{ label: string; value: string; valueFont?: 'inter' | 'thai' }>) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
+      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E', lineHeight: '20px', flexShrink: 0 }}>{label}</span>
+      <span style={{ fontFamily: valueFont === 'inter' ? "'Inter', sans-serif" : "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#1A1A1A', lineHeight: '20px', textAlign: 'right' }}>{value || '—'}</span>
+    </div>
+  );
+}
+
+// ── GQL → ConfirmedBooking mapper (mirrors BookingsPage.mapGqlBooking) ─────────
+
+function computeEndTime(startTime: string, durationHours: number): string {
+  try {
+    const [sh, sm] = startTime.split(':').map(Number);
+    const endMin = sh * 60 + sm + Math.round(durationHours * 60);
+    const eh = Math.floor(endMin / 60) % 24;
+    const em = endMin % 60;
+    return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+  } catch { return ''; }
+}
+
+function mapGqlStatus(s: string): ConfirmedBooking['status'] {
+  const v = s.toLowerCase();
+  if (v === 'accepted' || v === 'confirmed') return 'accepted';
+  if (v === 'rejected' || v === 'declined') return 'rejected';
+  if (v === 'cancelled') return 'cancelled';
+  if (v === 'completed') return 'completed';
+  return 'pending';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapGqlBooking(api: any): ConfirmedBooking {
+  const idSuffix = String(api.id).toUpperCase().replaceAll('-', '').slice(-6);
+  const startTime: string = api.startTime ?? '';
+  const durationHours: number = api.durationHours ?? 0;
+  const endTime = startTime && durationHours ? computeEndTime(startTime, durationHours) : '';
+  const serviceLocations: ('at_home' | 'accompany_outside')[] = (api.serviceLocations ?? []).filter(
+    (l: string) => l === 'at_home' || l === 'accompany_outside',
+  );
+  const tasks: { id: string; name: string }[] = (api.tasks ?? []).map((name: string) => ({ id: name, name }));
+
+  const draft: BookingRequest = {
+    serviceTypes: api.serviceType ? [api.serviceType] : [],
+    serviceLocation: serviceLocations,
+    dateTime: { date: api.bookingDate ?? '', slot: api.timeSlot ?? '', startTime, endTime, duration: durationHours },
+    locationDetails: { at_home: { address: api.locationAddress ?? '', lat: 0, lng: 0 } },
+    jobDetails: { tasks },
+    estimatedCost: {
+      hourlyRate: api.caregiver?.hourlyRate ?? 0,
+      hours: durationHours,
+      platformFee: Math.round((api.estimatedCost ?? 0) * 0.1),
+      total: api.estimatedCost ?? 0,
+    },
+    recipient: api.careRecipientName
+      ? { type: 'member', patientDetails: { name: api.careRecipientName, age: 0 } }
+      : { type: 'self' },
+  };
+
+  return {
+    id: api.id,
+    ref: `REF-${idSuffix}`,
+    caregiverId: api.caregiver?.id ?? '',
+    caregiverName: api.caregiver?.fullName ?? '(รอจับคู่)',
+    caregiverAvatarUrl: api.caregiver?.avatarUrl ?? null,
+    caregiverHourlyRate: api.caregiver?.hourlyRate ?? 0,
+    confirmedAt: api.createdAt ?? new Date().toISOString(),
+    status: mapGqlStatus(api.status ?? ''),
+    draft,
+  };
+}
+
+// ── Main Page ──────────────────────────────────────────────────────────────────
+
+export default function BookingDetailPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { id } = useParams<{ id: string }>();
+
+  // Navigation state used as instant initial data while query loads
+  const stateBooking = location.state?.booking as ConfirmedBooking | undefined;
+
+  const { data, loading } = useQuery(GET_MY_BOOKING, {
+    variables: { id },
+    skip: !id,
+    fetchPolicy: 'cache-and-network',
+  });
+
+  const booking = useMemo<ConfirmedBooking | undefined>(() => {
+    if (data?.myBooking) return mapGqlBooking(data.myBooking);
+    return stateBooking;
+  }, [data, stateBooking]);
+
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  if (loading && !booking) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F6FAF9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <span className="material-icons" style={{ fontSize: 40, color: '#52B69A', animation: 'spin 1s linear infinite' }}>refresh</span>
+          <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, color: '#8A8C8E', marginTop: 12 }}>กำลังโหลดข้อมูล...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F6FAF9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 16, color: '#8A8C8E' }}>ไม่พบข้อมูลการจอง</p>
+          <button
+            type="button"
+            onClick={() => navigate('/bookings')}
+            style={{ marginTop: 16, padding: '8px 20px', background: '#52B69A', color: '#FFFFFF', border: 'none', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+          >
+            กลับไปยังนัดหมาย
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const badge = STATUS_BADGE[booking.status];
+  const banner = STATUS_BANNER[booking.status];
+  const dt = booking.draft.dateTime;
+  const est = booking.draft.estimatedCost;
+  const svcTypes = booking.draft.serviceTypes ?? [];
+  const svcTypeLabel = svcTypes.map((t) => SERVICE_TYPE_LABELS[t] ?? t).join(', ') || '—';
+  const dateStr = dt?.date ? formatThaiDate(dt.date) : '—';
+  const timeStr = dt?.startTime && dt?.endTime ? `${dt.startTime}–${dt.endTime} น.` : (dt?.slot ?? '—');
+  const durationStr = dt?.duration ? `${dt.duration} ชั่วโมง` : '—';
+  const locationStr = booking.draft.locationDetails?.at_home?.address
+    || booking.draft.locationDetails?.accompany_outside?.hospitalName
+    || '—';
+  const recipientName = booking.draft.recipient?.patientDetails?.name ?? 'ตัวเอง';
+  const total = est?.total ?? 0;
+  const tasks = booking.draft.jobDetails?.tasks ?? [];
+  const tasksText = tasks.length > 0 ? tasks.map((t) => t.name).join(', ') : null;
+  const cgInitial = booking.caregiverName?.charAt(0) ?? '?';
+  const isCancellable = CANCELLABLE_STATUSES.includes(booking.status);
+  const caregiverDisplayName = booking.caregiverName === '(รอจับคู่)' ? 'ผู้ดูแล' : booking.caregiverName;
+
+  const showToast = () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToastVisible(true);
+    toastTimer.current = setTimeout(() => {
+      setToastVisible(false);
+      setTimeout(() => navigate('/bookings'), 300);
+    }, 2000);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (isCancelling) return;
+    setIsCancelling(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:3000/graphql';
+      const restBaseUrl = graphqlUrl.replace('/graphql', '/api/v1');
+      const res = await fetch(`${restBaseUrl}/bookings/${booking.id}/cancel`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setShowCancelModal(false);
+      showToast();
+    } catch {
+      setIsCancelling(false);
+    }
+  };
+
+  return (
+    <>
+      {/* Toast */}
+      <div
+        style={{
+          position: 'fixed', top: 20, right: 20, zIndex: 9999,
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '12px 24px',
+          background: '#047857',
+          boxShadow: '0px 8px 32px rgba(0,0,0,0.15)',
+          borderRadius: 12,
+          opacity: toastVisible ? 1 : 0,
+          transform: toastVisible ? 'translateY(0)' : 'translateY(-10px)',
+          transition: 'opacity 0.25s ease, transform 0.25s ease',
+          pointerEvents: 'none',
+        }}
+      >
+        <span className="material-icons" style={{ fontSize: 20, color: '#FFFFFF' }}>check_circle</span>
+        <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontWeight: 600, fontSize: 14, color: '#FFFFFF', whiteSpace: 'nowrap' }}>
+          ยกเลิกคำขอจองสำเร็จ
+        </span>
+      </div>
+
+      {/* Cancel Confirm Modal */}
+      {showCancelModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
+          onClick={() => !isCancelling && setShowCancelModal(false)}
+        >
+          <div
+            style={{ width: '100%', maxWidth: 420, background: '#FFFFFF', borderRadius: 20, boxShadow: '0px 20px 60px rgba(0,0,0,0.15)', padding: '32px 28px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ width: 60, height: 60, borderRadius: 30, background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <span className="material-icons" style={{ fontSize: 32, color: '#DC2626' }}>report_problem</span>
+            </div>
+            <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 18, fontWeight: 700, color: '#1A1A1A', textAlign: 'center', margin: 0 }}>
+              ยืนยันการยกเลิกคำขอจอง
+            </p>
+            <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#575859', textAlign: 'center', margin: '10px 0 24px', maxWidth: 330, lineHeight: '21px' }}>
+              คุณแน่ใจหรือไม่ว่าต้องการยกเลิกคำขอจองสำหรับ{' '}
+              <span style={{ fontWeight: 700, color: '#1A1A1A' }}>{booking.caregiverName}</span>?
+              <br />การดำเนินการนี้ไม่สามารถย้อนกลับได้
+            </p>
+            <div style={{ display: 'flex', gap: 12, width: '100%' }}>
+              <button type="button" onClick={() => setShowCancelModal(false)} disabled={isCancelling}
+                style={{ flex: 1, height: 44, background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 10, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#575859', cursor: 'pointer' }}>
+                ย้อนกลับ
+              </button>
+              <button type="button" onClick={handleConfirmCancel} disabled={isCancelling}
+                style={{ flex: 1, height: 44, background: '#DC2626', border: 'none', borderRadius: 10, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#FFFFFF', cursor: isCancelling ? 'wait' : 'pointer', opacity: isCancelling ? 0.7 : 1 }}>
+                {isCancelling ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Page */}
+      <div style={{ minHeight: '100vh', background: '#F6FAF9' }}>
+        <div style={{ maxWidth: 720, margin: '0 auto', padding: '28px 24px 100px' }}>
+
+          {/* Back link */}
+          <button
+            type="button"
+            onClick={() => navigate('/bookings')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginBottom: 18 }}
+          >
+            <span className="material-icons" style={{ fontSize: 16, color: '#52B69A' }}>arrow_back</span>
+            <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#52B69A', lineHeight: '20px' }}>
+              กลับไปยังนัดหมายทั้งหมด
+            </span>
+          </button>
+
+          {/* Header */}
+          <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+            <div>
+              <h1 style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 20, fontWeight: 700, color: '#1A1A1A', margin: '0 0 4px', lineHeight: '30px' }}>
+                รายละเอียดใบสมัครจองบริการ
+              </h1>
+              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: '#8A8C8E', margin: 0, lineHeight: '18px' }}>
+                Booking Reference: {booking.ref}
+              </p>
+            </div>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 10px', height: 24, background: badge.bg, borderRadius: 9999, flexShrink: 0, marginTop: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: 3, background: badge.dot, flexShrink: 0 }} />
+              <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, fontWeight: 600, color: badge.text, lineHeight: '18px' }}>
+                {badge.label}
+              </span>
+            </span>
+          </div>
+
+          {/* Status banner */}
+          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, background: banner.bg, border: `0.8px solid ${banner.border}`, borderRadius: 12, marginBottom: 18 }}>
+            <span className="material-icons" style={{ fontSize: 18, color: banner.iconColor, flexShrink: 0, marginTop: 1 }}>{banner.icon}</span>
+            <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: banner.textColor, margin: 0, lineHeight: '20px' }}>
+              {banner.message(caregiverDisplayName)}
+            </p>
+          </div>
+
+          {/* Main card */}
+          <div style={{ background: '#FFFFFF', border: '0.8px solid #E0E2E5', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 20, padding: 24 }}>
+
+            {/* ── Section 1: ข้อมูลผู้ดูแล ── */}
+            <SectionTitle>ข้อมูลผู้ดูแล</SectionTitle>
+            <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                {/* Avatar + check badge */}
+                <div style={{ position: 'relative', width: 48, height: 48, flexShrink: 0 }}>
+                  {booking.caregiverAvatarUrl ? (
+                    <img src={booking.caregiverAvatarUrl} alt={booking.caregiverName} style={{ width: 48, height: 48, borderRadius: 24, objectFit: 'cover', border: '2.4px solid #FFFFFF', boxShadow: '0px 4px 16px rgba(82,182,154,0.2)' }} />
+                  ) : (
+                    <div style={{ width: 48, height: 48, borderRadius: 24, background: 'linear-gradient(135deg, #52B69A 0%, #76C893 100%)', border: '2.4px solid #FFFFFF', boxShadow: '0px 4px 16px rgba(82,182,154,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 18, fontWeight: 700, color: '#FFFFFF' }}>{cgInitial}</span>
+                    </div>
+                  )}
+                  <div style={{ position: 'absolute', bottom: -1, right: -1, width: 18, height: 18, borderRadius: 9, background: '#52B69A', border: '1.6px solid #FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span className="material-icons" style={{ fontSize: 11, color: '#FFFFFF' }}>check</span>
+                  </div>
+                </div>
+
+                <div>
+                  <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '21px' }}>
+                    {booking.caregiverName}
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    {booking.caregiverHourlyRate > 0 && (
+                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#575859', lineHeight: '18px' }}>
+                        ฿{booking.caregiverHourlyRate.toLocaleString()}/ชม.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {booking.caregiverId && booking.caregiverName !== '(รอจับคู่)' && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/caregivers/${booking.caregiverId}`)}
+                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 32, padding: '0 12px', background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 6, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, fontWeight: 600, color: '#575859', cursor: 'pointer', flexShrink: 0 }}
+                >
+                  ดูโปรไฟล์
+                </button>
+              )}
+            </div>
+
+            <Divider />
+
+            {/* ── Section 2: รายละเอียดนัดหมาย ── */}
+            <SectionTitle>รายละเอียดนัดหมาย</SectionTitle>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
+              <InfoRow label="ประเภทงานบริการ" value={svcTypeLabel} valueFont="thai" />
+              <InfoRow label="วันที่ให้บริการ" value={dateStr} />
+              <InfoRow label="เวลาให้บริการ" value={timeStr} />
+              <InfoRow label="ระยะเวลาบริการ" value={durationStr} />
+            </div>
+            <InfoRow label="สถานที่รับบริการ" value={locationStr} />
+
+            <Divider />
+
+            {/* ── Section 3: ข้อมูลคนไข้ ── */}
+            <SectionTitle>ข้อมูลคนไข้</SectionTitle>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
+              <InfoRow label="ชื่อผู้รับบริการ" value={recipientName} valueFont="thai" />
+            </div>
+
+            <Divider />
+
+            {/* ── Section 4: รายละเอียดภารกิจ ── */}
+            <SectionTitle>รายละเอียดภารกิจ</SectionTitle>
+            <div style={{ background: '#F9FAFB', borderRadius: 10, padding: 14 }}>
+              <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontStyle: 'italic', fontSize: 13, color: tasksText ? '#575859' : '#B0B3B8', margin: 0, lineHeight: '20px' }}>
+                {tasksText ?? 'ไม่ได้ระบุภารกิจเพิ่มเติม'}
+              </p>
+            </div>
+
+            <Divider />
+
+            {/* ── Section 5: ราคา ── */}
+            <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#1A1A1A', margin: 0 }}>
+                ราคาค่าบริการประมาณการทั้งสิ้น
+              </p>
+              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, color: '#52B69A', margin: 0, lineHeight: '33px' }}>
+                {total > 0 ? `฿${total.toLocaleString()}` : '—'}
+              </p>
+            </div>
+          </div>
+
+          {/* Cancel button */}
+          {isCancellable && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(true)}
+                style={{ height: 37, padding: '0 28px', background: '#FFFFFF', border: '0.8px solid #FCA5A5', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#DC2626', cursor: 'pointer' }}
+              >
+                ยกเลิกรายการจองนี้
+              </button>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </>
+  );
+}

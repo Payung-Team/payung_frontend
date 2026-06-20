@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
-import { useToast } from '../../hooks/useToast';
-import { supabase } from '../../lib/supabase';
 import BookingStep1 from './steps/BookingStep1';
 import BookingStep2 from './steps/BookingStep2';
 import BookingStep3 from './steps/BookingStep3';
@@ -88,8 +86,12 @@ function SearchingLoadingScreen() {
 
 export default function BookingRequestPage() {
   const navigate = useNavigate();
-  const { step, goToStep, bookingDraft } = useBooking();
-  const { success, error } = useToast();
+  const { step, goToStep, bookingDraft, resetBooking } = useBooking();
+
+  useEffect(() => {
+    resetBooking();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [isSearching, setIsSearching] = useState(false);
 
   // Helper values for sidebar cost estimation
@@ -103,87 +105,11 @@ export default function BookingRequestPage() {
     if (!bookingDraft) return;
 
     setIsSearching(true);
-
-    try {
-      // 1. Get auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      // 2. Map booking details for CreateBookingDto
-      const tasksList = [
-        ...(bookingDraft.jobDetails?.tasks?.map(t => t.name) || []),
-        ...(bookingDraft.jobDetails?.customTasks?.map(t => t.name) || [])
-      ];
-
-      const serviceLocs = bookingDraft.serviceLocation || [];
-      const atHomeAddress = bookingDraft.locationDetails?.at_home?.address || '';
-      const hospitalName = bookingDraft.locationDetails?.accompany_outside?.hospitalName || '';
-      const meetingPoint = bookingDraft.locationDetails?.accompany_outside?.meetingPoint || '';
-
-      const displayAddressParts = [];
-      if (serviceLocs.includes('at_home') && atHomeAddress) {
-        displayAddressParts.push(atHomeAddress);
-      }
-      if (serviceLocs.includes('accompany_outside') && hospitalName) {
-        displayAddressParts.push(`ปลายทาง: ${hospitalName}${meetingPoint ? ` (จุดนัดพบ: ${meetingPoint})` : ''}`);
-      }
-      const displayAddress = displayAddressParts.length > 0 ? displayAddressParts.join(' / ') : '-';
-
-      // Map serviceType from Thai label to database enum string
-      const serviceTypeMap: Record<string, string> = {
-        'ดูแลทั่วไป': 'general_care',
-        'ดูแลผู้ป่วยติดเตียง': 'bedridden_care',
-        'กายภาพบำบัด': 'physiotherapy',
-        'ช่วยจัดการยา': 'medication',
-        'เป็นเพื่อน/พูดคุย': 'companion'
-      };
-      const selectedThaiServiceType = bookingDraft.serviceTypes?.[0] || '';
-      const mappedServiceType = serviceTypeMap[selectedThaiServiceType] || 'general_care';
-
-      const payload = {
-        tasks: tasksList,
-        serviceLocations: serviceLocs,
-        serviceType: mappedServiceType,
-        timeSlot: bookingDraft.dateTime?.slot || '',
-        startTime: bookingDraft.dateTime?.startTime ? `${bookingDraft.dateTime.startTime}:00` : '',
-        durationHours: bookingDraft.dateTime?.duration || 4,
-        locationAddress: displayAddress,
-        bookingDate: bookingDraft.dateTime?.date || '',
-        dayOfContactName: bookingDraft.contactPerson?.name || undefined,
-        dayOfContactPhone: bookingDraft.contactPerson?.phone || undefined,
-        dayOfContactRelationship: bookingDraft.contactPerson?.relationship || undefined,
-        careRecipientId: bookingDraft.recipient?.type === 'member' ? bookingDraft.recipient.selectedMemberId : undefined
-      };
-
-      // 3. REST API call to backend
-      const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:3000/graphql';
-      const restBaseUrl = graphqlUrl.replace('/graphql', '/api/v1');
-
-      const response = await fetch(`${restBaseUrl}/bookings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      // Add a slight delay for smooth transition and display of the search animation
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      success('สร้างคำขอจองบริการและจับคู่ผู้ดูแลเสร็จสิ้น');
-      setIsSearching(false);
-      navigate('/search');
-    } catch (err: any) {
-      console.error('Failed to create booking:', err);
-      error(err.message || 'เกิดข้อผิดพลาดในการส่งข้อมูลการจอง');
-      setIsSearching(false);
-    }
+    // แสดง animation แล้วไปหน้า search โดยไม่สร้าง booking ใน DB
+    // booking จะถูกสร้างเมื่อ patient เลือก caregiver ที่หน้า CaregiverProfilePage
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    setIsSearching(false);
+    navigate('/search');
   };
 
   if (isSearching) {

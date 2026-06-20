@@ -15,6 +15,7 @@ import {
   ACCEPT_BOOKING,
   DECLINE_BOOKING,
   CANCEL_ACCEPTANCE,
+  COMPLETE_BOOKING,
 } from '../../graphql/queries';
 
 export interface Booking {
@@ -29,7 +30,6 @@ export interface Booking {
   declineReason?: string;
   createdAt: string;
   relation?: string;
-  condition?: string; // TODO: No backend source yet
   locationName?: string;
   serviceFormat?: string; // TODO: No backend source yet
   durationText?: string;
@@ -38,6 +38,14 @@ export interface Booking {
 }
 
 type TabType = 'scheduled' | 'action_required' | 'history';
+
+function serviceLocationLabel(loc: string): string {
+  switch (loc) {
+    case 'at_home': return 'ดูแลที่บ้านผู้ป่วย';
+    case 'outside': return 'สถานพยาบาลภายนอก';
+    default: return loc;
+  }
+}
 
 // Helper to convert backend booking summary to frontend Booking model
 function mapToBooking(summary: any): Booking {
@@ -96,13 +104,12 @@ function mapToBooking(summary: any): Booking {
     declineReason: summary.rejectionReason ?? undefined,
     createdAt: summary.createdAt,
     relation: summary.careRecipientName ? `สำหรับ: ${summary.careRecipientName}` : 'สำหรับตัวเอง',
-    condition: undefined, // TODO: No backend source yet
-    locationName: summary.locationAddress || (summary.serviceLocations ? summary.serviceLocations.join(', ') : undefined),
-    serviceFormat: undefined, // TODO: No backend source yet
+    locationName: summary.locationAddress || undefined,
+    serviceFormat: summary.serviceLocations?.[0] ? serviceLocationLabel(summary.serviceLocations[0]) : undefined,
     durationText: `${durationHours} ชม.`,
-    tasks: undefined, // TODO: No backend source yet
+    tasks: summary.tasks && summary.tasks.length > 0 ? summary.tasks : undefined,
     receivedTimeText,
-    notes: undefined, // TODO: No backend source yet
+    notes: summary.notes ?? undefined,
   };
 }
 
@@ -182,7 +189,7 @@ export const CaregiverBookings: React.FC = () => {
     error: confirmedError,
     refetch: refetchConfirmed,
   } = useQuery<CaregiverBookingsData>(GET_CAREGIVER_BOOKINGS, {
-    variables: { input: { status: 'CONFIRMED', upcoming: true, limit: 50 } },
+    variables: { input: { status: 'CONFIRMED', limit: 50 } },
   });
 
   // History tab variables
@@ -216,6 +223,7 @@ export const CaregiverBookings: React.FC = () => {
   const [acceptBooking] = useMutation(ACCEPT_BOOKING);
   const [declineBooking] = useMutation(DECLINE_BOOKING);
   const [cancelAcceptance] = useMutation(CANCEL_ACCEPTANCE);
+  const [completeBooking] = useMutation(COMPLETE_BOOKING);
 
   // Lists mapped through adapter
   const pendingList = pendingData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
@@ -255,6 +263,7 @@ export const CaregiverBookings: React.FC = () => {
         refetchQueries: [
           { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'PENDING', limit: 50 } } },
           { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'ACCEPTED', limit: 50 } } },
+          { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'CONFIRMED', limit: 50 } } },
         ],
         awaitRefetchQueries: true,
       });
@@ -266,8 +275,13 @@ export const CaregiverBookings: React.FC = () => {
         </>
       );
       showSuccess(msg, 4000, 'booking-toast');
-    } catch (err) {
-      showError('ไม่สามารถยอมรับการจองได้ กรุณาลองใหม่อีกครั้ง');
+    } catch (err: unknown) {
+      const gqlMsg = (err as any)?.graphQLErrors?.[0]?.message ?? '';
+      if (gqlMsg.includes('ซ้อนทับ')) {
+        showError('ช่วงเวลาของงานนี้ซ้อนทับกับงานที่คุณยืนยันไปแล้ว');
+      } else {
+        showError('ไม่สามารถยอมรับการจองได้ กรุณาลองใหม่อีกครั้ง');
+      }
     }
   };
 
@@ -848,6 +862,26 @@ export const CaregiverBookings: React.FC = () => {
         booking={detailModalBooking}
         onClose={() => setDetailModalBooking(null)}
         onCancelAcceptanceClick={handleCancelAcceptanceClick}
+        onStartJob={async (id) => {
+          try {
+            const targetBooking = findBookingById(id);
+            await completeBooking({
+              variables: { bookingId: id },
+              refetchQueries: [
+                { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'CONFIRMED', limit: 50 } } },
+                { query: GET_CAREGIVER_BOOKING_HISTORY, variables: { input: { page: historyPage, limit: historyLimit } } },
+              ],
+              awaitRefetchQueries: true,
+            });
+            showSuccess(
+              <>นำส่งงานให้ <strong className="font-bold text-[#1A1A1A]">{targetBooking?.patientName ?? 'ผู้ใช้บริการ'}</strong> เสร็จสิ้นแล้ว</>,
+              4000,
+              'complete-job-toast',
+            );
+          } catch {
+            showError('ไม่สามารถนำส่งงานได้ กรุณาลองใหม่อีกครั้ง');
+          }
+        }}
         formatThaiDate={formatThaiDate}
         getDaysUntil={getDaysUntil}
         getStatusBadgeStyle={getStatusBadgeStyle}

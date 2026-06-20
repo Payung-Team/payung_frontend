@@ -27,6 +27,7 @@ import CaregiverBookings from './pages/caregiver/CaregiverBookings';
 import CaregiverSettings from './pages/caregiver/CaregiverSettings';
 import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
 import BookingsPage from './pages/profile/BookingsPage';
+import BookingDetailPage from './pages/profile/BookingDetailPage';
 import BookingRequestPage from './pages/booking/BookingRequestPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
@@ -38,6 +39,8 @@ import ResetPassword from './pages/auth/ResetPassword';
 import AuthCallback from './pages/auth/AuthCallback';
 import MessagePage from './pages/profile/MessagePage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
+import CaregiverProfilePage from './pages/search/CaregiverProfilePage';
+import BookingSuccessPage from './pages/booking/BookingSuccessPage';
 
 function KycFormGuard({ children }: { children: React.ReactNode }) {
   const { data, loading } = useQuery<{ myCaregiverProfile?: { kycStatus: string } }>(GET_CAREGIVER_PROFILE);
@@ -172,7 +175,10 @@ function App() {
         <Route path="/" element={<HomeRedirect />} />
 
         <Route path="/search" element={<CaregiverSearchWrapper />} />
+        <Route path="/caregivers/:id" element={<CaregiverProfilePage />} />
+        <Route path="/booking/success" element={<BookingSuccessPage />} />
         <Route path="/bookings" element={<BookingsPage />} />
+        <Route path="/bookings/:id" element={<BookingDetailPage />} />
         <Route path="/messages" element={<MessagePage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
 

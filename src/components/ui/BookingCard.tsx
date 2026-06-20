@@ -79,7 +79,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
           <div className="flex flex-col items-start p-0 grow shrink-0 basis-auto w-full md:w-auto">
             <div className="flex flex-col items-start p-0 w-full h-auto">
               <h3 className="font-['Inter'] font-extrabold text-base md:text-lg leading-7 tracking-[0.5px] text-[#1A1A1A] truncate max-w-full">
-                {booking.id} <span className="font-sans font-bold text-sm text-gray-500">· {booking.serviceType}</span>
+                REF-{booking.id.slice(-6).toUpperCase()} <span className="font-sans font-bold text-sm text-gray-500">· {booking.serviceType}</span>
               </h3>
             </div>
 
@@ -154,11 +154,6 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                   <span className="font-['Bai_Jamjuree'] font-normal text-xs leading-[18px] text-[#8A8C8E] mt-0.5">
                     สำหรับ: {booking.relation || 'สำหรับตัวเอง'}
                   </span>
-                  {booking.condition && (
-                    <span className="font-['Bai_Jamjuree'] font-semibold text-[11px] leading-[15px] text-[#DC2626] mt-0.5">
-                      อาการ/เงื่อนไข: {booking.condition}
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
@@ -205,7 +200,20 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                     <Icon name="place" color="#8A8C8E" style={{ fontSize: '16px' }} />
                   </div>
                   <span className="w-[90px] text-[#8A8C8E] flex-shrink-0 font-['Bai_Jamjuree']">สถานที่</span>
-                  <span className="text-[#1A1A1A] font-['Bai_Jamjuree']">{booking.locationName || '-'}</span>
+                  <div className="flex flex-col items-start gap-0.5">
+                    <span className="text-[#1A1A1A] font-['Bai_Jamjuree']">{booking.locationName || '-'}</span>
+                    {booking.locationName && (
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.locationName)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex flex-row items-center gap-0.5 text-[#52B69A] text-[11px] font-semibold hover:underline"
+                      >
+                        <Icon name="map" color="#52B69A" style={{ fontSize: '11px' }} className="shrink-0" />
+                        Google Maps
+                      </a>
+                    )}
+                  </div>
                 </div>
 
                 {/* Format */}

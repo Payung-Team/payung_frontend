@@ -7,6 +7,7 @@ interface BookingDetailModalProps {
   booking: Booking | null;
   onClose: () => void;
   onCancelAcceptanceClick: (id: string) => void;
+  onStartJob?: (id: string) => void;
   formatThaiDate: (dateStr: string) => string;
   getDaysUntil: (dateStr: string) => string;
   getStatusBadgeStyle: (status: Booking['status']) => { bg: string; dot: string; text: string; label: string };
@@ -17,6 +18,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
   booking,
   onClose,
   onCancelAcceptanceClick,
+  onStartJob,
   formatThaiDate,
   getDaysUntil,
   getStatusBadgeStyle,
@@ -24,6 +26,13 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
   if (!isOpen || !booking) return null;
 
   const style = getStatusBadgeStyle(booking.status);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const bookingDay = new Date(booking.bookingDate);
+  bookingDay.setHours(0, 0, 0, 0);
+  const diffDays = Math.ceil((bookingDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const isStartable = booking.status === 'confirmed' && diffDays <= 3;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none bg-black/50 transition-opacity p-4">
@@ -106,15 +115,20 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
                 <span className="font-['Bai_Jamjuree'] font-semibold text-[13px] leading-5 text-[#1A1A1A]">
                   {booking.locationName || '-'}
                 </span>
+                {booking.locationName && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.locationName)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-row items-center gap-1 mt-1 text-[#52B69A] text-xs font-semibold hover:underline"
+                  >
+                    <Icon name="map" color="#52B69A" style={{ fontSize: '13px' }} className="shrink-0" />
+                    ดูใน Google Maps
+                  </a>
+                )}
                 <span className="font-['Bai_Jamjuree'] font-normal text-xs leading-4.5 text-[#575859] mt-1">
                   รูปแบบบริการ: {booking.serviceFormat || 'ดูแลที่บ้านผู้ป่วย'}
                 </span>
-                <div className="flex flex-row items-center gap-1 mt-2 text-[#8A8C8E]">
-                  <Icon name="lock" color="#8A8C8E" style={{ fontSize: '13px' }} className="flex-shrink-0" />
-                  <span className="font-['Bai_Jamjuree'] font-normal text-xs leading-[18px]">
-                    ที่อยู่เต็มจะถูกเปิดเผยเมื่อผู้ดูแลกดเริ่มงานในวันที่กำหนด
-                  </span>
-                </div>
               </div>
             </div>
           </div>
@@ -164,11 +178,16 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
             <div className="w-full flex flex-col items-start mt-4">
               <button
                 type="button"
-                disabled
-                className="w-full h-11 bg-[#52B69A]/55 text-white font-bold text-sm rounded-lg flex flex-row justify-center items-center gap-2 shadow-[0px_4px_12px_rgba(82,182,154,0.2)] cursor-not-allowed"
+                disabled={!isStartable}
+                onClick={isStartable ? () => { onClose(); onStartJob?.(booking.id); } : undefined}
+                className={`w-full h-11 text-white font-bold text-sm rounded-lg flex flex-row justify-center items-center gap-2 shadow-[0px_4px_12px_rgba(82,182,154,0.2)] transition-colors ${isStartable ? 'bg-[#52B69A] hover:bg-[#3A9A7E] cursor-pointer' : 'bg-[#52B69A]/55 cursor-not-allowed'}`}
               >
                 <Icon name="event" color="#FFFFFF" style={{ fontSize: '16px' }} className="mt-0.5" />
-                <span>เริ่มนำส่งการดูแลได้เฉพาะในวันทำงานจริง ({getDaysUntil(booking.bookingDate)})</span>
+                <span>
+                  {isStartable
+                    ? 'ส่งการดูแล'
+                    : `ส่งการดูแลได้ในอีก ${diffDays - 3} วัน`}
+                </span>
               </button>
               {booking.status === 'accepted' && (
                 <button
