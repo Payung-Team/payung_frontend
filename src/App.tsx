@@ -24,6 +24,7 @@ import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
 import CaregiverHome from './pages/caregiver/CaregiverHome';
 import CaregiverBookings from './pages/caregiver/CaregiverBookings';
+import CaregiverBookingDetailPage from './pages/caregiver/CaregiverBookingDetailPage';
 import CaregiverSettings from './pages/caregiver/CaregiverSettings';
 import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
 import BookingsPage from './pages/profile/BookingsPage';
@@ -41,6 +42,7 @@ import MessagePage from './pages/profile/MessagePage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 import CaregiverProfilePage from './pages/search/CaregiverProfilePage';
 import BookingSuccessPage from './pages/booking/BookingSuccessPage';
+import PaymentPage from './pages/booking/PaymentPage';
 
 function KycFormGuard({ children }: { children: React.ReactNode }) {
   const { data, loading } = useQuery<{ myCaregiverProfile?: { kycStatus: string } }>(GET_CAREGIVER_PROFILE);
@@ -161,6 +163,16 @@ function App() {
           }
         />
 
+        {/* Caregiver Booking Detail */}
+        <Route
+          path="/caregiver/bookings/:id"
+          element={
+            <RoleRoute requiredRole={2}>
+              <CaregiverBookingDetailPage />
+            </RoleRoute>
+          }
+        />
+
         {/* Admin home */}
         <Route
           path="/admin-home"
@@ -179,6 +191,7 @@ function App() {
         <Route path="/booking/success" element={<BookingSuccessPage />} />
         <Route path="/bookings" element={<BookingsPage />} />
         <Route path="/bookings/:id" element={<BookingDetailPage />} />
+        <Route path="/bookings/:id/payment" element={<PaymentPage />} />
         <Route path="/messages" element={<MessagePage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
 

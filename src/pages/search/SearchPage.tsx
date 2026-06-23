@@ -724,6 +724,7 @@ function SearchPageContent() {
         dayOfContactName:         bookingDraft.contactPerson?.name         ?? undefined,
         dayOfContactPhone:        bookingDraft.contactPerson?.phone        ?? undefined,
         dayOfContactRelationship: bookingDraft.contactPerson?.relationship ?? undefined,
+        patientName:              bookingDraft.recipient?.patientDetails?.name ?? undefined,
         careRecipientId: bookingDraft.recipient?.type === 'member'
           ? bookingDraft.recipient.selectedMemberId
           : undefined,

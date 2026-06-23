@@ -11,7 +11,16 @@ import {
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
-type NotificationType = 'kyc_submitted' | 'kyc_verified' | 'kyc_rejected' | 'kyc_resubmitted';
+type NotificationType =
+  | 'kyc_submitted'
+  | 'kyc_verified'
+  | 'kyc_rejected'
+  | 'kyc_resubmitted'
+  | 'booking_new'
+  | 'booking_accepted'
+  | 'booking_declined'
+  | 'booking_confirmed'
+  | 'booking_cancelled';
 
 interface NotificationItem {
   id: string;
@@ -69,6 +78,16 @@ function notificationIconByType(type: NotificationType): { icon: string; bg: str
       return { icon: '✗', bg: '#FEF2F2', color: '#DC2626' };
     case 'kyc_resubmitted':
       return { icon: '↻', bg: '#EFF6FF', color: '#2563EB' };
+    case 'booking_new':
+      return { icon: '📋', bg: '#EFF6FF', color: '#2563EB' };
+    case 'booking_accepted':
+      return { icon: '✓', bg: '#F0FDF4', color: '#16A34A' };
+    case 'booking_confirmed':
+      return { icon: '✓', bg: '#F0FDF4', color: '#16A34A' };
+    case 'booking_declined':
+      return { icon: '✗', bg: '#FEF2F2', color: '#DC2626' };
+    case 'booking_cancelled':
+      return { icon: '✗', bg: '#FEF2F2', color: '#DC2626' };
     case 'kyc_submitted':
     default:
       return { icon: '⏳', bg: '#FFFBEB', color: '#F59E0B' };
@@ -194,7 +213,14 @@ export default function NotificationsPage() {
 
     await refetchUnread();
     setItems((prev) => prev.map((entry) => (entry.id === item.id ? { ...entry, isRead: true } : entry)));
-    navigate('/kyc/status');
+
+    if (item.type.startsWith('booking_')) {
+      // caregiver-targeted types → caregiver dashboard; patient-targeted types → patient bookings
+      const caregiverTypes: NotificationType[] = ['booking_new', 'booking_confirmed', 'booking_cancelled'];
+      navigate(caregiverTypes.includes(item.type) ? '/caregiver/bookings' : '/bookings');
+    } else {
+      navigate('/kyc/status');
+    }
   };
 
   const handleToggleEmailPreference = async () => {

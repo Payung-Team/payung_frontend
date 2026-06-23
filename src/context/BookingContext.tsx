@@ -84,7 +84,7 @@ export interface ConfirmedBooking {
   caregiverProvince?: string;
   draft: BookingRequest;
   confirmedAt: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'completed';
+  status: 'pending' | 'awaiting_payment' | 'accepted' | 'rejected' | 'cancelled' | 'completed';
 }
 
 export interface Recipient {

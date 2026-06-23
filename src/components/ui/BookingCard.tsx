@@ -296,22 +296,31 @@ export const BookingCard: React.FC<BookingCardProps> = ({
             {/* Container 3: Footer Actions */}
             <div className="box-border w-full flex flex-col sm:flex-row justify-end items-stretch sm:items-center px-4 py-3 gap-2 bg-white self-stretch">
               {booking.status === 'pending' ? (
-                <>
+                <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
                   <button
                     type="button"
-                    onClick={() => onDeclineClick(booking.id)}
-                    className="w-full sm:w-auto px-4 py-2 sm:py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold cursor-pointer transition-colors duration-200"
+                    onClick={() => onViewDetails(booking)}
+                    className="px-3.5 h-9 bg-white border-[0.8px] border-[#E0E2E5] rounded-lg font-semibold text-[13px] text-[#575859] hover:bg-gray-50 flex items-center justify-center cursor-pointer transition-colors duration-200"
                   >
-                    ปฏิเสธการจอง
+                    ดูรายละเอียด
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onAccept(booking.id)}
-                    className="w-full sm:w-auto px-4 py-2 sm:py-1.5 bg-[#009265] hover:bg-[#087C58] text-white rounded-lg text-xs font-semibold cursor-pointer shadow-sm transition-colors duration-200"
-                  >
-                    ตอบรับการจอง
-                  </button>
-                </>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onDeclineClick(booking.id)}
+                      className="w-full sm:w-auto px-4 py-2 sm:py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold cursor-pointer transition-colors duration-200"
+                    >
+                      ปฏิเสธการจอง
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onAccept(booking.id)}
+                      className="w-full sm:w-auto px-4 py-2 sm:py-1.5 bg-[#009265] hover:bg-[#087C58] text-white rounded-lg text-xs font-semibold cursor-pointer shadow-sm transition-colors duration-200"
+                    >
+                      ตอบรับการจอง
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="flex flex-row items-center gap-4">
                   {booking.status === 'accepted' && (

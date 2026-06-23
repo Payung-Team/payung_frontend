@@ -23,10 +23,10 @@ export function useToast() {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
-  const success = useCallback((message: React.ReactNode, duration?: number, variant?: ToastVariant) => addToast(message, 'success', duration, variant), [addToast]);
-  const error = useCallback((message: React.ReactNode, duration?: number, variant?: ToastVariant) => addToast(message, 'error', duration, variant), [addToast]);
-  const info = useCallback((message: React.ReactNode, duration?: number, variant?: ToastVariant) => addToast(message, 'info', duration, variant), [addToast]);
-  const warning = useCallback((message: React.ReactNode, duration?: number, variant?: ToastVariant) => addToast(message, 'warning', duration, variant), [addToast]);
+  const success = useCallback((message: React.ReactNode, duration?: number, variant?: ToastVariant) => addToast(message, 'success', duration, variant ?? 'booking-toast'), [addToast]);
+  const error = useCallback((message: React.ReactNode, duration?: number, variant?: ToastVariant) => addToast(message, 'error', duration, variant ?? 'decline-toast'), [addToast]);
+  const info = useCallback((message: React.ReactNode, duration?: number, variant?: ToastVariant) => addToast(message, 'info', duration, variant ?? 'booking-toast'), [addToast]);
+  const warning = useCallback((message: React.ReactNode, duration?: number, variant?: ToastVariant) => addToast(message, 'warning', duration, variant ?? 'decline-toast'), [addToast]);
 
   return { toasts, addToast, removeToast, success, error, info, warning };
 }

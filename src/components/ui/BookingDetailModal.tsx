@@ -70,7 +70,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
                   {booking.patientName}
                 </span>
                 <span className="font-['Bai_Jamjuree'] font-normal text-xs leading-[18px] text-[#8A8C8E] mt-0.5">
-                  ผู้รับการดูแล: {booking.relation || 'สำหรับตัวเอง'}
+                  ผู้รับการดูแล: {booking.careRecipientName || (booking.relation?.replace('สำหรับ: ', '')) || 'สำหรับตัวเอง'}
                 </span>
               </div>
             </div>
@@ -132,6 +132,39 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Contact Person on Day of Service */}
+          {booking.dayOfContactName && (
+            <div className="w-full flex flex-col items-start mt-2">
+              <span className="font-['Bai_Jamjuree'] font-bold text-[13px] leading-5 text-[#575859]">
+                ผู้ติดต่อในวันนัดหมาย
+              </span>
+              <div className="box-border w-full flex flex-col items-start p-3.5 gap-2 border border-[#E5E7EB] rounded-xl mt-1.5">
+                <div className="flex items-center gap-2">
+                  <Icon name="person" color="#52B69A" style={{ fontSize: '16px' }} className="shrink-0" />
+                  <span className="font-['Bai_Jamjuree'] font-semibold text-[13px] leading-5 text-[#1A1A1A]">
+                    {booking.dayOfContactName}
+                  </span>
+                </div>
+                {booking.dayOfContactPhone && (
+                  <div className="flex items-center gap-2">
+                    <Icon name="phone" color="#52B69A" style={{ fontSize: '16px' }} className="shrink-0" />
+                    <span className="font-['Bai_Jamjuree'] font-normal text-[13px] leading-5 text-[#575859]">
+                      {booking.dayOfContactPhone}
+                    </span>
+                  </div>
+                )}
+                {booking.dayOfContactRelationship && (
+                  <div className="flex items-center gap-2">
+                    <Icon name="people" color="#52B69A" style={{ fontSize: '16px' }} className="shrink-0" />
+                    <span className="font-['Bai_Jamjuree'] font-normal text-[13px] leading-5 text-[#575859]">
+                      {booking.dayOfContactRelationship}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Patient Notes */}
           <div className="w-full flex flex-col items-start mt-2">

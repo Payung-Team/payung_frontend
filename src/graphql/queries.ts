@@ -683,6 +683,10 @@ const CAREGIVER_BOOKING_SUMMARY_FIELDS = `
     avatarUrl
   }
   careRecipientName
+  patientName
+  dayOfContactName
+  dayOfContactPhone
+  dayOfContactRelationship
   confirmedAt
   rejectionReason
   createdAt
@@ -704,6 +708,10 @@ export const GET_MY_BOOKING = gql`
       notes
       estimatedCost
       careRecipientName
+      patientName
+      dayOfContactName
+      dayOfContactPhone
+      dayOfContactRelationship
       confirmedAt
       createdAt
       caregiver {
@@ -851,6 +859,32 @@ export const CANCEL_ACCEPTANCE = gql`
       id
       status
       rejectionReason
+    }
+  }
+`;
+
+export const CREATE_PAYMENT = gql`
+  mutation CreatePayment($input: CreatePaymentInput!) {
+    createPayment(input: $input) {
+      id
+      paymentStatus
+      omiseChargeId
+      amount
+      currency
+      qrCodeUrl
+    }
+  }
+`;
+
+export const GET_PAYMENT_BY_BOOKING = gql`
+  query GetPaymentByBooking($bookingId: ID!) {
+    paymentByBooking(bookingId: $bookingId) {
+      id
+      paymentStatus
+      omiseChargeId
+      amount
+      currency
+      qrCodeUrl
     }
   }
 `;

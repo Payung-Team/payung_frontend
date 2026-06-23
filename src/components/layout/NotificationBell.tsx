@@ -9,7 +9,16 @@ import {
 } from '../../graphql/queries';
 import { supabase } from '../../lib/supabase';
 
-type NotificationType = 'kyc_submitted' | 'kyc_verified' | 'kyc_rejected' | 'kyc_resubmitted';
+type NotificationType =
+  | 'kyc_submitted'
+  | 'kyc_verified'
+  | 'kyc_rejected'
+  | 'kyc_resubmitted'
+  | 'booking_new'
+  | 'booking_accepted'
+  | 'booking_declined'
+  | 'booking_confirmed'
+  | 'booking_cancelled';
 
 interface NotificationData {
   notifications: Array<{
@@ -61,10 +70,30 @@ function notificationVisual(type: NotificationType): { icon: string; iconBg: str
       return { icon: '✗', iconBg: '#FEF2F2', iconColor: '#DC2626' };
     case 'kyc_resubmitted':
       return { icon: '↻', iconBg: '#EFF6FF', iconColor: '#2563EB' };
+    case 'booking_new':
+      return { icon: '📋', iconBg: '#EFF6FF', iconColor: '#2563EB' };
+    case 'booking_accepted':
+    case 'booking_confirmed':
+      return { icon: '✓', iconBg: '#F0FDF4', iconColor: '#16A34A' };
+    case 'booking_declined':
+    case 'booking_cancelled':
+      return { icon: '✗', iconBg: '#FEF2F2', iconColor: '#DC2626' };
     case 'kyc_submitted':
     default:
       return { icon: '⏳', iconBg: '#FFFBEB', iconColor: '#F59E0B' };
   }
+}
+
+function bookingNavigatePath(type: NotificationType): string {
+  // caregiver-targeted types
+  if (type === 'booking_new' || type === 'booking_confirmed' || type === 'booking_cancelled') {
+    return '/caregiver/bookings';
+  }
+  // patient-targeted types
+  if (type === 'booking_accepted' || type === 'booking_declined') {
+    return '/bookings';
+  }
+  return '/kyc/status';
 }
 
 export default function NotificationBell({
@@ -193,7 +222,7 @@ export default function NotificationBell({
     setOpen(false);
     await refetchUnreadCount();
     await refetchNotifications();
-    navigate('/kyc/status');
+    navigate(bookingNavigatePath(item.type));
   };
 
   return (

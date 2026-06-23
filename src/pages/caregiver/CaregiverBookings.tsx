@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import Icon from '../../components/ui/Icon';
 import { ToastContainer } from '../../components/ui/Toast';
@@ -6,7 +7,6 @@ import { useToast } from '../../hooks/useToast';
 import { BookingCard } from '../../components/ui/BookingCard';
 import { DeclineModal } from '../../components/ui/DeclineModal';
 import { CancelAcceptanceModal } from '../../components/ui/CancelAcceptanceModal';
-import { BookingDetailModal } from '../../components/ui/BookingDetailModal';
 import { AcceptBookingModal } from '../../components/ui/AcceptBookingModal';
 import Skeleton from '../../components/ui/Skeleton';
 import {
@@ -15,7 +15,6 @@ import {
   ACCEPT_BOOKING,
   DECLINE_BOOKING,
   CANCEL_ACCEPTANCE,
-  COMPLETE_BOOKING,
 } from '../../graphql/queries';
 
 export interface Booking {
@@ -25,16 +24,20 @@ export interface Booking {
   serviceType: string;
   patientName: string;
   price: number;
-  notes?: string; // TODO: No backend source yet
+  notes?: string;
   status: 'pending' | 'accepted' | 'confirmed' | 'declined' | 'completed' | 'cancelled';
   declineReason?: string;
   createdAt: string;
   relation?: string;
   locationName?: string;
-  serviceFormat?: string; // TODO: No backend source yet
+  serviceFormat?: string;
   durationText?: string;
-  tasks?: string[]; // TODO: No backend source yet
+  tasks?: string[];
   receivedTimeText?: string;
+  careRecipientName?: string;
+  dayOfContactName?: string;
+  dayOfContactPhone?: string;
+  dayOfContactRelationship?: string;
 }
 
 type TabType = 'scheduled' | 'action_required' | 'history';
@@ -110,6 +113,10 @@ function mapToBooking(summary: any): Booking {
     tasks: summary.tasks && summary.tasks.length > 0 ? summary.tasks : undefined,
     receivedTimeText,
     notes: summary.notes ?? undefined,
+    careRecipientName: summary.patientName || summary.careRecipientName || undefined,
+    dayOfContactName: summary.dayOfContactName ?? undefined,
+    dayOfContactPhone: summary.dayOfContactPhone ?? undefined,
+    dayOfContactRelationship: summary.dayOfContactRelationship ?? undefined,
   };
 }
 
@@ -140,6 +147,7 @@ interface CaregiverBookingHistoryData {
 
 
 export const CaregiverBookings: React.FC = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('scheduled');
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
 
@@ -155,9 +163,6 @@ export const CaregiverBookings: React.FC = () => {
   // History tab filter state
   const [historySubFilter, setHistorySubFilter] = useState<'all' | 'completed' | 'cancelled' | 'declined'>('all');
   const [historySortBy, setHistorySortBy] = useState<string>('newest');
-
-  // Detail Modal state
-  const [detailModalBooking, setDetailModalBooking] = useState<Booking | null>(null);
 
   // Accept Booking Modal state
   const [acceptModalBooking, setAcceptModalBooking] = useState<Booking | null>(null);
@@ -203,6 +208,11 @@ export const CaregiverBookings: React.FC = () => {
       ? 'REJECTED'
       : historySubFilter.toUpperCase();
 
+  // Always-running minimal query for badge count accuracy (limit:1 = minimal bandwidth)
+  const { data: historyCountData } = useQuery<CaregiverBookingHistoryData>(GET_CAREGIVER_BOOKING_HISTORY, {
+    variables: { input: { page: 1, limit: 1 } },
+  });
+
   const {
     data: historyData,
     loading: historyLoading,
@@ -223,7 +233,6 @@ export const CaregiverBookings: React.FC = () => {
   const [acceptBooking] = useMutation(ACCEPT_BOOKING);
   const [declineBooking] = useMutation(DECLINE_BOOKING);
   const [cancelAcceptance] = useMutation(CANCEL_ACCEPTANCE);
-  const [completeBooking] = useMutation(COMPLETE_BOOKING);
 
   // Lists mapped through adapter
   const pendingList = pendingData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
@@ -271,7 +280,7 @@ export const CaregiverBookings: React.FC = () => {
       const msg = (
         <>
           ยอมรับคำขอของ <strong className="font-bold text-[#1A1A1A]">{booking.patientName}</strong> แล้ว{"\n"}
-          ส่งตารางเวลาให้ผู้ป่วยยืนยันขั้นตอนต่อไป
+          รอผู้ป่วยชำระเงินเพื่อยืนยันการจอง
         </>
       );
       showSuccess(msg, 4000, 'booking-toast');
@@ -380,7 +389,7 @@ export const CaregiverBookings: React.FC = () => {
     }
 
     return [...list].sort((a, b) => {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime();
     });
   };
 
@@ -390,7 +399,10 @@ export const CaregiverBookings: React.FC = () => {
   const newRequestsCount = pendingData?.caregiverBookings?.pagination?.total ?? pendingList.length;
   const waitingConfirmCount = acceptedData?.caregiverBookings?.pagination?.total ?? acceptedList.length;
   const pendingCount = newRequestsCount + waitingConfirmCount;
-  const historyCount = historyData?.caregiverBookingHistory?.pagination?.total ?? historyList.length;
+  const historyCount =
+    historyData?.caregiverBookingHistory?.pagination?.total
+    ?? historyCountData?.caregiverBookingHistory?.pagination?.total
+    ?? historyList.length;
 
   const isLoading = pendingLoading || acceptedLoading || confirmedLoading || (activeTab === 'history' && historyLoading);
   const isError = !!(pendingError || acceptedError || confirmedError || (activeTab === 'history' && historyError));
@@ -410,7 +422,7 @@ export const CaregiverBookings: React.FC = () => {
           bg: 'bg-[#FFFBEB]',
           dot: 'bg-[#F59E0B]',
           text: 'text-[#B45309]',
-          label: 'รอคนไข้ยืนยัน'
+          label: 'รอคนไข้ชำระเงิน'
         };
       case 'pending':
         return {
@@ -452,7 +464,7 @@ export const CaregiverBookings: React.FC = () => {
           icon: 'event_available',
           iconColor: 'text-[#52B69A]',
           title: 'งานในกำหนดเวลา',
-          subtitle: 'การนัดหมายปัจจุบันที่ยืนยันแล้ว',
+          subtitle: 'การนัดหมายที่ยืนยันและชำระเงินแล้ว รอไปทำงานตามนัดหมาย',
           badgeBg: 'bg-[#E6F5ED]',
           badgeText: 'text-[#1B5C48]',
           countText: `${scheduledCount} งาน`
@@ -462,7 +474,7 @@ export const CaregiverBookings: React.FC = () => {
           icon: 'pending_actions',
           iconColor: 'text-[#F08C00]',
           title: 'งานที่ต้องดำเนินการ',
-          subtitle: 'คำขอรับบริการและรอตรวจสอบเวลาจอง',
+          subtitle: 'คำขอรับบริการใหม่และรอผู้ป่วยชำระเงินยืนยัน',
           badgeBg: 'bg-[#FFF3E0]',
           badgeText: 'text-[#F08C00]',
           countText: `${pendingCount} รายการ`
@@ -709,7 +721,7 @@ export const CaregiverBookings: React.FC = () => {
                             : 'bg-[#E6F5ED] text-[#3A9A7E] hover:bg-[#d5ecd1] font-semibold'
                           }`}
                       >
-                        รอคนไข้ยืนยัน ({waitingConfirmCount})
+                        รอคนไข้ชำระเงิน ({waitingConfirmCount})
                       </button>
                     </div>
                   )}
@@ -753,7 +765,7 @@ export const CaregiverBookings: React.FC = () => {
                         onAccept={handleAccept}
                         onDeclineClick={handleDeclineClick}
                         onCancelAcceptanceClick={handleCancelAcceptanceClick}
-                        onViewDetails={setDetailModalBooking}
+                        onViewDetails={(b) => navigate(`/caregiver/bookings/${b.id}`, { state: { booking: b } })}
                         formatThaiDate={formatThaiDate}
                         getDaysUntil={getDaysUntil}
                         getAcceptedTimeText={getAcceptedTimeText}
@@ -855,36 +867,6 @@ export const CaregiverBookings: React.FC = () => {
             showError('ไม่สามารถยกเลิกการตอบรับงานได้ กรุณาลองใหม่อีกครั้ง');
           }
         }}
-      />
-
-      <BookingDetailModal
-        isOpen={!!detailModalBooking}
-        booking={detailModalBooking}
-        onClose={() => setDetailModalBooking(null)}
-        onCancelAcceptanceClick={handleCancelAcceptanceClick}
-        onStartJob={async (id) => {
-          try {
-            const targetBooking = findBookingById(id);
-            await completeBooking({
-              variables: { bookingId: id },
-              refetchQueries: [
-                { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'CONFIRMED', limit: 50 } } },
-                { query: GET_CAREGIVER_BOOKING_HISTORY, variables: { input: { page: historyPage, limit: historyLimit } } },
-              ],
-              awaitRefetchQueries: true,
-            });
-            showSuccess(
-              <>นำส่งงานให้ <strong className="font-bold text-[#1A1A1A]">{targetBooking?.patientName ?? 'ผู้ใช้บริการ'}</strong> เสร็จสิ้นแล้ว</>,
-              4000,
-              'complete-job-toast',
-            );
-          } catch {
-            showError('ไม่สามารถนำส่งงานได้ กรุณาลองใหม่อีกครั้ง');
-          }
-        }}
-        formatThaiDate={formatThaiDate}
-        getDaysUntil={getDaysUntil}
-        getStatusBadgeStyle={getStatusBadgeStyle}
       />
 
       {/* Toast Notifications */}

@@ -33,22 +33,24 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
 };
 
 const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: string; bg: string; text: string }> = {
-  pending:   { label: 'รอผู้ดูแลตอบรับ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
-  accepted:  { label: 'ยืนยันแล้ว',      dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
-  rejected:  { label: 'ปฏิเสธแล้ว',      dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
-  cancelled: { label: 'ยกเลิกแล้ว',      dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280' },
-  completed: { label: 'เสร็จสิ้น',       dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
+  pending:          { label: 'รอผู้ดูแลตอบรับ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
+  awaiting_payment: { label: 'รอชำระเงิน',      dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
+  accepted:         { label: 'ยืนยันแล้ว',      dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
+  rejected:         { label: 'ปฏิเสธแล้ว',      dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
+  cancelled:        { label: 'ยกเลิกแล้ว',      dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280' },
+  completed:        { label: 'เสร็จสิ้น',       dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
 };
 
 const STATUS_BANNER: Record<ConfirmedBooking['status'], { icon: string; iconColor: string; bg: string; border: string; textColor: string; message: (name: string) => string }> = {
-  pending:   { icon: 'info', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: (n) => `ส่งคำขอของคุณไปยัง ${n} เรียบร้อยแล้ว ขณะนี้รอการตอบรับ` },
-  accepted:  { icon: 'check_circle', iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: (n) => `${n} ได้ตอบรับการจองของคุณแล้ว กรุณายืนยันการนัดหมาย` },
-  rejected:  { icon: 'cancel', iconColor: '#DC2626', bg: '#FEF2F2', border: '#FECACA', textColor: '#991B1B', message: (n) => `${n} ไม่สามารถรับงานนี้ได้ คุณสามารถค้นหาผู้ดูแลท่านอื่น` },
-  cancelled: { icon: 'do_not_disturb_on', iconColor: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', textColor: '#374151', message: () => `การจองนี้ถูกยกเลิกแล้ว` },
-  completed: { icon: 'task_alt', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: () => `การนัดหมายเสร็จสิ้นเรียบร้อยแล้ว` },
+  pending:          { icon: 'info',              iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: (n) => `ส่งคำขอของคุณไปยัง ${n} เรียบร้อยแล้ว ขณะนี้รอการตอบรับ` },
+  awaiting_payment: { icon: 'credit_card',       iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1D4ED8', message: (n) => `${n} ได้ตอบรับคำขอของคุณแล้ว – กรุณาชำระเงินเพื่อยืนยันการจอง` },
+  accepted:         { icon: 'check_circle',      iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: (n) => `${n} ยืนยันการจองของคุณแล้ว พบกันในวันนัดหมาย` },
+  rejected:         { icon: 'cancel',            iconColor: '#DC2626', bg: '#FEF2F2', border: '#FECACA', textColor: '#991B1B', message: (n) => `${n} ไม่สามารถรับงานนี้ได้ คุณสามารถค้นหาผู้ดูแลท่านอื่น` },
+  cancelled:        { icon: 'do_not_disturb_on', iconColor: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', textColor: '#374151', message: () => `การจองนี้ถูกยกเลิกแล้ว` },
+  completed:        { icon: 'task_alt',          iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: () => `การนัดหมายเสร็จสิ้นเรียบร้อยแล้ว` },
 };
 
-const CANCELLABLE_STATUSES: ConfirmedBooking['status'][] = ['pending', 'accepted'];
+const CANCELLABLE_STATUSES = new Set<ConfirmedBooking['status']>(['pending', 'awaiting_payment', 'accepted']);
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -87,7 +89,8 @@ function computeEndTime(startTime: string, durationHours: number): string {
 
 function mapGqlStatus(s: string): ConfirmedBooking['status'] {
   const v = s.toLowerCase();
-  if (v === 'accepted' || v === 'confirmed') return 'accepted';
+  if (v === 'awaiting_payment' || v === 'accepted') return 'awaiting_payment';
+  if (v === 'confirmed') return 'accepted';
   if (v === 'rejected' || v === 'declined') return 'rejected';
   if (v === 'cancelled') return 'cancelled';
   if (v === 'completed') return 'completed';
@@ -105,21 +108,29 @@ function mapGqlBooking(api: any): ConfirmedBooking {
   );
   const tasks: { id: string; name: string }[] = (api.tasks ?? []).map((name: string) => ({ id: name, name }));
 
+  const resolvedPatientName: string | undefined = api.patientName || api.careRecipientName || undefined;
+
   const draft: BookingRequest = {
     serviceTypes: api.serviceType ? [api.serviceType] : [],
     serviceLocation: serviceLocations,
     dateTime: { date: api.bookingDate ?? '', slot: api.timeSlot ?? '', startTime, endTime, duration: durationHours },
     locationDetails: { at_home: { address: api.locationAddress ?? '', lat: 0, lng: 0 } },
-    jobDetails: { tasks },
-    estimatedCost: {
-      hourlyRate: api.caregiver?.hourlyRate ?? 0,
-      hours: durationHours,
-      platformFee: Math.round((api.estimatedCost ?? 0) * 0.1),
-      total: api.estimatedCost ?? 0,
-    },
-    recipient: api.careRecipientName
-      ? { type: 'member', patientDetails: { name: api.careRecipientName, age: 0 } }
+    jobDetails: { tasks, notes: api.notes ?? '' },
+    estimatedCost: (() => {
+      const base = api.estimatedCost ?? 0;
+      const fee = Math.round(base * 0.1);
+      return { hourlyRate: api.caregiver?.hourlyRate ?? 0, hours: durationHours, platformFee: fee, total: base + fee };
+    })(),
+    recipient: resolvedPatientName
+      ? { type: 'member', patientDetails: { name: resolvedPatientName, age: 0 } }
       : { type: 'self' },
+    contactPerson: (api.dayOfContactName || api.dayOfContactPhone || api.dayOfContactRelationship)
+      ? {
+          name: api.dayOfContactName ?? '',
+          phone: api.dayOfContactPhone ?? '',
+          relationship: api.dayOfContactRelationship ?? '',
+        }
+      : undefined,
   };
 
   return {
@@ -202,11 +213,12 @@ export default function BookingDetailPage() {
     || booking.draft.locationDetails?.accompany_outside?.hospitalName
     || '—';
   const recipientName = booking.draft.recipient?.patientDetails?.name ?? 'ตัวเอง';
+  const contactPerson = booking.draft.contactPerson;
   const total = est?.total ?? 0;
   const tasks = booking.draft.jobDetails?.tasks ?? [];
   const tasksText = tasks.length > 0 ? tasks.map((t) => t.name).join(', ') : null;
   const cgInitial = booking.caregiverName?.charAt(0) ?? '?';
-  const isCancellable = CANCELLABLE_STATUSES.includes(booking.status);
+  const isCancellable = CANCELLABLE_STATUSES.has(booking.status);
   const caregiverDisplayName = booking.caregiverName === '(รอจับคู่)' ? 'ผู้ดูแล' : booking.caregiverName;
 
   const showToast = () => {
@@ -404,6 +416,20 @@ export default function BookingDetailPage() {
               <InfoRow label="ชื่อผู้รับบริการ" value={recipientName} valueFont="thai" />
             </div>
 
+            {contactPerson?.name && (
+              <>
+                <Divider />
+                <SectionTitle>ผู้ติดต่อในวันนัดหมาย</SectionTitle>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
+                  <InfoRow label="ชื่อผู้ติดต่อ" value={contactPerson.name} valueFont="thai" />
+                  <InfoRow label="เบอร์โทรศัพท์" value={contactPerson.phone} />
+                  {contactPerson.relationship && (
+                    <InfoRow label="ความสัมพันธ์" value={contactPerson.relationship} valueFont="thai" />
+                  )}
+                </div>
+              </>
+            )}
+
             <Divider />
 
             {/* ── Section 4: รายละเอียดภารกิจ ── */}
@@ -427,8 +453,36 @@ export default function BookingDetailPage() {
             </div>
           </div>
 
-          {/* Cancel button */}
-          {isCancellable && (
+          {/* Pay button (awaiting_payment status) */}
+          {booking.status === 'awaiting_payment' && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 24 }}>
+              <button
+                type="button"
+                onClick={() => navigate(`/bookings/${booking.id}/payment`, { state: { booking } })}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  height: 50, padding: '0 40px',
+                  background: '#3B82F6', border: 'none',
+                  boxShadow: '0px 4px 14px rgba(26,86,219,0.35)',
+                  borderRadius: 12, fontFamily: "'Bai Jamjuree', sans-serif",
+                  fontSize: 15, fontWeight: 700, color: '#FFFFFF', cursor: 'pointer',
+                }}
+              >
+                <span className="material-icons" style={{ fontSize: 18 }}>credit_card</span>
+                ชำระเงิน {total > 0 ? `฿${total.toLocaleString()}` : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(true)}
+                style={{ height: 37, padding: '0 28px', background: '#FFFFFF', border: '0.8px solid #FCA5A5', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#DC2626', cursor: 'pointer' }}
+              >
+                ยกเลิกรายการจองนี้
+              </button>
+            </div>
+          )}
+
+          {/* Cancel button (pending / accepted — no payment required) */}
+          {isCancellable && booking.status !== 'awaiting_payment' && (
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
               <button
                 type="button"

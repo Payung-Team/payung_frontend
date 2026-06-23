@@ -42,13 +42,13 @@ const TAB_META: Record<TabKey, { label: string; icon: string; sectionTitle: stri
     label: 'นัดหมายที่จะมาถึง',
     icon: 'event_available',
     sectionTitle: 'นัดหมายที่จะมาถึง',
-    sectionSubtitle: 'การนัดหมายปัจจุบันที่ยืนยันแล้ว',
+    sectionSubtitle: 'การนัดหมายที่ยืนยันและชำระเงินแล้ว',
   },
   pending: {
     label: 'รอดำเนินการ',
     icon: 'pending_actions',
     sectionTitle: 'รอดำเนินการ',
-    sectionSubtitle: 'คำขอที่รอการตอบรับจาก Caregiver',
+    sectionSubtitle: 'คำขอที่รอตอบรับหรือรอชำระเงิน',
   },
   history: {
     label: 'ประวัติการนัดหมาย',
@@ -59,11 +59,12 @@ const TAB_META: Record<TabKey, { label: string; icon: string; sectionTitle: stri
 };
 
 const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: string; bg: string; text: string }> = {
-  pending:   { label: 'รอตอบรับ',   dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
-  accepted:  { label: 'ยืนยันแล้ว', dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
-  rejected:  { label: 'ปฏิเสธแล้ว', dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
-  cancelled: { label: 'ยกเลิกแล้ว', dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280' },
-  completed: { label: 'เสร็จสิ้น',  dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
+  pending:          { label: 'รอตอบรับ',     dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
+  awaiting_payment: { label: 'รอชำระเงิน',   dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
+  accepted:         { label: 'ยืนยันแล้ว',   dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
+  rejected:         { label: 'ปฏิเสธแล้ว',   dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
+  cancelled:        { label: 'ยกเลิกแล้ว',   dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280' },
+  completed:        { label: 'เสร็จสิ้น',    dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
 };
 
 // ── Booking Card ───────────────────────────────────────────────────────────────
@@ -98,11 +99,12 @@ function computeEndTime(startTime: string, durationHours: number): string {
 
 function mapGqlStatus(s: string): ConfirmedBooking['status'] {
   const v = s.toLowerCase();
-  if (v === 'accepted' || v === 'confirmed') return 'accepted';
+  if (v === 'awaiting_payment' || v === 'accepted') return 'awaiting_payment';
+  if (v === 'confirmed') return 'accepted';
   if (v === 'rejected' || v === 'declined') return 'rejected';
   if (v === 'cancelled') return 'cancelled';
   if (v === 'completed') return 'completed';
-  return 'pending'; // unmatched + pending both show as "รอตอบรับ"
+  return 'pending';
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -130,12 +132,11 @@ function mapGqlBooking(api: any): ConfirmedBooking {
       at_home: { address: api.locationAddress ?? '', lat: 0, lng: 0 },
     },
     jobDetails: { tasks },
-    estimatedCost: {
-      hourlyRate: api.caregiver?.hourlyRate ?? 0,
-      hours: durationHours,
-      platformFee: Math.round((api.estimatedCost ?? 0) * 0.1),
-      total: api.estimatedCost ?? 0,
-    },
+    estimatedCost: (() => {
+      const base = api.estimatedCost ?? 0;
+      const fee = Math.round(base * 0.1);
+      return { hourlyRate: api.caregiver?.hourlyRate ?? 0, hours: durationHours, platformFee: fee, total: base + fee };
+    })(),
     recipient: api.careRecipientName
       ? { type: 'member', patientDetails: { name: api.careRecipientName, age: 0 } }
       : { type: 'self' },
@@ -183,7 +184,7 @@ function DetailRow({ icon, label, value }: Readonly<{ icon: string; label: strin
   );
 }
 
-function BookingCard({ booking, onCancel, onViewDetail }: Readonly<{ booking: ConfirmedBooking; onCancel?: () => void; onViewDetail?: () => void }>) {
+function BookingCard({ booking, onCancel, onViewDetail, onPayment }: Readonly<{ booking: ConfirmedBooking; onCancel?: () => void; onViewDetail?: () => void; onPayment?: () => void }>) {
   const [expanded, setExpanded] = useState(false);
 
   const badge = STATUS_BADGE[booking.status];
@@ -200,7 +201,7 @@ function BookingCard({ booking, onCancel, onViewDetail }: Readonly<{ booking: Co
   const hourlyRate = est?.hourlyRate ?? booking.caregiverHourlyRate;
   const hours = est?.hours ?? dt?.duration ?? 0;
   const subtotal = hourlyRate * hours;
-  const platformFee = est?.platformFee ?? Math.round(subtotal * 0.05);
+  const platformFee = est?.platformFee ?? Math.round(subtotal * 0.1);
   const total = est?.total ?? (subtotal + platformFee);
 
   const locType = booking.draft.serviceLocation?.[0];
@@ -529,47 +530,116 @@ function BookingCard({ booking, onCancel, onViewDetail }: Readonly<{ booking: Co
 
           {/* Section 5: Action buttons */}
           <div style={{ padding: '12px 16px' }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                onClick={onViewDetail}
-                style={{
-                  flex: 1,
-                  height: 40,
-                  background: '#FFFFFF',
-                  border: '0.8px solid #E0E2E5',
-                  borderRadius: 8,
-                  fontFamily: "'Bai Jamjuree', sans-serif",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: '#575859',
-                  cursor: 'pointer',
-                }}
-              >
-                ดูรายละเอียด
-              </button>
-              {(booking.status === 'pending' || booking.status === 'accepted') && (
-              <button
-                type="button"
-                onClick={onCancel}
-                style={{
-                  height: 40,
-                  padding: '0 16px',
-                  background: '#FEF2F2',
-                  border: '0.8px solid #FCA5A5',
-                  borderRadius: 8,
-                  fontFamily: "'Bai Jamjuree', sans-serif",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: '#DC2626',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                ยกเลิกคำขอ
-              </button>
-              )}
-            </div>
+            {/* awaiting_payment: show pay button prominently */}
+            {booking.status === 'awaiting_payment' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={onPayment}
+                  style={{
+                    width: '100%',
+                    height: 44,
+                    background: '#3B82F6',
+                    border: 'none',
+                    boxShadow: '0px 4px 14px rgba(26,86,219,0.3)',
+                    borderRadius: 10,
+                    fontFamily: "'Bai Jamjuree', sans-serif",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: '#FFFFFF',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span className="material-icons" style={{ fontSize: 16 }}>credit_card</span>
+                  ชำระเงิน{total > 0 ? ` ฿${total.toLocaleString()}` : ''}
+                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={onViewDetail}
+                    style={{
+                      flex: 1,
+                      height: 38,
+                      background: '#FFFFFF',
+                      border: '0.8px solid #E0E2E5',
+                      borderRadius: 8,
+                      fontFamily: "'Bai Jamjuree', sans-serif",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: '#575859',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ดูรายละเอียด
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onCancel}
+                    style={{
+                      height: 38,
+                      padding: '0 16px',
+                      background: '#FEF2F2',
+                      border: '0.8px solid #FCA5A5',
+                      borderRadius: 8,
+                      fontFamily: "'Bai Jamjuree', sans-serif",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: '#DC2626',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    ยกเลิกคำขอ
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={onViewDetail}
+                  style={{
+                    flex: 1,
+                    height: 40,
+                    background: '#FFFFFF',
+                    border: '0.8px solid #E0E2E5',
+                    borderRadius: 8,
+                    fontFamily: "'Bai Jamjuree', sans-serif",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: '#575859',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ดูรายละเอียด
+                </button>
+                {(booking.status === 'pending' || booking.status === 'accepted') && (
+                  <button
+                    type="button"
+                    onClick={onCancel}
+                    style={{
+                      height: 40,
+                      padding: '0 16px',
+                      background: '#FEF2F2',
+                      border: '0.8px solid #FCA5A5',
+                      borderRadius: 8,
+                      fontFamily: "'Bai Jamjuree', sans-serif",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: '#DC2626',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    ยกเลิกคำขอ
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -1109,6 +1179,7 @@ interface BookingListFrameProps {
   bookings: ConfirmedBooking[];
   onCancelBooking: (id: string) => void;
   onViewDetail: (booking: ConfirmedBooking) => void;
+  onPayBooking?: (booking: ConfirmedBooking) => void;
   isLoading?: boolean;
   historyStatusFilter?: HistoryStatusFilter;
   onHistoryStatusFilterChange?: (f: HistoryStatusFilter) => void;
@@ -1119,7 +1190,7 @@ interface BookingListFrameProps {
 }
 
 function BookingListFrame({
-  tab, bookings, onCancelBooking, onViewDetail, isLoading,
+  tab, bookings, onCancelBooking, onViewDetail, onPayBooking, isLoading,
   historyStatusFilter, onHistoryStatusFilterChange,
   historyDateFrom, onHistoryDateFromChange,
   historyDateTo, onHistoryDateToChange,
@@ -1289,7 +1360,15 @@ function BookingListFrame({
             </span>
           </div>
         ) : (
-          bookings.map((b) => <BookingCard key={b.id} booking={b} onCancel={() => onCancelBooking(b.id)} onViewDetail={() => onViewDetail(b)} />)
+          bookings.map((b) => (
+            <BookingCard
+              key={b.id}
+              booking={b}
+              onCancel={() => onCancelBooking(b.id)}
+              onViewDetail={() => onViewDetail(b)}
+              onPayment={onPayBooking ? () => onPayBooking(b) : undefined}
+            />
+          ))
         )}
       </div>
     </div>
@@ -1385,7 +1464,7 @@ const BookingsPage: React.FC = () => {
 
   const grouped: Record<TabKey, ConfirmedBooking[]> = {
     upcoming: allBookings.filter((b) => b.status === 'accepted'),
-    pending:  allBookings.filter((b) => b.status === 'pending'),
+    pending:  allBookings.filter((b) => b.status === 'pending' || b.status === 'awaiting_payment'),
     history:  allBookings.filter((b) => b.status === 'rejected' || b.status === 'cancelled' || b.status === 'completed'),
   };
 
@@ -1554,6 +1633,7 @@ const BookingsPage: React.FC = () => {
           bookings={activeTab === 'history' ? filteredHistory : grouped[activeTab]}
           onCancelBooking={handleCancelBooking}
           onViewDetail={(b) => navigate(`/bookings/${b.id}`, { state: { booking: b } })}
+          onPayBooking={(b) => navigate(`/bookings/${b.id}/payment`, { state: { booking: b } })}
           isLoading={isFetching}
           historyStatusFilter={historyStatusFilter}
           onHistoryStatusFilterChange={setHistoryStatusFilter}

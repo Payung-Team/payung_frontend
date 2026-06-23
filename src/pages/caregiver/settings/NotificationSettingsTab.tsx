@@ -14,8 +14,18 @@ import { supabase } from '../../../lib/supabase';
 
 type NotificationFilter = 'all' | 'unread' | 'kyc' | 'job' | 'system';
 type NotificationSection = 'today' | 'yesterday' | 'earlier';
-type NotificationType = 'kyc_submitted' | 'kyc_verified' | 'kyc_rejected' | 'kyc_resubmitted';
-type NotificationState = 'pending' | 'verified' | 'rejected' | 'resubmit';
+type NotificationType =
+  | 'kyc_submitted'
+  | 'kyc_verified'
+  | 'kyc_rejected'
+  | 'kyc_resubmitted'
+  | 'booking_new'
+  | 'booking_accepted'
+  | 'booking_declined'
+  | 'booking_confirmed'
+  | 'booking_cancelled';
+type NotificationState = 'pending' | 'verified' | 'rejected' | 'resubmit'
+  | 'booking_new' | 'booking_accepted' | 'booking_confirmed' | 'booking_declined' | 'booking_cancelled';
 
 interface NotificationListItem {
   id: string;
@@ -68,10 +78,25 @@ function resolveNotificationState(type: NotificationType): NotificationState {
       return 'rejected';
     case 'kyc_resubmitted':
       return 'resubmit';
+    case 'booking_new':
+      return 'booking_new';
+    case 'booking_accepted':
+      return 'booking_accepted';
+    case 'booking_confirmed':
+      return 'booking_confirmed';
+    case 'booking_declined':
+      return 'booking_declined';
+    case 'booking_cancelled':
+      return 'booking_cancelled';
     case 'kyc_submitted':
     default:
       return 'pending';
   }
+}
+
+function resolveNotificationCategory(type: NotificationType): Exclude<NotificationFilter, 'all' | 'unread'> {
+  if (type.startsWith('booking_')) return 'job';
+  return 'kyc';
 }
 
 function resolveNotificationSection(createdAt: string): NotificationSection {
@@ -133,6 +158,46 @@ const notificationStateClasses: Record<
     statusWrap: 'bg-[#EFF6FF]',
     statusText: 'text-[#2563EB]',
   },
+  booking_new: {
+    iconSymbol: '📋',
+    statusLabel: 'งานใหม่',
+    iconWrap: 'bg-[#EFF6FF]',
+    iconColor: '#2563EB',
+    statusWrap: 'bg-[#EFF6FF]',
+    statusText: 'text-[#2563EB]',
+  },
+  booking_accepted: {
+    iconSymbol: '✓',
+    statusLabel: 'ตอบรับแล้ว',
+    iconWrap: 'bg-[#F0FDF4]',
+    iconColor: '#16A34A',
+    statusWrap: 'bg-[#F0FDF4]',
+    statusText: 'text-[#16A34A]',
+  },
+  booking_confirmed: {
+    iconSymbol: '✓',
+    statusLabel: 'ยืนยันแล้ว',
+    iconWrap: 'bg-[#F0FDF4]',
+    iconColor: '#16A34A',
+    statusWrap: 'bg-[#F0FDF4]',
+    statusText: 'text-[#16A34A]',
+  },
+  booking_declined: {
+    iconSymbol: '✗',
+    statusLabel: 'ปฏิเสธ',
+    iconWrap: 'bg-[#FEF2F2]',
+    iconColor: '#DC2626',
+    statusWrap: 'bg-[#FEF2F2]',
+    statusText: 'text-[#DC2626]',
+  },
+  booking_cancelled: {
+    iconSymbol: '✗',
+    statusLabel: 'ยกเลิกแล้ว',
+    iconWrap: 'bg-[#FEF2F2]',
+    iconColor: '#DC2626',
+    statusWrap: 'bg-[#FEF2F2]',
+    statusText: 'text-[#DC2626]',
+  },
 };
 
 export const NotificationSettingsTab: React.FC = () => {
@@ -182,7 +247,7 @@ export const NotificationSettingsTab: React.FC = () => {
       title: item.title,
       description: item.body,
       section: resolveNotificationSection(item.createdAt),
-      category: 'kyc',
+      category: resolveNotificationCategory(item.type),
       state: resolveNotificationState(item.type),
       timeLabel: relativeTimeTH(item.createdAt),
       unread: !item.isRead,
@@ -227,7 +292,11 @@ export const NotificationSettingsTab: React.FC = () => {
       await markNotificationAsRead({ variables: { id: item.id } });
       await refetchNotifications();
     }
-    navigate('/kyc/status');
+    if (item.type.startsWith('booking_')) {
+      navigate('/caregiver/bookings');
+    } else {
+      navigate('/kyc/status');
+    }
   };
 
   const toggleEmailPreference = async () => {
