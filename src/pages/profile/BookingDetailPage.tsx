@@ -1,9 +1,9 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { useQuery } from '@apollo/client/react';
+import { useQuery/*, useMutation*/ } from '@apollo/client/react';
 import { supabase } from '../../lib/supabase';
 import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
-import { GET_MY_BOOKING, GET_PAYMENT_BY_BOOKING } from '../../graphql/queries';
+import { GET_MY_BOOKING, GET_PAYMENT_BY_BOOKING/*, FLAG_BOOKING_DISPUTE*/ } from '../../graphql/queries';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -264,19 +264,15 @@ export default function BookingDetailPage() {
     }
   };
 
+  // TODO: uncomment เมื่อ feature/PYG-287-disputes merge เข้า tina
+  // const [flagDispute] = useMutation(FLAG_BOOKING_DISPUTE);
+
   const handleSubmitDispute = async () => {
     if (isSubmittingDispute || disputeReason.trim().length < 20) return;
     setIsSubmittingDispute(true);
     try {
-      // TODO: connect BE — PATCH /api/v1/bookings/:id/dispute
-      // const { data: { session } } = await supabase.auth.getSession();
-      // const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:3000/graphql';
-      // const restBaseUrl = graphqlUrl.replace('/graphql', '/api/v1');
-      // await fetch(`${restBaseUrl}/bookings/${booking.id}/dispute`, {
-      //   method: 'PATCH',
-      //   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      //   body: JSON.stringify({ reason: disputeReason }),
-      // });
+      // TODO: เปลี่ยนเป็นบรรทัดนี้เมื่อ feature/PYG-287-disputes merge แล้ว:
+      // await flagDispute({ variables: { bookingId: booking.id, reason: disputeReason } });
       await new Promise((r) => setTimeout(r, 600)); // stub delay
       setShowDisputeModal(false);
       setDisputeReason('');
