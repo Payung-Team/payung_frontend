@@ -23,11 +23,19 @@ export default function AuthInput({
   const [showPassword, setShowPassword] = useState(false);
   const type = isPassword ? (showPassword ? 'text' : 'password') : props.type || 'text';
 
+  const isReadOnlyOrDisabled = props.disabled || props.readOnly;
+
   const inputBorder = error
     ? 'border-[#DC3545] bg-[#FFF0F1] text-[#DC3545]'
-    : 'border-[#E0E2E5] bg-white focus:border-[#52B69A] text-[#1A1A1A]';
+    : isReadOnlyOrDisabled
+      ? 'border-[#E0E2E5] bg-[#F5F6F7] text-[#8A8C8E] cursor-not-allowed'
+      : 'border-[#E0E2E5] bg-white focus:border-[#52B69A] text-[#1A1A1A]';
 
-  const iconColor = error ? 'text-[#DC3545]' : 'text-[#AAB2BA]';
+  const iconColor = error 
+    ? 'text-[#DC3545]' 
+    : isReadOnlyOrDisabled
+      ? 'text-[#C6C8CB]'
+      : 'text-[#AAB2BA]';
 
   return (
     <div className={wrapperClassName}>

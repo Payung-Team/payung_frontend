@@ -49,7 +49,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   // Redirect immediately when caregiver data is available
   useEffect(() => {
-    console.log('AppLayout: Checking KYC redirect', {
+    console.log('AppLayout: Checking KYC/Onboarding redirect', {
       currentRole,
       caregiverLoading,
       caregiverError: caregiverError?.message,

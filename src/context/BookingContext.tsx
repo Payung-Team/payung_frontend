@@ -7,6 +7,8 @@ export interface BookingRequest {
   locationDetails?: {
     province?: string;
     district?: string;
+    subDistrict?: string;
+    postalCode?: string;
     at_home?: {
       address: string;
       lat: number;

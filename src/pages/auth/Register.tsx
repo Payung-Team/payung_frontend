@@ -221,15 +221,17 @@ export default function Register() {
         password,
         role: roleMap[selectedRole]
       });
-      setIsSubmitting(false);
 
       if (result.error) {
+        setIsSubmitting(false);
         setFormError(result.error);
         setErrorCount(prev => prev + 1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
-        // Success -> redirect immediately
-        navigate(selectedRole === 'caregiver' ? '/kyc' : '/');
+        // Success → redirect ทันที (ไม่ต้อง setIsSubmitting(false) เพราะออกจากหน้าแล้ว
+        // การเรียก setState ก่อน navigate จะ trigger re-render ที่ทำให้ GuestRoute
+        // ตัดสินใจ redirect ผิดหน้า เพราะ is_registering ถูกลบไปแล้วจาก render ก่อนหน้า)
+        navigate(selectedRole === 'caregiver' ? '/kyc' : '/onboarding');
       }
     } else {
       setErrorCount(prev => prev + 1);
@@ -238,11 +240,16 @@ export default function Register() {
   };
 
   const handleGoogleSignIn = async () => {
+    // เซ็ต flag ก่อน redirect ไป Google เพื่อให้ AuthCallback รู้ว่าเป็น "สมัคร" ไม่ใช่ "เข้าสู่ระบบ"
+    // flag จะอยู่ใน localStorage ข้าม redirect ไป Google แล้วกลับมาได้
+    localStorage.setItem('is_registering', 'true');
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
     if (error) {
+      localStorage.removeItem('is_registering');
       setFormError('สมัครด้วย Google ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
       setErrorCount(prev => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
