@@ -889,6 +889,15 @@ export const GET_PAYMENT_BY_BOOKING = gql`
   }
 `;
 
+export const FLAG_BOOKING_DISPUTE = gql`
+  mutation FlagBookingDispute($bookingId: ID!, $reason: String!) {
+    flagBookingDispute(bookingId: $bookingId, reason: $reason) {
+      id
+      disputeStatus
+    }
+  }
+`;
+
 export const UPDATE_PASSWORD = gql`
   mutation UpdatePassword($newPassword: String!) {
     updatePassword(input: { newPassword: $newPassword }) {

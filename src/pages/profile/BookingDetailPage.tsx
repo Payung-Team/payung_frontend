@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { supabase } from '../../lib/supabase';
 import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
-import { GET_MY_BOOKING } from '../../graphql/queries';
+import { GET_MY_BOOKING, GET_PAYMENT_BY_BOOKING } from '../../graphql/queries';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -167,10 +167,22 @@ export default function BookingDetailPage() {
     return stateBooking;
   }, [data, stateBooking]);
 
+  const { data: paymentData } = useQuery(GET_PAYMENT_BY_BOOKING, {
+    variables: { bookingId: id },
+    skip: !id,
+  });
+  const payment = paymentData?.paymentByBooking as { id: string; paymentStatus: string; amount: number } | undefined;
+
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('ยกเลิกคำขอจองสำเร็จ');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [isSubmittingDispute, setIsSubmittingDispute] = useState(false);
+  const [disputeSubmitted, setDisputeSubmitted] = useState(false);
 
   if (loading && !booking) {
     return (
@@ -221,14 +233,17 @@ export default function BookingDetailPage() {
   const isCancellable = CANCELLABLE_STATUSES.has(booking.status);
   const caregiverDisplayName = booking.caregiverName === '(รอจับคู่)' ? 'ผู้ดูแล' : booking.caregiverName;
 
-  const showToast = () => {
+  const showToast = (msg: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToastMessage(msg);
     setToastVisible(true);
     toastTimer.current = setTimeout(() => {
       setToastVisible(false);
       setTimeout(() => navigate('/bookings'), 300);
-    }, 2000);
+    }, 2500);
   };
+
+  const hasHeldPayment = payment?.paymentStatus === 'held';
 
   const handleConfirmCancel = async () => {
     if (isCancelling) return;
@@ -243,9 +258,35 @@ export default function BookingDetailPage() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setShowCancelModal(false);
-      showToast();
+      showToast(hasHeldPayment ? 'ยกเลิกสำเร็จ คืนเงินภายใน 3-5 วันทำการ' : 'ยกเลิกคำขอจองสำเร็จ');
     } catch {
       setIsCancelling(false);
+    }
+  };
+
+  const handleSubmitDispute = async () => {
+    if (isSubmittingDispute || disputeReason.trim().length < 20) return;
+    setIsSubmittingDispute(true);
+    try {
+      // TODO: connect BE — PATCH /api/v1/bookings/:id/dispute
+      // const { data: { session } } = await supabase.auth.getSession();
+      // const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:3000/graphql';
+      // const restBaseUrl = graphqlUrl.replace('/graphql', '/api/v1');
+      // await fetch(`${restBaseUrl}/bookings/${booking.id}/dispute`, {
+      //   method: 'PATCH',
+      //   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      //   body: JSON.stringify({ reason: disputeReason }),
+      // });
+      await new Promise((r) => setTimeout(r, 600)); // stub delay
+      setShowDisputeModal(false);
+      setDisputeReason('');
+      setDisputeSubmitted(true);
+      setToastMessage('ทีมงานจะตรวจสอบภายใน 24 ชม.');
+      setToastVisible(true);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setToastVisible(false), 3000);
+    } finally {
+      setIsSubmittingDispute(false);
     }
   };
 
@@ -268,7 +309,7 @@ export default function BookingDetailPage() {
       >
         <span className="material-icons" style={{ fontSize: 20, color: '#FFFFFF' }}>check_circle</span>
         <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontWeight: 600, fontSize: 14, color: '#FFFFFF', whiteSpace: 'nowrap' }}>
-          ยกเลิกคำขอจองสำเร็จ
+          {toastMessage}
         </span>
       </div>
 
@@ -287,13 +328,22 @@ export default function BookingDetailPage() {
               <span className="material-icons" style={{ fontSize: 32, color: '#DC2626' }}>report_problem</span>
             </div>
             <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 18, fontWeight: 700, color: '#1A1A1A', textAlign: 'center', margin: 0 }}>
-              ยืนยันการยกเลิกคำขอจอง
+              {hasHeldPayment ? 'ยืนยันการยกเลิกการจอง?' : 'ยืนยันการยกเลิกคำขอจอง'}
             </p>
-            <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#575859', textAlign: 'center', margin: '10px 0 24px', maxWidth: 330, lineHeight: '21px' }}>
+            <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#575859', textAlign: 'center', margin: '10px 0 0', maxWidth: 330, lineHeight: '21px' }}>
               คุณแน่ใจหรือไม่ว่าต้องการยกเลิกคำขอจองสำหรับ{' '}
               <span style={{ fontWeight: 700, color: '#1A1A1A' }}>{booking.caregiverName}</span>?
               <br />การดำเนินการนี้ไม่สามารถย้อนกลับได้
             </p>
+            {hasHeldPayment && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#ECFDF5', border: '0.8px solid #A7F3D0', borderRadius: 10, margin: '14px 0 24px', width: '100%' }}>
+                <span className="material-icons" style={{ fontSize: 18, color: '#059669', flexShrink: 0 }}>payments</span>
+                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#065F46', margin: 0, lineHeight: '20px' }}>
+                  คืนเงิน ฿{payment!.amount.toLocaleString()} เต็มจำนวนภายใน 3-5 วันทำการ
+                </p>
+              </div>
+            )}
+            {!hasHeldPayment && <div style={{ marginBottom: 24 }} />}
             <div style={{ display: 'flex', gap: 12, width: '100%' }}>
               <button type="button" onClick={() => setShowCancelModal(false)} disabled={isCancelling}
                 style={{ flex: 1, height: 44, background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 10, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#575859', cursor: 'pointer' }}>
@@ -302,6 +352,76 @@ export default function BookingDetailPage() {
               <button type="button" onClick={handleConfirmCancel} disabled={isCancelling}
                 style={{ flex: 1, height: 44, background: '#DC2626', border: 'none', borderRadius: 10, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#FFFFFF', cursor: isCancelling ? 'wait' : 'pointer', opacity: isCancelling ? 0.7 : 1 }}>
                 {isCancelling ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dispute Modal */}
+      {showDisputeModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
+          onClick={() => !isSubmittingDispute && setShowDisputeModal(false)}
+        >
+          <div
+            style={{ width: '100%', maxWidth: 460, background: '#FFFFFF', borderRadius: 20, boxShadow: '0px 20px 60px rgba(0,0,0,0.15)', padding: '32px 28px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ width: 60, height: 60, borderRadius: 30, background: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <span className="material-icons" style={{ fontSize: 32, color: '#F08C00' }}>flag</span>
+            </div>
+            <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 18, fontWeight: 700, color: '#1A1A1A', textAlign: 'center', margin: 0 }}>
+              แจ้งปัญหาเกี่ยวกับบริการ
+            </p>
+            <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#575859', textAlign: 'center', margin: '8px 0 18px', lineHeight: '21px' }}>
+              โปรดอธิบายปัญหาที่พบ ทีมงานจะตรวจสอบและติดต่อกลับภายใน 24 ชั่วโมง
+            </p>
+            <div style={{ width: '100%', position: 'relative' }}>
+              <textarea
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                placeholder="อธิบายปัญหาที่พบ เช่น ผู้ดูแลไม่ตรงตามที่ระบุ บริการไม่ครบถ้วน..."
+                rows={4}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '12px 14px 28px',
+                  background: '#F9FAFB', border: `1px solid ${disputeReason.trim().length > 0 && disputeReason.trim().length < 20 ? '#FCA5A5' : '#E0E2E5'}`,
+                  borderRadius: 10, resize: 'none',
+                  fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#1A1A1A', lineHeight: '20px',
+                  outline: 'none',
+                }}
+              />
+              <span style={{
+                position: 'absolute', bottom: 8, right: 12,
+                fontFamily: "'Inter', sans-serif", fontSize: 11,
+                color: disputeReason.trim().length < 20 ? '#DC2626' : '#8A8C8E',
+              }}>
+                {disputeReason.trim().length}/20 ตัวอักษรขั้นต่ำ
+              </span>
+            </div>
+            {disputeReason.trim().length > 0 && disputeReason.trim().length < 20 && (
+              <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#DC2626', margin: '6px 0 0', alignSelf: 'flex-start' }}>
+                กรุณาอธิบายรายละเอียดอย่างน้อย 20 ตัวอักษร
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 20 }}>
+              <button
+                type="button"
+                onClick={() => { setShowDisputeModal(false); setDisputeReason(''); }}
+                disabled={isSubmittingDispute}
+                style={{ flex: 1, height: 44, background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 10, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#575859', cursor: 'pointer' }}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitDispute}
+                disabled={isSubmittingDispute || disputeReason.trim().length < 20}
+                style={{ flex: 1, height: 44, background: disputeReason.trim().length >= 20 ? '#F08C00' : '#E5E7EB', border: 'none', borderRadius: 10, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: disputeReason.trim().length >= 20 ? '#FFFFFF' : '#9CA3AF', cursor: disputeReason.trim().length >= 20 ? 'pointer' : 'not-allowed', opacity: isSubmittingDispute ? 0.7 : 1 }}
+              >
+                {isSubmittingDispute ? 'กำลังส่ง...' : 'ส่งเรื่อง'}
               </button>
             </div>
           </div>
@@ -474,9 +594,10 @@ export default function BookingDetailPage() {
               <button
                 type="button"
                 onClick={() => setShowCancelModal(true)}
-                style={{ height: 37, padding: '0 28px', background: '#FFFFFF', border: '0.8px solid #FCA5A5', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#DC2626', cursor: 'pointer' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 40, padding: '0 28px', background: '#FFFFFF', border: '1px solid #FCA5A5', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#DC2626', cursor: 'pointer' }}
               >
-                ยกเลิกรายการจองนี้
+                <span className="material-icons" style={{ fontSize: 16 }}>cancel</span>
+                ยกเลิกการจอง
               </button>
             </div>
           )}
@@ -487,10 +608,34 @@ export default function BookingDetailPage() {
               <button
                 type="button"
                 onClick={() => setShowCancelModal(true)}
-                style={{ height: 37, padding: '0 28px', background: '#FFFFFF', border: '0.8px solid #FCA5A5', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#DC2626', cursor: 'pointer' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 40, padding: '0 28px', background: '#FFFFFF', border: '1px solid #FCA5A5', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#DC2626', cursor: 'pointer', width: '100%', justifyContent: 'center' }}
               >
-                ยกเลิกรายการจองนี้
+                <span className="material-icons" style={{ fontSize: 16 }}>cancel</span>
+                ยกเลิกการจอง
               </button>
+            </div>
+          )}
+
+          {/* Dispute button (completed bookings) */}
+          {booking.status === 'completed' && (
+            <div style={{ marginTop: 16 }}>
+              {disputeSubmitted ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#FFFBEB', border: '0.8px solid #FCD34D', borderRadius: 10 }}>
+                  <span className="material-icons" style={{ fontSize: 18, color: '#F08C00' }}>hourglass_top</span>
+                  <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#B45309', margin: 0 }}>
+                    แจ้งปัญหาแล้ว — ทีมงานกำลังตรวจสอบภายใน 24 ชม.
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowDisputeModal(true)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 40, padding: '0 28px', background: '#FFFFFF', border: '1px solid #FCD34D', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#D97706', cursor: 'pointer', width: '100%', justifyContent: 'center' }}
+                >
+                  <span className="material-icons" style={{ fontSize: 16 }}>warning_amber</span>
+                  แจ้งปัญหา
+                </button>
+              )}
             </div>
           )}
 
