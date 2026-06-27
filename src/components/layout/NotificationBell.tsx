@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from '@apollo/client/react';
 import {
@@ -8,27 +8,20 @@ import {
   MARK_NOTIFICATION_AS_READ,
 } from '../../graphql/queries';
 import { supabase } from '../../lib/supabase';
-
-type NotificationType =
-  | 'kyc_submitted'
-  | 'kyc_verified'
-  | 'kyc_rejected'
-  | 'kyc_resubmitted'
-  | 'booking_new'
-  | 'booking_accepted'
-  | 'booking_declined'
-  | 'booking_confirmed'
-  | 'booking_cancelled';
+import type { NotificationItem } from '../notifications/notificationMeta';
+import {
+  UNREAD_DOT_COLOR,
+  FILTER_TABS,
+  deriveSource,
+  getSubtitle,
+  notificationIcon,
+  relativeTimeTH,
+  resolveDeepLink,
+} from '../notifications/notificationMeta';
+import type { FilterTab } from '../notifications/notificationMeta';
 
 interface NotificationData {
-  notifications: Array<{
-    id: string;
-    type: NotificationType;
-    title: string;
-    body: string;
-    isRead: boolean;
-    createdAt: string;
-  }>;
+  notifications: NotificationItem[];
 }
 
 interface UnreadCountData {
@@ -40,62 +33,6 @@ interface NotificationBellProps {
   readonly externalUnreadCount?: number;
 }
 
-function formatRelativeTime(createdAt: string): string {
-  const now = Date.now();
-  const created = new Date(createdAt).getTime();
-  const diffMs = Math.max(0, now - created);
-  const diffMinutes = Math.floor(diffMs / 60000);
-
-  if (diffMinutes < 1) {
-    return 'เมื่อสักครู่';
-  }
-  if (diffMinutes < 60) {
-    return `${diffMinutes} นาทีที่แล้ว`;
-  }
-
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) {
-    return `${diffHours} ชั่วโมงที่แล้ว`;
-  }
-
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} วันที่แล้ว`;
-}
-
-function notificationVisual(type: NotificationType): { icon: string; iconBg: string; iconColor: string } {
-  switch (type) {
-    case 'kyc_verified':
-      return { icon: '✓', iconBg: '#F0FDF4', iconColor: '#16A34A' };
-    case 'kyc_rejected':
-      return { icon: '✗', iconBg: '#FEF2F2', iconColor: '#DC2626' };
-    case 'kyc_resubmitted':
-      return { icon: '↻', iconBg: '#EFF6FF', iconColor: '#2563EB' };
-    case 'booking_new':
-      return { icon: '📋', iconBg: '#EFF6FF', iconColor: '#2563EB' };
-    case 'booking_accepted':
-    case 'booking_confirmed':
-      return { icon: '✓', iconBg: '#F0FDF4', iconColor: '#16A34A' };
-    case 'booking_declined':
-    case 'booking_cancelled':
-      return { icon: '✗', iconBg: '#FEF2F2', iconColor: '#DC2626' };
-    case 'kyc_submitted':
-    default:
-      return { icon: '⏳', iconBg: '#FFFBEB', iconColor: '#F59E0B' };
-  }
-}
-
-function bookingNavigatePath(type: NotificationType): string {
-  // caregiver-targeted types
-  if (type === 'booking_new' || type === 'booking_confirmed' || type === 'booking_cancelled') {
-    return '/caregiver/bookings';
-  }
-  // patient-targeted types
-  if (type === 'booking_accepted' || type === 'booking_declined') {
-    return '/bookings';
-  }
-  return '/kyc/status';
-}
-
 export default function NotificationBell({
   currentUserId,
   externalUnreadCount,
@@ -104,6 +41,7 @@ export default function NotificationBell({
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+  const [bellTab, setBellTab] = useState<FilterTab>('all');
 
   useEffect(() => {
     const handleResize = () => {
@@ -126,7 +64,7 @@ export default function NotificationBell({
     data: notificationData,
     refetch: refetchNotifications,
   } = useQuery<NotificationData>(GET_NOTIFICATIONS, {
-    variables: { limit: 5, offset: 0, unreadOnly: false },
+    variables: { limit: 20, offset: 0, unreadOnly: false },
     fetchPolicy: 'cache-and-network',
   });
 
@@ -187,6 +125,11 @@ export default function NotificationBell({
   }, [open]);
 
   const items = notificationData?.notifications ?? [];
+  const visibleBellItems = useMemo(
+    () => (bellTab === 'all' ? items : items.filter((item) => deriveSource(item) === bellTab)),
+    [items, bellTab],
+  );
+
   const unreadCount = useMemo(() => {
     if (typeof externalUnreadCount === 'number' && externalUnreadCount >= 0) {
       return externalUnreadCount;
@@ -205,9 +148,16 @@ export default function NotificationBell({
     if (isMobile) {
       navigate('/caregiver/settings/notifications');
     } else {
-      setOpen((prev) => !prev);
+      setOpen((prev) => {
+        if (prev) setBellTab('all'); // reset tab เมื่อปิด dropdown
+        return !prev;
+      });
     }
   };
+
+  const handleSelectTab = useCallback((tab: FilterTab) => {
+    setBellTab(tab);
+  }, []);
 
   const handleClickItem = async (id: string) => {
     const item = items.find((entry) => entry.id === id);
@@ -222,7 +172,7 @@ export default function NotificationBell({
     setOpen(false);
     await refetchUnreadCount();
     await refetchNotifications();
-    navigate(bookingNavigatePath(item.type));
+    navigate(resolveDeepLink(item));
   };
 
   return (
@@ -230,7 +180,7 @@ export default function NotificationBell({
       <button
         type="button"
         onClick={handleClickBell}
-        className="relative w-9 h-9 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:cursor-pointer transition-colors rounded-full hover:bg-gray-100"
+        className="relative w-9 h-9 flex items-center justify-center text-gray-600 hover:text-gray-900 cursor-pointer transition-colors rounded-full hover:bg-gray-100"
         aria-label="เปิดการแจ้งเตือน"
       >
         <span className="material-icons text-base">notifications</span>
@@ -256,20 +206,42 @@ export default function NotificationBell({
             <button
               type="button"
               onClick={handleMarkAll}
-              className="text-[11px] font-medium leading-[13px] text-[#14554F] hover:underline"
+              className="cursor-pointer text-[11px] font-medium leading-[13px] text-[#14554F] hover:underline"
             >
               อ่านทั้งหมด
             </button>
+          </div>
+
+          {/* Filter tabs */}
+          <div className="flex gap-1 overflow-x-auto px-3 py-2 border-b border-[#F0F2F1]">
+            {FILTER_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => handleSelectTab(tab.key)}
+                className={`cursor-pointer shrink-0 rounded-full px-3 py-0.5 text-[10px] font-medium transition-colors ${
+                  bellTab === tab.key
+                    ? 'bg-[#14554F] text-white'
+                    : 'bg-[#F0F2F1] text-[#6B7773] hover:bg-[#E4E8E6]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
           {items.length === 0 ? (
             <div className="flex h-[67px] items-center justify-center bg-white px-4 text-[11px] text-[#8B9591]">
               ยังไม่มีการแจ้งเตือน
             </div>
+          ) : visibleBellItems.length === 0 ? (
+            <div className="flex h-[67px] items-center justify-center bg-white px-4 text-[11px] text-[#8B9591]">
+              ไม่มีการแจ้งเตือนในหมวดนี้
+            </div>
           ) : (
-            <div className="max-h-[340px] overflow-y-auto">
-              {items.slice(0, 5).map((item) => {
-                const visual = notificationVisual(item.type);
+            <div className="max-h-[300px] overflow-y-auto">
+              {visibleBellItems.slice(0, 5).map((item) => {
+                const visual = notificationIcon(item.type);
                 const rowBgClass = item.isRead ? 'bg-white' : 'bg-[#E6F4F3]';
 
                 return (
@@ -277,23 +249,31 @@ export default function NotificationBell({
                     type="button"
                     key={item.id}
                     onClick={() => handleClickItem(item.id)}
-                    className={`flex w-full h-[67px] items-start gap-[10px] px-4 py-3 text-left transition-colors ${rowBgClass}`}
+                    className={`cursor-pointer flex w-full h-[67px] items-start gap-[10px] px-4 py-3 text-left transition-colors ${rowBgClass}`}
                   >
                     <span
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-[14px] font-bold"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px]"
                       style={{
-                        backgroundColor: visual.iconBg,
-                        color: visual.iconColor,
+                        backgroundColor: visual.bg,
+                        color: visual.color,
                       }}
                     >
-                      {visual.icon}
+                      <span className="material-icons text-[18px] leading-none">{visual.icon}</span>
                     </span>
 
                     <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
                       <span className="text-[12px] font-semibold leading-[15px] text-[#1A2422]">{item.title}</span>
-                      <span className="truncate text-[11px] font-normal leading-[13px] text-[#6B7773]">{item.body}</span>
-                      <span className="text-[9px] font-medium leading-[11px] text-[#8B9591]">{formatRelativeTime(item.createdAt)}</span>
+                      <span className="truncate text-[11px] font-normal leading-[13px] text-[#6B7773]">{getSubtitle(item)}</span>
+                      <span className="text-[9px] font-medium leading-[11px] text-[#8B9591]">{relativeTimeTH(item.createdAt)}</span>
                     </span>
+
+                    {!item.isRead && (
+                      <span
+                        className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: UNREAD_DOT_COLOR }}
+                        aria-label="ยังไม่อ่าน"
+                      />
+                    )}
                   </button>
                 );
               })}

@@ -11,27 +11,25 @@ import {
 } from '../../../graphql/queries';
 import { Icon } from '../../../components/ui/Icon';
 import { supabase } from '../../../lib/supabase';
+import type { FilterTab, NotificationSource, NotificationType } from '../../../components/notifications/notificationMeta';
+import {
+  FILTER_TABS,
+  UNREAD_DOT_COLOR,
+  deriveSource,
+  getSubtitle,
+  notificationIcon,
+  relativeTimeTH,
+  resolveDeepLink,
+} from '../../../components/notifications/notificationMeta';
 
-type NotificationFilter = 'all' | 'unread' | 'kyc' | 'job' | 'system';
 type NotificationSection = 'today' | 'yesterday' | 'earlier';
-type NotificationType =
-  | 'kyc_submitted'
-  | 'kyc_verified'
-  | 'kyc_rejected'
-  | 'kyc_resubmitted'
-  | 'booking_new'
-  | 'booking_accepted'
-  | 'booking_declined'
-  | 'booking_confirmed'
-  | 'booking_cancelled';
-type NotificationState = 'pending' | 'verified' | 'rejected' | 'resubmit'
-  | 'booking_new' | 'booking_accepted' | 'booking_confirmed' | 'booking_declined' | 'booking_cancelled';
 
 interface NotificationListItem {
   id: string;
   type: NotificationType;
   title: string;
   body: string;
+  data?: string | null;
   isRead: boolean;
   createdAt: string;
 }
@@ -42,61 +40,10 @@ interface NotificationItem {
   title: string;
   description: string;
   section: NotificationSection;
-  category: Exclude<NotificationFilter, 'all' | 'unread'>;
-  state: NotificationState;
+  category: NotificationSource;
   timeLabel: string;
   unread: boolean;
-}
-
-function relativeTimeTH(dateText: string): string {
-  const now = Date.now();
-  const then = new Date(dateText).getTime();
-  const diffMs = Math.max(0, now - then);
-  const minutes = Math.floor(diffMs / 60000);
-
-  if (minutes < 1) {
-    return 'เมื่อสักครู่';
-  }
-  if (minutes < 60) {
-    return `${minutes} นาทีที่แล้ว`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours} ชั่วโมงที่แล้ว`;
-  }
-
-  const days = Math.floor(hours / 24);
-  return `${days} วันที่แล้ว`;
-}
-
-function resolveNotificationState(type: NotificationType): NotificationState {
-  switch (type) {
-    case 'kyc_verified':
-      return 'verified';
-    case 'kyc_rejected':
-      return 'rejected';
-    case 'kyc_resubmitted':
-      return 'resubmit';
-    case 'booking_new':
-      return 'booking_new';
-    case 'booking_accepted':
-      return 'booking_accepted';
-    case 'booking_confirmed':
-      return 'booking_confirmed';
-    case 'booking_declined':
-      return 'booking_declined';
-    case 'booking_cancelled':
-      return 'booking_cancelled';
-    case 'kyc_submitted':
-    default:
-      return 'pending';
-  }
-}
-
-function resolveNotificationCategory(type: NotificationType): Exclude<NotificationFilter, 'all' | 'unread'> {
-  if (type.startsWith('booking_')) return 'job';
-  return 'kyc';
+  rawData?: string | null;
 }
 
 function resolveNotificationSection(createdAt: string): NotificationSection {
@@ -115,95 +62,10 @@ function resolveNotificationSection(createdAt: string): NotificationSection {
   return 'earlier';
 }
 
-const notificationStateClasses: Record<
-  NotificationState,
-  {
-    iconSymbol: string;
-    statusLabel: string;
-    iconWrap: string;
-    iconColor: string;
-    statusWrap: string;
-    statusText: string;
-  }
-> = {
-  pending: {
-    iconSymbol: '⏳',
-    statusLabel: 'PENDING',
-    iconWrap: 'bg-[#FFFBEB]',
-    iconColor: '#F59E0B',
-    statusWrap: 'bg-[#FFFBEB]',
-    statusText: 'text-[#F59E0B]',
-  },
-  verified: {
-    iconSymbol: '✓',
-    statusLabel: 'VERIFIED',
-    iconWrap: 'bg-[#F0FDF4]',
-    iconColor: '#16A34A',
-    statusWrap: 'bg-[#F0FDF4]',
-    statusText: 'text-[#16A34A]',
-  },
-  rejected: {
-    iconSymbol: '✕',
-    statusLabel: 'REJECTED',
-    iconWrap: 'bg-[#FEF2F2]',
-    iconColor: '#DC2626',
-    statusWrap: 'bg-[#FEF2F2]',
-    statusText: 'text-[#DC2626]',
-  },
-  resubmit: {
-    iconSymbol: '↻',
-    statusLabel: 'RESUBMIT',
-    iconWrap: 'bg-[#EFF6FF]',
-    iconColor: '#2563EB',
-    statusWrap: 'bg-[#EFF6FF]',
-    statusText: 'text-[#2563EB]',
-  },
-  booking_new: {
-    iconSymbol: '📋',
-    statusLabel: 'งานใหม่',
-    iconWrap: 'bg-[#EFF6FF]',
-    iconColor: '#2563EB',
-    statusWrap: 'bg-[#EFF6FF]',
-    statusText: 'text-[#2563EB]',
-  },
-  booking_accepted: {
-    iconSymbol: '✓',
-    statusLabel: 'ตอบรับแล้ว',
-    iconWrap: 'bg-[#F0FDF4]',
-    iconColor: '#16A34A',
-    statusWrap: 'bg-[#F0FDF4]',
-    statusText: 'text-[#16A34A]',
-  },
-  booking_confirmed: {
-    iconSymbol: '✓',
-    statusLabel: 'ยืนยันแล้ว',
-    iconWrap: 'bg-[#F0FDF4]',
-    iconColor: '#16A34A',
-    statusWrap: 'bg-[#F0FDF4]',
-    statusText: 'text-[#16A34A]',
-  },
-  booking_declined: {
-    iconSymbol: '✗',
-    statusLabel: 'ปฏิเสธ',
-    iconWrap: 'bg-[#FEF2F2]',
-    iconColor: '#DC2626',
-    statusWrap: 'bg-[#FEF2F2]',
-    statusText: 'text-[#DC2626]',
-  },
-  booking_cancelled: {
-    iconSymbol: '✗',
-    statusLabel: 'ยกเลิกแล้ว',
-    iconWrap: 'bg-[#FEF2F2]',
-    iconColor: '#DC2626',
-    statusWrap: 'bg-[#FEF2F2]',
-    statusText: 'text-[#DC2626]',
-  },
-};
-
 export const NotificationSettingsTab: React.FC = () => {
   const navigate = useNavigate();
   const [activeNotificationFilter, setActiveNotificationFilter] =
-    useState<NotificationFilter>('all');
+    useState<FilterTab>('all');
 
   const { data: userData } = useQuery<{
     me: {
@@ -245,12 +107,12 @@ export const NotificationSettingsTab: React.FC = () => {
       id: item.id,
       type: item.type,
       title: item.title,
-      description: item.body,
+      description: getSubtitle(item),
       section: resolveNotificationSection(item.createdAt),
-      category: resolveNotificationCategory(item.type),
-      state: resolveNotificationState(item.type),
+      category: deriveSource(item),
       timeLabel: relativeTimeTH(item.createdAt),
       unread: !item.isRead,
+      rawData: item.data,
     }));
   }, [notificationData?.notifications]);
 
@@ -292,11 +154,15 @@ export const NotificationSettingsTab: React.FC = () => {
       await markNotificationAsRead({ variables: { id: item.id } });
       await refetchNotifications();
     }
-    if (item.type.startsWith('booking_')) {
-      navigate('/caregiver/bookings');
-    } else {
-      navigate('/kyc/status');
-    }
+    navigate(resolveDeepLink({
+      id: item.id,
+      type: item.type,
+      title: item.title,
+      body: item.description,
+      data: item.rawData,
+      isRead: !item.unread,
+      createdAt: '',
+    }));
   };
 
   const toggleEmailPreference = async () => {
@@ -307,40 +173,30 @@ export const NotificationSettingsTab: React.FC = () => {
     });
   };
 
-  const notificationCounts = {
+  const notificationCounts = useMemo(() => ({
     all: notifications.length,
-    unread: notifications.filter((item) => item.unread).length,
-    kyc: notifications.filter((item) => item.category === 'kyc').length,
-    job: notifications.filter((item) => item.category === 'job').length,
-    system: notifications.filter((item) => item.category === 'system').length,
-  };
+    booking: notifications.filter((n) => n.category === 'booking').length,
+    finance: notifications.filter((n) => n.category === 'finance').length,
+    system: notifications.filter((n) => n.category === 'system').length,
+  }), [notifications]);
 
-  const filteredNotifications = notifications.filter((item) => {
-    if (activeNotificationFilter === 'all') {
-      return true;
-    }
-    if (activeNotificationFilter === 'unread') {
-      return item.unread;
-    }
-    return item.category === activeNotificationFilter;
-  });
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => n.unread).length,
+    [notifications],
+  );
+
+  const filteredNotifications = useMemo(
+    () => activeNotificationFilter === 'all'
+      ? notifications
+      : notifications.filter((n) => n.category === activeNotificationFilter),
+    [notifications, activeNotificationFilter],
+  );
 
   const groupedNotifications: Record<NotificationSection, NotificationItem[]> = {
     today: filteredNotifications.filter((item) => item.section === 'today'),
     yesterday: filteredNotifications.filter((item) => item.section === 'yesterday'),
     earlier: filteredNotifications.filter((item) => item.section === 'earlier'),
   };
-
-  const notificationFilters: Array<{
-    key: NotificationFilter;
-    label: string;
-  }> = [
-    { key: 'all', label: 'ทั้งหมด' },
-    { key: 'unread', label: 'ยังไม่อ่าน' },
-    { key: 'kyc', label: 'KYC' },
-    { key: 'job', label: 'งาน' },
-    { key: 'system', label: 'ระบบ' },
-  ];
 
   const sectionLabels: Record<NotificationSection, string> = {
     today: 'วันนี้',
@@ -409,7 +265,7 @@ export const NotificationSettingsTab: React.FC = () => {
           <button
             type="button"
             onClick={markAllNotificationsAsRead}
-            className="inline-flex h-9 items-center gap-2 rounded-[8px] bg-[#228B55] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#1f7d4d]"
+            className="cursor-pointer inline-flex h-9 items-center gap-2 rounded-[8px] bg-[#228B55] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#1f7d4d]"
           >
             <Icon name="done_all" variant="outlined" size="small" color="white" />
             อ่านทั้งหมด
@@ -417,22 +273,22 @@ export const NotificationSettingsTab: React.FC = () => {
         </div>
 
         <div className="mb-5 flex flex-wrap gap-2">
-          {notificationFilters.map((filter) => {
-            const isActive = activeNotificationFilter === filter.key;
-            const pillCount = notificationCounts[filter.key];
+          {FILTER_TABS.map((tab) => {
+            const isActive = activeNotificationFilter === tab.key;
+            const pillCount = notificationCounts[tab.key];
 
             return (
               <button
                 type="button"
-                key={filter.key}
-                onClick={() => setActiveNotificationFilter(filter.key)}
-                className={`inline-flex items-center gap-2 rounded-full border px-[14px] py-[8px] text-[13px] font-semibold transition-colors ${
+                key={tab.key}
+                onClick={() => setActiveNotificationFilter(tab.key)}
+                className={`cursor-pointer inline-flex items-center gap-2 rounded-full border px-[14px] py-[8px] text-[13px] font-semibold transition-colors ${
                   isActive
                     ? 'border-[#12181B] bg-[#12181B] text-white'
                     : 'border-[#E5E7E9] bg-white text-[#414A52] hover:bg-[#F8F9FA]'
                 }`}
               >
-                {filter.label}
+                {tab.label}
                 <span
                   className={`rounded-full px-[6px] py-[1px] text-[11px] font-bold ${
                     isActive
@@ -464,9 +320,9 @@ export const NotificationSettingsTab: React.FC = () => {
                 </div>
 
                 {sectionItems.map((item) => {
-                  const theme = notificationStateClasses[item.state];
+                  const visual = notificationIcon(item.type);
                   const cardStateClass = item.unread
-                    ? 'bg-[#E6F4F3] border-[1px] border-l-[3px] border-[#F58634]'
+                    ? 'bg-[#E6F4F3] border-[1px] border-l-[3px] border-[#2563EB]'
                     : 'bg-white border border-[#DDE3E0]';
 
                   return (
@@ -474,34 +330,29 @@ export const NotificationSettingsTab: React.FC = () => {
                       type="button"
                       key={item.id}
                       onClick={() => handleNotificationAction(item)}
-                      className={`w-full rounded-[12px] p-4 text-left transition-colors ${cardStateClass} cursor-pointer`}
+                      className={`cursor-pointer w-full rounded-[12px] p-4 text-left transition-colors ${cardStateClass}`}
                     >
                       <div className="flex items-start gap-[14px]">
-                        <div
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] ${theme.iconWrap}`}
+                        <span
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px]"
+                          style={{ backgroundColor: visual.bg, color: visual.color }}
                         >
-                          <span className="text-[18px] font-bold leading-[22px]" style={{ color: theme.iconColor }}>
-                            {theme.iconSymbol}
-                          </span>
-                        </div>
+                          <span className="material-icons text-[22px] leading-none">{visual.icon}</span>
+                        </span>
 
                         <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-[13px] font-semibold leading-4 text-[#1A2422]">{item.title}</h3>
-                            <span
-                              className={`rounded-[4px] px-[6px] py-[2px] text-[9px] font-bold tracking-[0.08em] ${theme.statusWrap} ${theme.statusText}`}
-                            >
-                              {theme.statusLabel}
-                            </span>
-                          </div>
-
+                          <h3 className="text-[13px] font-semibold leading-4 text-[#1A2422]">{item.title}</h3>
                           <p className="truncate text-[12px] leading-[15px] text-[#6B7773]">{item.description}</p>
-
                           <div className="flex items-center gap-2 pt-[2px]">
                             <span className="text-[10px] font-medium leading-3 text-[#8B9591]">
                               {item.timeLabel}
                             </span>
-                            {item.unread && <span className="h-2 w-2 rounded-full bg-[#F58634]" />}
+                            {item.unread && (
+                              <span
+                                className="h-2 w-2 rounded-full"
+                                style={{ backgroundColor: UNREAD_DOT_COLOR }}
+                              />
+                            )}
                           </div>
                         </div>
                       </div>
@@ -529,7 +380,7 @@ export const NotificationSettingsTab: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/kyc/status')}
-              className="inline-flex items-center justify-center rounded-md p-1 transition-colors hover:bg-[#F3F4F5]"
+              className="cursor-pointer inline-flex items-center justify-center rounded-md p-1 transition-colors hover:bg-[#F3F4F5]"
               aria-label="เปิดหน้าสถานะ KYC"
             >
               <Icon name="open_in_new" variant="outlined" size="small" color="#ABB4BA" />
@@ -599,7 +450,7 @@ export const NotificationSettingsTab: React.FC = () => {
               <button
                 type="button"
                 onClick={toggleEmailPreference}
-                className={`relative h-[22px] w-10 rounded-full transition-colors ${
+                className={`cursor-pointer relative h-[22px] w-10 rounded-full transition-colors ${
                   emailEnabled ? 'bg-[#228B55]' : 'bg-[#D2D7DA]'
                 }`}
                 aria-label="สลับอีเมล KYC"
@@ -627,12 +478,12 @@ export const NotificationSettingsTab: React.FC = () => {
             </div>
             <div className="flex items-center justify-between text-[#B3BABF]">
               <span>ยังไม่อ่าน</span>
-              <span className="text-[16px] font-bold text-[#F58634]">{notificationCounts.unread}</span>
+              <span className="text-[16px] font-bold text-[#F58634]">{unreadCount}</span>
             </div>
             <div className="flex items-center justify-between text-[#B3BABF]">
               <span>อีเมลที่ส่งออก</span>
               <span className="text-[16px] font-bold text-white">
-                {emailEnabled ? notifications.length : 0}
+                {emailEnabled ? notificationCounts.all : 0}
               </span>
             </div>
           </div>

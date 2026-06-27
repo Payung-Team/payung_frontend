@@ -10,26 +10,19 @@ import {
 } from '../../graphql/queries';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-
-type NotificationType =
-  | 'kyc_submitted'
-  | 'kyc_verified'
-  | 'kyc_rejected'
-  | 'kyc_resubmitted'
-  | 'booking_new'
-  | 'booking_accepted'
-  | 'booking_declined'
-  | 'booking_confirmed'
-  | 'booking_cancelled';
-
-interface NotificationItem {
-  id: string;
-  type: NotificationType;
-  title: string;
-  body: string;
-  isRead: boolean;
-  createdAt: string;
-}
+import type {
+  NotificationItem,
+  FilterTab,
+} from '../../components/notifications/notificationMeta';
+import {
+  UNREAD_DOT_COLOR,
+  FILTER_TABS,
+  deriveSource,
+  getSubtitle,
+  notificationIcon,
+  relativeTimeTH,
+  resolveDeepLink,
+} from '../../components/notifications/notificationMeta';
 
 interface NotificationsQueryResult {
   notifications: NotificationItem[];
@@ -48,52 +41,6 @@ interface UnreadQueryResult {
 
 const PAGE_SIZE = 20;
 
-function relativeTimeTH(dateText: string): string {
-  const now = Date.now();
-  const then = new Date(dateText).getTime();
-  const diffMs = Math.max(0, now - then);
-  const minutes = Math.floor(diffMs / 60000);
-
-  if (minutes < 1) {
-    return 'เมื่อสักครู่';
-  }
-  if (minutes < 60) {
-    return `${minutes} นาทีที่แล้ว`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours} ชั่วโมงที่แล้ว`;
-  }
-
-  const days = Math.floor(hours / 24);
-  return `${days} วันที่แล้ว`;
-}
-
-function notificationIconByType(type: NotificationType): { icon: string; bg: string; color: string } {
-  switch (type) {
-    case 'kyc_verified':
-      return { icon: '✓', bg: '#F0FDF4', color: '#16A34A' };
-    case 'kyc_rejected':
-      return { icon: '✗', bg: '#FEF2F2', color: '#DC2626' };
-    case 'kyc_resubmitted':
-      return { icon: '↻', bg: '#EFF6FF', color: '#2563EB' };
-    case 'booking_new':
-      return { icon: '📋', bg: '#EFF6FF', color: '#2563EB' };
-    case 'booking_accepted':
-      return { icon: '✓', bg: '#F0FDF4', color: '#16A34A' };
-    case 'booking_confirmed':
-      return { icon: '✓', bg: '#F0FDF4', color: '#16A34A' };
-    case 'booking_declined':
-      return { icon: '✗', bg: '#FEF2F2', color: '#DC2626' };
-    case 'booking_cancelled':
-      return { icon: '✗', bg: '#FEF2F2', color: '#DC2626' };
-    case 'kyc_submitted':
-    default:
-      return { icon: '⏳', bg: '#FFFBEB', color: '#F59E0B' };
-  }
-}
-
 export default function NotificationsPage() {
   const navigate = useNavigate();
   const client = useApolloClient();
@@ -102,6 +49,7 @@ export default function NotificationsPage() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loadingPage, setLoadingPage] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [activeTab, setActiveTab] = useState<FilterTab>('all');
 
   const { data: userData } = useQuery<UserQueryResult>(GET_USER);
   const { data: unreadData, refetch: refetchUnread } = useQuery<UnreadQueryResult>(GET_UNREAD_COUNT, {
@@ -129,7 +77,7 @@ export default function NotificationsPage() {
           fetchPolicy: 'network-only',
         });
 
-        const next = result.data.notifications ?? [];
+        const next = result.data?.notifications ?? [];
 
         setItems((prev) => {
           if (offset === 0) {
@@ -214,13 +162,7 @@ export default function NotificationsPage() {
     await refetchUnread();
     setItems((prev) => prev.map((entry) => (entry.id === item.id ? { ...entry, isRead: true } : entry)));
 
-    if (item.type.startsWith('booking_')) {
-      // caregiver-targeted types → caregiver dashboard; patient-targeted types → patient bookings
-      const caregiverTypes: NotificationType[] = ['booking_new', 'booking_confirmed', 'booking_cancelled'];
-      navigate(caregiverTypes.includes(item.type) ? '/caregiver/bookings' : '/bookings');
-    } else {
-      navigate('/kyc/status');
-    }
+    navigate(resolveDeepLink(item));
   };
 
   const handleToggleEmailPreference = async () => {
@@ -229,7 +171,15 @@ export default function NotificationsPage() {
     await client.refetchQueries({ include: [GET_USER] });
   };
 
-  const empty = useMemo(() => items.length === 0 && !loadingPage, [items.length, loadingPage]);
+  const visibleItems = useMemo(
+    () => (activeTab === 'all' ? items : items.filter((item) => deriveSource(item) === activeTab)),
+    [items, activeTab],
+  );
+
+  const empty = useMemo(
+    () => visibleItems.length === 0 && !loadingPage,
+    [visibleItems.length, loadingPage],
+  );
 
   return (
     <div className="mx-auto max-w-[980px] px-6 py-8">
@@ -242,7 +192,7 @@ export default function NotificationsPage() {
         <button
           type="button"
           onClick={handleMarkAll}
-          className="rounded-lg bg-[#228B55] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7d4d]"
+          className="cursor-pointer rounded-lg bg-[#228B55] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7d4d]"
         >
           อ่านทั้งหมด ({unreadCount})
         </button>
@@ -259,7 +209,7 @@ export default function NotificationsPage() {
             type="button"
             disabled={updatingEmailPreference}
             onClick={handleToggleEmailPreference}
-            className={`relative h-[22px] w-10 rounded-full transition-colors ${
+            className={`cursor-pointer relative h-[22px] w-10 rounded-full transition-colors ${
               emailEnabled ? 'bg-[#228B55]' : 'bg-[#D2D7DA]'
             }`}
             aria-label="สลับการรับอีเมลแจ้งเตือน"
@@ -273,41 +223,70 @@ export default function NotificationsPage() {
         </div>
       </div>
 
+      <div className="mb-4 flex gap-2 overflow-x-auto">
+        {FILTER_TABS.map((tab) => {
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`cursor-pointer shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors ${
+                isActive
+                  ? 'bg-[#14554F] text-white'
+                  : 'bg-[#F0F2F1] text-[#6B7773] hover:bg-[#E4E8E6]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
       {empty && (
         <div className="rounded-xl border border-dashed border-[#DDE3E0] bg-white px-6 py-14 text-center">
           <p className="text-[14px] font-semibold text-[#1A2422]">ยังไม่มีการแจ้งเตือน</p>
-          <p className="mt-1 text-[12px] text-[#8B9591]">เมื่อมีการอัปเดตสถานะ KYC ข้อมูลจะแสดงที่นี่</p>
+          <p className="mt-1 text-[12px] text-[#8B9591]">
+            {activeTab === 'all'
+              ? 'เมื่อมีการอัปเดตข้อมูลจะแสดงที่นี่'
+              : 'ยังไม่มีการแจ้งเตือนในหมวดนี้'}
+          </p>
         </div>
       )}
 
       <div className="space-y-3">
-        {items.map((item) => {
-          const iconStyle = notificationIconByType(item.type);
+        {visibleItems.map((item) => {
+          const iconStyle = notificationIcon(item.type);
           const cardStateClass = item.isRead
             ? 'border-[#DDE3E0] bg-white'
-            : 'border-[#F58634] border-l-[3px] bg-[#E6F4F3]';
+            : 'border-[#2563EB] border-l-[3px] bg-[#EFF6FF]';
 
           return (
             <button
               type="button"
               key={item.id}
               onClick={() => handleClickNotification(item)}
-              className={`w-full rounded-[12px] border p-4 text-left transition-colors ${cardStateClass}`}
+              className={`cursor-pointer w-full rounded-[12px] border p-4 text-left transition-colors ${cardStateClass}`}
             >
               <div className="flex items-start gap-[14px]">
                 <span
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-[18px] font-bold"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px]"
                   style={{ backgroundColor: iconStyle.bg, color: iconStyle.color }}
                 >
-                  {iconStyle.icon}
+                  <span className="material-icons text-[22px] leading-none">{iconStyle.icon}</span>
                 </span>
 
                 <span className="min-w-0 flex-1 space-y-1">
                   <span className="block text-[13px] font-semibold text-[#1A2422]">{item.title}</span>
-                  <span className="block truncate text-[12px] text-[#6B7773]">{item.body}</span>
+                  <span className="block truncate text-[12px] text-[#6B7773]">{getSubtitle(item)}</span>
                   <span className="inline-flex items-center gap-2 text-[10px] text-[#8B9591]">
                     {relativeTimeTH(item.createdAt)}
-                    {!item.isRead && <span className="h-2 w-2 rounded-full bg-[#F58634]" />}
+                    {!item.isRead && (
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: UNREAD_DOT_COLOR }}
+                      />
+                    )}
                   </span>
                 </span>
               </div>
@@ -318,7 +297,7 @@ export default function NotificationsPage() {
 
       <div ref={loadMoreRef} className="h-10 w-full" />
       {loadingPage && <p className="text-center text-[12px] text-[#8B9591]">กำลังโหลด...</p>}
-      {!hasMore && items.length > 0 && (
+      {!hasMore && visibleItems.length > 0 && (
         <p className="text-center text-[12px] text-[#8B9591]">แสดงครบทั้งหมดแล้ว</p>
       )}
     </div>
