@@ -57,7 +57,7 @@ const RoleRoute: React.FC<RoleRouteProps> = ({ children, requiredRole }) => {
   }
 
   // GraphQL role is authoritative; localStorage is only a fallback for initial render
-  const currentRole = userData?.me?.role || (userRole ? Number(userRole) : null);
+  const currentRole = (userData as any)?.me?.role || (userRole ? Number(userRole) : null);
 
   // ถ้าไม่มี userRole ก็ redirect ไป /
   if (!currentRole) {

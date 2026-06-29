@@ -49,7 +49,7 @@ const ProfileFormFields: React.FC<ProfileFormFieldsProps> = ({
     <>
       {fieldWithLock(
         'หมายเลขประจำตัวผู้ดูแล',
-        caregiverId,
+        caregiverId || '',
         'หมายเลขประจำตัวผู้ดูแลถูกกำหนดโดยระบบ ไม่สามารถแก้ไขได้',
       )}
 
@@ -68,7 +68,7 @@ const ProfileFormFields: React.FC<ProfileFormFieldsProps> = ({
 
       {fieldWithLock(
         'เลขประจำตัวประชาชน',
-        citizenId,
+        citizenId || '',
         'ต้องการแก้ไขกรุณาติดต่อ admin',
       )}
     </>

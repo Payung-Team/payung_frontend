@@ -1,4 +1,3 @@
-import React from 'react';
 import { useQuery } from '@apollo/client/react';
 import { GET_CAREGIVER_PROFILE } from '../graphql/queries';
 import SearchPage from '../pages/search/SearchPage';

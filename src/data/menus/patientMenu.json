@@ -10,22 +10,6 @@
       "icon": "home-outline",
       "route": "/patient-home",
       "allowedRoles": ["patient"]
-    },
-    {
-      "id": "search_caregivers",
-      "type": "navigation",
-      "label": "ค้นหาผู้ดูแล",
-      "icon": "person-outline",
-      "route": "/booking/new",
-      "allowedRoles": ["patient"]
-    },
-    {
-      "id": "bookings",
-      "type": "navigation",
-      "label": "นัดหมาย",
-      "icon": "calendar-outline",
-      "route": "/bookings",
-      "allowedRoles": ["patient"]
     }
   ],
   "avatar": [

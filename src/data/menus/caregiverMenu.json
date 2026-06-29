@@ -10,14 +10,6 @@
       "icon": "home-outline",
       "route": "/caregiver-home",
       "allowedRoles": ["caregiver"]
-    },
-    {
-      "id": "my_jobs",
-      "type": "navigation",
-      "label": "งานของฉัน",
-      "icon": "inbox-outline",
-      "route": "/caregiver/bookings",
-      "allowedRoles": ["caregiver"]
     }
   ],
   "avatar": [

@@ -923,7 +923,7 @@ export default function AdminUsersPage() {
 
   const [scheduleDelete, { loading: scheduleDeleteLoading }] = useMutation(SCHEDULE_DELETE_ADMIN, {
     update(cache, { data }) {
-      const payload = data?.scheduleDeleteAdmin;
+      const payload = (data as any)?.scheduleDeleteAdmin;
       if (!payload) return;
       cache.modify({
         id: cache.identify({ __typename: 'UserSummary', id: payload.user.id }),
@@ -940,7 +940,7 @@ export default function AdminUsersPage() {
 
   const [cancelDelete, { loading: cancelLoading }] = useMutation(CANCEL_SCHEDULED_DELETE, {
     update(cache, { data }) {
-      const user = data?.cancelScheduledDelete?.user;
+      const user = (data as any)?.cancelScheduledDelete?.user;
       if (!user) return;
       cache.modify({
         id: cache.identify({ __typename: 'UserSummary', id: user.id }),
@@ -957,8 +957,8 @@ export default function AdminUsersPage() {
 
   const [suspendUser, { loading: suspendLoading }] = useMutation(SUSPEND_USER, {
     update(cache, { data }) {
-      if (!data?.suspendUser) return;
-      const { id } = data.suspendUser;
+      if (!(data as any)?.suspendUser) return;
+      const { id } = (data as any).suspendUser;
       const in7Days = new Date();
       in7Days.setDate(in7Days.getDate() + 7);
       cache.modify({

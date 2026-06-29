@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useMutation } from '@apollo/client/react';
-import type { ApolloError } from '@apollo/client';
 import { UPDATE_PROFILE, GET_USER } from '../../graphql/queries';
 import { useToast } from '../../hooks/useToast';
 import Avatar from '../ui/Avatar';
@@ -27,7 +26,6 @@ export default function EditProfileModal({
   onSuccess,
 }: EditProfileModalProps) {
   const [displayName, setDisplayName] = useState(currentDisplayName);
-  const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState(currentPhone);
   const [address, setAddress] = useState(currentAddress);
   const [bio, setBio] = useState(currentBio);
@@ -37,9 +35,9 @@ export default function EditProfileModal({
   const [updateProfile, { loading }] = useMutation(UPDATE_PROFILE, {
     refetchQueries: [{ query: GET_USER }],
     awaitRefetchQueries: true,
-    onCompleted: (data) => {
+    onCompleted: (data: unknown) => {
       // อัปเดต state ของ modal ด้วยข้อมูลใหม่จาก mutation result
-      const updatedUser = data.updateProfile;
+      const updatedUser = (data as any)?.updateProfile;
       if (updatedUser) {
         setDisplayName(updatedUser.displayName || '');
         setPhone(updatedUser.phone || '');
@@ -53,7 +51,7 @@ export default function EditProfileModal({
         handleClose();
       }, 1500);
     },
-    onError: (err: ApolloError) => {
+    onError: (err: Error) => {
       const errorMessage = err.message || 'เกิดข้อผิดพลาดในการอัปเดต';
       showError(errorMessage);
       setError(errorMessage);
@@ -62,7 +60,6 @@ export default function EditProfileModal({
 
   const handleClose = () => {
     setDisplayName(currentDisplayName);
-    setFullName('');
     setPhone(currentPhone);
     setAddress(currentAddress);
     setBio(currentBio);

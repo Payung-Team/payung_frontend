@@ -6,7 +6,6 @@ import PageSkeleton from './components/ui/PageSkeleton';
 import { useAuth } from './context/AuthContext';
 import { getPostLoginRedirect } from './utils/getRedirectPath';
 import AppLayout from './components/layout/AppLayout';
-import CaregiverSearchWrapper from './components/CaregiverSearchWrapper';
 import { KycProvider } from './context/KycContext';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -23,11 +22,8 @@ import AdminLayout from './components/layout/AdminLayout';
 import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
 import CaregiverHome from './pages/caregiver/CaregiverHome';
-import CaregiverBookings from './pages/caregiver/CaregiverBookings';
 import CaregiverSettings from './pages/caregiver/CaregiverSettings';
 import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
-import BookingsPage from './pages/profile/BookingsPage';
-import BookingRequestPage from './pages/booking/BookingRequestPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
 import GuestRoute from './components/GuestRoute';
@@ -37,7 +33,6 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
 import AuthCallback from './pages/auth/AuthCallback';
 import MessagePage from './pages/profile/MessagePage';
-import NotificationsPage from './pages/notifications/NotificationsPage';
 import OnboardingPage from './pages/auth/OnboardingPage';
 
 function KycFormGuard({ children }: { children: React.ReactNode }) {
@@ -155,15 +150,8 @@ function App() {
             }
           />
 
-          {/* Booking Request */}
-          <Route
-            path="/booking/new"
-            element={
-              <RoleRoute requiredRole={1}>
-                <BookingRequestPage />
-              </RoleRoute>
-            }
-          />
+          {/* Booking Request — Sprint 4 (gated for demo) */}
+          <Route path="/booking/new" element={<Navigate to="/" replace />} />
 
           {/* Caregiver home */}
           <Route
@@ -175,15 +163,8 @@ function App() {
             }
           />
 
-          {/* Caregiver Bookings */}
-          <Route
-            path="/caregiver/bookings"
-            element={
-              <RoleRoute requiredRole={2}>
-                <CaregiverBookings />
-              </RoleRoute>
-            }
-          />
+          {/* Caregiver Bookings — Sprint 4 (gated for demo) */}
+          <Route path="/caregiver/bookings" element={<Navigate to="/" replace />} />
 
           {/* Admin home */}
           <Route
@@ -198,10 +179,11 @@ function App() {
           {/* Home - redirect based on role */}
           <Route path="/" element={<HomeRedirect />} />
 
-          <Route path="/search" element={<CaregiverSearchWrapper />} />
-          <Route path="/bookings" element={<BookingsPage />} />
+          {/* Sprint 4–5 routes — gated for demo */}
+          <Route path="/search" element={<Navigate to="/" replace />} />
+          <Route path="/bookings" element={<Navigate to="/" replace />} />
+          <Route path="/notifications" element={<Navigate to="/" replace />} />
           <Route path="/messages" element={<MessagePage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
 
           {/* Caregiver settings */}
           <Route
@@ -231,14 +213,8 @@ function App() {
             }
           />
 
-          <Route
-            path="/caregiver/settings/notifications"
-            element={
-              <RoleRoute requiredRole={2}>
-                <CaregiverSettings />
-              </RoleRoute>
-            }
-          />
+          {/* Notifications settings — Sprint 4 (gated for demo) */}
+          <Route path="/caregiver/settings/notifications" element={<Navigate to="/" replace />} />
 
           <Route
             path="/caregiver/settings/language"

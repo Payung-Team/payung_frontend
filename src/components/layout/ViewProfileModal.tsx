@@ -19,7 +19,7 @@ export default function ViewProfileModal({
 
   if (!isOpen) return null;
 
-  const user = data?.me;
+  const user = (data as any)?.me;
   const userInitial = user?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || '?';
 
   return (

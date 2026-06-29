@@ -14,7 +14,7 @@ interface CaregiverProfileDropdownProps {
 }
 
 export default function CaregiverProfileDropdown({
-  onSettingsClick,
+  onSettingsClick: _onSettingsClick,
   avatarFallbackColor = '#52B69A',
   avatarUrl,
   displayName,

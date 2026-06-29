@@ -280,35 +280,6 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
     }
   }
 
-  const handlePreview = async (docType: string, docTitle: string) => {
-    const existing = uploadedDocs.find((u) => u.docType === docType);
-    if (!existing) return;
-
-    let url = existing.fileUrl;
-
-    // Refresh signed URL for private bucket files
-    if (url.includes('/kyc-documents/')) {
-      try {
-        const parts = url.split('/kyc-documents/');
-        const path = parts.length > 1 ? parts[1].split('?')[0] : null;
-
-        if (path) {
-          const { data } = await supabase.storage
-            .from('kyc-documents')
-            .createSignedUrl(decodeURIComponent(path), 3600); // 1 hour
-          
-          if (data?.signedUrl) {
-            url = data.signedUrl;
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to refresh signed URL for preview:', err);
-      }
-    }
-
-    setPreview({ isOpen: true, url, name: docTitle });
-  };
-
   const handleDelete = (docType: string) => {
     const existing = uploadedDocs.find((u) => u.docType === docType);
     if (!existing) {

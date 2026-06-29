@@ -206,8 +206,8 @@ export default function AdminCaregiverDetailPage() {
     }
   );
 
-  const caregiver = userDetailData?.adminUserDetail?.caregiver;
-  const user = userDetailData?.adminUserDetail?.user;
+  const caregiver = (userDetailData as any)?.adminUserDetail?.caregiver;
+  const user = (userDetailData as any)?.adminUserDetail?.user;
 
   // 2. Fetch locked fields from backend
   const { data: lockedFieldsData, refetch: refetchLockedFields } = useQuery<{
@@ -246,8 +246,8 @@ export default function AdminCaregiverDetailPage() {
     }
   );
 
-  const documents = kycDetailData?.adminKycDetail?.documents ?? [];
-  const reviews = kycDetailData?.adminKycDetail?.reviews ?? [];
+  const documents = (kycDetailData as any)?.adminKycDetail?.documents ?? [];
+  const reviews = (kycDetailData as any)?.adminKycDetail?.reviews ?? [];
 
   const isLoading = userDetailLoading || (caregiver?.id && kycDetailLoading);
 
@@ -255,8 +255,8 @@ export default function AdminCaregiverDetailPage() {
     ? (statusMeta[caregiver.kycStatus as keyof typeof statusMeta] ?? statusMeta.none)
     : statusMeta.none;
 
-  const scheduledDeleteAt = userDetailData?.adminUserDetail?.scheduledDeleteAt;
-  const editLogs = kycDetailData?.adminKycDetail?.editHistory ?? [];
+  const scheduledDeleteAt = (userDetailData as any)?.adminUserDetail?.scheduledDeleteAt;
+  const editLogs = (kycDetailData as any)?.adminKycDetail?.editHistory ?? [];
   const isActive = user?.isActive ?? false;
   const daysUntilDelete = scheduledDeleteAt ? daysUntil(scheduledDeleteAt) : null;
 

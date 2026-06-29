@@ -33,8 +33,8 @@ export default function Login() {
   const { setUserRole, setMustChangePassword } = useAuth();
 
   const [loginMutation, { loading: isSubmitting }] = useMutation(LOGIN_USER, {
-    onCompleted: async (data) => {
-      const loginUser = data?.login?.user;
+    onCompleted: async (data: unknown) => {
+      const loginUser = (data as any)?.login?.user;
 
       // ตรวจสอบบัญชีถูกระงับก่อน set session
       if (loginUser?.isActive === false) {
@@ -44,10 +44,10 @@ export default function Login() {
         return;
       }
 
-      if (data?.login?.accessToken && data?.login?.refreshToken) {
+      if ((data as any)?.login?.accessToken && (data as any)?.login?.refreshToken) {
         await supabase.auth.setSession({
-          access_token: data.login.accessToken,
-          refresh_token: data.login.refreshToken,
+          access_token: (data as any).login.accessToken,
+          refresh_token: (data as any).login.refreshToken,
         });
       }
 
@@ -62,8 +62,8 @@ export default function Login() {
     onError: (error) => {
       console.error('Login mutation error details:', error);
       console.error('Error message:', error.message);
-      console.error('GraphQL errors:', error.graphQLErrors);
-      console.error('Network error:', error.networkError);
+      console.error('GraphQL errors:', (error as any).graphQLErrors);
+      console.error('Network error:', (error as any).networkError);
       setFormError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
       setErrorCount(prev => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });

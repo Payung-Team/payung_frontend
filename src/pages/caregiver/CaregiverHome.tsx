@@ -258,7 +258,7 @@ interface QuickActionsProps {
   readonly kycStatus: string;
 }
 
-function QuickActionsGrid({ unreadCount, kycStatus }: QuickActionsProps) {
+function QuickActionsGrid({ unreadCount }: QuickActionsProps) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <Link to="/caregiver/bookings" className={`${cardBase} no-underline text-[#1A1A1A]`}>

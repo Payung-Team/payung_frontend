@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { KycProvider, useKyc } from '../../context/KycContext';
+import { useKyc } from '../../context/KycContext';
 import KycIntro from './KycIntro';
 import KycStep1 from './steps/KycStep1';
 import KycStep2 from './steps/KycStep2';

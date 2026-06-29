@@ -158,7 +158,7 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
     formState: { errors },
     reset,
   } = useForm<Step1Form>({
-    resolver: zodResolver(step1Schema),
+    resolver: zodResolver(step1Schema) as any,
     defaultValues: step1Data
       ? { ...step1Data }
       : {
@@ -238,7 +238,7 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
           กรอกข้อมูลให้ตรงกับบัตรประชาชนของคุณ
         </p>
 
-        <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
+        <form onSubmit={handleSubmit(onSubmit as any)} noValidate className="flex flex-col gap-5">
           {/* ชื่อจริง - นามสกุล */}
           <div className="grid grid-cols-2 gap-4">
             <Input

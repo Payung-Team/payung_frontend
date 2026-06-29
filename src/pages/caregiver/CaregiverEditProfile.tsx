@@ -91,11 +91,11 @@ const CaregiverEditProfile: React.FC = () => {
     refetchQueries: [{ query: GET_CAREGIVER_PROFILE }],
     update: (cache, { data: updateData }) => {
       // อัปเดต Apollo Cache ทันที
-      if (updateData?.updateCaregiverProfile) {
+      if ((updateData as any)?.updateCaregiverProfile) {
         cache.writeQuery({
           query: GET_CAREGIVER_PROFILE,
           data: {
-            myCaregiverProfile: updateData.updateCaregiverProfile,
+            myCaregiverProfile: (updateData as any).updateCaregiverProfile,
           },
         });
       }
@@ -203,7 +203,7 @@ const CaregiverEditProfile: React.FC = () => {
         variables: { input },
       });
 
-      if (result.data?.updateCaregiverProfile) {
+      if ((result.data as any)?.updateCaregiverProfile) {
         setToastMessage({ type: 'success', message: 'บันทึกข้อมูลสำเร็จ' });
         setIsDirty(false);
         // อัปเดต cache ทันที เพื่อให้หน้าอื่นเห็นข้อมูลใหม่

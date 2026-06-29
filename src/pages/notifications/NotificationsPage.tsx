@@ -110,7 +110,7 @@ export default function NotificationsPage() {
           fetchPolicy: 'network-only',
         });
 
-        const next = result.data.notifications ?? [];
+        const next = result.data?.notifications ?? [];
 
         setItems((prev) => {
           if (offset === 0) {

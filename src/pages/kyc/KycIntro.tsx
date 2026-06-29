@@ -1,5 +1,4 @@
 import { useKyc } from '../../context/KycContext';
-import Icon from '../../components/ui/Icon';
 
 const STEPS = [
   {
