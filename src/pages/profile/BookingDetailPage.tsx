@@ -4,6 +4,8 @@ import { useQuery/*, useMutation*/ } from '@apollo/client/react';
 import { supabase } from '../../lib/supabase';
 import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
 import { GET_MY_BOOKING, GET_PAYMENT_BY_BOOKING/*, FLAG_BOOKING_DISPUTE*/ } from '../../graphql/queries';
+import { PaymentInfoSection } from '../../features/payment/PaymentInfoSection';
+import type { PaymentInfo } from '../../features/payment/PaymentInfoSection';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -171,7 +173,7 @@ export default function BookingDetailPage() {
     variables: { bookingId: id },
     skip: !id,
   });
-  const payment = paymentData?.paymentByBooking as { id: string; paymentStatus: string; amount: number } | undefined;
+  const payment = paymentData?.paymentByBooking as PaymentInfo | undefined;
 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -568,6 +570,14 @@ export default function BookingDetailPage() {
               </p>
             </div>
           </div>
+
+          {/* Payment info card */}
+          {payment && (
+            <PaymentInfoSection
+              payment={payment}
+              onRetry={() => navigate('/checkout')}
+            />
+          )}
 
           {/* Pay button (awaiting_payment status) */}
           {booking.status === 'awaiting_payment' && (

@@ -909,6 +909,9 @@ export const GET_PAYMENT_BY_BOOKING = gql`
       amount
       currency
       qrCodeUrl
+      paymentMethod
+      failureMessage
+      updatedAt
     }
   }
 `;
