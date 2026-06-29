@@ -6,6 +6,9 @@ import { ToastContainer } from '../../components/ui/Toast';
 import Icon from '../../components/ui/Icon';
 import { CompleteServiceModal } from '../../components/ui/CompleteServiceModal';
 import { ReviewPromptCard } from '../../components/ui/ReviewPromptCard';
+import { BookingReviewForm, type BookingReviewData } from '../../components/booking/BookingReviewForm';
+import { SubmittedReviewCard } from '../../components/booking/SubmittedReviewCard';
+import { getBookingReview, saveStoredReview } from '../../utils/bookingReview';
 // TODO: uncomment when backend is ready
 // import { useQuery, useMutation } from '@apollo/client/react';
 // import { GET_BOOKING_DETAIL, COMPLETE_SERVICE } from '../../graphql/queries';
@@ -117,6 +120,13 @@ const BookingDetailPage: React.FC = () => {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
 
+  // Review state (mock — replace with backend query)
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [existingReview, setExistingReview] = useState<BookingReviewData | null>(() =>
+    getBookingReview(id || 'unknown'),
+  );
+
   // ──────────────────────────────────────────
   // Data — mock จนกว่า backend พร้อม
   // TODO: replace with useQuery(GET_BOOKING_DETAIL, { variables: { bookingId: id } })
@@ -126,6 +136,8 @@ const BookingDetailPage: React.FC = () => {
 
   useEffect(() => {
     setBooking(getMockBooking(id || 'unknown'));
+    setExistingReview(getBookingReview(id || 'unknown'));
+    setShowReviewForm(false);
   }, [id]);
 
   // ──────────────────────────────────────────
@@ -178,9 +190,30 @@ const BookingDetailPage: React.FC = () => {
   };
 
   const handleReview = () => {
-    // TODO: navigate ไปหน้า review เมื่อสร้างแล้ว
-    showSuccess('ฟีเจอร์รีวิวกำลังจะมาเร็วๆ นี้', 3000);
+    setShowReviewForm(true);
   };
+
+  const handleSubmitReview = async (review: BookingReviewData) => {
+    if (!id) return;
+    setIsSubmittingReview(true);
+    try {
+      // TODO: replace with actual mutation
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      saveStoredReview(id, review);
+      setExistingReview(review);
+      setShowReviewForm(false);
+      showSuccess('ขอบคุณสำหรับรีวิว!', 4000);
+    } catch {
+      showError('ไม่สามารถส่งรีวิวได้ กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  const showReviewSection =
+    booking.status === 'completed' && isPatient;
+  const canShowReviewPrompt = showReviewSection && !existingReview && !showReviewForm;
+  const canShowSubmittedReview = showReviewSection && !!existingReview && !showReviewForm;
 
   // ──────────────────────────────────────────
   // Loading / Error
@@ -190,6 +223,21 @@ const BookingDetailPage: React.FC = () => {
       <div className="min-h-screen bg-[#F6FAF9] flex items-center justify-center">
         <div className="w-10 h-10 border-3 border-gray-300 border-t-[#52B69A] rounded-full animate-spin" />
       </div>
+    );
+  }
+
+  if (showReviewForm && showReviewSection) {
+    return (
+      <>
+        <BookingReviewForm
+          caregiverName={booking.caregiver.fullName}
+          caregiverAvatarUrl={booking.caregiver.avatarUrl}
+          onBack={() => setShowReviewForm(false)}
+          onSubmit={handleSubmitReview}
+          isSubmitting={isSubmittingReview}
+        />
+        <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />
+      </>
     );
   }
 
@@ -313,11 +361,17 @@ const BookingDetailPage: React.FC = () => {
                 </div>
               )}
 
-              {/* ── Review Prompt Card (patient only, after completion) ── */}
-              {booking.status === 'completed' && isPatient && (
-                <ReviewPromptCard
+              {/* ── Review Prompt Card (patient only, after completion, no review yet) ── */}
+              {canShowReviewPrompt && (
+                <ReviewPromptCard onReview={handleReview} />
+              )}
+
+              {/* ── Submitted review (read-only) ── */}
+              {canShowSubmittedReview && existingReview && (
+                <SubmittedReviewCard
                   caregiverName={booking.caregiver.fullName}
-                  onReview={handleReview}
+                  caregiverAvatarUrl={booking.caregiver.avatarUrl}
+                  review={existingReview}
                 />
               )}
 
