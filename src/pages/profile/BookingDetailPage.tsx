@@ -35,7 +35,7 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
 };
 
 const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: string; bg: string; text: string }> = {
-  pending:          { label: 'รอผู้ดูแลตอบรับ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
+  pending:          { label: 'รอตอบรับ',          dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
   awaiting_payment: { label: 'รอชำระเงิน',      dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
   accepted:         { label: 'ยืนยันแล้ว',      dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
   rejected:         { label: 'ปฏิเสธแล้ว',      dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
