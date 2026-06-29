@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useQuery/*, useMutation*/ } from '@apollo/client/react';
 import { supabase } from '../../lib/supabase';
 import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
-import { GET_MY_BOOKING, GET_PAYMENT_BY_BOOKING/*, FLAG_BOOKING_DISPUTE*/ } from '../../graphql/queries';
+import { GET_MY_BOOKING/*, FLAG_BOOKING_DISPUTE*/ } from '../../graphql/queries';
 import { PaymentInfoSection } from '../../features/payment/PaymentInfoSection';
 import type { PaymentInfo } from '../../features/payment/PaymentInfoSection';
 
@@ -169,11 +169,7 @@ export default function BookingDetailPage() {
     return stateBooking;
   }, [data, stateBooking]);
 
-  const { data: paymentData } = useQuery(GET_PAYMENT_BY_BOOKING, {
-    variables: { bookingId: id },
-    skip: !id,
-  });
-  const payment = paymentData?.paymentByBooking as PaymentInfo | undefined;
+  const payment: PaymentInfo | undefined = undefined;
 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);

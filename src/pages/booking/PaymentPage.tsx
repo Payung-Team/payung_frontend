@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
-import { GET_MY_BOOKING, CREATE_PAYMENT, GET_PAYMENT_BY_BOOKING } from '../../graphql/queries';
+import { GET_MY_BOOKING, CREATE_PAYMENT, GET_PAYMENT_HISTORY } from '../../graphql/queries';
 import { loadOmiseJs } from '../../lib/omise-loader';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -292,19 +292,21 @@ export default function PaymentPage() {
   const [promptPayQrUrl, setPromptPayQrUrl] = useState<string | null>(null);
   const [promptPayActive, setPromptPayActive] = useState(false);
 
+  const [paymentId, setPaymentId] = useState<string | null>(null);
+
   // Poll every 3 s after PromptPay QR is generated
-  const { data: pollData } = useQuery(GET_PAYMENT_BY_BOOKING, {
-    variables: { bookingId: id },
-    skip: !promptPayActive || !id,
+  const { data: pollData } = useQuery(GET_PAYMENT_HISTORY, {
+    variables: { paymentId },
+    skip: !promptPayActive || !paymentId,
     pollInterval: 3000,
     fetchPolicy: 'network-only',
   });
 
   // Navigate to success as soon as webhook confirms payment
   useEffect(() => {
-    const payment = (pollData as { paymentByBooking?: { paymentStatus?: string } } | undefined)
-      ?.paymentByBooking;
-    if (payment?.paymentStatus === 'captured' && booking) {
+    const history = (pollData as { paymentHistory?: { toStatus?: string }[] } | undefined)?.paymentHistory;
+    const latestStatus = history?.[history.length - 1]?.toStatus;
+    if (latestStatus === 'captured' && booking) {
       navigate('/booking/success', {
         state: { ref: booking.id, caregiverName: booking.caregiverName, paid: true },
       });
@@ -408,17 +410,16 @@ export default function PaymentPage() {
           });
         }
       } else if (method === 'promptpay') {
-        // Backend creates PromptPay charge and returns QR URL
         const result = await createPayment({
-          variables: { input: { bookingId: id, paymentMethod: 'promptpay' } },
+          variables: { input: { bookingId: id, omiseToken: 'promptpay' } },
         });
-        const mutationData = result.data as { createPayment?: { qrCodeUrl?: string } } | null;
-        const qrUrl = mutationData?.createPayment?.qrCodeUrl;
-        if (qrUrl) {
-          setPromptPayQrUrl(qrUrl);
-          setPromptPayActive(true); // starts polling
+        const mutationData = result.data as { createPayment?: { id?: string } } | null;
+        const newPaymentId = mutationData?.createPayment?.id;
+        if (newPaymentId) {
+          setPaymentId(newPaymentId);
+          setPromptPayActive(true); // starts polling paymentHistory
         } else {
-          setPayError('ไม่ได้รับ QR Code จากระบบ กรุณาลองใหม่');
+          setPayError('ไม่ได้รับข้อมูลการชำระเงิน กรุณาลองใหม่');
         }
       }
     } catch (err: unknown) {
