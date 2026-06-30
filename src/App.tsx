@@ -19,6 +19,7 @@ import KycReviewListPage from './pages/admin/KycReviewListPage';
 import KycReviewDetailPage from './pages/admin/KycReviewDetailPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminCaregiverDetailPage from './pages/admin/AdminCaregiverDetailPage';
+import AdminPaymentsPage from './pages/admin/AdminPaymentsPage';
 import AdminLayout from './components/layout/AdminLayout';
 import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
@@ -28,8 +29,8 @@ import CaregiverBookingDetailPage from './pages/caregiver/CaregiverBookingDetail
 import CaregiverSettings from './pages/caregiver/CaregiverSettings';
 import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
 import BookingsPage from './pages/profile/BookingsPage';
-import BookingDetailPage from './pages/profile/BookingDetailPage';
 import BookingRequestPage from './pages/booking/BookingRequestPage';
+import BookingDetailPage from './pages/booking/BookingDetailPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
 import GuestRoute from './components/GuestRoute';
@@ -233,7 +234,6 @@ function App() {
               </RoleRoute>
             }
           />
-
           <Route path="/messages" element={<MessagePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
 
@@ -336,6 +336,7 @@ function App() {
           <Route path="/admin/kyc/:caregiverId" element={<KycReviewDetailPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/users/:caregiverId" element={<AdminCaregiverDetailPage />} />
+          <Route path="/admin/payments" element={<AdminPaymentsPage />} />
         </Route>
 
         {/* 404 - Not Found (must be last) */}

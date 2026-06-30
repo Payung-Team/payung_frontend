@@ -930,3 +930,120 @@ export const UPDATE_PASSWORD = gql`
     }
   }
 `;
+
+// TODO: Backend ยังไม่มี — stub สำหรับ SP-2 Complete Service
+export const GET_BOOKING_DETAIL = gql`
+  query GetBookingDetail($bookingId: ID!) {
+    bookingDetail(bookingId: $bookingId) {
+      id
+      status
+      paymentStatus
+      serviceType
+      serviceLocations
+      timeSlot
+      bookingDate
+      startTime
+      durationHours
+      estimatedCost
+      locationAddress
+      patient {
+        id
+        displayName
+        avatarUrl
+      }
+      caregiver {
+        id
+        fullName
+        avatarUrl
+      }
+      careRecipientName
+      acceptedAt
+      confirmedAt
+      completedAt
+      rejectionReason
+      createdAt
+    }
+  }
+`;
+
+// TODO: Backend ยังไม่มี — stub สำหรับ SP-2 Complete Service
+export const COMPLETE_SERVICE = gql`
+  mutation CompleteService($bookingId: ID!) {
+    completeService(bookingId: $bookingId) {
+      id
+      status
+      completedAt
+    }
+  }
+`;
+
+// TODO: Backend ยังไม่มี — stub สำหรับ SP-1 Admin Payments
+export const ADMIN_PENDING_TRANSFERS = gql`
+  query AdminPendingTransfers($page: Int, $limit: Int) {
+    adminPendingTransfers(page: $page, limit: $limit) {
+      items {
+        id
+        caregiverName
+        bookingId
+        amount
+        serviceDate
+        status
+      }
+      total
+      page
+      totalPages
+    }
+  }
+`;
+
+export const ADMIN_DISPUTES = gql`
+  query AdminDisputes($page: Int, $limit: Int) {
+    adminDisputes(page: $page, limit: $limit) {
+      items {
+        id
+        bookingId
+        patientName
+        caregiverName
+        reason
+        flaggedAt
+        paymentAmount
+        serviceType
+        bookingDate
+        disputeReason
+      }
+      total
+      page
+      totalPages
+    }
+  }
+`;
+
+export const ADMIN_REFUND_HISTORY = gql`
+  query AdminRefundHistory($page: Int, $limit: Int) {
+    adminRefundHistory(page: $page, limit: $limit) {
+      items {
+        id
+        bookingId
+        patientName
+        amount
+        resolution
+        resolvedBy
+        resolvedAt
+      }
+      total
+      page
+      totalPages
+    }
+  }
+`;
+
+export const RESOLVE_DISPUTE = gql`
+  mutation ResolveDispute($input: ResolveDisputeInput!) {
+    resolveDispute(input: $input) {
+      id
+      resolution
+      amount
+      resolvedAt
+    }
+  }
+`;
