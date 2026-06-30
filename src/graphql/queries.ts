@@ -736,6 +736,15 @@ export const GET_MY_BOOKING = gql`
         avatarUrl
         hourlyRate
       }
+      payment {
+        id
+        amount
+        currency
+        paymentMethod
+        paymentStatus
+        failureMessage
+        updatedAt
+      }
     }
   }
 `;

@@ -169,7 +169,7 @@ export default function BookingDetailPage() {
     return stateBooking;
   }, [data, stateBooking]);
 
-  const payment: PaymentInfo | undefined = undefined;
+  const payment = (data?.myBooking?.payment ?? undefined) as PaymentInfo | undefined;
 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -571,7 +571,7 @@ export default function BookingDetailPage() {
           {payment && (
             <PaymentInfoSection
               payment={payment}
-              onRetry={() => navigate('/checkout')}
+              onRetry={() => navigate(`/bookings/${booking.id}/payment`, { state: { booking } })}
             />
           )}
 

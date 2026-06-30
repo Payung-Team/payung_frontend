@@ -20,7 +20,7 @@ export interface PaymentStatusConfig {
 
 export const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, PaymentStatusConfig> = {
   pending:            { label: 'รอดำเนินการ',          dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309', icon: 'schedule',         iconColor: '#F59E0B' },
-  held:               { label: 'กันวงเงินแล้ว',        dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8', icon: 'lock',             iconColor: '#3B82F6' },
+  held:               { label: 'กันวงเงินแล้ว (Held)', dot: '#F59E0B', bg: '#FFFBEB', text: '#D97706', icon: 'lock',             iconColor: '#D97706' },
   captured:           { label: 'ตัดเงินแล้ว',          dot: '#10B981', bg: '#ECFDF5', text: '#047857', icon: 'check_circle',     iconColor: '#10B981' },
   transferred:        { label: 'โอนให้ผู้ดูแลแล้ว',   dot: '#6366F1', bg: '#EEF2FF', text: '#4338CA', icon: 'payments',         iconColor: '#6366F1' },
   voided:             { label: 'ยกเลิกการกันวงเงิน',  dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280', icon: 'cancel',           iconColor: '#9CA3AF' },
