@@ -313,6 +313,20 @@ export default function PaymentPage() {
     }
   }, [pollData, booking, navigate]);
 
+  // Restore existing pending PromptPay payment on mount/refresh
+  useEffect(() => {
+    const payment = (data as { myBooking?: { payment?: { id: string; paymentMethod: string; paymentStatus: string; qrCodeUrl?: string } } } | undefined)?.myBooking?.payment;
+    if (payment) {
+      if (payment.paymentMethod === 'promptpay' && payment.paymentStatus === 'pending') {
+        setPaymentId(payment.id);
+        setPromptPayActive(true);
+        if (payment.qrCodeUrl) {
+          setPromptPayQrUrl(payment.qrCodeUrl);
+        }
+      }
+    }
+  }, [data]);
+
   const cardType = detectCardType(cardNumber);
 
   if (loading && !booking) {
@@ -411,12 +425,16 @@ export default function PaymentPage() {
         }
       } else if (method === 'promptpay') {
         const result = await createPayment({
-          variables: { input: { bookingId: id, omiseToken: 'promptpay' } },
+          variables: { input: { bookingId: id, paymentMethod: 'promptpay' } },
         });
-        const mutationData = result.data as { createPayment?: { id?: string } } | null;
+        const mutationData = result.data as { createPayment?: { id?: string; qrCodeUrl?: string } } | null;
         const newPaymentId = mutationData?.createPayment?.id;
+        const qrCodeUrl = mutationData?.createPayment?.qrCodeUrl;
         if (newPaymentId) {
           setPaymentId(newPaymentId);
+          if (qrCodeUrl) {
+            setPromptPayQrUrl(qrCodeUrl);
+          }
           setPromptPayActive(true); // starts polling paymentHistory
         } else {
           setPayError('ไม่ได้รับข้อมูลการชำระเงิน กรุณาลองใหม่');

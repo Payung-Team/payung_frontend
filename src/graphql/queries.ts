@@ -743,6 +743,7 @@ export const GET_MY_BOOKING = gql`
         paymentMethod
         paymentStatus
         failureMessage
+        qrCodeUrl
         updatedAt
       }
     }
@@ -896,6 +897,7 @@ export const CREATE_PAYMENT = gql`
       omiseChargeId
       amount
       currency
+      qrCodeUrl
     }
   }
 `;
