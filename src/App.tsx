@@ -30,7 +30,7 @@ import CaregiverSettings from './pages/caregiver/CaregiverSettings';
 import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
 import BookingsPage from './pages/profile/BookingsPage';
 import BookingRequestPage from './pages/booking/BookingRequestPage';
-import BookingDetailPage from './pages/booking/BookingDetailPage';
+import BookingDetailPage from './pages/profile/BookingDetailPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
 import GuestRoute from './components/GuestRoute';

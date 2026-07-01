@@ -859,6 +859,18 @@ export const COMPLETE_BOOKING = gql`
   }
 `;
 
+export const CREATE_REVIEW = gql`
+  mutation CreateReview($input: CreateReviewInput!) {
+    createReview(input: $input) {
+      id
+      rating
+      comment
+      isAnonymous
+      createdAt
+    }
+  }
+`;
+
 export const ACCEPT_BOOKING = gql`
   mutation AcceptBooking($bookingId: ID!) {
     acceptBooking(bookingId: $bookingId) {

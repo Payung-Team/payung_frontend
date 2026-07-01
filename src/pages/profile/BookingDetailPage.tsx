@@ -1,9 +1,17 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { useQuery/*, useMutation*/ } from '@apollo/client/react';
+import { useQuery, useMutation } from '@apollo/client/react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../hooks/useToast';
+import { ToastContainer } from '../../components/ui/Toast';
+import { CompleteServiceModal } from '../../components/ui/CompleteServiceModal';
+import { ReviewPromptCard } from '../../components/ui/ReviewPromptCard';
+import { BookingReviewForm, type BookingReviewData } from '../../components/booking/BookingReviewForm';
+import { SubmittedReviewCard } from '../../components/booking/SubmittedReviewCard';
+import { getBookingReview, saveStoredReview } from '../../utils/bookingReview';
 import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
-import { GET_MY_BOOKING/*, FLAG_BOOKING_DISPUTE*/ } from '../../graphql/queries';
+import { GET_MY_BOOKING, COMPLETE_BOOKING, CREATE_REVIEW/*, FLAG_BOOKING_DISPUTE*/ } from '../../graphql/queries';
 import { PaymentInfoSection } from '../../features/payment/PaymentInfoSection';
 import type { PaymentInfo } from '../../features/payment/PaymentInfoSection';
 
@@ -154,11 +162,13 @@ export default function BookingDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
+  const { userRole } = useAuth();
+  const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
 
   // Navigation state used as instant initial data while query loads
   const stateBooking = location.state?.booking as ConfirmedBooking | undefined;
 
-  const { data, loading } = useQuery(GET_MY_BOOKING, {
+  const { data, loading, refetch } = useQuery(GET_MY_BOOKING, {
     variables: { id },
     skip: !id,
     fetchPolicy: 'cache-and-network',
@@ -181,6 +191,27 @@ export default function BookingDetailPage() {
   const [disputeReason, setDisputeReason] = useState('');
   const [isSubmittingDispute, setIsSubmittingDispute] = useState(false);
   const [disputeSubmitted, setDisputeSubmitted] = useState(false);
+
+  // Complete Service state
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [completeBooking] = useMutation(COMPLETE_BOOKING);
+
+  // Review state
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [existingReview, setExistingReview] = useState<BookingReviewData | null>(() =>
+    getBookingReview(id || 'unknown'),
+  );
+  const [createReview] = useMutation(CREATE_REVIEW);
+
+  useEffect(() => {
+    setExistingReview(getBookingReview(id || 'unknown'));
+    setShowReviewForm(false);
+  }, [id]);
+
+  const isPatient = userRole === 1;
+  const isCaregiver = userRole === 2;
 
   if (loading && !booking) {
     return (
@@ -243,6 +274,65 @@ export default function BookingDetailPage() {
 
   const hasHeldPayment = payment?.paymentStatus === 'held';
 
+  const isServiceDatePassed = (() => {
+    if (!dt?.date) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const serviceDate = new Date(dt.date);
+    serviceDate.setHours(0, 0, 0, 0);
+    return serviceDate <= today;
+  })();
+
+  // booking.status === 'accepted' here represents the backend 'confirmed' status (see mapGqlStatus)
+  const canComplete = booking.status === 'accepted' && hasHeldPayment && isServiceDatePassed && (isPatient || isCaregiver);
+
+  const handleCompleteService = async () => {
+    setIsCompleting(true);
+    try {
+      await completeBooking({ variables: { bookingId: booking.id } });
+      await refetch();
+      setShowCompleteModal(false);
+      showSuccess('บริการเสร็จสิ้น ขอบคุณ', 4000);
+    } catch {
+      showError('ไม่สามารถยืนยันบริการเสร็จสิ้นได้ กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+
+  const handleReview = () => {
+    setShowReviewForm(true);
+  };
+
+  const handleSubmitReview = async (review: BookingReviewData) => {
+    if (!id) return;
+    setIsSubmittingReview(true);
+    try {
+      await createReview({
+        variables: {
+          input: {
+            bookingId: id,
+            rating: review.rating,
+            comment: review.text || undefined,
+            isAnonymous: false,
+          },
+        },
+      });
+      saveStoredReview(id, review);
+      setExistingReview(review);
+      setShowReviewForm(false);
+      showSuccess('ขอบคุณสำหรับรีวิว!', 4000);
+    } catch {
+      showError('ไม่สามารถส่งรีวิวได้ กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  const showReviewSection = booking.status === 'completed' && isPatient;
+  const canShowReviewPrompt = showReviewSection && !existingReview && !showReviewForm;
+  const canShowSubmittedReview = showReviewSection && !!existingReview && !showReviewForm;
+
   const handleConfirmCancel = async () => {
     if (isCancelling) return;
     setIsCancelling(true);
@@ -283,6 +373,21 @@ export default function BookingDetailPage() {
       setIsSubmittingDispute(false);
     }
   };
+
+  if (showReviewForm && showReviewSection) {
+    return (
+      <>
+        <BookingReviewForm
+          caregiverName={booking.caregiverName}
+          caregiverAvatarUrl={booking.caregiverAvatarUrl ?? undefined}
+          onBack={() => setShowReviewForm(false)}
+          onSubmit={handleSubmitReview}
+          isSubmitting={isSubmittingReview}
+        />
+        <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />
+      </>
+    );
+  }
 
   return (
     <>
@@ -575,6 +680,38 @@ export default function BookingDetailPage() {
             />
           )}
 
+          {/* Complete Service button */}
+          {canComplete && (
+            <div style={{ marginTop: 24 }}>
+              <button
+                type="button"
+                onClick={() => setShowCompleteModal(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', height: 50, background: '#009265', border: 'none', boxShadow: '0px 4px 12px rgba(0,146,101,0.25)', borderRadius: 12, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 15, fontWeight: 700, color: '#FFFFFF', cursor: 'pointer' }}
+              >
+                <span className="material-icons" style={{ fontSize: 18 }}>task_alt</span>
+                ยืนยันบริการเสร็จสิ้น
+              </button>
+            </div>
+          )}
+
+          {/* Review Prompt Card (patient only, after completion, no review yet) */}
+          {canShowReviewPrompt && (
+            <div style={{ marginTop: 24 }}>
+              <ReviewPromptCard onReview={handleReview} />
+            </div>
+          )}
+
+          {/* Submitted review (read-only) */}
+          {canShowSubmittedReview && existingReview && (
+            <div style={{ marginTop: 24 }}>
+              <SubmittedReviewCard
+                caregiverName={booking.caregiverName}
+                caregiverAvatarUrl={booking.caregiverAvatarUrl ?? undefined}
+                review={existingReview}
+              />
+            </div>
+          )}
+
           {/* Pay button (awaiting_payment status) */}
           {booking.status === 'awaiting_payment' && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 24 }}>
@@ -643,6 +780,18 @@ export default function BookingDetailPage() {
 
         </div>
       </div>
+
+      {/* Complete Service Confirm Modal */}
+      <CompleteServiceModal
+        isOpen={showCompleteModal}
+        isLoading={isCompleting}
+        amount={total}
+        onClose={() => setShowCompleteModal(false)}
+        onConfirm={handleCompleteService}
+      />
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />
     </>
   );
 }
