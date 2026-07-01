@@ -707,10 +707,6 @@ const CAREGIVER_BOOKING_SUMMARY_FIELDS = `
     avatarUrl
   }
   careRecipientName
-  patientName
-  dayOfContactName
-  dayOfContactPhone
-  dayOfContactRelationship
   confirmedAt
   rejectionReason
   createdAt
@@ -732,10 +728,6 @@ export const GET_MY_BOOKING = gql`
       notes
       estimatedCost
       careRecipientName
-      patientName
-      dayOfContactName
-      dayOfContactPhone
-      dayOfContactRelationship
       confirmedAt
       createdAt
       caregiver {
@@ -743,6 +735,16 @@ export const GET_MY_BOOKING = gql`
         fullName
         avatarUrl
         hourlyRate
+      }
+      payment {
+        id
+        amount
+        currency
+        paymentMethod
+        paymentStatus
+        failureMessage
+        qrCodeUrl
+        updatedAt
       }
     }
   }
@@ -851,7 +853,7 @@ export const REQUEST_PASSWORD_RESET = gql`
 export const COMPLETE_BOOKING = gql`
   mutation CompleteBooking($bookingId: ID!) {
     completeBooking(bookingId: $bookingId) {
-      id
+      bookingId
       status
     }
   }
@@ -900,22 +902,23 @@ export const CREATE_PAYMENT = gql`
   }
 `;
 
-export const GET_PAYMENT_BY_BOOKING = gql`
-  query GetPaymentByBooking($bookingId: ID!) {
-    paymentByBooking(bookingId: $bookingId) {
+export const GET_PAYMENT_HISTORY = gql`
+  query GetPaymentHistory($paymentId: ID!) {
+    paymentHistory(paymentId: $paymentId) {
       id
-      paymentStatus
-      omiseChargeId
-      amount
-      currency
-      qrCodeUrl
+      paymentId
+      fromStatus
+      toStatus
+      reason
+      changedBy
+      createdAt
     }
   }
 `;
 
 export const FLAG_BOOKING_DISPUTE = gql`
   mutation FlagBookingDispute($bookingId: ID!, $reason: String!) {
-    flagBookingDispute(bookingId: $bookingId, reason: $reason) {
+    flagBookingDispute(input: { bookingId: $bookingId, reason: $reason }) {
       id
       disputeStatus
     }

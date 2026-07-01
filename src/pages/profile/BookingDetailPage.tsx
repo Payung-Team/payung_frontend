@@ -3,7 +3,9 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useQuery/*, useMutation*/ } from '@apollo/client/react';
 import { supabase } from '../../lib/supabase';
 import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
-import { GET_MY_BOOKING, GET_PAYMENT_BY_BOOKING/*, FLAG_BOOKING_DISPUTE*/ } from '../../graphql/queries';
+import { GET_MY_BOOKING/*, FLAG_BOOKING_DISPUTE*/ } from '../../graphql/queries';
+import { PaymentInfoSection } from '../../features/payment/PaymentInfoSection';
+import type { PaymentInfo } from '../../features/payment/PaymentInfoSection';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -33,7 +35,7 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
 };
 
 const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: string; bg: string; text: string }> = {
-  pending:          { label: 'รอผู้ดูแลตอบรับ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
+  pending:          { label: 'รอตอบรับ',          dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
   awaiting_payment: { label: 'รอชำระเงิน',      dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
   accepted:         { label: 'ยืนยันแล้ว',      dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
   rejected:         { label: 'ปฏิเสธแล้ว',      dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
@@ -167,11 +169,7 @@ export default function BookingDetailPage() {
     return stateBooking;
   }, [data, stateBooking]);
 
-  const { data: paymentData } = useQuery(GET_PAYMENT_BY_BOOKING, {
-    variables: { bookingId: id },
-    skip: !id,
-  });
-  const payment = paymentData?.paymentByBooking as { id: string; paymentStatus: string; amount: number } | undefined;
+  const payment = (data?.myBooking?.payment ?? undefined) as PaymentInfo | undefined;
 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -568,6 +566,14 @@ export default function BookingDetailPage() {
               </p>
             </div>
           </div>
+
+          {/* Payment info card */}
+          {payment && (
+            <PaymentInfoSection
+              payment={payment}
+              onRetry={() => navigate(`/bookings/${booking.id}/payment`, { state: { booking } })}
+            />
+          )}
 
           {/* Pay button (awaiting_payment status) */}
           {booking.status === 'awaiting_payment' && (

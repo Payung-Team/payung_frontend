@@ -99,7 +99,7 @@ function computeEndTime(startTime: string, durationHours: number): string {
 
 function mapGqlStatus(s: string): ConfirmedBooking['status'] {
   const v = s.toLowerCase();
-  if (v === 'awaiting_payment' || v === 'accepted') return 'awaiting_payment';
+  if (v === 'accepted') return 'awaiting_payment';
   if (v === 'confirmed') return 'accepted';
   if (v === 'rejected' || v === 'declined') return 'rejected';
   if (v === 'cancelled') return 'cancelled';
