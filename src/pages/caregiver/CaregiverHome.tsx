@@ -136,6 +136,21 @@ function toAvatarGradient(name: string): string {
   return AVATAR_GRADIENTS[code % AVATAR_GRADIENTS.length];
 }
 
+const SKILL_TRANSLATIONS: Record<string, string> = {
+  mobility: 'ช่วยเคลื่อนไหว',
+  medication: 'ดูแลยา',
+  bathing: 'อาบน้ำ / สุขอนามัย',
+  cooking: 'ทำอาหาร',
+  companionship: 'เป็นเพื่อนคุย',
+  wound_care: 'ดูแลแผล',
+  physical_therapy: 'กายภาพบำบัด',
+  physiotherapy: 'กายภาพบำบัด',
+  dementia_care: 'ดูแลสมองเสื่อม',
+  general_care: 'ดูแลทั่วไป',
+  bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
+  companion: 'เป็นเพื่อน/พูดคุย',
+};
+
 // ─── Sub-components ───────────────────────────────────────────────────────
 
 interface HeroCardProps {
@@ -511,6 +526,7 @@ const CaregiverHome: React.FC = () => {
     reviews.length > 0
       ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
       : null;
+  const translatedSkills = (profile?.skills ?? []).map(s => SKILL_TRANSLATIONS[s] ?? s);
 
   const handleToggleAvailability = async () => {
     if (!canToggle) return;
@@ -568,71 +584,112 @@ const CaregiverHome: React.FC = () => {
             <ProfileStatusCard profile={profile} completeness={completeness} />
           )}
 
-          {/* Reviews section */}
-          {!isLoading && !reviewsLoading && (
+          {/* Public profile section */}
+          {!isLoading && profile && (
             <section>
-              <h2 className="text-[15px] font-bold text-[#1A1A1A] mb-3">รีวิวจากผู้ว่าจ้าง</h2>
-              <div className="bg-white rounded-2xl p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] flex flex-col gap-4">
-                {reviews.length === 0 ? (
-                  <p className="text-[13px] text-[#8A8C8E]">ยังไม่มีรีวิว</p>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[36px] font-bold text-[#1A1A1A]" style={{ fontFamily: "'Inter', sans-serif" }}>
-                        {avgRating !== null ? avgRating.toFixed(1) : '—'}
-                      </span>
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-0.5">
-                          {[1, 2, 3, 4, 5].map(s => (
-                            <span
-                              key={s}
-                              className="material-icons text-[18px]"
-                              style={{ color: avgRating !== null && s <= Math.round(avgRating) ? '#F59E0B' : '#D1D5DB' }}
-                            >
-                              star
-                            </span>
-                          ))}
-                        </div>
-                        <span className="text-[12px] text-[#8A8C8E]">{reviewTotal} รีวิว</span>
-                      </div>
-                    </div>
-                    <RatingDistribution reviews={reviews} />
-                    <div className="flex flex-col gap-4">
-                      {reviews.map((br, idx) => (
-                        <div key={br.id}>
-                          {idx > 0 && <div className="h-px bg-gray-100 mb-4" />}
-                          <div className="flex items-start gap-3">
-                            <div
-                              className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-[13px]"
-                              style={{ background: toAvatarGradient(br.reviewerName) }}
-                            >
-                              {br.reviewerName.charAt(0)}
-                            </div>
-                            <div className="flex-1 flex flex-col gap-1">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[13px] font-bold text-[#1A1A1A]">{br.reviewerName}</span>
-                                <span className="text-[11px] text-[#8A8C8E]">{formatTimeAgo(br.createdAt)}</span>
-                              </div>
-                              <div className="flex items-center gap-0.5">
-                                {[1, 2, 3, 4, 5].map(s => (
-                                  <span
-                                    key={s}
-                                    className="material-icons text-[13px]"
-                                    style={{ color: s <= br.rating ? '#FFA92C' : '#D1D5DB' }}
-                                  >
-                                    star
-                                  </span>
-                                ))}
-                              </div>
-                              {br.comment && (
-                                <p className="text-[13px] text-[#575859]">{br.comment}</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-[15px] font-bold text-[#1A1A1A]">โปรไฟล์สาธารณะ</h2>
+                <Link
+                  to="/caregiver/edit-profile"
+                  className="text-[13px] font-semibold text-[#52B69A] hover:opacity-75 transition-opacity no-underline"
+                >
+                  แก้ไข
+                </Link>
+              </div>
+              <div className="flex flex-col gap-3">
+                {/* Card: เกี่ยวกับฉัน */}
+                <div className="bg-white rounded-2xl p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <Icon name="person" size="small" color="#52B69A" />
+                    <span className="text-[13px] font-bold text-[#1A1A1A]">เกี่ยวกับฉัน</span>
+                  </div>
+                  <p className="text-[13px] text-[#575859] leading-[21px]">
+                    {profile.bio || 'ยังไม่มีข้อมูล'}
+                  </p>
+                  {translatedSkills.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {translatedSkills.map(skill => (
+                        <span
+                          key={skill}
+                          className="text-[12px] font-semibold text-[#3A9A7E] bg-[#E6F5ED] rounded-full px-3 py-1"
+                        >
+                          {skill}
+                        </span>
                       ))}
                     </div>
-                  </>
+                  )}
+                </div>
+
+                {/* Card: คะแนนรีวิว */}
+                {!reviewsLoading && (
+                  <div className="bg-white rounded-2xl p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] flex flex-col gap-4">
+                    <div className="flex items-center gap-2">
+                      <Icon name="star" size="small" color="#52B69A" />
+                      <span className="text-[13px] font-bold text-[#1A1A1A]">คะแนนรีวิว</span>
+                      <span className="text-[11px] text-[#8A8C8E]">จากผู้ป่วยที่ใช้บริการ</span>
+                    </div>
+                    {reviews.length === 0 ? (
+                      <p className="text-[13px] text-[#8A8C8E]">ยังไม่มีรีวิว</p>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[36px] font-bold text-[#1A1A1A]" style={{ fontFamily: "'Inter', sans-serif" }}>
+                            {avgRating !== null ? avgRating.toFixed(1) : '—'}
+                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-0.5">
+                              {[1, 2, 3, 4, 5].map(s => (
+                                <span
+                                  key={s}
+                                  className="material-icons text-[18px]"
+                                  style={{ color: avgRating !== null && s <= Math.round(avgRating) ? '#F59E0B' : '#D1D5DB' }}
+                                >
+                                  star
+                                </span>
+                              ))}
+                            </div>
+                            <span className="text-[12px] text-[#8A8C8E]">{reviewTotal} รีวิว</span>
+                          </div>
+                        </div>
+                        <RatingDistribution reviews={reviews} />
+                        <div className="flex flex-col gap-4">
+                          {reviews.map((br, idx) => (
+                            <div key={br.id}>
+                              {idx > 0 && <div className="h-px bg-gray-100 mb-4" />}
+                              <div className="flex items-start gap-3">
+                                <div
+                                  className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-[13px]"
+                                  style={{ background: toAvatarGradient(br.reviewerName) }}
+                                >
+                                  {br.reviewerName.charAt(0)}
+                                </div>
+                                <div className="flex-1 flex flex-col gap-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[13px] font-bold text-[#1A1A1A]">{br.reviewerName}</span>
+                                    <span className="text-[11px] text-[#8A8C8E]">{formatTimeAgo(br.createdAt)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-0.5">
+                                    {[1, 2, 3, 4, 5].map(s => (
+                                      <span
+                                        key={s}
+                                        className="material-icons text-[13px]"
+                                        style={{ color: s <= br.rating ? '#FFA92C' : '#D1D5DB' }}
+                                      >
+                                        star
+                                      </span>
+                                    ))}
+                                  </div>
+                                  {br.comment && (
+                                    <p className="text-[13px] text-[#575859]">{br.comment}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             </section>
