@@ -871,6 +871,23 @@ export const CREATE_REVIEW = gql`
   }
 `;
 
+export const CAREGIVER_REVIEWS = gql`
+  query CaregiverReviews($input: CaregiverReviewsInput!) {
+    caregiverReviews(input: $input) {
+      data {
+        id
+        rating
+        comment
+        reviewerName
+        isAnonymous
+        isVisible
+        createdAt
+      }
+      pagination { page limit total totalPages }
+    }
+  }
+`;
+
 export const ACCEPT_BOOKING = gql`
   mutation AcceptBooking($bookingId: ID!) {
     acceptBooking(bookingId: $bookingId) {

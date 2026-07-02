@@ -607,7 +607,20 @@ export default function BookingDetailPage() {
               {booking.caregiverId && booking.caregiverName !== '(รอจับคู่)' && (
                 <button
                   type="button"
-                  onClick={() => navigate(`/caregivers/${booking.caregiverId}`)}
+                  onClick={() => navigate(`/caregivers/${booking.caregiverId}`, {
+                    state: {
+                      caregiver: {
+                        id: booking.caregiverId,
+                        fullName: booking.caregiverName,
+                        avatarUrl: booking.caregiverAvatarUrl,
+                        hourlyRate: booking.caregiverHourlyRate,
+                        reviewCount: 0,
+                        skills: [],
+                        province: '',
+                        district: '',
+                      },
+                    },
+                  })}
                   style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 32, padding: '0 12px', background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 6, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, fontWeight: 600, color: '#575859', cursor: 'pointer', flexShrink: 0 }}
                 >
                   ดูโปรไฟล์

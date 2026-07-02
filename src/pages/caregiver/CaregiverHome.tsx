@@ -7,8 +7,11 @@ import {
   SET_CAREGIVER_SEARCHABLE,
   GET_UNREAD_COUNT,
   GET_CAREGIVER_BOOKINGS,
+  CAREGIVER_REVIEWS,
 } from '../../graphql/queries';
 import Skeleton from '../../components/ui/Skeleton';
+import { RatingDistribution } from '../../components/ui/RatingDistribution';
+import { formatTimeAgo } from '../../utils/formatTimeAgo';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { Icon } from '../../components/ui/Icon';
 import { ToastContainer } from '../../components/ui/Toast';
@@ -47,6 +50,23 @@ interface CaregiverData {
 
 interface UnreadCountData {
   unreadCount: number;
+}
+
+interface BackendReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  reviewerName: string;
+  isAnonymous: boolean;
+  isVisible: boolean;
+  createdAt: string;
+}
+
+interface CaregiverReviewsData {
+  caregiverReviews: {
+    data: BackendReview[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -101,6 +121,20 @@ function getInitials(name: string): string {
 
 const cardBase =
   'bg-white rounded-2xl p-4 border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.05)] flex flex-col gap-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)]';
+
+const AVATAR_GRADIENTS = [
+  'linear-gradient(135deg, #E17055 0%, #FAB1A0 100%)',
+  'linear-gradient(135deg, #52B69A 0%, #76C893 100%)',
+  'linear-gradient(135deg, #3B5BDB 0%, #74C0FC 100%)',
+  'linear-gradient(135deg, #F08C00 0%, #FCC419 100%)',
+  'linear-gradient(135deg, #7950F2 0%, #DA77F2 100%)',
+  'linear-gradient(135deg, #0CA678 0%, #63E6BE 100%)',
+];
+
+function toAvatarGradient(name: string): string {
+  const code = name.charCodeAt(0) || 0;
+  return AVATAR_GRADIENTS[code % AVATAR_GRADIENTS.length];
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────
 
@@ -442,6 +476,15 @@ const CaregiverHome: React.FC = () => {
     fetchPolicy: 'cache-and-network',
     pollInterval: 30_000,
   });
+
+  const { data: reviewsData, loading: reviewsLoading } = useQuery<CaregiverReviewsData>(
+    CAREGIVER_REVIEWS,
+    {
+      variables: { input: { caregiverId: caregiverData?.myCaregiverProfile?.id ?? '', limit: 50, page: 1 } },
+      skip: !caregiverData?.myCaregiverProfile?.id,
+    },
+  );
+
   const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
 
   const [optimisticSearchable, setOptimisticSearchable] = useState<boolean | null>(null);
@@ -460,6 +503,14 @@ const CaregiverHome: React.FC = () => {
   const canToggle = isVerified && !togglingAvail;
   const displayName = profile?.fullName || data?.me?.displayName || 'ผู้ดูแล';
   const isLoading = loading || caregiverLoading;
+
+  const allFetched = reviewsData?.caregiverReviews?.data ?? [];
+  const reviews = allFetched.filter(r => r.isVisible);
+  const reviewTotal = reviewsData?.caregiverReviews?.pagination?.total ?? 0;
+  const avgRating =
+    reviews.length > 0
+      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+      : null;
 
   const handleToggleAvailability = async () => {
     if (!canToggle) return;
@@ -515,6 +566,76 @@ const CaregiverHome: React.FC = () => {
             <Skeleton height={90} borderRadius={20} />
           ) : profile && (
             <ProfileStatusCard profile={profile} completeness={completeness} />
+          )}
+
+          {/* Reviews section */}
+          {!isLoading && !reviewsLoading && (
+            <section>
+              <h2 className="text-[15px] font-bold text-[#1A1A1A] mb-3">รีวิวจากผู้ว่าจ้าง</h2>
+              <div className="bg-white rounded-2xl p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] flex flex-col gap-4">
+                {reviews.length === 0 ? (
+                  <p className="text-[13px] text-[#8A8C8E]">ยังไม่มีรีวิว</p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[36px] font-bold text-[#1A1A1A]" style={{ fontFamily: "'Inter', sans-serif" }}>
+                        {avgRating !== null ? avgRating.toFixed(1) : '—'}
+                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map(s => (
+                            <span
+                              key={s}
+                              className="material-icons text-[18px]"
+                              style={{ color: avgRating !== null && s <= Math.round(avgRating) ? '#F59E0B' : '#D1D5DB' }}
+                            >
+                              star
+                            </span>
+                          ))}
+                        </div>
+                        <span className="text-[12px] text-[#8A8C8E]">{reviewTotal} รีวิว</span>
+                      </div>
+                    </div>
+                    <RatingDistribution reviews={reviews} />
+                    <div className="flex flex-col gap-4">
+                      {reviews.map((br, idx) => (
+                        <div key={br.id}>
+                          {idx > 0 && <div className="h-px bg-gray-100 mb-4" />}
+                          <div className="flex items-start gap-3">
+                            <div
+                              className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-[13px]"
+                              style={{ background: toAvatarGradient(br.reviewerName) }}
+                            >
+                              {br.reviewerName.charAt(0)}
+                            </div>
+                            <div className="flex-1 flex flex-col gap-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[13px] font-bold text-[#1A1A1A]">{br.reviewerName}</span>
+                                <span className="text-[11px] text-[#8A8C8E]">{formatTimeAgo(br.createdAt)}</span>
+                              </div>
+                              <div className="flex items-center gap-0.5">
+                                {[1, 2, 3, 4, 5].map(s => (
+                                  <span
+                                    key={s}
+                                    className="material-icons text-[13px]"
+                                    style={{ color: s <= br.rating ? '#FFA92C' : '#D1D5DB' }}
+                                  >
+                                    star
+                                  </span>
+                                ))}
+                              </div>
+                              {br.comment && (
+                                <p className="text-[13px] text-[#575859]">{br.comment}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
           )}
 
           {/* Quick actions */}

@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import { useQuery } from '@apollo/client/react';
 import { useBooking } from '../../context/BookingContext';
+import { CAREGIVER_REVIEWS } from '../../graphql/queries';
+import { RatingDistribution } from '../../components/ui/RatingDistribution';
+import { formatTimeAgo } from '../../utils/formatTimeAgo';
 import BookingConfirmModal from '../../components/ui/BookingConfirmModal';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
@@ -84,26 +88,43 @@ function buildAvailMatrix(
   return matrix;
 }
 
-// Demo data ────────────────────────────────────────────────────────────────────
+interface BackendReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  reviewerName: string;
+  isAnonymous: boolean;
+  isVisible: boolean;
+  createdAt: string;
+}
 
-const DEMO_REVIEWS: Review[] = [
-  {
-    id: '1',
-    reviewerName: 'นภัสวรรณ',
-    rating: 5,
-    timeAgo: '2 สัปดาห์ก่อน',
-    text: 'ใส่ใจดีมาก คุณยายชอบเป็นพิเศษ ตรงต่อเวลา ทำได้ตามที่ต้องการทุกอย่าง',
-    avatarGradient: 'linear-gradient(135deg, #E17055 0%, #FAB1A0 100%)',
-  },
-  {
-    id: '2',
-    reviewerName: 'ธีระ',
-    rating: 4.5,
-    timeAgo: '1 เดือนก่อน',
-    text: 'มีความรู้ด้านกายภาพดี ช่วยให้คุณพ่อขยับตัวได้สะดวกขึ้นมาก',
-    avatarGradient: 'linear-gradient(135deg, #52B69A 0%, #76C893 100%)',
-  },
+interface CaregiverReviewsData {
+  caregiverReviews: {
+    data: BackendReview[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  };
+}
+
+const AVATAR_GRADIENTS = [
+  'linear-gradient(135deg, #E17055 0%, #FAB1A0 100%)',
+  'linear-gradient(135deg, #52B69A 0%, #76C893 100%)',
+  'linear-gradient(135deg, #3B5BDB 0%, #74C0FC 100%)',
+  'linear-gradient(135deg, #F08C00 0%, #FCC419 100%)',
+  'linear-gradient(135deg, #7950F2 0%, #DA77F2 100%)',
+  'linear-gradient(135deg, #0CA678 0%, #63E6BE 100%)',
 ];
+
+function toReview(br: BackendReview): Review {
+  const code = br.reviewerName.charCodeAt(0) || 0;
+  return {
+    id: br.id,
+    reviewerName: br.reviewerName,
+    rating: br.rating,
+    timeAgo: formatTimeAgo(br.createdAt),
+    text: br.comment ?? '',
+    avatarGradient: AVATAR_GRADIENTS[code % AVATAR_GRADIENTS.length],
+  };
+}
 
 const EMPTY_AVAIL: boolean[][] = [
   [false, false, false, false, false, false, false],
@@ -232,18 +253,40 @@ const CaregiverProfilePage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [avail, setAvail] = useState<boolean[][]>(EMPTY_AVAIL);
+  const [completedBookingCount, setCompletedBookingCount] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const [allReviews, setAllReviews] = useState<BackendReview[]>([]);
+
+  const { data: reviewsData, loading: reviewsLoading } = useQuery<CaregiverReviewsData>(
+    CAREGIVER_REVIEWS,
+    { variables: { input: { caregiverId: caregiverId!, limit: 10, page } }, skip: !caregiverId },
+  );
+
+  const reviewPagination = reviewsData?.caregiverReviews?.pagination;
+  const reviewTotal = reviewPagination?.total ?? 0;
+  const totalPages = reviewPagination?.totalPages ?? 1;
+  const visibleReviews = allReviews.filter(r => r.isVisible);
 
   useEffect(() => {
     if (!caregiverId) return;
     const apiBase = import.meta.env.VITE_GRAPHQL_URL?.replace('/graphql', '') ?? '';
     fetch(`${apiBase}/api/v1/caregivers/${caregiverId}/public`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { availability?: { day: number; slots: string[] }[] } | null) => {
+      .then((data: { availability?: { day: number; slots: string[] }[]; completed_booking_count?: number } | null) => {
         if (data?.availability) setAvail(buildAvailMatrix(data.availability));
+        if (data?.completed_booking_count !== undefined) setCompletedBookingCount(data.completed_booking_count);
       })
       .catch(() => undefined);
   }, [caregiverId]);
 
+  useEffect(() => {
+    if (reviewsData?.caregiverReviews?.data) {
+      const newReviews = reviewsData.caregiverReviews.data;
+      setAllReviews(prev => (page === 1 ? newReviews : [...prev, ...newReviews]));
+    }
+  }, [reviewsData, page]);
+
+  // TODO: fetch caregiver summary by ID when location.state is absent
   const cg = location.state?.caregiver as CaregiverSummary | undefined;
 
   const fullName = cg?.fullName ?? '—';
@@ -419,7 +462,7 @@ const CaregiverProfilePage: React.FC = () => {
                       <span className="inline-flex items-center gap-[5px]">
                         <span className="material-icons" style={{ fontSize: 15, color: 'rgba(255,255,255,0.8)' }}>event_available</span>
                         <span className="text-white font-semibold num" style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, lineHeight: '20px' }}>
-                          จอง {reviewCount > 0 ? reviewCount * 2 : 0} ครั้ง
+                          จอง {completedBookingCount ?? 0} ครั้ง
                         </span>
                       </span>
                       <span className="inline-flex items-center gap-[5px]">
@@ -469,29 +512,45 @@ const CaregiverProfilePage: React.FC = () => {
 
               {/* Reviews */}
               <div className="flex flex-col" style={{ padding: '22px 28px' }}>
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2">
-                    <span className="material-icons" style={{ fontSize: 17, color: '#52B69A' }}>chat</span>
-                    <span className="font-bold text-[#1A1A1A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, lineHeight: '21px' }}>รีวิวจากผู้ว่าจ้าง</span>
-                  </div>
-                  {reviewCount > 0 && (
-                    <button
-                      type="button"
-                      className="font-semibold hover:opacity-75 transition-opacity cursor-pointer"
-                      style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#52B69A', lineHeight: '20px' }}
-                    >
-                      ดูรีวิวทั้งหมด ({reviewCount})
-                    </button>
-                  )}
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="material-icons" style={{ fontSize: 17, color: '#52B69A' }}>chat</span>
+                  <span className="font-bold text-[#1A1A1A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, lineHeight: '21px' }}>
+                    รีวิวจากผู้ว่าจ้าง
+                    {reviewTotal > 0 && (
+                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E', fontWeight: 400, marginLeft: 6 }}>
+                        ({reviewTotal} รีวิว)
+                      </span>
+                    )}
+                  </span>
                 </div>
-                <div className="flex flex-col gap-[18px] mt-4">
-                  {DEMO_REVIEWS.map((review, idx) => (
-                    <React.Fragment key={review.id}>
-                      {idx > 0 && <div style={{ height: 1, background: '#F0F1F3', width: '100%' }} />}
-                      <ReviewItem review={review} />
-                    </React.Fragment>
-                  ))}
-                </div>
+                {reviewsLoading && visibleReviews.length === 0 ? (
+                  <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E' }}>กำลังโหลด...</p>
+                ) : visibleReviews.length === 0 ? (
+                  <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E' }}>ยังไม่มีรีวิว</p>
+                ) : (
+                  <>
+                    <RatingDistribution reviews={visibleReviews} />
+                    <div className="flex flex-col gap-[18px] mt-4">
+                      {visibleReviews.map((br, idx) => (
+                        <React.Fragment key={br.id}>
+                          {idx > 0 && <div style={{ height: 1, background: '#F0F1F3', width: '100%' }} />}
+                          <ReviewItem review={toReview(br)} />
+                        </React.Fragment>
+                      ))}
+                    </div>
+                    {page < totalPages && (
+                      <button
+                        type="button"
+                        onClick={() => setPage(p => p + 1)}
+                        disabled={reviewsLoading}
+                        className="mt-4 w-full font-semibold hover:opacity-75 transition-opacity cursor-pointer disabled:opacity-50"
+                        style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#52B69A', lineHeight: '20px' }}
+                      >
+                        {reviewsLoading ? 'กำลังโหลด...' : 'โหลดเพิ่ม'}
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -578,7 +637,7 @@ const CaregiverProfilePage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#8A8C8E', lineHeight: '18px' }}>งานที่รับ</span>
                   <span className="font-semibold num" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#1A1A1A', lineHeight: '18px' }}>
-                    {reviewCount > 0 ? reviewCount * 2 : '—'} ครั้ง
+                    {completedBookingCount !== null ? completedBookingCount : '—'} ครั้ง
                   </span>
                 </div>
               </div>
