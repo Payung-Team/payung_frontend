@@ -717,6 +717,8 @@ export const GET_MY_BOOKING = gql`
     myBooking(id: $id) {
       id
       status
+      disputeStatus
+      disputeReason
       serviceType
       timeSlot
       startTime

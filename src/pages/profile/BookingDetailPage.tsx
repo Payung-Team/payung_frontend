@@ -11,7 +11,7 @@ import { BookingReviewForm, type BookingReviewData } from '../../components/book
 import { SubmittedReviewCard } from '../../components/booking/SubmittedReviewCard';
 import { getBookingReview, saveStoredReview } from '../../utils/bookingReview';
 import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
-import { GET_MY_BOOKING, COMPLETE_BOOKING, CREATE_REVIEW/*, FLAG_BOOKING_DISPUTE*/ } from '../../graphql/queries';
+import { GET_MY_BOOKING, COMPLETE_BOOKING, CREATE_REVIEW, FLAG_BOOKING_DISPUTE } from '../../graphql/queries';
 import { PaymentInfoSection } from '../../features/payment/PaymentInfoSection';
 import type { PaymentInfo } from '../../features/payment/PaymentInfoSection';
 
@@ -196,6 +196,7 @@ export default function BookingDetailPage() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [completeBooking] = useMutation(COMPLETE_BOOKING);
+  const [flagDispute] = useMutation(FLAG_BOOKING_DISPUTE);
 
   // Review state
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -261,14 +262,17 @@ export default function BookingDetailPage() {
   const cgInitial = booking.caregiverName?.charAt(0) ?? '?';
   const isCancellable = CANCELLABLE_STATUSES.has(booking.status);
   const caregiverDisplayName = booking.caregiverName === '(รอจับคู่)' ? 'ผู้ดูแล' : booking.caregiverName;
+  const disputeStatus = (data?.myBooking?.disputeStatus ?? 'none') as string;
+  const isDisputed = disputeStatus === 'flagged' || disputeStatus === 'resolved' || disputeSubmitted;
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, opts?: { navigateAway?: boolean }) => {
+    const navigateAway = opts?.navigateAway ?? true;
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToastMessage(msg);
     setToastVisible(true);
     toastTimer.current = setTimeout(() => {
       setToastVisible(false);
-      setTimeout(() => navigate('/bookings'), 300);
+      if (navigateAway) setTimeout(() => navigate('/bookings'), 300);
     }, 2500);
   };
 
@@ -352,23 +356,18 @@ export default function BookingDetailPage() {
     }
   };
 
-  // TODO: uncomment เมื่อ feature/PYG-287-disputes merge เข้า tina
-  // const [flagDispute] = useMutation(FLAG_BOOKING_DISPUTE);
-
   const handleSubmitDispute = async () => {
     if (isSubmittingDispute || disputeReason.trim().length < 20) return;
     setIsSubmittingDispute(true);
     try {
-      // TODO: เปลี่ยนเป็นบรรทัดนี้เมื่อ feature/PYG-287-disputes merge แล้ว:
-      // await flagDispute({ variables: { bookingId: booking.id, reason: disputeReason } });
-      await new Promise((r) => setTimeout(r, 600)); // stub delay
+      await flagDispute({ variables: { bookingId: booking.id, reason: disputeReason.trim() } });
+      await refetch();
       setShowDisputeModal(false);
       setDisputeReason('');
       setDisputeSubmitted(true);
-      setToastMessage('ทีมงานจะตรวจสอบภายใน 24 ชม.');
-      setToastVisible(true);
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-      toastTimer.current = setTimeout(() => setToastVisible(false), 3000);
+      showToast('ทีมงานจะตรวจสอบภายใน 24 ชม.', { navigateAway: false });
+    } catch {
+      showToast('ส่งเรื่องไม่สำเร็จ กรุณาลองใหม่', { navigateAway: false });
     } finally {
       setIsSubmittingDispute(false);
     }
@@ -771,13 +770,22 @@ export default function BookingDetailPage() {
           {/* Dispute button (completed bookings) */}
           {booking.status === 'completed' && (
             <div style={{ marginTop: 16 }}>
-              {disputeSubmitted ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#FFFBEB', border: '0.8px solid #FCD34D', borderRadius: 10 }}>
-                  <span className="material-icons" style={{ fontSize: 18, color: '#F08C00' }}>hourglass_top</span>
-                  <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#B45309', margin: 0 }}>
-                    แจ้งปัญหาแล้ว — ทีมงานกำลังตรวจสอบภายใน 24 ชม.
-                  </p>
-                </div>
+              {isDisputed ? (
+                disputeStatus === 'resolved' ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#F0FDF4', border: '0.8px solid #86EFAC', borderRadius: 10 }}>
+                    <span className="material-icons" style={{ fontSize: 18, color: '#16A34A' }}>check_circle</span>
+                    <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#15803D', margin: 0 }}>
+                      ตรวจสอบปัญหาเสร็จสิ้นแล้ว
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#FFFBEB', border: '0.8px solid #FCD34D', borderRadius: 10 }}>
+                    <span className="material-icons" style={{ fontSize: 18, color: '#F08C00' }}>hourglass_top</span>
+                    <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#B45309', margin: 0 }}>
+                      แจ้งปัญหาแล้ว — ทีมงานกำลังตรวจสอบภายใน 24 ชม.
+                    </p>
+                  </div>
+                )
               ) : (
                 <button
                   type="button"
