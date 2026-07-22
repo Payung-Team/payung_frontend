@@ -303,18 +303,8 @@ export default function AdminPaymentsPage() {
         );
       },
     },
-    {
-      key: 'actions',
-      header: 'Actions',
-      render: () => (
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-md border border-[#059669] px-2.5 py-1 text-xs font-semibold text-[#059669] hover:bg-emerald-50"
-        >
-          ดำเนินการ
-        </button>
-      ),
-    },
+    // การโอนเงินจริงย้ายไปที่ transferPaymentToCaregiver mutation ผ่านหน้า
+    // Admin Exception Controls / payout engine ในรอบถัดไป
   ], []);
 
   const disputeColumns = useMemo<DataTableColumn<Dispute>[]>(() => [

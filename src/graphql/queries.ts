@@ -223,6 +223,25 @@ export const GET_KYC_STATUS = gql`
         signedUrl
         mimeType
       }
+      payoutAccount {
+        bankCode
+        accountName
+        accountNumberLast4
+        status
+        recipientStatus
+      }
+    }
+  }
+`;
+
+export const UPDATE_PAYOUT_ACCOUNT = gql`
+  mutation UpdatePayoutAccount($input: PayoutAccountInput!) {
+    updatePayoutAccount(input: $input) {
+      bankCode
+      accountName
+      accountNumberLast4
+      status
+      recipientStatus
     }
   }
 `;
@@ -359,6 +378,14 @@ export const ADMIN_KYC_DETAIL = gql`
           oldValue
           newValue
         }
+      }
+      payoutAccount {
+        bankCode
+        accountName
+        accountNumberLast4
+        status
+        recipientStatus
+        hasOmiseRecipient
       }
     }
   }

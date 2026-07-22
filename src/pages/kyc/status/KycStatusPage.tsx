@@ -8,6 +8,12 @@ import Skeleton from '../../../components/ui/Skeleton';
 import { useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import KycRejectionList from '../../../components/ui/KycRejectionList';
+import {
+  PayoutSummaryCard,
+  PayoutBackfillBanner,
+  PayoutAccountModal,
+  type PayoutAccountSummary,
+} from '../../../features/kyc/PayoutAccountWidgets';
 
 // ── Components ────────────────────────────────────────────────────────────
 
@@ -121,10 +127,13 @@ export default function KycStatusPage() {
     let targetStep = 1;
     if (reason.documentType === 'ข้อมูลส่วนตัว') {
       targetStep = 1;
-    } else if (reason.documentType === 'บัตรประชาชน' || reason.documentType === 'รูปถ่ายคู่บัตรประชาชน') {
+    } else if (
+      reason.documentType === 'บัตรประชาชน' ||
+      reason.documentType === 'รูปถ่ายคู่บัตรประชาชน' ||
+      reason.documentType === 'ใบรับรองอบรม'
+    ) {
+      // เอกสารทั้งหมด (รวมใบรับรองอบรม) อยู่ที่ step 2 — step 3 คือบัญชีรับเงิน (PYG-266) ไม่เกี่ยวกับเอกสาร
       targetStep = 2;
-    } else if (reason.documentType === 'ใบรับรองอบรม') {
-      targetStep = 3;
     }
     navigate('/kyc/resubmit', { state: { step: targetStep } });
   };
@@ -135,6 +144,8 @@ export default function KycStatusPage() {
   const rejectedReason = data?.kycStatus?.rejectedReason;
   const rejectionReasons = data?.kycStatus?.caregiver?.rejectionReasons || [];
   const rawDocuments = data?.kycStatus?.documents || [];
+  const payoutAccount: PayoutAccountSummary | null = data?.kycStatus?.payoutAccount ?? null;
+  const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
 
   const [refreshedDocs, setRefreshedDocs] = useState<KycDocument[]>([]);
 
@@ -333,6 +344,11 @@ export default function KycStatusPage() {
             </div>
           </div>
 
+          {/* Payout Account Summary (PYG-266) */}
+          {payoutAccount && (
+            <PayoutSummaryCard payoutAccount={payoutAccount} onEdit={() => setIsPayoutModalOpen(true)} />
+          )}
+
           {/* Actions */}
           <div className="pt-4">
             <button
@@ -419,6 +435,15 @@ export default function KycStatusPage() {
             </span>
           </div>
 
+          {/* Payout Account (PYG-266) — banner ถ้ายังไม่มี, สรุปแบบ mask ถ้ามีแล้ว */}
+          <div className="w-full mb-6">
+            {payoutAccount ? (
+              <PayoutSummaryCard payoutAccount={payoutAccount} onEdit={() => setIsPayoutModalOpen(true)} />
+            ) : (
+              <PayoutBackfillBanner onAdd={() => setIsPayoutModalOpen(true)} />
+            )}
+          </div>
+
           {/* Actions */}
           <div className="w-full space-y-4">
             <button
@@ -502,6 +527,16 @@ export default function KycStatusPage() {
           </div>
         </div>
       )}
+
+      {/* Payout Account add/edit modal (PYG-266) — standalone flow นอก wizard */}
+      <PayoutAccountModal
+        isOpen={isPayoutModalOpen}
+        onClose={() => setIsPayoutModalOpen(false)}
+        onSaved={() => {
+          setIsPayoutModalOpen(false);
+          refetch();
+        }}
+      />
     </div>
   );
 }
