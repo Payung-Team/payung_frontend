@@ -1071,6 +1071,60 @@ export const ADMIN_REFUND_HISTORY = gql`
   }
 `;
 
+// PYG-317 — Admin Dispute Queue (ตรงตาม schema จริง: adminDisputes → DisputeSummaryConnection)
+export const ADMIN_DISPUTE_QUEUE = gql`
+  query AdminDisputeQueue(
+    $disputeStatus: DisputeStatus
+    $dateFrom: DateTime
+    $dateTo: DateTime
+    $filedBy: DisputeFiledBy
+    $q: String
+    $sortBy: DisputeSortBy
+    $page: Int
+    $limit: Int
+  ) {
+    list: adminDisputes(input: {
+      disputeStatus: $disputeStatus
+      dateFrom: $dateFrom
+      dateTo: $dateTo
+      filedBy: $filedBy
+      q: $q
+      sortBy: $sortBy
+      page: $page
+      limit: $limit
+    }) {
+      nodes {
+        id
+        bookingId
+        filedBy
+        amount
+        currency
+        filedAt
+        slaDueAt
+        status
+        patient { id displayName email }
+        caregiver { id displayName email }
+      }
+      totalCount
+      page
+      limit
+      hasNextPage
+    }
+    allCount: adminDisputes(input: { page: 1, limit: 1 }) { totalCount }
+    flaggedCount: adminDisputes(input: { disputeStatus: flagged, page: 1, limit: 1 }) { totalCount }
+    resolvedCount: adminDisputes(input: { disputeStatus: resolved, page: 1, limit: 1 }) { totalCount }
+  }
+`;
+
+// PYG-317 — badge count คำร้องรอตรวจสอบ (สำหรับ sidebar)
+export const ADMIN_DISPUTE_PENDING_COUNT = gql`
+  query AdminDisputePendingCount {
+    flaggedCount: adminDisputes(input: { disputeStatus: flagged, page: 1, limit: 1 }) {
+      totalCount
+    }
+  }
+`;
+
 export const RESOLVE_DISPUTE = gql`
   mutation ResolveDispute($input: ResolveDisputeInput!) {
     resolveDispute(input: $input) {

@@ -12,8 +12,8 @@ import { SubmittedReviewCard } from '../../components/booking/SubmittedReviewCar
 import { getBookingReview, saveStoredReview } from '../../utils/bookingReview';
 import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
 import { GET_MY_BOOKING, COMPLETE_BOOKING, CREATE_REVIEW, FLAG_BOOKING_DISPUTE } from '../../graphql/queries';
-import { PaymentInfoSection } from '../../features/payment/PaymentInfoSection';
-import type { PaymentInfo } from '../../features/payment/PaymentInfoSection';
+import { PaymentInfoSection } from '../../components/payment/PaymentInfoSection';
+import type { PaymentInfo } from '../../components/payment/PaymentInfoSection';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -43,21 +43,21 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
 };
 
 const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: string; bg: string; text: string }> = {
-  pending:          { label: 'รอตอบรับ',          dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
-  awaiting_payment: { label: 'รอชำระเงิน',      dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
-  accepted:         { label: 'ยืนยันแล้ว',      dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
-  rejected:         { label: 'ปฏิเสธแล้ว',      dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
-  cancelled:        { label: 'ยกเลิกแล้ว',      dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280' },
-  completed:        { label: 'เสร็จสิ้น',       dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
+  pending: { label: 'รอตอบรับ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
+  awaiting_payment: { label: 'รอชำระเงิน', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
+  accepted: { label: 'ยืนยันแล้ว', dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
+  rejected: { label: 'ปฏิเสธแล้ว', dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
+  cancelled: { label: 'ยกเลิกแล้ว', dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280' },
+  completed: { label: 'เสร็จสิ้น', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
 };
 
 const STATUS_BANNER: Record<ConfirmedBooking['status'], { icon: string; iconColor: string; bg: string; border: string; textColor: string; message: (name: string) => string }> = {
-  pending:          { icon: 'info',              iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: (n) => `ส่งคำขอของคุณไปยัง ${n} เรียบร้อยแล้ว ขณะนี้รอการตอบรับ` },
-  awaiting_payment: { icon: 'credit_card',       iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1D4ED8', message: (n) => `${n} ได้ตอบรับคำขอของคุณแล้ว – กรุณาชำระเงินเพื่อยืนยันการจอง` },
-  accepted:         { icon: 'check_circle',      iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: (n) => `${n} ยืนยันการจองของคุณแล้ว พบกันในวันนัดหมาย` },
-  rejected:         { icon: 'cancel',            iconColor: '#DC2626', bg: '#FEF2F2', border: '#FECACA', textColor: '#991B1B', message: (n) => `${n} ไม่สามารถรับงานนี้ได้ คุณสามารถค้นหาผู้ดูแลท่านอื่น` },
-  cancelled:        { icon: 'do_not_disturb_on', iconColor: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', textColor: '#374151', message: () => `การจองนี้ถูกยกเลิกแล้ว` },
-  completed:        { icon: 'task_alt',          iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: () => `การนัดหมายเสร็จสิ้นเรียบร้อยแล้ว` },
+  pending: { icon: 'info', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: (n) => `ส่งคำขอของคุณไปยัง ${n} เรียบร้อยแล้ว ขณะนี้รอการตอบรับ` },
+  awaiting_payment: { icon: 'credit_card', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1D4ED8', message: (n) => `${n} ได้ตอบรับคำขอของคุณแล้ว – กรุณาชำระเงินเพื่อยืนยันการจอง` },
+  accepted: { icon: 'check_circle', iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: (n) => `${n} ยืนยันการจองของคุณแล้ว พบกันในวันนัดหมาย` },
+  rejected: { icon: 'cancel', iconColor: '#DC2626', bg: '#FEF2F2', border: '#FECACA', textColor: '#991B1B', message: (n) => `${n} ไม่สามารถรับงานนี้ได้ คุณสามารถค้นหาผู้ดูแลท่านอื่น` },
+  cancelled: { icon: 'do_not_disturb_on', iconColor: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', textColor: '#374151', message: () => `การจองนี้ถูกยกเลิกแล้ว` },
+  completed: { icon: 'task_alt', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: () => `การนัดหมายเสร็จสิ้นเรียบร้อยแล้ว` },
 };
 
 const CANCELLABLE_STATUSES = new Set<ConfirmedBooking['status']>(['pending', 'awaiting_payment', 'accepted']);
@@ -136,10 +136,10 @@ function mapGqlBooking(api: any): ConfirmedBooking {
       : { type: 'self' },
     contactPerson: (api.dayOfContactName || api.dayOfContactPhone || api.dayOfContactRelationship)
       ? {
-          name: api.dayOfContactName ?? '',
-          phone: api.dayOfContactPhone ?? '',
-          relationship: api.dayOfContactRelationship ?? '',
-        }
+        name: api.dayOfContactName ?? '',
+        phone: api.dayOfContactPhone ?? '',
+        relationship: api.dayOfContactRelationship ?? '',
+      }
       : undefined,
   };
 
