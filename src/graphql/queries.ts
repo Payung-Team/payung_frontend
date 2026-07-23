@@ -1075,8 +1075,6 @@ export const ADMIN_REFUND_HISTORY = gql`
 export const ADMIN_DISPUTE_QUEUE = gql`
   query AdminDisputeQueue(
     $disputeStatus: DisputeStatus
-    $dateFrom: DateTime
-    $dateTo: DateTime
     $filedBy: DisputeFiledBy
     $q: String
     $sortBy: DisputeSortBy
@@ -1085,8 +1083,6 @@ export const ADMIN_DISPUTE_QUEUE = gql`
   ) {
     list: adminDisputes(input: {
       disputeStatus: $disputeStatus
-      dateFrom: $dateFrom
-      dateTo: $dateTo
       filedBy: $filedBy
       q: $q
       sortBy: $sortBy

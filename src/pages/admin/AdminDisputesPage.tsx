@@ -11,7 +11,7 @@ import DisputeFilterBar, { type DisputeFilters } from '../../components/features
 import SlaBadge from '../../components/features/dispute/SlaBadge';
 import DisputeStatusBadge from '../../components/features/dispute/DisputeStatusBadge';
 import FiledByBadge from '../../components/features/dispute/FiledByBadge';
-import { formatTHB, formatThaiDate, type DisputeFiledBy } from '../../components/features/dispute/disputeMeta';
+import { formatTHB, formatThaiDate, toSortBy, type DisputeFiledBy } from '../../components/features/dispute/disputeMeta';
 
 // ─── Types (ตรงกับ ADMIN_DISPUTE_QUEUE) ──────────────────────────────────────
 
@@ -48,13 +48,13 @@ interface QueueData {
 }
 
 const PAGE_SIZE = 10;
-const GRID = '150px 130px minmax(160px,1.4fr) 120px 130px minmax(150px,auto) 130px';
+// คอลัมน์ข้อความยืดตามพื้นที่ (fr) / คอลัมน์ค่าคงที่ (เงิน วันที่ SLA สถานะ ปุ่ม) ตรึงความกว้างไว้
+const GRID = 'minmax(140px,1.2fr) minmax(120px,1fr) minmax(150px,1.1fr) 110px 120px 180px 130px 120px';
+const TABLE_MIN_WIDTH = 'min-w-[1220px]';
 
 const INITIAL_FILTERS: DisputeFilters = {
   status: 'all',
   filedBy: 'all',
-  dateFrom: '',
-  dateTo: '',
   sortBy: 'sla_asc',
   q: '',
 };
@@ -85,14 +85,12 @@ export default function AdminDisputesPage() {
     () => ({
       disputeStatus: filters.status === 'all' ? undefined : filters.status,
       filedBy: filters.filedBy === 'all' ? undefined : filters.filedBy,
-      dateFrom: filters.dateFrom ? new Date(filters.dateFrom).toISOString() : undefined,
-      dateTo: filters.dateTo ? new Date(`${filters.dateTo}T23:59:59`).toISOString() : undefined,
-      sortBy: filters.sortBy,
+      sortBy: toSortBy(filters.sortBy),
       q: debouncedQ.trim() || undefined,
       page,
       limit: PAGE_SIZE,
     }),
-    [filters.status, filters.filedBy, filters.dateFrom, filters.dateTo, filters.sortBy, debouncedQ, page],
+    [filters.status, filters.filedBy, filters.sortBy, debouncedQ, page],
   );
 
   const { data, loading, error } = useQuery<QueueData>(ADMIN_DISPUTE_QUEUE, {
@@ -125,10 +123,29 @@ export default function AdminDisputesPage() {
         </div>
       ),
     },
-    { key: 'amount', header: 'จำนวนเงิน', className: 'text-sm font-bold text-gray-900', render: (r) => formatTHB(r.amount) },
+    {
+      key: 'amount',
+      header: 'จำนวนเงิน',
+      className: 'text-sm font-bold text-gray-900',
+      render: (r) => formatTHB(r.amount),
+    },
     { key: 'filedAt', header: 'วันที่ยื่น', className: 'text-xs text-gray-500', render: (r) => formatThaiDate(r.filedAt) },
     { key: 'sla', header: 'SLA คงเหลือ', render: (r) => <SlaBadge slaDueAt={r.slaDueAt} status={r.status} /> },
     { key: 'status', header: 'สถานะ', render: (r) => <DisputeStatusBadge status={r.status} /> },
+    {
+      key: 'actions',
+      header: 'การดำเนินการ',
+      align: 'center',
+      // TODO: ต่อ action จริง (เปิดหน้า/โมดัลตรวจสอบ dispute)
+      render: () => (
+        <button
+          type="button"
+          className="inline-flex h-8 cursor-pointer items-center rounded-md bg-[#059669] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#047857]"
+        >
+          ตรวจสอบ
+        </button>
+      ),
+    },
   ];
 
   const showSkeleton = loading && !data;
@@ -150,16 +167,17 @@ export default function AdminDisputesPage() {
           items={nodes}
           getRowKey={(r) => r.id}
           gridTemplateColumns={GRID}
-          minWidthClassName="min-w-[980px]"
+          minWidthClassName={TABLE_MIN_WIDTH}
           loading={showSkeleton}
           loadingContent={
             <DataTableSkeleton
               rows={PAGE_SIZE}
               gridTemplateColumns={GRID}
-              minWidthClassName="min-w-[980px]"
+              minWidthClassName={TABLE_MIN_WIDTH}
               cells={[
                 { width: 120 }, { width: 100 }, { width: 160 }, { width: 80 },
                 { width: 100 }, { width: 130, height: 24, borderRadius: 99 }, { width: 90, height: 24, borderRadius: 99 },
+                { width: 80, height: 32, borderRadius: 6 },
               ]}
             />
           }

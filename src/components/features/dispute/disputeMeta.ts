@@ -4,6 +4,22 @@ export type DisputeStatus = 'none' | 'flagged' | 'resolved';
 export type DisputeFiledBy = 'customer' | 'caregiver';
 export type DisputeSortBy = 'sla_asc' | 'sla_desc';
 
+// ตัวเลือกเรียงลำดับระดับ UI — backend มีแค่ sla_asc/sla_desc
+// (SLA = filed_at + ค่าคงที่ → "วันที่ยื่น: เก่า→ใหม่" = sla_asc นั่นเอง แต่แยกตัวเลือกให้ผู้ใช้เลือกได้ชัดเจน)
+export type DisputeSortOption = DisputeSortBy | 'date_asc';
+
+export const SORT_OPTION_LABEL: Record<DisputeSortOption, string> = {
+  sla_asc: 'ตาม SLA (ค่าเริ่มต้น)',
+  sla_desc: 'วันที่ยื่น: ใหม่→เก่า',
+  date_asc: 'วันที่ยื่น: เก่า→ใหม่',
+};
+
+export const SORT_OPTIONS: DisputeSortOption[] = ['sla_asc', 'sla_desc', 'date_asc'];
+
+export function toSortBy(option: DisputeSortOption): DisputeSortBy {
+  return option === 'date_asc' ? 'sla_asc' : option;
+}
+
 // ─── Status meta (schema จริงมีแค่ flagged | resolved ในคิว) ────────────────
 export interface DisputeStatusMeta {
   label: string;
