@@ -80,6 +80,15 @@ export function formatTHB(amount?: number | null): string {
   return `฿${amount.toLocaleString('en-US')}`;
 }
 
+// "12 มิ.ย. 2026 · 09:12" — ใช้ใน timeline / บันทึกภายใน (PYG-321)
+export function formatThaiDateTime(value?: string | null): string {
+  if (!value) return '-';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '-';
+  const time = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+  return `${formatThaiDate(value)} · ${time}`;
+}
+
 export function formatThaiDate(value?: string | null): string {
   if (!value) return '-';
   const d = new Date(value);

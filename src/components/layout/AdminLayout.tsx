@@ -34,6 +34,7 @@ function getPageInfo(pathname: string): { title: string; breadcrumb: string } {
   if (pathname.startsWith('/admin/users/')) return { title: 'รายละเอียดผู้ดูแล', breadcrumb: 'หน้าหลัก / จัดการผู้ใช้ / รายละเอียดผู้ดูแล' };
   if (pathname === '/admin/payments') return { title: 'Payments', breadcrumb: 'หน้าหลัก / Payments' };
   if (pathname === '/admin/disputes') return { title: 'จัดการคำร้อง', breadcrumb: 'หน้าหลัก / จัดการคำร้อง' };
+  if (pathname.startsWith('/admin/disputes/')) return { title: 'ตรวจสอบคำร้อง', breadcrumb: 'หน้าหลัก / จัดการคำร้อง / รายละเอียด' };
   return { title: 'Admin', breadcrumb: 'หน้าหลัก / Admin' };
 }
 

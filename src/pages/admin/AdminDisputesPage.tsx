@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { ADMIN_DISPUTE_QUEUE } from '../../graphql/queries';
 import DataTable, { type DataTableColumn } from '../../components/ui/DataTable';
@@ -66,6 +67,7 @@ function filerName(row: DisputeRow): string {
 }
 
 export default function AdminDisputesPage() {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState<DisputeFilters>(INITIAL_FILTERS);
   const [page, setPage] = useState(1);
 
@@ -136,10 +138,10 @@ export default function AdminDisputesPage() {
       key: 'actions',
       header: 'การดำเนินการ',
       align: 'center',
-      // TODO: ต่อ action จริง (เปิดหน้า/โมดัลตรวจสอบ dispute)
-      render: () => (
+      render: (r) => (
         <button
           type="button"
+          onClick={() => navigate(`/admin/disputes/${r.id}`)}
           className="inline-flex h-8 cursor-pointer items-center rounded-md bg-[#059669] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#047857]"
         >
           ตรวจสอบ
