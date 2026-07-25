@@ -3,6 +3,14 @@
 export type DisputeStatus = 'none' | 'flagged' | 'resolved';
 export type DisputeFiledBy = 'customer' | 'caregiver';
 export type DisputeSortBy = 'sla_asc' | 'sla_desc';
+export type ResolutionKind = 'full_refund' | 'partial_refund' | 'no_refund';
+
+// ป้ายชื่อ operation ที่แสดงระหว่าง resolve (เฉพาะคืนเงินที่ยิงไป Omise จริง)
+export const RESOLUTION_OPERATION_LABEL: Record<ResolutionKind, string> = {
+  full_refund: 'omise.refunds.create',
+  partial_refund: 'omise.refunds.create',
+  no_refund: 'dispute.resolve',
+};
 
 // ตัวเลือกเรียงลำดับระดับ UI — backend มีแค่ sla_asc/sla_desc
 // (SLA = filed_at + ค่าคงที่ → "วันที่ยื่น: เก่า→ใหม่" = sla_asc นั่นเอง แต่แยกตัวเลือกให้ผู้ใช้เลือกได้ชัดเจน)
@@ -36,11 +44,12 @@ export const STATUS_META: Record<'flagged' | 'resolved', DisputeStatusMeta> = {
 export interface DisputeFiledByMeta {
   label: string;
   badgeClass: string;
+  avatarClass: string;
 }
 
 export const FILED_BY_META: Record<DisputeFiledBy, DisputeFiledByMeta> = {
-  customer:  { label: 'ลูกค้า', badgeClass: 'bg-[#EEF2FF] text-[#4338CA]' },
-  caregiver: { label: 'ผู้ดูแล', badgeClass: 'bg-[#FFF3E0] text-[#C2410C]' },
+  customer:  { label: 'ลูกค้า', badgeClass: 'bg-[#EEF2FF] text-[#4338CA]', avatarClass: 'bg-[#4338CA]' },
+  caregiver: { label: 'ผู้ดูแล', badgeClass: 'bg-[#FFF3E0] text-[#C2410C]', avatarClass: 'bg-[#C2410C]' },
 };
 
 // ─── SLA (คำนวณจาก slaDueAt เทียบเวลาปัจจุบัน) — พอร์ตจาก mockup slaInfo ──────
