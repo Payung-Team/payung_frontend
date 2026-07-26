@@ -2,29 +2,32 @@ import { useState } from 'react';
 import DisputeCard, { DisputeField } from './DisputeCard';
 import DisputeStatusBadge from './DisputeStatusBadge';
 import { cn } from '../../../lib/utils';
-import { computeSla, formatTHB, formatThaiDate } from './disputeMeta';
+import { computeSla, formatTHB, formatThaiDate, type ResolutionKind } from './disputeMeta';
 import type { DisputeDetail } from './disputeDetailMapper';
 
-// REST vocabulary ตรงกับ backend (resolve-dispute.dto.ts): full_refund | partial_refund | reject
-type ResolutionKind = 'full_refund' | 'partial_refund' | 'reject';
+export interface ResolutionPayload {
+  kind: ResolutionKind;
+  amount: number;
+  reason: string;
+}
 
 interface DisputeResolutionPanelProps {
-  dispute: DisputeDetail;
-  submitting?: boolean;
-  onSubmit: (payload: { kind: ResolutionKind; amount?: number; reason: string }) => void;
+  readonly dispute: DisputeDetail;
+  readonly isSubmitting?: boolean;
+  readonly onSubmit: (payload: ResolutionPayload) => void;
 }
 
 const OPTIONS: { kind: ResolutionKind; title: string; description: string }[] = [
   { kind: 'full_refund', title: 'คืนเงินเต็มจำนวน', description: 'คืนเงินทั้งหมดที่ลูกค้าชำระ' },
   { kind: 'partial_refund', title: 'คืนเงินบางส่วน', description: 'คืนเงินเพียงบางส่วนของยอดที่ชำระ' },
-  { kind: 'reject', title: 'ปิดเรื่องโดยไม่คืนเงิน', description: 'ไม่คืนเงิน ยืนยันว่าผู้ดูแลทำถูกต้อง' },
+  { kind: 'no_refund', title: 'ปิดเรื่องโดยไม่คืนเงิน', description: 'ไม่คืนเงิน ยืนยันว่าผู้ดูแลทำถูกต้อง' },
 ];
 
 const PERCENTS = [25, 50, 75];
 const REASON_MAX_LENGTH = 500;
 
 // PYG-320/321 — ฟอร์มดำเนินการแก้ไข (mock: validate ครบแต่ยังไม่ยิง mutation)
-export default function DisputeResolutionPanel({ dispute, submitting = false, onSubmit }: DisputeResolutionPanelProps) {
+export default function DisputeResolutionPanel({ dispute, isSubmitting = false, onSubmit }: DisputeResolutionPanelProps) {
   const [kind, setKind] = useState<ResolutionKind | null>(null);
   const [partialAmount, setPartialAmount] = useState('');
   const [reason, setReason] = useState('');
@@ -36,15 +39,15 @@ export default function DisputeResolutionPanel({ dispute, submitting = false, on
   const parsedAmount = Number(partialAmount);
   const partialValid = Number.isFinite(parsedAmount) && parsedAmount > 0 && parsedAmount <= dispute.amount;
   const canSubmit =
-    isResolvable && !submitting && kind !== null && reason.trim() !== '' && (kind !== 'partial_refund' || partialValid);
+    isResolvable && kind !== null && reason.trim() !== '' && (kind !== 'partial_refund' || partialValid);
+  const partialActive = kind === 'partial_refund';
+  const partialPercent = partialValid ? Math.round((parsedAmount / dispute.amount) * 100) : null;
+
+  const resolvedAmount = kind === 'full_refund' ? dispute.amount : kind === 'partial_refund' ? parsedAmount : 0;
 
   const handleSubmit = () => {
-    if (!kind || !canSubmit) return;
-    onSubmit({
-      kind,
-      amount: kind === 'partial_refund' ? parsedAmount : undefined,
-      reason: reason.trim(),
-    });
+    if (!kind || !canSubmit || isSubmitting) return;
+    onSubmit({ kind, amount: resolvedAmount, reason: reason.trim() });
   };
 
   return (
@@ -70,7 +73,8 @@ export default function DisputeResolutionPanel({ dispute, submitting = false, on
         </div>
       )}
 
-      <fieldset className="mt-5" disabled={!isResolvable || submitting}>
+      <fieldset className="mt-5" disabled={!isResolvable || isSubmitting}>
+
         <legend className="text-xs font-bold text-[#575859]">
           เลือกวิธีแก้ไข <span className="text-[#DC2626]">*</span>
         </legend>
@@ -119,7 +123,10 @@ export default function DisputeResolutionPanel({ dispute, submitting = false, on
                           value={partialAmount}
                           onChange={(e) => setPartialAmount(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
-                          className="h-10 w-full rounded-lg border border-[#E5E7EB] bg-white pl-7 pr-3 text-sm text-[#1A1A1A] outline-none focus:border-[#059669]"
+                          className={cn(
+                            'h-10 w-full rounded-lg border bg-white pl-7 pr-3 text-sm text-[#1A1A1A] outline-none',
+                            partialActive ? 'border-[#F59E0B]' : 'border-[#E5E7EB] focus:border-[#059669]',
+                          )}
                           aria-label="ยอดคืนเงินบางส่วน"
                         />
                       </div>
@@ -128,7 +135,7 @@ export default function DisputeResolutionPanel({ dispute, submitting = false, on
 
                   {option.kind === 'partial_refund' && (
                     <>
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
                         {PERCENTS.map((percent) => (
                           <button
                             key={percent}
@@ -137,11 +144,22 @@ export default function DisputeResolutionPanel({ dispute, submitting = false, on
                               setKind('partial_refund');
                               setPartialAmount(String(Math.round((dispute.amount * percent) / 100)));
                             }}
-                            className="h-7 cursor-pointer rounded-md border border-[#E5E7EB] bg-white px-3 text-xs font-bold text-[#575859] hover:border-[#059669] hover:text-[#059669]"
+                            className={cn(
+                              'h-7 cursor-pointer rounded-md border px-3 text-xs font-bold transition-colors',
+                              partialActive && partialPercent === percent
+                                ? 'border-[#F59E0B] bg-[#FFFBEB] text-[#F59E0B]'
+                                : 'border-[#E5E7EB] bg-white text-[#575859] hover:border-[#059669] hover:text-[#059669]',
+                            )}
                           >
                             {percent}%
                           </button>
                         ))}
+
+                        {partialActive && partialPercent !== null && (
+                          <span className="font-[Inter] text-[11px] text-[#8A8C8E]">
+                            คิดเป็น {partialPercent}% ของยอดที่เกี่ยวข้อง
+                          </span>
+                        )}
                       </div>
 
                       {selected && partialAmount !== '' && !partialValid && (
@@ -178,21 +196,21 @@ export default function DisputeResolutionPanel({ dispute, submitting = false, on
           onChange={(e) => setReason(e.target.value.slice(0, REASON_MAX_LENGTH))}
           maxLength={REASON_MAX_LENGTH}
           rows={3}
-          disabled={!isResolvable || submitting}
-          className="mt-2 w-full resize-y rounded-lg border border-[#E5E7EB] bg-white p-3 text-sm text-[#1A1A1A] outline-none focus:border-[#059669] disabled:bg-[#F9FAFB]"
+          disabled={!isResolvable || isSubmitting}
+          className="mt-2 w-full resize-y rounded-lg border border-[#E5E7EB] bg-white p-3 text-sm text-[#1A1A1A] outline-none focus:border-[#059669] disabled:cursor-not-allowed disabled:bg-[#F9FAFB]"
         />
       </div>
 
       <button
         type="button"
         onClick={handleSubmit}
-        disabled={!canSubmit}
+        disabled={!canSubmit || isSubmitting}
         className={cn(
           'mt-5 h-11 w-full rounded-xl text-sm font-bold text-white transition-colors',
-          canSubmit ? 'cursor-pointer bg-[#52B69A] hover:bg-[#3F9C83]' : 'cursor-not-allowed bg-[#C6C8CB]',
+          canSubmit && !isSubmitting ? 'cursor-pointer bg-[#52B69A] hover:bg-[#3F9C83]' : 'cursor-not-allowed bg-[#C6C8CB]',
         )}
       >
-        {submitting ? 'กำลังดำเนินการ...' : 'ยืนยันการดำเนินการ'}
+        {isSubmitting ? 'กำลังดำเนินการ...' : 'ยืนยันการดำเนินการ'}
       </button>
     </DisputeCard>
   );

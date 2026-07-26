@@ -7,10 +7,13 @@ import { useToast } from '../../hooks/useToast';
 import DisputeBookingInfoCard from '../../components/features/dispute/DisputeBookingInfoCard';
 import EvidenceGrid from '../../components/features/dispute/EvidenceGrid';
 import DisputePaymentHistory from '../../components/features/dispute/DisputePaymentHistory';
-import DisputeResolutionPanel from '../../components/features/dispute/DisputeResolutionPanel';
+import DisputeResolutionPanel, { type ResolutionPayload } from '../../components/features/dispute/DisputeResolutionPanel';
+import DisputeResolveConfirmModal from '../../components/features/dispute/DisputeResolveConfirmModal';
+import DisputeProcessingOverlay from '../../components/features/dispute/DisputeProcessingOverlay';
 import DisputeAuditTimeline from '../../components/features/dispute/DisputeAuditTimeline';
 import DisputeInternalNotes from '../../components/features/dispute/DisputeInternalNotes';
 import { mapDetailResponse, type DisputeDetail } from '../../components/features/dispute/disputeDetailMapper';
+import { RESOLUTION_OPERATION_LABEL } from '../../components/features/dispute/disputeMeta';
 import {
   addDisputeNote,
   fetchDisputeDetail,
@@ -18,7 +21,14 @@ import {
   type ResolutionAction,
 } from '../../lib/adminDisputeApi';
 
-// PYG-319 / PYG-320 / PYG-321 — หน้ารายละเอียดคำร้อง (ต่อ backend REST)
+// FE ใช้ vocabulary 'no_refund' ทั่วหน้า → map เป็น REST ('reject') จุดเดียวก่อนยิง
+const KIND_TO_RESOLUTION: Record<ResolutionPayload['kind'], ResolutionAction> = {
+  full_refund: 'full_refund',
+  partial_refund: 'partial_refund',
+  no_refund: 'reject',
+};
+
+// PYG-319 / PYG-320 / PYG-321 — หน้ารายละเอียดคำร้อง (ต่อ backend REST + confirm modal/overlay ของ PYG-325)
 export default function AdminDisputeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -27,21 +37,21 @@ export default function AdminDisputeDetailPage() {
   const [dispute, setDispute] = useState<DisputeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+
+  // ขั้นยืนยันก่อนยิงจริง (PYG-325): เก็บ payload ที่รอยืนยัน + สถานะระหว่างเรียก backend
+  const [pendingResolution, setPendingResolution] = useState<ResolutionPayload | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
+  const [resolvingKind, setResolvingKind] = useState<ResolutionPayload['kind'] | null>(null);
 
   // โหลด detail — แยกเป็นฟังก์ชันเพื่อให้ addNote/resolve เรียกซ้ำได้หลังทำสำเร็จ
   const load = useCallback(async () => {
     if (!id) return;
-    setLoading(true);
-    setError(null);
     try {
       const raw = await fetchDisputeDetail(id);
       setDispute(mapDetailResponse(raw));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'โหลดรายละเอียดคำร้องไม่สำเร็จ');
       setDispute(null);
-    } finally {
-      setLoading(false);
     }
   }, [id]);
 
@@ -79,19 +89,30 @@ export default function AdminDisputeDetailPage() {
     }
   };
 
-  const handleResolve = async (payload: { kind: ResolutionAction; amount?: number; reason: string }) => {
-    if (!id) return;
-    setSubmitting(true);
+  // ยืนยันจากโมดัลแล้ว → ยิง resolve จริง + refetch (แทน mock latency เดิมของ PYG-325)
+  const handleResolveConfirmed = async (payload: ResolutionPayload) => {
+    if (!id || isResolving) return;
+    setPendingResolution(null);
+    setResolvingKind(payload.kind);
+    setIsResolving(true);
     try {
-      await resolveDispute(id, { resolution: payload.kind, amount: payload.amount, reason: payload.reason });
+      await resolveDispute(id, {
+        resolution: KIND_TO_RESOLUTION[payload.kind],
+        amount: payload.kind === 'partial_refund' ? payload.amount : undefined,
+        reason: payload.reason,
+      });
       await load();
-      toast.success('บันทึกผลการดำเนินการเรียบร้อย');
+      toast.success('บันทึกผลการดำเนินการเรียบร้อย', undefined, 'dispute-toast');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'ดำเนินการไม่สำเร็จ');
     } finally {
-      setSubmitting(false);
+      setIsResolving(false);
+      setResolvingKind(null);
     }
   };
+
+  const resolvingTitle = resolvingKind === 'no_refund' ? 'กำลังบันทึกผลการดำเนินการ…' : 'กำลังดำเนินการกับ Omise…';
+  const resolvingSubtitle = resolvingKind ? `${RESOLUTION_OPERATION_LABEL[resolvingKind]} · โปรดรอสักครู่` : '';
 
   return (
     <div className="bg-[#F6FAF9] text-[#1A1A1A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
@@ -144,7 +165,11 @@ export default function AdminDisputeDetailPage() {
             </div>
 
             <div className="flex min-w-0 flex-col gap-5">
-              <DisputeResolutionPanel dispute={dispute} submitting={submitting} onSubmit={handleResolve} />
+              <DisputeResolutionPanel
+                dispute={dispute}
+                isSubmitting={isResolving || pendingResolution !== null}
+                onSubmit={setPendingResolution}
+              />
               <DisputeAuditTimeline events={dispute.timeline} />
               <DisputeInternalNotes notes={dispute.notes} onAddNote={handleAddNote} />
             </div>
@@ -152,7 +177,16 @@ export default function AdminDisputeDetailPage() {
         )}
       </div>
 
-      <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
+      {dispute && pendingResolution && (
+        <DisputeResolveConfirmModal
+          dispute={dispute}
+          payload={pendingResolution}
+          onCancel={() => setPendingResolution(null)}
+          onConfirm={() => handleResolveConfirmed(pendingResolution)}
+        />
+      )}
+      {isResolving && <DisputeProcessingOverlay title={resolvingTitle} subtitle={resolvingSubtitle} />}
+      <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} position="top-right" />
     </div>
   );
 }
