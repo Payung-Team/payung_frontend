@@ -41,9 +41,10 @@ export default function DisputeAuditTimeline({ events }: DisputeAuditTimelinePro
                   <span className="text-[13px] font-bold text-[#1A1A1A]">{event.actor}</span>
                   <span className="font-[Inter] text-[11px] text-[#C6C8CB]">{formatThaiDateTime(event.at)}</span>
                 </div>
-                <p className="mt-2 rounded-lg border border-[#E5E7EB] px-3 py-2 text-[13px] leading-5 text-[#575859]">
-                  {event.message}
-                </p>
+                <div className="mt-2 rounded-lg border border-[#E5E7EB] px-3 py-2">
+                  <p className="text-[13px] font-semibold leading-5 text-[#1A1A1A]">{event.title}</p>
+                  {event.detail && <p className="mt-1 text-[12px] leading-5 text-[#8A8C8E]">{event.detail}</p>}
+                </div>
               </div>
             </li>
           ))}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Icon from '../../ui/Icon';
 import DisputeCard, { DisputeField } from './DisputeCard';
 import DisputeStatusBadge from './DisputeStatusBadge';
 import { cn } from '../../../lib/utils';
@@ -67,13 +68,14 @@ export default function DisputeResolutionPanel({ dispute, isSubmitting = false, 
         </DisputeField>
       </dl>
 
-      {!isResolvable && (
-        <div className="mt-5 rounded-lg bg-[#F0F1F3] px-4 py-3 text-sm text-[#575859]">
-          คำร้องนี้ปิดเรื่องแล้ว ไม่สามารถดำเนินการซ้ำได้
+      {!isResolvable ? (
+        <div className="mt-5 flex items-center gap-2 rounded-lg bg-[#ECFDF5] px-4 py-3 text-sm text-[#047857]">
+          <Icon name="check_circle" style={{ fontSize: 18 }} />
+          คำร้องนี้ปิดเรื่องแล้ว
         </div>
-      )}
-
-      <fieldset className="mt-5" disabled={!isResolvable || isSubmitting}>
+      ) : (
+        <>
+      <fieldset className="mt-5" disabled={isSubmitting}>
 
         <legend className="text-xs font-bold text-[#575859]">
           เลือกวิธีแก้ไข <span className="text-[#DC2626]">*</span>
@@ -196,7 +198,7 @@ export default function DisputeResolutionPanel({ dispute, isSubmitting = false, 
           onChange={(e) => setReason(e.target.value.slice(0, REASON_MAX_LENGTH))}
           maxLength={REASON_MAX_LENGTH}
           rows={3}
-          disabled={!isResolvable || isSubmitting}
+          disabled={isSubmitting}
           className="mt-2 w-full resize-y rounded-lg border border-[#E5E7EB] bg-white p-3 text-sm text-[#1A1A1A] outline-none focus:border-[#059669] disabled:cursor-not-allowed disabled:bg-[#F9FAFB]"
         />
       </div>
@@ -212,6 +214,8 @@ export default function DisputeResolutionPanel({ dispute, isSubmitting = false, 
       >
         {isSubmitting ? 'กำลังดำเนินการ...' : 'ยืนยันการดำเนินการ'}
       </button>
+        </>
+      )}
     </DisputeCard>
   );
 }

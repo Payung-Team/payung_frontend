@@ -1,7 +1,7 @@
 // PYG-320 — แปลง REST response (DisputeDetailResponse) → shape ที่ component ในหน้านี้ใช้อยู่
 // เก็บ type เดิมไว้ทั้งหมด เพื่อให้ component แทบไม่ต้องแก้
 
-import type { DisputeFiledBy } from './disputeMeta';
+import { formatTHB, type DisputeFiledBy } from './disputeMeta';
 import type {
   AuditEntry,
   DisputeDetailResponse,
@@ -34,7 +34,8 @@ export interface TimelineEvent {
   actor: string;
   actorKind: 'customer' | 'caregiver' | 'system' | 'admin';
   at: string;
-  message: string;
+  title: string; // หัวข้อ/ผลตัดสิน (เน้น)
+  detail?: string; // เหตุผล/โน้ต (รอง)
 }
 
 export interface InternalNote {
@@ -93,9 +94,34 @@ const ACTION_LABEL: Record<string, string> = {
   resolved: 'ปิดเรื่องแล้ว',
 };
 
-function auditMessage(a: AuditEntry): string {
-  if (a.note) return a.note;
-  return ACTION_LABEL[a.action] ?? a.action;
+// ป้ายผลตัดสิน จาก metadata.decision + refundAmount ที่ backend เขียนไว้ตอน resolve
+function resolveSummary(a: AuditEntry): string {
+  const decision = a.metadata?.decision as string | undefined;
+  const refundAmount = a.metadata?.refundAmount as number | null | undefined;
+
+  if (decision === 'refund_full') {
+    return `ปิดเรื่อง · คืนเงินเต็มจำนวน${refundAmount != null ? ` ${formatTHB(refundAmount)}` : ''}`;
+  }
+  if (decision === 'refund_partial') {
+    return `ปิดเรื่อง · คืนเงินบางส่วน${refundAmount != null ? ` ${formatTHB(refundAmount)}` : ''}`;
+  }
+  if (decision === 'no_refund') {
+    return 'ปิดเรื่อง · ไม่คืนเงิน';
+  }
+  return ACTION_LABEL.resolved;
+}
+
+// แยกหัวข้อ (title) กับเหตุผล (detail) เพื่อให้ timeline มีลำดับสายตา ไม่กลืนกัน
+function auditTitleDetail(a: AuditEntry): { title: string; detail?: string } {
+  if (a.action === 'resolved') {
+    return { title: resolveSummary(a), detail: a.note ?? undefined };
+  }
+  const label = ACTION_LABEL[a.action];
+  if (label) {
+    return { title: label, detail: a.note ?? undefined };
+  }
+  // action ที่ไม่รู้จัก — ใช้ note เป็นหัวข้อไปเลย ไม่ต้องมี detail ซ้ำ
+  return { title: a.note ?? a.action };
 }
 
 function evidenceKind(mimeType: string): EvidenceKind {
@@ -117,7 +143,7 @@ function mapTimeline(a: AuditEntry): TimelineEvent {
   const actor =
     a.actor?.displayName ||
     (kind === 'system' ? 'ระบบ' : kind === 'customer' ? 'ลูกค้า' : kind === 'caregiver' ? 'ผู้ดูแล' : 'แอดมิน');
-  return { id: a.id, actor, actorKind: kind, at: a.createdAt, message: auditMessage(a) };
+  return { id: a.id, actor, actorKind: kind, at: a.createdAt, ...auditTitleDetail(a) };
 }
 
 function mapPayment(p: PaymentHistoryEntry, amount: number): PaymentEvent {
