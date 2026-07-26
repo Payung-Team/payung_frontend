@@ -4,7 +4,7 @@ import FiledByBadge from './FiledByBadge';
 import EvidenceLightbox from './EvidenceLightbox';
 import { cn } from '../../../lib/utils';
 import type { DisputeFiledBy } from './disputeMeta';
-import type { EvidenceFile } from './disputeDetailMock';
+import type { EvidenceFile } from './disputeDetailMapper';
 
 interface EvidenceGridProps {
   files: EvidenceFile[];

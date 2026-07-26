@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
 import Skeleton from '../../components/ui/Skeleton';
@@ -10,33 +10,87 @@ import DisputePaymentHistory from '../../components/features/dispute/DisputePaym
 import DisputeResolutionPanel from '../../components/features/dispute/DisputeResolutionPanel';
 import DisputeAuditTimeline from '../../components/features/dispute/DisputeAuditTimeline';
 import DisputeInternalNotes from '../../components/features/dispute/DisputeInternalNotes';
-import { findMockDispute, type InternalNote } from '../../components/features/dispute/disputeDetailMock';
+import { mapDetailResponse, type DisputeDetail } from '../../components/features/dispute/disputeDetailMapper';
+import {
+  addDisputeNote,
+  fetchDisputeDetail,
+  resolveDispute,
+  type ResolutionAction,
+} from '../../lib/adminDisputeApi';
 
-// PYG-319 / PYG-321 — หน้ารายละเอียดคำร้อง (mock UI, ยังไม่ต่อ backend)
+// PYG-319 / PYG-320 / PYG-321 — หน้ารายละเอียดคำร้อง (ต่อ backend REST)
 export default function AdminDisputeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const toast = useToast();
 
-  const dispute = useMemo(() => findMockDispute(id), [id]);
-
-  // mock loading — จำลอง network latency เพื่อให้เห็น skeleton จริงตาม DoD ของ PYG-321
+  const [dispute, setDispute] = useState<DisputeDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [notes, setNotes] = useState<InternalNote[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  // โหลด detail — แยกเป็นฟังก์ชันเพื่อให้ addNote/resolve เรียกซ้ำได้หลังทำสำเร็จ
+  const load = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const raw = await fetchDisputeDetail(id);
+      setDispute(mapDetailResponse(raw));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'โหลดรายละเอียดคำร้องไม่สำเร็จ');
+      setDispute(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
   useEffect(() => {
-    setLoading(true);
-    setNotes(dispute?.notes ?? []);
-    const timer = setTimeout(() => setLoading(false), 400);
-    return () => clearTimeout(timer);
-  }, [dispute]);
+    let cancelled = false;
+    (async () => {
+      if (!id) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const raw = await fetchDisputeDetail(id);
+        if (!cancelled) setDispute(mapDetailResponse(raw));
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'โหลดรายละเอียดคำร้องไม่สำเร็จ');
+          setDispute(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
-  const addNote = (message: string) => {
-    setNotes((prev) => [
-      { id: `note-${Date.now()}`, author: 'Admin A', at: new Date().toISOString(), message },
-      ...prev,
-    ]);
-    toast.success('บันทึกภายในเรียบร้อย (mock)');
+  const handleAddNote = async (message: string) => {
+    if (!id) return;
+    try {
+      await addDisputeNote(id, message);
+      await load();
+      toast.success('บันทึกภายในเรียบร้อย');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'บันทึกภายในไม่สำเร็จ');
+    }
+  };
+
+  const handleResolve = async (payload: { kind: ResolutionAction; amount?: number; reason: string }) => {
+    if (!id) return;
+    setSubmitting(true);
+    try {
+      await resolveDispute(id, { resolution: payload.kind, amount: payload.amount, reason: payload.reason });
+      await load();
+      toast.success('บันทึกผลการดำเนินการเรียบร้อย');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'ดำเนินการไม่สำเร็จ');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -66,13 +120,13 @@ export default function AdminDisputeDetailPage() {
               <Skeleton height={182} borderRadius={16} />
             </div>
           </div>
-        ) : !dispute ? (
+        ) : error || !dispute ? (
           <div className="mt-5 rounded-2xl border border-red-100 bg-white p-10 text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
               <Icon name="error_outline" variant="outlined" />
             </div>
             <h2 className="mt-4 text-base font-bold">ไม่พบคำร้องนี้</h2>
-            <p className="mt-1 text-sm text-[#8A8C8E]">คำร้องอาจถูกลบไปแล้ว หรือลิงก์ไม่ถูกต้อง</p>
+            <p className="mt-1 text-sm text-[#8A8C8E]">{error || 'คำร้องอาจถูกลบไปแล้ว หรือลิงก์ไม่ถูกต้อง'}</p>
             <button
               type="button"
               onClick={() => navigate('/admin/disputes')}
@@ -90,13 +144,9 @@ export default function AdminDisputeDetailPage() {
             </div>
 
             <div className="flex min-w-0 flex-col gap-5">
-              <DisputeResolutionPanel
-                dispute={dispute}
-                // TODO: เรียก mutation resolveDispute เมื่อ backend พร้อม (PYG-320)
-                onSubmit={() => toast.success('บันทึกผลการดำเนินการแล้ว (mock — ยังไม่ส่งไป backend)')}
-              />
+              <DisputeResolutionPanel dispute={dispute} submitting={submitting} onSubmit={handleResolve} />
               <DisputeAuditTimeline events={dispute.timeline} />
-              <DisputeInternalNotes notes={notes} onAddNote={addNote} />
+              <DisputeInternalNotes notes={dispute.notes} onAddNote={handleAddNote} />
             </div>
           </div>
         )}

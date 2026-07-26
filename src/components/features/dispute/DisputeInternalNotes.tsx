@@ -2,7 +2,7 @@ import { useState } from 'react';
 import DisputeCard from './DisputeCard';
 import { cn } from '../../../lib/utils';
 import { formatThaiDateTime } from './disputeMeta';
-import type { InternalNote } from './disputeDetailMock';
+import type { InternalNote } from './disputeDetailMapper';
 
 interface DisputeInternalNotesProps {
   notes: InternalNote[];

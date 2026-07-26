@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
 import Icon from '../../ui/Icon';
-import { cn } from '../../../lib/utils';
 import { FILED_BY_META } from './disputeMeta';
-import type { EvidenceFile } from './disputeDetailMock';
+import type { EvidenceFile } from './disputeDetailMapper';
 
 interface EvidenceLightboxProps {
   files: EvidenceFile[];
@@ -58,17 +57,24 @@ export default function EvidenceLightbox({ files, index, onIndexChange, onClose 
           </button>
         </div>
 
-        <div className="flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-[#111827] text-white/70">
-          <Icon name={isPdf ? 'picture_as_pdf' : 'image'} style={{ fontSize: 56 }} />
-          <span
-            className={cn(
-              'rounded px-2 py-1 text-xs font-bold',
-              isPdf ? 'bg-[#FEE2E2] text-[#B91C1C]' : 'bg-[#DCFCE7] text-[#047857]',
-            )}
-          >
-            {isPdf ? 'PDF' : 'รูปภาพ'}
-          </span>
-          <p className="text-xs text-white/50">ตัวอย่างไฟล์จริงจะแสดงเมื่อเชื่อมต่อ backend</p>
+        <div className="flex aspect-[4/3] flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-[#111827] text-white/70">
+          {isPdf ? (
+            <>
+              <Icon name="picture_as_pdf" style={{ fontSize: 56 }} />
+              <span className="rounded bg-[#FEE2E2] px-2 py-1 text-xs font-bold text-[#B91C1C]">PDF</span>
+              <a
+                href={file.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 items-center gap-1 rounded-lg bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/20"
+              >
+                <Icon name="open_in_new" style={{ fontSize: 16 }} />
+                เปิดไฟล์ในแท็บใหม่
+              </a>
+            </>
+          ) : (
+            <img src={file.url} alt={file.name} className="h-full w-full object-contain" />
+          )}
         </div>
 
         {files.length > 1 && (

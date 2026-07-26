@@ -3,40 +3,48 @@ import DisputeCard, { DisputeField } from './DisputeCard';
 import DisputeStatusBadge from './DisputeStatusBadge';
 import { cn } from '../../../lib/utils';
 import { computeSla, formatTHB, formatThaiDate } from './disputeMeta';
-import type { DisputeDetail } from './disputeDetailMock';
+import type { DisputeDetail } from './disputeDetailMapper';
 
-type ResolutionKind = 'full_refund' | 'partial_refund' | 'no_refund';
+// REST vocabulary ตรงกับ backend (resolve-dispute.dto.ts): full_refund | partial_refund | reject
+type ResolutionKind = 'full_refund' | 'partial_refund' | 'reject';
 
 interface DisputeResolutionPanelProps {
   dispute: DisputeDetail;
-  onSubmit: (payload: { kind: ResolutionKind; amount: number; reason: string }) => void;
+  submitting?: boolean;
+  onSubmit: (payload: { kind: ResolutionKind; amount?: number; reason: string }) => void;
 }
 
 const OPTIONS: { kind: ResolutionKind; title: string; description: string }[] = [
   { kind: 'full_refund', title: 'คืนเงินเต็มจำนวน', description: 'คืนเงินทั้งหมดที่ลูกค้าชำระ' },
   { kind: 'partial_refund', title: 'คืนเงินบางส่วน', description: 'คืนเงินเพียงบางส่วนของยอดที่ชำระ' },
-  { kind: 'no_refund', title: 'ปิดเรื่องโดยไม่คืนเงิน', description: 'ไม่คืนเงิน ยืนยันว่าผู้ดูแลทำถูกต้อง' },
+  { kind: 'reject', title: 'ปิดเรื่องโดยไม่คืนเงิน', description: 'ไม่คืนเงิน ยืนยันว่าผู้ดูแลทำถูกต้อง' },
 ];
 
 const PERCENTS = [25, 50, 75];
 const REASON_MAX_LENGTH = 500;
 
 // PYG-320/321 — ฟอร์มดำเนินการแก้ไข (mock: validate ครบแต่ยังไม่ยิง mutation)
-export default function DisputeResolutionPanel({ dispute, onSubmit }: DisputeResolutionPanelProps) {
+export default function DisputeResolutionPanel({ dispute, submitting = false, onSubmit }: DisputeResolutionPanelProps) {
   const [kind, setKind] = useState<ResolutionKind | null>(null);
   const [partialAmount, setPartialAmount] = useState('');
   const [reason, setReason] = useState('');
 
+  // resolve ได้เฉพาะ dispute ที่ยัง flagged (backend throw ถ้าไม่ใช่) → ปิดฟอร์มทั้งใบ
+  const isResolvable = dispute.status === 'flagged';
+
   const sla = computeSla(dispute.slaDueAt, dispute.status);
   const parsedAmount = Number(partialAmount);
   const partialValid = Number.isFinite(parsedAmount) && parsedAmount > 0 && parsedAmount <= dispute.amount;
-  const canSubmit = kind !== null && reason.trim() !== '' && (kind !== 'partial_refund' || partialValid);
-
-  const resolvedAmount = kind === 'full_refund' ? dispute.amount : kind === 'partial_refund' ? parsedAmount : 0;
+  const canSubmit =
+    isResolvable && !submitting && kind !== null && reason.trim() !== '' && (kind !== 'partial_refund' || partialValid);
 
   const handleSubmit = () => {
     if (!kind || !canSubmit) return;
-    onSubmit({ kind, amount: resolvedAmount, reason: reason.trim() });
+    onSubmit({
+      kind,
+      amount: kind === 'partial_refund' ? parsedAmount : undefined,
+      reason: reason.trim(),
+    });
   };
 
   return (
@@ -56,7 +64,13 @@ export default function DisputeResolutionPanel({ dispute, onSubmit }: DisputeRes
         </DisputeField>
       </dl>
 
-      <fieldset className="mt-5">
+      {!isResolvable && (
+        <div className="mt-5 rounded-lg bg-[#F0F1F3] px-4 py-3 text-sm text-[#575859]">
+          คำร้องนี้ปิดเรื่องแล้ว ไม่สามารถดำเนินการซ้ำได้
+        </div>
+      )}
+
+      <fieldset className="mt-5" disabled={!isResolvable || submitting}>
         <legend className="text-xs font-bold text-[#575859]">
           เลือกวิธีแก้ไข <span className="text-[#DC2626]">*</span>
         </legend>
@@ -164,7 +178,8 @@ export default function DisputeResolutionPanel({ dispute, onSubmit }: DisputeRes
           onChange={(e) => setReason(e.target.value.slice(0, REASON_MAX_LENGTH))}
           maxLength={REASON_MAX_LENGTH}
           rows={3}
-          className="mt-2 w-full resize-y rounded-lg border border-[#E5E7EB] bg-white p-3 text-sm text-[#1A1A1A] outline-none focus:border-[#059669]"
+          disabled={!isResolvable || submitting}
+          className="mt-2 w-full resize-y rounded-lg border border-[#E5E7EB] bg-white p-3 text-sm text-[#1A1A1A] outline-none focus:border-[#059669] disabled:bg-[#F9FAFB]"
         />
       </div>
 
@@ -177,7 +192,7 @@ export default function DisputeResolutionPanel({ dispute, onSubmit }: DisputeRes
           canSubmit ? 'cursor-pointer bg-[#52B69A] hover:bg-[#3F9C83]' : 'cursor-not-allowed bg-[#C6C8CB]',
         )}
       >
-        ยืนยันการดำเนินการ
+        {submitting ? 'กำลังดำเนินการ...' : 'ยืนยันการดำเนินการ'}
       </button>
     </DisputeCard>
   );

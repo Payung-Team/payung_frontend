@@ -1,7 +1,7 @@
 import DisputeCard from './DisputeCard';
 import { cn } from '../../../lib/utils';
 import { formatThaiDateTime } from './disputeMeta';
-import type { TimelineEvent } from './disputeDetailMock';
+import type { TimelineEvent } from './disputeDetailMapper';
 
 interface DisputeAuditTimelineProps {
   events: TimelineEvent[];

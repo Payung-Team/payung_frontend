@@ -20,6 +20,23 @@ export function toSortBy(option: DisputeSortOption): DisputeSortBy {
   return option === 'date_asc' ? 'sla_asc' : option;
 }
 
+// ─── Payment status → label ไทย (ใช้ในประวัติการชำระเงินหน้า dispute detail) ──
+export const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  pending: 'รอชำระเงิน',
+  held: 'กันวงเงินไว้ (Hold)',
+  captured: 'ชำระเงินแล้ว (Capture)',
+  transferred: 'โอนเงินให้ผู้ดูแลแล้ว',
+  voided: 'ยกเลิกการกันวงเงิน',
+  refunded: 'คืนเงินเต็มจำนวน',
+  partially_refunded: 'คืนเงินบางส่วน',
+  failed: 'ชำระเงินไม่สำเร็จ',
+  expired: 'การกันวงเงินหมดอายุ',
+};
+
+export function paymentStatusLabel(status: string): string {
+  return PAYMENT_STATUS_LABEL[status] ?? status;
+}
+
 // ─── Status meta (schema จริงมีแค่ flagged | resolved ในคิว) ────────────────
 export interface DisputeStatusMeta {
   label: string;

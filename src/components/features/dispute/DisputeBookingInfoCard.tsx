@@ -1,6 +1,6 @@
 import DisputeCard, { DisputeField, DisputeLink } from './DisputeCard';
 import FiledByBadge from './FiledByBadge';
-import type { DisputeDetail } from './disputeDetailMock';
+import type { DisputeDetail } from './disputeDetailMapper';
 import { formatTHB, formatThaiDate } from './disputeMeta';
 
 interface DisputeBookingInfoCardProps {
@@ -42,7 +42,7 @@ export default function DisputeBookingInfoCard({ dispute }: DisputeBookingInfoCa
 
       <div className="mt-5 border-t border-[#F0F1F3] pt-4">
         <p className="text-xs text-[#8A8C8E]">รายละเอียดปัญหา</p>
-        <p className="mt-2 text-[15px] leading-6 text-[#1A1A1A]">{dispute.reason}</p>
+        <p className="mt-2 text-[15px] leading-6 text-[#1A1A1A]">{dispute.reason || '—'}</p>
       </div>
     </DisputeCard>
   );
