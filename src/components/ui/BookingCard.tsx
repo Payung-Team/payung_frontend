@@ -14,6 +14,8 @@ interface BookingCardProps {
   getDaysUntil: (dateStr: string) => string;
   getAcceptedTimeText: (booking: Booking) => string;
   getStatusBadgeStyle: (status: Booking['status']) => { bg: string; dot: string; text: string; label: string };
+  /** True when this card is rendered inside the "scheduled" tab's "due" sub-tab (service date reached/overdue). */
+  isDueSection?: boolean;
 }
 
 export const BookingCard: React.FC<BookingCardProps> = ({
@@ -28,8 +30,12 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   getDaysUntil,
   getAcceptedTimeText,
   getStatusBadgeStyle,
+  isDueSection = false,
 }) => {
-  const badge = getStatusBadgeStyle(booking.status);
+  const isDueConfirmed = booking.status === 'confirmed' && isDueSection;
+  const badge = isDueConfirmed
+    ? { bg: 'bg-[#EFF6FF]', dot: 'bg-[#3B82F6]', text: 'text-[#1D4ED8]', label: 'ถึงกำหนดบริการแล้ว' }
+    : getStatusBadgeStyle(booking.status);
 
   return (
     <div
@@ -59,11 +65,17 @@ export const BookingCard: React.FC<BookingCardProps> = ({
               {getAcceptedTimeText(booking)}
             </span>
           ) : booking.status === 'confirmed' ? (
-            <div className="px-2 h-[20.5px] bg-[#EFF6FF] rounded flex items-center justify-center">
-              <span className="font-['Inter'] font-semibold text-[11px] leading-4 text-[#1D4ED8]">
-                {getDaysUntil(booking.bookingDate)}
+            isDueConfirmed ? (
+              <span className="font-['Inter'] font-normal text-[11px] leading-4 text-[#8A8C8E]">
+                {booking.time} น.
               </span>
-            </div>
+            ) : (
+              <div className="px-2 h-[20.5px] bg-[#EFF6FF] rounded flex items-center justify-center">
+                <span className="font-['Inter'] font-semibold text-[11px] leading-4 text-[#1D4ED8]">
+                  {getDaysUntil(booking.bookingDate)}
+                </span>
+              </div>
+            )
           ) : (
             <span className="font-['Inter'] font-normal text-[11px] leading-4 text-[#8A8C8E]">
               {formatThaiDate(booking.bookingDate)}
@@ -335,7 +347,11 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                   <button
                     type="button"
                     onClick={() => onViewDetails(booking)}
-                    className="box-sizing px-[14px] h-9 bg-white border-[0.8px] border-[#E0E2E5] rounded-lg font-semibold text-[13px] text-[#575859] hover:bg-gray-50 flex items-center justify-center cursor-pointer transition-colors duration-200"
+                    className={`box-sizing px-[14px] h-9 rounded-lg font-semibold text-[13px] flex items-center justify-center cursor-pointer transition-colors duration-200 ${
+                      booking.status === 'confirmed'
+                        ? 'bg-[#52B69A] hover:bg-[#3A9A7E] text-white'
+                        : 'bg-white border-[0.8px] border-[#E0E2E5] text-[#575859] hover:bg-gray-50'
+                    }`}
                   >
                     ดูรายละเอียด
                   </button>
