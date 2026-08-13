@@ -25,7 +25,16 @@ export interface Booking {
   patientName: string;
   price: number;
   notes?: string;
-  status: 'pending' | 'accepted' | 'confirmed' | 'declined' | 'completed' | 'cancelled';
+  status:
+    | 'pending'
+    | 'accepted'
+    | 'confirmed'
+    | 'declined'
+    | 'completed'
+    | 'cancelled'
+    | 'in_progress'
+    | 'awaiting_release'
+    | 'needs_review';
   declineReason?: string;
   createdAt: string;
   relation?: string;
@@ -38,6 +47,8 @@ export interface Booking {
   dayOfContactName?: string;
   dayOfContactPhone?: string;
   dayOfContactRelationship?: string;
+  locationLat?: number | null;
+  locationLng?: number | null;
 }
 
 type TabType = 'scheduled' | 'action_required' | 'history';
@@ -50,8 +61,11 @@ function serviceLocationLabel(loc: string): string {
   }
 }
 
-// Helper to convert backend booking summary to frontend Booking model
-function mapToBooking(summary: any): Booking {
+// Helper to convert backend booking summary to frontend Booking model. Exported so
+// CaregiverBookingDetailPage.tsx can reuse it for the single-booking query response instead of
+// duplicating the mapping logic.
+// eslint-disable-next-line react-refresh/only-export-components -- shared pure mapper, not a component
+export function mapToBooking(summary: any): Booking {
   const durationHours = summary.durationHours;
   const startTime = summary.startTime; // "HH:mm"
   
@@ -117,6 +131,8 @@ function mapToBooking(summary: any): Booking {
     dayOfContactName: summary.dayOfContactName ?? undefined,
     dayOfContactPhone: summary.dayOfContactPhone ?? undefined,
     dayOfContactRelationship: summary.dayOfContactRelationship ?? undefined,
+    locationLat: summary.locationLat ?? null,
+    locationLng: summary.locationLng ?? null,
   };
 }
 

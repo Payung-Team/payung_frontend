@@ -843,6 +843,101 @@ export const GET_CAREGIVER_BOOKING_HISTORY = gql`
   }
 `;
 
+// PYG-360 [FE] Caregiver check-in — single booking by id, with the coordinate/day-of-contact
+// fields the check-in and service-progress screens need on top of the shared summary fields.
+// Backend: caregiverBooking(id) is a planned addition (see implementation plan §3.1) — not yet
+// deployed, so this query will error until it ships. The page handles that gracefully (falls
+// back to router state / shows the existing "not found" state).
+export const GET_CAREGIVER_BOOKING = gql`
+  query GetCaregiverBooking($id: ID!) {
+    caregiverBooking(id: $id) {
+      ${CAREGIVER_BOOKING_SUMMARY_FIELDS}
+      locationLat
+      locationLng
+      dayOfContactName
+      dayOfContactPhone
+      dayOfContactRelationship
+    }
+  }
+`;
+
+export const CHECK_IN_BOOKING = gql`
+  mutation CheckInBooking($input: CheckInInput!) {
+    checkInBooking(input: $input) {
+      id
+      bookingId
+      eventType
+      source
+      lat
+      lng
+      distanceM
+      accuracyM
+      serverTs
+      deviceTs
+      gpsAccuracyLow
+      jobCoordsMissing
+      withinWarnRadius
+      reviewReasons
+      alreadyCheckedIn
+    }
+  }
+`;
+
+export const CHECK_OUT_BOOKING = gql`
+  mutation CheckOutBooking($input: CheckOutInput!) {
+    checkOutBooking(input: $input) {
+      id
+      bookingId
+      eventType
+      source
+      lat
+      lng
+      distanceM
+      accuracyM
+      serverTs
+      deviceTs
+      note
+      photoUrl
+      gpsAccuracyLow
+      jobCoordsMissing
+      withinWarnRadius
+      reviewReasons
+      alreadyCheckedIn
+    }
+  }
+`;
+
+export const GET_PROOF_OF_WORK = gql`
+  query GetProofOfWork($bookingId: ID!) {
+    proofOfWork(bookingId: $bookingId) {
+      checkIn {
+        serverTs
+        distanceM
+        accuracyM
+        reviewReasons
+        gpsAccuracyLow
+        withinWarnRadius
+      }
+      checkOut {
+        serverTs
+        distanceM
+        accuracyM
+        reviewReasons
+      }
+      actualMinutes
+      bookedMinutes
+      distanceInM
+      distanceOutM
+      durationOk
+      noCheckout
+      jobCoordsMissing
+      reviewReasons
+      disputed
+      verdict
+    }
+  }
+`;
+
 export const REQUEST_PASSWORD_RESET = gql`
   mutation RequestPasswordReset($email: String!) {
     requestPasswordReset(input: { email: $email }) {
