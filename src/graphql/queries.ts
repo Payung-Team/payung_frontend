@@ -727,6 +727,8 @@ export const GET_MY_BOOKING = gql`
       serviceLocations
       bookingDate
       locationAddress
+      locationLat
+      locationLng
       notes
       estimatedCost
       careRecipientName
@@ -748,6 +750,38 @@ export const GET_MY_BOOKING = gql`
         qrCodeUrl
         updatedAt
       }
+    }
+  }
+`;
+
+// PYG-361 — proof-of-work summary for the patient's live tracking view.
+// This is the single source of truth for check-in/check-out; the realtime
+// job_events subscription only tells us WHEN to refetch this, never what to show
+// (realtime delivers raw rows with no signed photo URL and no computed flags).
+export const GET_PROOF_OF_WORK = gql`
+  query GetProofOfWork($bookingId: ID!) {
+    proofOfWork(bookingId: $bookingId) {
+      checkIn {
+        serverTs
+        lat
+        lng
+        photoUrl
+        note
+      }
+      checkOut {
+        serverTs
+        photoUrl
+        note
+      }
+      actualMinutes
+      bookedMinutes
+      distanceInM
+      distanceOutM
+      noCheckout
+      jobCoordsMissing
+      reviewReasons
+      disputed
+      verdict
     }
   }
 `;

@@ -3,6 +3,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
 import { GET_MY_BOOKING, CREATE_PAYMENT, GET_PAYMENT_HISTORY } from '../../graphql/queries';
+import { mapGqlStatus } from '../../utils/bookingStatus';
 import { loadOmiseJs } from '../../lib/omise-loader';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -60,16 +61,6 @@ function extractErrorMessage(err: unknown): string {
     return msg;
   }
   return 'เกิดข้อผิดพลาดที่ไม่รู้จัก กรุณาลองใหม่';
-}
-
-function mapGqlStatus(s: string): ConfirmedBooking['status'] {
-  const v = s.toLowerCase();
-  if (v === 'awaiting_payment' || v === 'accepted') return 'awaiting_payment';
-  if (v === 'confirmed') return 'accepted';
-  if (v === 'rejected' || v === 'declined') return 'rejected';
-  if (v === 'cancelled') return 'cancelled';
-  if (v === 'completed') return 'completed';
-  return 'pending';
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

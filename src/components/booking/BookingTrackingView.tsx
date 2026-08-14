@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import type { ConfirmedBooking } from '../../context/BookingContext';
+import { useJobEvents } from '../../hooks/useJobEvents';
+import { ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
 
 // ── Tracking Service view (PYG-361) ─────────────────────────────────────────────
 // Shown to patients once a confirmed booking's service date has arrived. Three
@@ -50,7 +52,14 @@ function formatElapsed(ms: number): string {
   return `${hours} ชม. ${minutes} นาที`;
 }
 
-// Mock caregiver profile stats + care plan — none of this exists on ConfirmedBooking yet.
+// ── Still mocked ─────────────────────────────────────────────────────────────
+// Check-in/check-out now comes from proofOfWork, but these have no backend yet:
+//   • careLogs   — no care_logs table exists. Needs its own card.
+//   • tasks.done — booking_tasks has no done/completed_at column. Needs its own card.
+//   • rating / reviewCount / jobsCount / yearsExperience — not on CaregiverBriefDto.
+//   • health.*   — real values from booking.draft win; these are only fallbacks.
+// The 24h auto-release countdown is deliberately absent: there is no release_at
+// column and no release cron yet (PYG-366 / PYG-367), so any number would be a guess.
 const MOCK = {
   rating: 4.8,
   reviewCount: 92,
@@ -97,6 +106,16 @@ const CARE_LOG_CATEGORY: Record<string, { icon: string; label: string }> = {
 };
 
 const LOG_PREVIEW_COUNT = 3;
+
+function buildProgressDetail(isCheckedIn: boolean, checkedOutAt: Date | null, elapsedStr: string): string {
+  if (!isCheckedIn) return '—';
+  return checkedOutAt ? `รวม ${elapsedStr}` : `มาแล้ว ${elapsedStr}`;
+}
+
+function getProgressState(isCheckedIn: boolean, checkedOutAt: Date | null): TimelineStep['state'] {
+  if (!isCheckedIn) return 'pending';
+  return checkedOutAt ? 'done' : 'active';
+}
 
 const STATUS_PILL: Record<TrackingState, { label: string; bg: string; dot: string; text: string }> = {
   awaiting_checkin: { label: 'รอผู้ดูแลเช็คอิน', bg: '#F0F1F3', dot: '#575859', text: '#575859' },
@@ -374,34 +393,72 @@ export function BookingTrackingView({
   onMessage: () => void;
 }>) {
   const [showDetails, setShowDetails] = useState(false);
-
-  // Mock state switch — `?mock=checked_in` renders the "caregiver is working"
-  // state so each screen can be reviewed before the realtime wiring exists.
-  // Remove this once job_events drives the state for real.
-  const { search } = useLocation();
-  const mockParam = new URLSearchParams(search).get('mock');
-  const state: TrackingState = mockParam === 'checked_in' || mockParam === 'working'
-    ? mockParam
-    : 'awaiting_checkin';
-  const isWorking = state === 'working';
-  const isCheckedIn = isWorking || state === 'checked_in';
-
   const [showAllLogs, setShowAllLogs] = useState(false);
 
-  // Mock: caregiver checked in a while ago — long enough for the working state
-  // to have a plausible care log behind it. Pinned once on mount so the elapsed
-  // counter below actually ticks up instead of resetting each render.
-  const [checkedInAt] = useState(() => new Date(Date.now() - (isWorking ? 42 : 1) * 60_000));
+  // ── Live data ───────────────────────────────────────────────────────────────
+  // proofOfWork is the source of truth for check-in/check-out. The care log and
+  // task-progress parts of this screen are still mocked (see MOCK below).
+  const { proof } = useJobEvents(booking.id);
+
+  // `?mock=` stays as a dev override so the states that have no real data yet can
+  // still be reviewed. Real data always wins when it exists.
+  const { search } = useLocation();
+  const mockParam = new URLSearchParams(search).get('mock');
+  const mockState: TrackingState | null =
+    mockParam === 'checked_in' || mockParam === 'working' ? mockParam : null;
+
+  // Memoised on the raw timestamp string: a fresh Date every render would make the
+  // clock effect below re-subscribe on every render.
+  const checkInTs = proof?.checkIn?.serverTs ?? null;
+  const checkOutTs = proof?.checkOut?.serverTs ?? null;
+  const checkedInAt = useMemo(() => (checkInTs ? new Date(checkInTs) : null), [checkInTs]);
+  const checkedOutAt = useMemo(() => (checkOutTs ? new Date(checkOutTs) : null), [checkOutTs]);
+
+  // The booking status is a second, independent signal that the job has started.
+  // Trust it while proofOfWork is still in flight — otherwise an in-progress job
+  // flashes "ยังไม่เช็คอิน" on first paint, which is exactly the false reassurance
+  // this screen exists to prevent.
+  const statusSaysStarted = ACTIVE_JOB_STATUSES.has(booking.status);
+  const hasStarted = checkedInAt !== null || statusSaysStarted;
+
+  let state: TrackingState;
+  if (hasStarted) {
+    // 'working' vs 'checked_in' only decides whether the (still mocked) care log
+    // renders, so the override keeps its say here.
+    state = mockState === 'checked_in' ? 'checked_in' : 'working';
+  } else {
+    state = mockState ?? 'awaiting_checkin';
+  }
+  const isWorking = state === 'working';
+  const isCheckedIn = state !== 'awaiting_checkin';
+
+  // Mock clock, used only when `?mock=` is driving a state that has no real
+  // check-in row behind it.
+  const [mockCheckedInAt] = useState(() => new Date(Date.now() - 42 * 60_000));
+  const usingMockClock = checkedInAt === null && mockState !== null;
+  const effectiveCheckedInAt = checkedInAt ?? (usingMockClock ? mockCheckedInAt : null);
+
+  // Live elapsed clock, anchored to the SERVER timestamp — never the device clock.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!isCheckedIn) return;
+    if (!isCheckedIn || checkedOutAt) return;
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
-  }, [isCheckedIn]);
+  }, [isCheckedIn, checkedOutAt]);
 
-  const checkInTimeStr = formatThaiTime(checkedInAt);
-  const elapsedStr = formatElapsed(now - checkedInAt.getTime());
+  // Show a dash rather than a guess while the real timestamps are loading.
+  const checkInTimeStr = effectiveCheckedInAt ? formatThaiTime(effectiveCheckedInAt) : '—';
+  let elapsedStr = '—';
+  if (proof?.actualMinutes != null) {
+    elapsedStr = formatElapsed(proof.actualMinutes * 60_000);
+  } else if (effectiveCheckedInAt) {
+    elapsedStr = formatElapsed(now - effectiveCheckedInAt.getTime());
+  }
   const pill = STATUS_PILL[state];
+
+  // Hide the map when the booking has no coordinates — that is a gap in our data,
+  // not the caregiver's fault, and an empty map would just look broken.
+  const hideMap = proof ? proof.jobCoordsMissing : MOCK.jobCoordsMissing;
 
   const dt = booking.draft.dateTime;
   const est = booking.draft.estimatedCost;
@@ -417,6 +474,9 @@ export function BookingTrackingView({
 
   const loc = booking.draft.locationDetails;
   const areaStr = [loc?.district, loc?.province].filter(Boolean).join(', ') || locationStr;
+  // The map is still a mock drawing, so we caption it with the booking's district
+  // rather than reverse-geocoding proof.checkIn.lat/lng.
+  const checkInAreaStr = loc?.district || MOCK.checkInLocation;
   const serviceModeStr = booking.draft.serviceLocation?.includes('accompany_outside')
     ? 'พาไปโรงพยาบาล'
     : 'ดูแลที่บ้านผู้ป่วย';
@@ -444,10 +504,12 @@ export function BookingTrackingView({
   const totalCount = planTasks.length;
   const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
 
-  const careLogs: CareLogEntry[] = isWorking
+  // Still mocked — there is no care_logs table yet. Timestamps are derived from
+  // the real check-in time so they at least stay coherent with the rest.
+  const careLogs: CareLogEntry[] = isWorking && effectiveCheckedInAt
     ? MOCK.careLogs.map((l) => ({
         ...l,
-        time: formatThaiTime(new Date(checkedInAt.getTime() + l.minutesAfterCheckIn * 60_000)),
+        time: formatThaiTime(new Date(effectiveCheckedInAt.getTime() + l.minutesAfterCheckIn * 60_000)),
       }))
     : [];
   const visibleLogs = showAllLogs ? careLogs : careLogs.slice(0, LOG_PREVIEW_COUNT);
@@ -465,11 +527,20 @@ export function BookingTrackingView({
     {
       key: 'in_progress',
       icon: 'hourglass_top',
-      label: 'กำลังให้บริการ',
-      detail: isCheckedIn ? `มาแล้ว ${elapsedStr}` : '—',
-      state: isCheckedIn ? 'active' : 'pending',
+      label: checkedOutAt ? 'ให้บริการเสร็จสิ้น' : 'กำลังให้บริการ',
+      detail: buildProgressDetail(isCheckedIn, checkedOutAt, elapsedStr),
+      state: getProgressState(isCheckedIn, checkedOutAt),
     },
   ];
+  if (checkedOutAt) {
+    timelineSteps.push({
+      key: 'checkout',
+      icon: 'logout',
+      label: 'ผู้ดูแลเช็คเอาท์',
+      detail: formatThaiTime(checkedOutAt),
+      state: 'done',
+    });
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#F6FAF9', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -587,8 +658,8 @@ export function BookingTrackingView({
 
         {/* Checked in → live location map (mocked). Hidden entirely when the
             booking has no coordinates. */}
-        {isCheckedIn && !MOCK.jobCoordsMissing && (
-          <CheckInMapCard checkInTime={checkInTimeStr} location={MOCK.checkInLocation} />
+        {isCheckedIn && !hideMap && (
+          <CheckInMapCard checkInTime={checkInTimeStr} location={checkInAreaStr} />
         )}
 
         {/* Not-started alert banner */}
@@ -787,7 +858,13 @@ export function BookingTrackingView({
                 {isCheckedIn ? (
                   <div style={{ marginTop: 16, paddingTop: 16, borderTop: '0.8px solid #F0F1F3', display: 'flex', flexDirection: 'row', gap: 12 }}>
                     <StatRow icon="login" iconColor="#1D4ED8" iconBg="#EFF6FF" label="เริ่มงาน" value={checkInTimeStr} />
-                    <StatRow icon="hourglass_top" iconColor="#3A9A7E" iconBg="#E6F5ED" label="ระยะเวลา" value={elapsedStr} />
+                    <StatRow
+                      icon="hourglass_top"
+                      iconColor="#3A9A7E"
+                      iconBg="#E6F5ED"
+                      label={checkedOutAt ? 'รวมเวลา' : 'ระยะเวลา'}
+                      value={elapsedStr}
+                    />
                   </div>
                 ) : (
                   <div style={{ marginTop: 16, paddingTop: 16, borderTop: '0.8px solid #F0F1F3', display: 'flex', flexDirection: 'row' }}>

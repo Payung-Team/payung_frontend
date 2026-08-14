@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { useBooking, type ConfirmedBooking, type BookingRequest, type SavedCaregiver } from '../../context/BookingContext';
 import { GET_MY_BOOKING_HISTORY } from '../../graphql/queries';
+import { mapGqlStatus, ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
 import { supabase } from '../../lib/supabase';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -60,8 +61,11 @@ const TAB_META: Record<TabKey, { label: string; icon: string; sectionTitle: stri
 
 const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: string; bg: string; text: string }> = {
   pending:          { label: 'รอตอบรับ',     dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
-  awaiting_payment: { label: 'รอชำระเงิน',   dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
-  accepted:         { label: 'ยืนยันแล้ว',   dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
+  accepted:         { label: 'รอชำระเงิน',   dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
+  confirmed:        { label: 'ยืนยันแล้ว',   dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
+  in_progress:      { label: 'กำลังให้บริการ', dot: '#1D4ED8', bg: '#EFF6FF', text: '#1D4ED8' },
+  awaiting_release: { label: 'รอโอนเงิน',    dot: '#8B5CF6', bg: '#F5F3FF', text: '#6D28D9' },
+  needs_review:     { label: 'กำลังตรวจสอบ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
   rejected:         { label: 'ปฏิเสธแล้ว',   dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
   cancelled:        { label: 'ยกเลิกแล้ว',   dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280' },
   completed:        { label: 'เสร็จสิ้น',    dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
@@ -95,16 +99,6 @@ function computeEndTime(startTime: string, durationHours: number): string {
   } catch {
     return '';
   }
-}
-
-function mapGqlStatus(s: string): ConfirmedBooking['status'] {
-  const v = s.toLowerCase();
-  if (v === 'accepted') return 'awaiting_payment';
-  if (v === 'confirmed') return 'accepted';
-  if (v === 'rejected' || v === 'declined') return 'rejected';
-  if (v === 'cancelled') return 'cancelled';
-  if (v === 'completed') return 'completed';
-  return 'pending';
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -190,8 +184,8 @@ function BookingCard({ booking, onCancel, onViewDetail, onPayment, isDueSection 
   const dt = booking.draft.dateTime;
   const days = dt?.date ? daysUntil(dt.date) : null;
   // Within the "upcoming" tab's due (today/overdue) sub-tab, show a distinct badge + the
-  // appointment's time range instead of the generic "accepted" badge + "days until" pill.
-  const isDueConfirmed = booking.status === 'accepted' && isDueSection;
+  // appointment's time range instead of the generic "confirmed" badge + "days until" pill.
+  const isDueConfirmed = booking.status === 'confirmed' && isDueSection;
   const badge = isDueConfirmed
     ? { label: 'ถึงกำหนดบริการแล้ว', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' }
     : STATUS_BADGE[booking.status];
@@ -543,8 +537,8 @@ function BookingCard({ booking, onCancel, onViewDetail, onPayment, isDueSection 
 
           {/* Section 5: Action buttons */}
           <div style={{ padding: '12px 16px' }}>
-            {/* awaiting_payment: show pay button prominently */}
-            {booking.status === 'awaiting_payment' ? (
+            {/* backend 'accepted' = caregiver said yes, payment still due — lead with the pay button */}
+            {booking.status === 'accepted' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <button
                   type="button"
@@ -630,7 +624,7 @@ function BookingCard({ booking, onCancel, onViewDetail, onPayment, isDueSection 
                 >
                   ดูรายละเอียด
                 </button>
-                {(booking.status === 'pending' || booking.status === 'accepted') && (
+                {(booking.status === 'pending' || booking.status === 'confirmed') && (
                   <button
                     type="button"
                     onClick={onCancel}
@@ -1554,8 +1548,11 @@ const BookingsPage: React.FC = () => {
   const [historyDateTo, setHistoryDateTo] = useState('');
 
   const grouped: Record<TabKey, ConfirmedBooking[]> = {
-    upcoming: allBookings.filter((b) => b.status === 'accepted'),
-    pending:  allBookings.filter((b) => b.status === 'pending' || b.status === 'awaiting_payment'),
+    // Jobs that have started (in_progress / awaiting_release / needs_review) stay here
+    // rather than in history: they are not finished, and the patient must keep seeing
+    // them to raise a problem before the money is released.
+    upcoming: allBookings.filter((b) => b.status === 'confirmed' || ACTIVE_JOB_STATUSES.has(b.status)),
+    pending:  allBookings.filter((b) => b.status === 'pending' || b.status === 'accepted'),
     history:  allBookings.filter((b) => b.status === 'rejected' || b.status === 'cancelled' || b.status === 'completed'),
   };
 

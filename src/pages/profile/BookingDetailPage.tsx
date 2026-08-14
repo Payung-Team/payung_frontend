@@ -12,6 +12,7 @@ import { SubmittedReviewCard } from '../../components/booking/SubmittedReviewCar
 import { getBookingReview, saveStoredReview } from '../../utils/bookingReview';
 import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
 import { GET_MY_BOOKING, COMPLETE_BOOKING, CREATE_REVIEW, FLAG_BOOKING_DISPUTE } from '../../graphql/queries';
+import { mapGqlStatus, ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
 import { PaymentInfoSection } from '../../components/payment/PaymentInfoSection';
 import type { PaymentInfo } from '../../components/payment/PaymentInfoSection';
 import { Divider, SectionTitle, InfoRow } from '../../components/booking/BookingDetailFields';
@@ -46,8 +47,11 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
 
 const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: string; bg: string; text: string }> = {
   pending: { label: 'รอตอบรับ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
-  awaiting_payment: { label: 'รอชำระเงิน', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
-  accepted: { label: 'ยืนยันแล้ว', dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
+  accepted: { label: 'รอชำระเงิน', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
+  confirmed: { label: 'ยืนยันแล้ว', dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
+  in_progress: { label: 'กำลังให้บริการ', dot: '#1D4ED8', bg: '#EFF6FF', text: '#1D4ED8' },
+  awaiting_release: { label: 'รอโอนเงิน', dot: '#8B5CF6', bg: '#F5F3FF', text: '#6D28D9' },
+  needs_review: { label: 'กำลังตรวจสอบ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
   rejected: { label: 'ปฏิเสธแล้ว', dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
   cancelled: { label: 'ยกเลิกแล้ว', dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280' },
   completed: { label: 'เสร็จสิ้น', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
@@ -55,14 +59,18 @@ const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: str
 
 const STATUS_BANNER: Record<ConfirmedBooking['status'], { icon: string; iconColor: string; bg: string; border: string; textColor: string; message: (name: string) => string }> = {
   pending: { icon: 'info', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: (n) => `ส่งคำขอของคุณไปยัง ${n} เรียบร้อยแล้ว ขณะนี้รอการตอบรับ` },
-  awaiting_payment: { icon: 'credit_card', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1D4ED8', message: (n) => `${n} ได้ตอบรับคำขอของคุณแล้ว – กรุณาชำระเงินเพื่อยืนยันการจอง` },
-  accepted: { icon: 'check_circle', iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: (n) => `${n} ยืนยันการจองของคุณแล้ว พบกันในวันนัดหมาย` },
+  accepted: { icon: 'credit_card', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1D4ED8', message: (n: string) => `${n} ได้ตอบรับคำขอของคุณแล้ว – กรุณาชำระเงินเพื่อยืนยันการจอง` },
+  confirmed: { icon: 'check_circle', iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: (n: string) => `${n} ยืนยันการจองของคุณแล้ว พบกันในวันนัดหมาย` },
+  in_progress: { icon: 'schedule', iconColor: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1D4ED8', message: (n: string) => `${n} กำลังให้บริการอยู่ในขณะนี้` },
+  // No countdown yet — release_at does not exist on the backend (PYG-366/367).
+  awaiting_release: { icon: 'account_balance_wallet', iconColor: '#6D28D9', bg: '#F5F3FF', border: '#DDD6FE', textColor: '#6D28D9', message: () => 'งานเสร็จแล้ว ระบบจะโอนเงินให้ผู้ดูแลตามกำหนด หากมีปัญหาโปรดแจ้งก่อนเงินถูกโอน' },
+  needs_review: { icon: 'gpp_maybe', iconColor: '#B45309', bg: '#FFFBEB', border: '#FDE68A', textColor: '#B45309', message: () => 'แอดมินกำลังตรวจสอบงานนี้ เงินจะยังไม่ถูกโอนจนกว่าการตรวจสอบจะเสร็จสิ้น' },
   rejected: { icon: 'cancel', iconColor: '#DC2626', bg: '#FEF2F2', border: '#FECACA', textColor: '#991B1B', message: (n) => `${n} ไม่สามารถรับงานนี้ได้ คุณสามารถค้นหาผู้ดูแลท่านอื่น` },
   cancelled: { icon: 'do_not_disturb_on', iconColor: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', textColor: '#374151', message: () => `การจองนี้ถูกยกเลิกแล้ว` },
   completed: { icon: 'task_alt', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: () => `การนัดหมายเสร็จสิ้นเรียบร้อยแล้ว` },
 };
 
-const CANCELLABLE_STATUSES = new Set<ConfirmedBooking['status']>(['pending', 'awaiting_payment', 'accepted']);
+const CANCELLABLE_STATUSES = new Set<ConfirmedBooking['status']>(['pending', 'accepted', 'confirmed']);
 
 // ── GQL → ConfirmedBooking mapper (mirrors BookingsPage.mapGqlBooking) ─────────
 
@@ -74,16 +82,6 @@ function computeEndTime(startTime: string, durationHours: number): string {
     const em = endMin % 60;
     return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
   } catch { return ''; }
-}
-
-function mapGqlStatus(s: string): ConfirmedBooking['status'] {
-  const v = s.toLowerCase();
-  if (v === 'awaiting_payment' || v === 'accepted') return 'awaiting_payment';
-  if (v === 'confirmed') return 'accepted';
-  if (v === 'rejected' || v === 'declined') return 'rejected';
-  if (v === 'cancelled') return 'cancelled';
-  if (v === 'completed') return 'completed';
-  return 'pending';
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -268,13 +266,15 @@ export default function BookingDetailPage() {
     return serviceDate <= today;
   })();
 
-  // booking.status === 'accepted' here represents the backend 'confirmed' status (see mapGqlStatus)
-  const canComplete = booking.status === 'accepted' && hasHeldPayment && isServiceDatePassed && (isPatient || isCaregiver);
+  const canComplete = booking.status === 'confirmed' && hasHeldPayment && isServiceDatePassed && (isPatient || isCaregiver);
 
-  // Once the service date has arrived on a confirmed booking, patients see the
-  // Tracking Service view instead of the static summary (PYG-361). Mocked for now —
-  // there is no backend field yet for caregiver check-in / task progress / care log.
-  const isTrackingDue = isPatient && booking.status === 'accepted' && isServiceDatePassed;
+  // Patients see the Tracking Service view instead of the static summary (PYG-361).
+  // Once the job has actually started the date no longer matters — in_progress /
+  // awaiting_release / needs_review mean the caregiver checked in, by definition.
+  const isTrackingDue = isPatient && (
+    ACTIVE_JOB_STATUSES.has(booking.status) ||
+    (booking.status === 'confirmed' && isServiceDatePassed)
+  );
 
   const handleCompleteService = async () => {
     setIsCompleting(true);
@@ -729,8 +729,8 @@ export default function BookingDetailPage() {
             </div>
           )}
 
-          {/* Pay button (awaiting_payment status) */}
-          {booking.status === 'awaiting_payment' && (
+          {/* Pay button — backend 'accepted' = caregiver said yes, payment still due */}
+          {booking.status === 'accepted' && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 24 }}>
               <button
                 type="button"
@@ -758,8 +758,8 @@ export default function BookingDetailPage() {
             </div>
           )}
 
-          {/* Cancel button (pending / accepted — no payment required) */}
-          {isCancellable && booking.status !== 'awaiting_payment' && (
+          {/* Cancel button (pending / confirmed — the pay button owns the 'accepted' state) */}
+          {isCancellable && booking.status !== 'accepted' && (
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
               <button
                 type="button"
