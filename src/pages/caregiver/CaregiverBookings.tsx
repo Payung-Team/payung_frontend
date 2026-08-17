@@ -25,8 +25,24 @@ export interface Booking {
   patientName: string;
   price: number;
   notes?: string;
-  status: 'pending' | 'accepted' | 'confirmed' | 'declined' | 'completed' | 'cancelled';
+  status:
+    | 'pending'
+    | 'accepted'
+    | 'confirmed'
+    // ── PYG-352/358 proof-of-work ──
+    /** เช็คอินแล้ว กำลังปฏิบัติงาน */
+    | 'in_progress'
+    /** ปิดงานแล้ว รอระบบโอนเงิน */
+    | 'awaiting_release'
+    /** ปิดงานแล้วแต่ติดธง รอแอดมินตรวจสอบ */
+    | 'needs_review'
+    | 'declined'
+    | 'completed'
+    | 'cancelled';
   declineReason?: string;
+  /** พิกัดจุดงาน — ใช้คำนวณระยะทางเพื่อ "เตือน" ก่อนกดปิดงาน (ค่าจริง backend คำนวณเอง) */
+  locationLat?: number | null;
+  locationLng?: number | null;
   createdAt: string;
   relation?: string;
   locationName?: string;
@@ -108,6 +124,8 @@ function mapToBooking(summary: any): Booking {
     createdAt: summary.createdAt,
     relation: summary.careRecipientName ? `สำหรับ: ${summary.careRecipientName}` : 'สำหรับตัวเอง',
     locationName: summary.locationAddress || undefined,
+    locationLat: summary.locationLat ?? null,
+    locationLng: summary.locationLng ?? null,
     serviceFormat: summary.serviceLocations?.[0] ? serviceLocationLabel(summary.serviceLocations[0]) : undefined,
     durationText: `${durationHours} ชม.`,
     tasks: summary.tasks && summary.tasks.length > 0 ? summary.tasks : undefined,

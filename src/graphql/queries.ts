@@ -700,6 +700,8 @@ const CAREGIVER_BOOKING_SUMMARY_FIELDS = `
   durationHours
   estimatedCost
   locationAddress
+  locationLat
+  locationLng
   notes
   patient {
     id
@@ -1128,6 +1130,63 @@ export const RESOLVE_DISPUTE = gql`
       resolution
       amount
       resolvedAt
+    }
+  }
+`;
+
+// ══════════════════════════════════════════════════════════════════════════
+// PYG-358 — proof of work (เช็คอิน / เช็คเอาท์)
+// ══════════════════════════════════════════════════════════════════════════
+
+const JOB_EVENT_FIELDS = `
+  id
+  bookingId
+  eventType
+  source
+  lat
+  lng
+  distanceM
+  accuracyM
+  serverTs
+  deviceTs
+  note
+  photoUrl
+  gpsAccuracyLow
+  jobCoordsMissing
+  withinWarnRadius
+  reviewReasons
+  alreadyCheckedIn
+`;
+
+/**
+ * สรุปหลักฐานการทำงาน — "แหล่งความจริงเดียว" ของหน้าปิดงาน
+ *
+ * ★ เวลาเช็คอินและเวลาทำงานจริงต้องอ่านจากที่นี่เท่านั้น ห้ามคำนวณจากนาฬิกาเครื่อง
+ */
+export const PROOF_OF_WORK = gql`
+  query ProofOfWork($bookingId: ID!) {
+    proofOfWork(bookingId: $bookingId) {
+      checkIn { ${JOB_EVENT_FIELDS} }
+      checkOut { ${JOB_EVENT_FIELDS} }
+      actualMinutes
+      bookedMinutes
+      distanceInM
+      distanceOutM
+      durationOk
+      noCheckout
+      jobCoordsMissing
+      reviewReasons
+      disputed
+      verdict
+    }
+  }
+`;
+
+/** ผู้ดูแลกดปิดงานเอง — ผู้รับบริการไม่ต้องยืนยันอะไรอีก (ทีมตัดสินใจ 2026-07-27) */
+export const CHECK_OUT_BOOKING = gql`
+  mutation CheckOutBooking($input: CheckOutInput!) {
+    checkOutBooking(input: $input) {
+      ${JOB_EVENT_FIELDS}
     }
   }
 `;
