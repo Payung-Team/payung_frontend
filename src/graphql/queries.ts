@@ -758,33 +758,33 @@ export const GET_MY_BOOKING = gql`
 // This is the single source of truth for check-in/check-out; the realtime
 // job_events subscription only tells us WHEN to refetch this, never what to show
 // (realtime delivers raw rows with no signed photo URL and no computed flags).
-export const GET_PROOF_OF_WORK = gql`
-  query GetProofOfWork($bookingId: ID!) {
-    proofOfWork(bookingId: $bookingId) {
-      checkIn {
-        serverTs
-        lat
-        lng
-        photoUrl
-        note
-      }
-      checkOut {
-        serverTs
-        photoUrl
-        note
-      }
-      actualMinutes
-      bookedMinutes
-      distanceInM
-      distanceOutM
-      noCheckout
-      jobCoordsMissing
-      reviewReasons
-      disputed
-      verdict
-    }
-  }
-`;
+// export const GET_PROOF_OF_WORK = gql`
+//   query GetProofOfWork($bookingId: ID!) {
+//     proofOfWork(bookingId: $bookingId) {
+//       checkIn {
+//         serverTs
+//         lat
+//         lng
+//         photoUrl
+//         note
+//       }
+//       checkOut {
+//         serverTs
+//         photoUrl
+//         note
+//       }
+//       actualMinutes
+//       bookedMinutes
+//       distanceInM
+//       distanceOutM
+//       noCheckout
+//       jobCoordsMissing
+//       reviewReasons
+//       disputed
+//       verdict
+//     }
+//   }
+// `;
 
 export const GET_MY_BOOKING_HISTORY = gql`
   query GetMyBookingHistory($input: BookingHistoryInput) {
