@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { supabase } from '../../lib/supabase';
@@ -12,8 +12,11 @@ import { SubmittedReviewCard } from '../../components/booking/SubmittedReviewCar
 import { getBookingReview, saveStoredReview } from '../../utils/bookingReview';
 import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
 import { GET_MY_BOOKING, COMPLETE_BOOKING, CREATE_REVIEW, FLAG_BOOKING_DISPUTE } from '../../graphql/queries';
+import { mapGqlStatus, ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
 import { PaymentInfoSection } from '../../components/payment/PaymentInfoSection';
 import type { PaymentInfo } from '../../components/payment/PaymentInfoSection';
+import { Divider, SectionTitle, InfoRow } from '../../components/booking/BookingDetailFields';
+import { BookingTrackingView } from '../../components/booking/BookingTrackingView';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -44,8 +47,11 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
 
 const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: string; bg: string; text: string }> = {
   pending: { label: 'รอตอบรับ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
-  awaiting_payment: { label: 'รอชำระเงิน', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
-  accepted: { label: 'ยืนยันแล้ว', dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
+  accepted: { label: 'รอชำระเงิน', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
+  confirmed: { label: 'ยืนยันแล้ว', dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
+  in_progress: { label: 'กำลังให้บริการ', dot: '#1D4ED8', bg: '#EFF6FF', text: '#1D4ED8' },
+  awaiting_release: { label: 'รอโอนเงิน', dot: '#8B5CF6', bg: '#F5F3FF', text: '#6D28D9' },
+  needs_review: { label: 'กำลังตรวจสอบ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
   rejected: { label: 'ปฏิเสธแล้ว', dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
   cancelled: { label: 'ยกเลิกแล้ว', dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280' },
   completed: { label: 'เสร็จสิ้น', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
@@ -53,37 +59,18 @@ const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: str
 
 const STATUS_BANNER: Record<ConfirmedBooking['status'], { icon: string; iconColor: string; bg: string; border: string; textColor: string; message: (name: string) => string }> = {
   pending: { icon: 'info', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: (n) => `ส่งคำขอของคุณไปยัง ${n} เรียบร้อยแล้ว ขณะนี้รอการตอบรับ` },
-  awaiting_payment: { icon: 'credit_card', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1D4ED8', message: (n) => `${n} ได้ตอบรับคำขอของคุณแล้ว – กรุณาชำระเงินเพื่อยืนยันการจอง` },
-  accepted: { icon: 'check_circle', iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: (n) => `${n} ยืนยันการจองของคุณแล้ว พบกันในวันนัดหมาย` },
+  accepted: { icon: 'credit_card', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1D4ED8', message: (n: string) => `${n} ได้ตอบรับคำขอของคุณแล้ว – กรุณาชำระเงินเพื่อยืนยันการจอง` },
+  confirmed: { icon: 'check_circle', iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: (n: string) => `${n} ยืนยันการจองของคุณแล้ว พบกันในวันนัดหมาย` },
+  in_progress: { icon: 'schedule', iconColor: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1D4ED8', message: (n: string) => `${n} กำลังให้บริการอยู่ในขณะนี้` },
+  // No countdown yet — release_at does not exist on the backend (PYG-366/367).
+  awaiting_release: { icon: 'account_balance_wallet', iconColor: '#6D28D9', bg: '#F5F3FF', border: '#DDD6FE', textColor: '#6D28D9', message: () => 'งานเสร็จแล้ว ระบบจะโอนเงินให้ผู้ดูแลตามกำหนด หากมีปัญหาโปรดแจ้งก่อนเงินถูกโอน' },
+  needs_review: { icon: 'gpp_maybe', iconColor: '#B45309', bg: '#FFFBEB', border: '#FDE68A', textColor: '#B45309', message: () => 'แอดมินกำลังตรวจสอบงานนี้ เงินจะยังไม่ถูกโอนจนกว่าการตรวจสอบจะเสร็จสิ้น' },
   rejected: { icon: 'cancel', iconColor: '#DC2626', bg: '#FEF2F2', border: '#FECACA', textColor: '#991B1B', message: (n) => `${n} ไม่สามารถรับงานนี้ได้ คุณสามารถค้นหาผู้ดูแลท่านอื่น` },
   cancelled: { icon: 'do_not_disturb_on', iconColor: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', textColor: '#374151', message: () => `การจองนี้ถูกยกเลิกแล้ว` },
   completed: { icon: 'task_alt', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: () => `การนัดหมายเสร็จสิ้นเรียบร้อยแล้ว` },
 };
 
-const CANCELLABLE_STATUSES = new Set<ConfirmedBooking['status']>(['pending', 'awaiting_payment', 'accepted']);
-
-// ── Sub-components ─────────────────────────────────────────────────────────────
-
-function Divider() {
-  return <div style={{ height: '0.8px', background: '#F0F1F3', margin: '18px 0' }} />;
-}
-
-function SectionTitle({ children }: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#8A8C8E', margin: '0 0 10px', lineHeight: '20px' }}>
-      {children}
-    </p>
-  );
-}
-
-function InfoRow({ label, value, valueFont = 'inter' }: Readonly<{ label: string; value: string; valueFont?: 'inter' | 'thai' }>) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
-      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E', lineHeight: '20px', flexShrink: 0 }}>{label}</span>
-      <span style={{ fontFamily: valueFont === 'inter' ? "'Inter', sans-serif" : "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#1A1A1A', lineHeight: '20px', textAlign: 'right' }}>{value || '—'}</span>
-    </div>
-  );
-}
+const CANCELLABLE_STATUSES = new Set<ConfirmedBooking['status']>(['pending', 'accepted', 'confirmed']);
 
 // ── GQL → ConfirmedBooking mapper (mirrors BookingsPage.mapGqlBooking) ─────────
 
@@ -95,16 +82,6 @@ function computeEndTime(startTime: string, durationHours: number): string {
     const em = endMin % 60;
     return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
   } catch { return ''; }
-}
-
-function mapGqlStatus(s: string): ConfirmedBooking['status'] {
-  const v = s.toLowerCase();
-  if (v === 'awaiting_payment' || v === 'accepted') return 'awaiting_payment';
-  if (v === 'confirmed') return 'accepted';
-  if (v === 'rejected' || v === 'declined') return 'rejected';
-  if (v === 'cancelled') return 'cancelled';
-  if (v === 'completed') return 'completed';
-  return 'pending';
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -174,12 +151,14 @@ export default function BookingDetailPage() {
     fetchPolicy: 'cache-and-network',
   });
 
-  const booking = useMemo<ConfirmedBooking | undefined>(() => {
-    if (data?.myBooking) return mapGqlBooking(data.myBooking);
-    return stateBooking;
-  }, [data, stateBooking]);
+  const gqlData = data as { myBooking?: Record<string, unknown> } | undefined;
 
-  const payment = (data?.myBooking?.payment ?? undefined) as PaymentInfo | undefined;
+  const booking = useMemo<ConfirmedBooking | undefined>(() => {
+    if (gqlData?.myBooking) return mapGqlBooking(gqlData.myBooking);
+    return stateBooking;
+  }, [gqlData, stateBooking]);
+
+  const payment = (gqlData?.myBooking?.payment ?? undefined) as PaymentInfo | undefined;
 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -262,7 +241,7 @@ export default function BookingDetailPage() {
   const cgInitial = booking.caregiverName?.charAt(0) ?? '?';
   const isCancellable = CANCELLABLE_STATUSES.has(booking.status);
   const caregiverDisplayName = booking.caregiverName === '(รอจับคู่)' ? 'ผู้ดูแล' : booking.caregiverName;
-  const disputeStatus = (data?.myBooking?.disputeStatus ?? 'none') as string;
+  const disputeStatus = (gqlData?.myBooking?.disputeStatus ?? 'none') as string;
   const isDisputed = disputeStatus === 'flagged' || disputeStatus === 'resolved' || disputeSubmitted;
 
   const showToast = (msg: string, opts?: { navigateAway?: boolean }) => {
@@ -287,8 +266,15 @@ export default function BookingDetailPage() {
     return serviceDate <= today;
   })();
 
-  // booking.status === 'accepted' here represents the backend 'confirmed' status (see mapGqlStatus)
-  const canComplete = booking.status === 'accepted' && hasHeldPayment && isServiceDatePassed && (isPatient || isCaregiver);
+  const canComplete = booking.status === 'confirmed' && hasHeldPayment && isServiceDatePassed && (isPatient || isCaregiver);
+
+  // Patients see the Tracking Service view instead of the static summary (PYG-361).
+  // Once the job has actually started the date no longer matters — in_progress /
+  // awaiting_release / needs_review mean the caregiver checked in, by definition.
+  const isTrackingDue = isPatient && (
+    ACTIVE_JOB_STATUSES.has(booking.status) ||
+    (booking.status === 'confirmed' && isServiceDatePassed)
+  );
 
   const handleCompleteService = async () => {
     setIsCompleting(true);
@@ -388,6 +374,92 @@ export default function BookingDetailPage() {
     );
   }
 
+  // Shared dispute modal — mounted from either the normal detail view or the
+  // Tracking Service view (via "แจ้งปัญหา").
+  const disputeModal = showDisputeModal && (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
+      onClick={() => !isSubmittingDispute && setShowDisputeModal(false)}
+    >
+      <div
+        style={{ width: '100%', maxWidth: 460, background: '#FFFFFF', borderRadius: 20, boxShadow: '0px 20px 60px rgba(0,0,0,0.15)', padding: '32px 28px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ width: 60, height: 60, borderRadius: 30, background: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+          <span className="material-icons" style={{ fontSize: 32, color: '#F08C00' }}>flag</span>
+        </div>
+        <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 18, fontWeight: 700, color: '#1A1A1A', textAlign: 'center', margin: 0 }}>
+          แจ้งปัญหาเกี่ยวกับบริการ
+        </p>
+        <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#575859', textAlign: 'center', margin: '8px 0 18px', lineHeight: '21px' }}>
+          โปรดอธิบายปัญหาที่พบ ทีมงานจะตรวจสอบและติดต่อกลับภายใน 24 ชั่วโมง
+        </p>
+        <div style={{ width: '100%', position: 'relative' }}>
+          <textarea
+            value={disputeReason}
+            onChange={(e) => setDisputeReason(e.target.value)}
+            placeholder="อธิบายปัญหาที่พบ เช่น ผู้ดูแลไม่ตรงตามที่ระบุ บริการไม่ครบถ้วน..."
+            rows={4}
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              padding: '12px 14px 28px',
+              background: '#F9FAFB', border: `1px solid ${disputeReason.trim().length > 0 && disputeReason.trim().length < 20 ? '#FCA5A5' : '#E0E2E5'}`,
+              borderRadius: 10, resize: 'none',
+              fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#1A1A1A', lineHeight: '20px',
+              outline: 'none',
+            }}
+          />
+          <span style={{
+            position: 'absolute', bottom: 8, right: 12,
+            fontFamily: "'Inter', sans-serif", fontSize: 11,
+            color: disputeReason.trim().length < 20 ? '#DC2626' : '#8A8C8E',
+          }}>
+            {disputeReason.trim().length}/20 ตัวอักษรขั้นต่ำ
+          </span>
+        </div>
+        {disputeReason.trim().length > 0 && disputeReason.trim().length < 20 && (
+          <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#DC2626', margin: '6px 0 0', alignSelf: 'flex-start' }}>
+            กรุณาอธิบายรายละเอียดอย่างน้อย 20 ตัวอักษร
+          </p>
+        )}
+        <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 20 }}>
+          <button
+            type="button"
+            onClick={() => { setShowDisputeModal(false); setDisputeReason(''); }}
+            disabled={isSubmittingDispute}
+            style={{ flex: 1, height: 44, background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 10, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#575859', cursor: 'pointer' }}
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmitDispute}
+            disabled={isSubmittingDispute || disputeReason.trim().length < 20}
+            style={{ flex: 1, height: 44, background: disputeReason.trim().length >= 20 ? '#F08C00' : '#E5E7EB', border: 'none', borderRadius: 10, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: disputeReason.trim().length >= 20 ? '#FFFFFF' : '#9CA3AF', cursor: disputeReason.trim().length >= 20 ? 'pointer' : 'not-allowed', opacity: isSubmittingDispute ? 0.7 : 1 }}
+          >
+            {isSubmittingDispute ? 'กำลังส่ง...' : 'ส่งเรื่อง'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (isTrackingDue) {
+    return (
+      <>
+        <BookingTrackingView
+          booking={booking}
+          onBack={() => navigate('/bookings')}
+          onReportProblem={() => setShowDisputeModal(true)}
+          onMessage={() => navigate('/messages')}
+        />
+        {disputeModal}
+        <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />
+      </>
+    );
+  }
+
   return (
     <>
       {/* Toast */}
@@ -457,74 +529,7 @@ export default function BookingDetailPage() {
       )}
 
       {/* Dispute Modal */}
-      {showDisputeModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
-          onClick={() => !isSubmittingDispute && setShowDisputeModal(false)}
-        >
-          <div
-            style={{ width: '100%', maxWidth: 460, background: '#FFFFFF', borderRadius: 20, boxShadow: '0px 20px 60px rgba(0,0,0,0.15)', padding: '32px 28px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ width: 60, height: 60, borderRadius: 30, background: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-              <span className="material-icons" style={{ fontSize: 32, color: '#F08C00' }}>flag</span>
-            </div>
-            <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 18, fontWeight: 700, color: '#1A1A1A', textAlign: 'center', margin: 0 }}>
-              แจ้งปัญหาเกี่ยวกับบริการ
-            </p>
-            <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#575859', textAlign: 'center', margin: '8px 0 18px', lineHeight: '21px' }}>
-              โปรดอธิบายปัญหาที่พบ ทีมงานจะตรวจสอบและติดต่อกลับภายใน 24 ชั่วโมง
-            </p>
-            <div style={{ width: '100%', position: 'relative' }}>
-              <textarea
-                value={disputeReason}
-                onChange={(e) => setDisputeReason(e.target.value)}
-                placeholder="อธิบายปัญหาที่พบ เช่น ผู้ดูแลไม่ตรงตามที่ระบุ บริการไม่ครบถ้วน..."
-                rows={4}
-                style={{
-                  width: '100%', boxSizing: 'border-box',
-                  padding: '12px 14px 28px',
-                  background: '#F9FAFB', border: `1px solid ${disputeReason.trim().length > 0 && disputeReason.trim().length < 20 ? '#FCA5A5' : '#E0E2E5'}`,
-                  borderRadius: 10, resize: 'none',
-                  fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#1A1A1A', lineHeight: '20px',
-                  outline: 'none',
-                }}
-              />
-              <span style={{
-                position: 'absolute', bottom: 8, right: 12,
-                fontFamily: "'Inter', sans-serif", fontSize: 11,
-                color: disputeReason.trim().length < 20 ? '#DC2626' : '#8A8C8E',
-              }}>
-                {disputeReason.trim().length}/20 ตัวอักษรขั้นต่ำ
-              </span>
-            </div>
-            {disputeReason.trim().length > 0 && disputeReason.trim().length < 20 && (
-              <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#DC2626', margin: '6px 0 0', alignSelf: 'flex-start' }}>
-                กรุณาอธิบายรายละเอียดอย่างน้อย 20 ตัวอักษร
-              </p>
-            )}
-            <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 20 }}>
-              <button
-                type="button"
-                onClick={() => { setShowDisputeModal(false); setDisputeReason(''); }}
-                disabled={isSubmittingDispute}
-                style={{ flex: 1, height: 44, background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 10, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#575859', cursor: 'pointer' }}
-              >
-                ยกเลิก
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmitDispute}
-                disabled={isSubmittingDispute || disputeReason.trim().length < 20}
-                style={{ flex: 1, height: 44, background: disputeReason.trim().length >= 20 ? '#F08C00' : '#E5E7EB', border: 'none', borderRadius: 10, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: disputeReason.trim().length >= 20 ? '#FFFFFF' : '#9CA3AF', cursor: disputeReason.trim().length >= 20 ? 'pointer' : 'not-allowed', opacity: isSubmittingDispute ? 0.7 : 1 }}
-              >
-                {isSubmittingDispute ? 'กำลังส่ง...' : 'ส่งเรื่อง'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {disputeModal}
 
       {/* Page */}
       <div style={{ minHeight: '100vh', background: '#F6FAF9' }}>
@@ -724,8 +729,8 @@ export default function BookingDetailPage() {
             </div>
           )}
 
-          {/* Pay button (awaiting_payment status) */}
-          {booking.status === 'awaiting_payment' && (
+          {/* Pay button — backend 'accepted' = caregiver said yes, payment still due */}
+          {booking.status === 'accepted' && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 24 }}>
               <button
                 type="button"
@@ -753,8 +758,8 @@ export default function BookingDetailPage() {
             </div>
           )}
 
-          {/* Cancel button (pending / accepted — no payment required) */}
-          {isCancellable && booking.status !== 'awaiting_payment' && (
+          {/* Cancel button (pending / confirmed — the pay button owns the 'accepted' state) */}
+          {isCancellable && booking.status !== 'accepted' && (
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
               <button
                 type="button"

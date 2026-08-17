@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    allowedHosts: ['f52f-2403-6200-88a4-5bc1-d48-30ac-987b-dec6.ngrok-free.app'],
+    allowedHosts: ['mud-shale-onshore.ngrok-free.dev'],
   },
   optimizeDeps: {
     include: ['@apollo/client', 'graphql'],
