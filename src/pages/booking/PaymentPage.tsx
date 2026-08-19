@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import type { ConfirmedBooking, BookingRequest } from '../../context/BookingContext';
-import { GET_MY_BOOKING, CREATE_PAYMENT, GET_PAYMENT_HISTORY } from '../../graphql/queries';
+import { GET_MY_BOOKING, CREATE_PAYMENT, GET_PAYMENT_BY_BOOKING } from '../../graphql/queries';
 import { loadOmiseJs } from '../../lib/omise-loader';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -292,21 +292,21 @@ export default function PaymentPage() {
   const [promptPayQrUrl, setPromptPayQrUrl] = useState<string | null>(null);
   const [promptPayActive, setPromptPayActive] = useState(false);
 
-  const [paymentId, setPaymentId] = useState<string | null>(null);
-
-  // Poll every 3 s after PromptPay QR is generated
-  const { data: pollData } = useQuery(GET_PAYMENT_HISTORY, {
-    variables: { paymentId },
-    skip: !promptPayActive || !paymentId,
+  // Poll every 3 s after PromptPay QR is generated — paymentByBooking actively
+  // re-checks the charge with Omise and self-heals if the webhook never arrives
+  // (e.g. Omise can't reach a local/dev backend), unlike paymentHistory which
+  // only reads back rows already written to the DB.
+  const { data: pollData } = useQuery(GET_PAYMENT_BY_BOOKING, {
+    variables: { bookingId: id },
+    skip: !promptPayActive || !id,
     pollInterval: 3000,
     fetchPolicy: 'network-only',
   });
 
-  // Navigate to success as soon as webhook confirms payment
+  // Navigate to success as soon as the payment is confirmed
   useEffect(() => {
-    const history = (pollData as { paymentHistory?: { toStatus?: string }[] } | undefined)?.paymentHistory;
-    const latestStatus = history?.[history.length - 1]?.toStatus;
-    if (latestStatus === 'captured' && booking) {
+    const payment = (pollData as { paymentByBooking?: { paymentStatus?: string } } | undefined)?.paymentByBooking;
+    if (payment?.paymentStatus === 'captured' && booking) {
       navigate('/booking/success', {
         state: { ref: booking.id, caregiverName: booking.caregiverName, paid: true },
       });
@@ -318,7 +318,6 @@ export default function PaymentPage() {
     const payment = (data as { myBooking?: { payment?: { id: string; paymentMethod: string; paymentStatus: string; qrCodeUrl?: string } } } | undefined)?.myBooking?.payment;
     if (payment) {
       if (payment.paymentMethod === 'promptpay' && payment.paymentStatus === 'pending') {
-        setPaymentId(payment.id);
         setPromptPayActive(true);
         if (payment.qrCodeUrl) {
           setPromptPayQrUrl(payment.qrCodeUrl);
@@ -431,11 +430,10 @@ export default function PaymentPage() {
         const newPaymentId = mutationData?.createPayment?.id;
         const qrCodeUrl = mutationData?.createPayment?.qrCodeUrl;
         if (newPaymentId) {
-          setPaymentId(newPaymentId);
           if (qrCodeUrl) {
             setPromptPayQrUrl(qrCodeUrl);
           }
-          setPromptPayActive(true); // starts polling paymentHistory
+          setPromptPayActive(true); // starts polling paymentByBooking
         } else {
           setPayError('ไม่ได้รับข้อมูลการชำระเงิน กรุณาลองใหม่');
         }

@@ -700,6 +700,8 @@ const CAREGIVER_BOOKING_SUMMARY_FIELDS = `
   durationHours
   estimatedCost
   locationAddress
+  locationLat
+  locationLng
   notes
   patient {
     id
@@ -843,8 +845,9 @@ export const GET_CAREGIVER_BOOKING_HISTORY = gql`
   }
 `;
 
-// PYG-360 [FE] Caregiver check-in — single booking by id, with the coordinate/day-of-contact
-// fields the check-in and service-progress screens need on top of the shared summary fields.
+// PYG-360 [FE] Caregiver check-in — single booking by id, with the day-of-contact fields the
+// check-in and service-progress screens need on top of the shared summary fields (which already
+// include locationLat/locationLng).
 // Backend: caregiverBooking(id) is a planned addition (see implementation plan §3.1) — not yet
 // deployed, so this query will error until it ships. The page handles that gracefully (falls
 // back to router state / shows the existing "not found" state).
@@ -852,8 +855,6 @@ export const GET_CAREGIVER_BOOKING = gql`
   query GetCaregiverBooking($id: ID!) {
     caregiverBooking(id: $id) {
       ${CAREGIVER_BOOKING_SUMMARY_FIELDS}
-      locationLat
-      locationLng
       dayOfContactName
       dayOfContactPhone
       dayOfContactRelationship
@@ -1038,6 +1039,17 @@ export const GET_PAYMENT_HISTORY = gql`
       reason
       changedBy
       createdAt
+    }
+  }
+`;
+
+export const GET_PAYMENT_BY_BOOKING = gql`
+  query GetPaymentByBooking($bookingId: ID!) {
+    paymentByBooking(bookingId: $bookingId) {
+      id
+      paymentStatus
+      paymentMethod
+      qrCodeUrl
     }
   }
 `;

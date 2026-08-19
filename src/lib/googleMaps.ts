@@ -30,6 +30,38 @@ export interface GeoResult {
   district: string;
 }
 
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
+/** Forward-geocodes a free-text address into coordinates — used as a fallback for bookings that
+ * never got a dropped-pin lat/lng saved (see CaregiverBookingDetailPage/CaregiverServiceProgressPage),
+ * so their map can still show a job-site marker derived from the real location_address on file. */
+export async function geocodeAddress(address: string): Promise<LatLng | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no google.maps type package installed
+  const g = (window as any).google;
+  const geocoder = new g.maps.Geocoder();
+  return new Promise((resolve) => {
+    geocoder.geocode(
+      { address, region: 'TH' },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no google.maps type package installed
+      (results: any[], status: string) => {
+        if (status !== 'OK' || !results?.[0]) {
+          resolve(null);
+          return;
+        }
+        const location = results[0].geometry?.location;
+        if (!location) {
+          resolve(null);
+          return;
+        }
+        resolve({ lat: location.lat(), lng: location.lng() });
+      }
+    );
+  });
+}
+
 export async function reverseGeocode(lat: number, lng: number): Promise<GeoResult> {
   const g = (window as any).google;
   const geocoder = new g.maps.Geocoder();

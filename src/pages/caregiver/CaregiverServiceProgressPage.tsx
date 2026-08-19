@@ -1,11 +1,13 @@
 import { useQuery } from '@apollo/client/react';
 import { GET_PROOF_OF_WORK } from '../../graphql/queries';
+import { useJobCoordinates } from '../../hooks/useJobCoordinates';
 import type { Booking } from './CaregiverBookings';
-import ServiceProgressMap from './serviceProgress/ServiceProgressMap';
-import TimeCards from './serviceProgress/TimeCards';
+import ServiceProgressWorkCard from './serviceProgress/ServiceProgressWorkCard';
+import PatientHeaderCard from './serviceProgress/PatientHeaderCard';
+import ChecklistCard from './serviceProgress/ChecklistCard';
+import CareLogCard from './serviceProgress/CareLogCard';
 import EmergencyContactCard from './serviceProgress/EmergencyContactCard';
 import ExpandableSection from './serviceProgress/ExpandableSection';
-import CheckoutButton from './serviceProgress/CheckoutButton';
 import { Icon } from '../../components/ui/Icon';
 import Skeleton from '../../components/ui/Skeleton';
 
@@ -21,30 +23,7 @@ interface ProofOfWorkData {
   };
 }
 
-function TaskTagsCard({ tasks }: Readonly<{ tasks: string[] }>) {
-  if (tasks.length === 0) return null;
-  return (
-    <div className="rounded-2xl bg-white p-5 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-        รายการแผนงาน
-      </p>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {tasks.map((task) => (
-          <span
-            key={task}
-            className="rounded-full bg-[#F0F1F3] px-2.5 py-1 text-xs text-[#575859]"
-            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-          >
-            {task}
-          </span>
-        ))}
-      </div>
-      <p className="mt-2.5 text-[11px] text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-        การติ๊กเสร็จงานจะเปิดใช้งานเร็ว ๆ นี้
-      </p>
-    </div>
-  );
-}
+const PROFILE_SECTION_ID = 'service-progress-patient-profile';
 
 function BookingDetailRow({ icon, label, value }: Readonly<{ icon: string; label: string; value: string }>) {
   return (
@@ -67,37 +46,48 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
 
   const checkInServerTs = data?.proofOfWork?.checkIn?.serverTs ?? null;
   const checkOutServerTs = data?.proofOfWork?.checkOut?.serverTs ?? null;
-  const jobLat = booking.locationLat ?? null;
-  const jobLng = booking.locationLng ?? null;
+  const jobCoords = useJobCoordinates(booking.locationLat, booking.locationLng, booking.locationName);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[621fr_414fr]">
       <div className="order-2 flex flex-col gap-5 lg:order-1">
-        <ServiceProgressMap jobLat={jobLat} jobLng={jobLng} />
+        <PatientHeaderCard
+          patientName={booking.patientName}
+          careRecipientName={booking.careRecipientName}
+          profileSectionId={PROFILE_SECTION_ID}
+        />
 
-        <div className="rounded-2xl bg-white p-5 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
-          <p className="text-[17px] font-bold text-[#1A1A1A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-            ผู้รับบริการ
+        <div className="flex items-start gap-2.5 rounded-xl border border-[#FFEAA7] bg-[#FFF8E7] p-3.5">
+          <Icon name="warning" size="small" color="#B45309" />
+          <p className="text-xs text-[#8A6D1F]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+            โปรดตรวจสอบข้อมูลผู้รับบริการในโปรไฟล์ก่อนเริ่มดูแล เพื่อความปลอดภัย
           </p>
-          <div className="mt-3 flex items-center gap-3">
-            <span
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white"
-              style={{ background: 'linear-gradient(135deg, #168AAD 0%, #52B69A 100%)' }}
-            >
-              <span className="text-lg font-bold" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                {booking.patientName?.charAt(0) ?? '?'}
-              </span>
-            </span>
-            <div>
-              <p className="text-sm font-bold text-[#1A1A1A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                {booking.patientName}
-              </p>
-              <p className="text-xs text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                {booking.careRecipientName ? `สำหรับ: ${booking.careRecipientName}` : 'สำหรับตัวเอง'}
-              </p>
-            </div>
-          </div>
         </div>
+
+        {loading ? (
+          <Skeleton height={260} />
+        ) : (
+          <ServiceProgressWorkCard
+            bookingId={booking.id}
+            jobLat={jobCoords.lat}
+            jobLng={jobCoords.lng}
+            checkInServerTs={checkInServerTs}
+            checkOutServerTs={checkOutServerTs}
+            bookedDurationText={booking.durationText}
+            approximateLocation={jobCoords.source === 'geocoded'}
+            onCheckedOut={onCheckedOut}
+          />
+        )}
+
+        <ChecklistCard tasks={booking.tasks ?? []} notes={booking.notes} />
+      </div>
+
+      <div className="order-1 flex flex-col gap-5 lg:order-2">
+        <EmergencyContactCard
+          name={booking.dayOfContactName}
+          phone={booking.dayOfContactPhone}
+          relationship={booking.dayOfContactRelationship}
+        />
 
         <ExpandableSection title="ดูรายละเอียดการจอง">
           <div className="flex flex-col gap-2.5">
@@ -109,38 +99,15 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
           </div>
         </ExpandableSection>
 
-        <ExpandableSection title="ดูโปรไฟล์ผู้รับบริการ">
-          <p className="text-xs text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-            ข้อมูลโปรไฟล์ผู้รับบริการจะเปิดใช้งานเร็ว ๆ นี้
-          </p>
-        </ExpandableSection>
-
-        <TaskTagsCard tasks={booking.tasks ?? []} />
-      </div>
-
-      <div className="order-1 flex flex-col gap-5 lg:order-2">
-        {loading ? (
-          <Skeleton height={96} />
-        ) : (
-          <TimeCards checkInServerTs={checkInServerTs} checkOutServerTs={checkOutServerTs} />
-        )}
-
-        {checkOutServerTs ? (
-          <div className="rounded-2xl bg-white p-5 text-center shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
-            <Icon name="task_alt" color="#047857" size="large" />
-            <p className="mt-2 text-sm font-semibold text-[#1A1A1A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-              จบงานเรียบร้อยแล้ว
+        <div id={PROFILE_SECTION_ID}>
+          <ExpandableSection title="ดูโปรไฟล์ผู้รับบริการ">
+            <p className="text-xs text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+              ข้อมูลโปรไฟล์ผู้รับบริการจะเปิดใช้งานเร็ว ๆ นี้
             </p>
-          </div>
-        ) : (
-          <CheckoutButton bookingId={booking.id} onCheckedOut={onCheckedOut} />
-        )}
+          </ExpandableSection>
+        </div>
 
-        <EmergencyContactCard
-          name={booking.dayOfContactName}
-          phone={booking.dayOfContactPhone}
-          relationship={booking.dayOfContactRelationship}
-        />
+        <CareLogCard />
       </div>
     </div>
   );

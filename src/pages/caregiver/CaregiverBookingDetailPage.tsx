@@ -14,10 +14,13 @@ import { CancelAcceptanceModal } from '../../components/ui/CancelAcceptanceModal
 import { AcceptBookingModal } from '../../components/ui/AcceptBookingModal';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
+import { useJobCoordinates } from '../../hooks/useJobCoordinates';
 import Skeleton from '../../components/ui/Skeleton';
 import CheckInMap from './CheckInMap';
 import CaregiverCheckInPanel from './CaregiverCheckInPanel';
 import CaregiverServiceProgressPage from './CaregiverServiceProgressPage';
+import PatientSummaryCard from './checkin/PatientSummaryCard';
+import BookingDetailCard from './checkin/BookingDetailCard';
 
 const IN_PROGRESS_STATUSES: ReadonlyArray<Booking['status']> = ['in_progress', 'awaiting_release', 'needs_review'];
 
@@ -133,6 +136,9 @@ export default function CaregiverBookingDetailPage() {
   });
   const fetchedBooking = fetchedData?.caregiverBooking ? mapToBooking(fetchedData.caregiverBooking) : undefined;
   const booking = fetchedBooking ?? stateBooking;
+  // Called unconditionally (rules of hooks) even though booking may still be undefined here —
+  // the hook itself tolerates undefined lat/lng/address.
+  const jobCoords = useJobCoordinates(booking?.locationLat, booking?.locationLng, booking?.locationName);
 
   const showToast = (message: string, isError = false) => {
     if (isError) showError(message, 3000);
@@ -305,7 +311,10 @@ export default function CaregiverBookingDetailPage() {
             </p>
           </div>
 
-          {/* Main card */}
+          {/* Main card — superseded by PatientSummaryCard + BookingDetailCard once the check-in
+              cards render below (same info, restyled to the Figma check-in spec), so it's hidden
+              for that branch to avoid showing everything twice. Still used for every other status. */}
+          {!canCheckInToday && (
           <div style={{ background: '#FFFFFF', border: '0.8px solid #E0E2E5', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 20, padding: 24 }}>
 
             {/* ── Section 1: ผู้จอง ── */}
@@ -396,6 +405,7 @@ export default function CaregiverBookingDetailPage() {
               </p>
             </div>
           </div>
+          )}
 
           {/* ── Action buttons ── */}
           <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
@@ -432,19 +442,38 @@ export default function CaregiverBookingDetailPage() {
             <div className="mt-6">
               {canCheckInToday ? (
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-[621fr_414fr]">
-                  <div className="order-2 lg:order-1">
+                  <div className="order-2 flex flex-col gap-5 lg:order-1">
                     <CheckInMap
-                      jobLat={booking.locationLat ?? null}
-                      jobLng={booking.locationLng ?? null}
+                      jobLat={jobCoords.lat}
+                      jobLng={jobCoords.lng}
                       caregiverLat={previewPosition?.lat ?? null}
                       caregiverLng={previewPosition?.lng ?? null}
+                      approximate={jobCoords.source === 'geocoded'}
+                    />
+                    <PatientSummaryCard
+                      patientName={booking.patientName}
+                      careRecipientName={booking.careRecipientName}
+                    />
+                    <BookingDetailCard
+                      serviceLabel={svcLabel}
+                      dateText={dateStr}
+                      timeText={booking.time ? `${booking.time} น.` : '—'}
+                      durationText={booking.durationText}
+                      locationName={booking.locationName}
+                      serviceFormat={booking.serviceFormat}
+                      price={booking.price}
+                      tasks={tasks}
+                      notes={booking.notes}
+                      dayOfContactName={booking.dayOfContactName}
+                      dayOfContactPhone={booking.dayOfContactPhone}
+                      dayOfContactRelationship={booking.dayOfContactRelationship}
                     />
                   </div>
                   <div className="order-1 lg:order-2">
                     <CaregiverCheckInPanel
                       bookingId={booking.id}
-                      jobLat={booking.locationLat ?? null}
-                      jobLng={booking.locationLng ?? null}
+                      jobLat={jobCoords.lat}
+                      jobLng={jobCoords.lng}
                       bookingDate={booking.bookingDate}
                       startTime={booking.time ? booking.time.split(' - ')[0] : null}
                       onCheckedIn={() => refetchBooking()}
