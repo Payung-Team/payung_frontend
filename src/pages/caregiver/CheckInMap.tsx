@@ -16,6 +16,12 @@ export interface CheckInMapProps {
   overlayBadge?: React.ReactNode;
   /** The 200m/500m rings are only meaningful pre-check-in; Service Progress hides them. */
   showRadiusCircles?: boolean;
+  /** Bottom-left overlay content — takes priority over the distance chip when both are given
+   * (e.g. Service Progress shows "เช็คอิน HH:MM" here instead of a distance figure). */
+  bottomLeftContent?: React.ReactNode;
+  /** True when jobLat/jobLng came from geocoding the saved address rather than a dropped pin
+   * (see useJobCoordinates) — shows a caption so the caregiver knows it's an approximation. */
+  approximate?: boolean;
 }
 
 const JOB_MARKER_ICON = { url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' };
@@ -30,6 +36,8 @@ export default function CheckInMap({
   hideDistanceChip = false,
   overlayBadge,
   showRadiusCircles = true,
+  bottomLeftContent,
+  approximate = false,
 }: Readonly<CheckInMapProps>) {
   const mapDivRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no google.maps type package installed, matches MapPicker.tsx convention
@@ -128,27 +136,40 @@ export default function CheckInMap({
   }
 
   return (
-    <div className="relative h-105 w-full overflow-hidden rounded-2xl border border-[#E5E7EB] lg:h-85">
-      <div ref={mapDivRef} className="h-full w-full" />
+    <div>
+      <div className="relative h-105 w-full overflow-hidden rounded-2xl border border-[#E5E7EB] lg:h-85">
+        <div ref={mapDivRef} className="h-full w-full" />
 
-      {!loaded && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-gray-50">
-          <span className="material-icons animate-spin text-3xl text-[#52B69A]">refresh</span>
-          <span className="text-xs font-semibold text-[#8A8C8E]">กำลังโหลดแผนที่...</span>
-        </div>
-      )}
+        {!loaded && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-gray-50">
+            <span className="material-icons animate-spin text-3xl text-[#52B69A]">refresh</span>
+            <span className="text-xs font-semibold text-[#8A8C8E]">กำลังโหลดแผนที่...</span>
+          </div>
+        )}
 
-      {showRadiusCircles && <RadiusCircles map={mapInstance} center={{ lat: jobLat, lng: jobLng }} />}
+        {showRadiusCircles && <RadiusCircles map={mapInstance} center={{ lat: jobLat, lng: jobLng }} />}
 
-      {overlayBadge && <div className="absolute left-3 top-3 z-1">{overlayBadge}</div>}
+        {overlayBadge && <div className="absolute left-3 top-3 z-1">{overlayBadge}</div>}
 
-      {!hideDistanceChip && distanceM !== null && distanceM !== undefined && (
-        <div
-          className="absolute bottom-3 left-3 z-1 rounded-[10px] bg-white/95 px-3 py-1.5 text-sm font-bold text-[#1A1A1A] shadow-sm"
-          style={{ fontFamily: "'Inter', sans-serif" }}
-        >
-          {Math.round(distanceM)} ม. จากจุดงาน
-        </div>
+        {bottomLeftContent ? (
+          <div className="absolute bottom-3 left-3 z-1">{bottomLeftContent}</div>
+        ) : (
+          !hideDistanceChip && distanceM !== null && distanceM !== undefined && (
+            <div
+              className="absolute bottom-3 left-3 z-1 rounded-[10px] bg-white/95 px-3 py-1.5 text-sm font-bold text-[#1A1A1A] shadow-sm"
+              style={{ fontFamily: "'Inter', sans-serif" }}
+            >
+              {Math.round(distanceM)} ม. จากจุดงาน
+            </div>
+          )
+        )}
+      </div>
+
+      {approximate && (
+        <p className="mt-1.5 flex items-center gap-1 text-[11px] text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+          <Icon name="info" size="small" color="#B0B3B8" />
+          ตำแหน่งโดยประมาณจากที่อยู่ที่บันทึกไว้ ไม่ใช่หมุดที่ปักไว้จริง
+        </p>
       )}
     </div>
   );

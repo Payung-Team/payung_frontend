@@ -4,6 +4,8 @@ import { Icon } from '../../../components/ui/Icon';
 export interface TimeCardsProps {
   checkInServerTs: string | null;
   checkOutServerTs: string | null;
+  /** Display text for the booked duration, e.g. "4 ชม." — already computed elsewhere on the page. */
+  bookedDurationText?: string;
 }
 
 const TICK_INTERVAL_MS = 60_000;
@@ -38,16 +40,17 @@ function formatElapsed(minutes: number): string {
   return `${hours} ชม. ${mins} นาที`;
 }
 
-function TimeCard({
+function TimeCell({
   icon,
   label,
   time,
   subtitle,
   tone,
-}: Readonly<{ icon: string; label: string; time: string; subtitle: string; tone: 'active' | 'pending' }>) {
+  bordered,
+}: Readonly<{ icon: string; label: string; time: string; subtitle: string; tone: 'active' | 'pending'; bordered?: boolean }>) {
   const iconColor = tone === 'active' ? '#047857' : '#8A8C8E';
   return (
-    <div className="flex-1 rounded-xl border border-[#F0F1F3] p-3.5 text-center">
+    <div className={`flex-1 px-4 py-3.5 text-center ${bordered ? 'border-l border-[#F0F1F3]' : ''}`}>
       <div className="flex items-center justify-center gap-1">
         <Icon name={icon} size="small" color={iconColor} />
         <span className="text-xs font-semibold" style={{ color: iconColor, fontFamily: "'Bai Jamjuree', sans-serif" }}>
@@ -64,24 +67,27 @@ function TimeCard({
   );
 }
 
-export default function TimeCards({ checkInServerTs, checkOutServerTs }: Readonly<TimeCardsProps>) {
+/** Shell-less time row — meant to be nested inside a parent card (ServiceProgressWorkCard),
+ * matching the Figma spec where check-in/check-out sit inside the same card as the map. */
+export default function TimeCards({ checkInServerTs, checkOutServerTs, bookedDurationText }: Readonly<TimeCardsProps>) {
   const elapsedMinutes = useElapsedMinutes(checkInServerTs, checkOutServerTs);
 
   return (
-    <div className="flex gap-3 rounded-2xl bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
-      <TimeCard
+    <div className="flex divide-x divide-[#F0F1F3]">
+      <TimeCell
         icon="login"
         label="เช็คอิน"
         time={checkInServerTs ? formatTime(checkInServerTs) : '—'}
         subtitle={elapsedMinutes !== null ? `ทำงานมาแล้ว ${formatElapsed(elapsedMinutes)}` : ''}
         tone="active"
       />
-      <TimeCard
+      <TimeCell
         icon="logout"
-        label="เช็คเอาท์"
-        time={checkOutServerTs ? formatTime(checkOutServerTs) : '(ยังไม่มี)'}
-        subtitle=""
+        label={checkOutServerTs ? 'เช็คเอาท์' : 'เช็คเอาท์ (คาดว่า)'}
+        time={checkOutServerTs ? formatTime(checkOutServerTs) : '—'}
+        subtitle={bookedDurationText ? `ตามเวลาที่จอง ${bookedDurationText}` : ''}
         tone={checkOutServerTs ? 'active' : 'pending'}
+        bordered
       />
     </div>
   );

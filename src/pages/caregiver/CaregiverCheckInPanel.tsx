@@ -6,6 +6,7 @@ import { useToast } from '../../hooks/useToast';
 import { ToastContainer } from '../../components/ui/Toast';
 import { Icon } from '../../components/ui/Icon';
 import { haversineM } from '../../lib/checkinThresholds';
+import { extractGraphQLErrorMessage } from '../../lib/apolloErrors';
 import { deriveCheckInGpsState, deriveTimingNotice, type CheckInGpsState } from './checkInStates';
 
 export interface CheckInJobEvent {
@@ -122,8 +123,7 @@ export default function CaregiverCheckInPanel({
       setSuccessEvent(jobEvent);
       onCheckedIn(jobEvent);
     } catch (err) {
-      const message = (err as { graphQLErrors?: { message?: string }[] })?.graphQLErrors?.[0]?.message;
-      showError(message || 'ไม่สามารถเช็คอินได้ กรุณาลองใหม่', 4000);
+      showError(extractGraphQLErrorMessage(err) ?? 'ไม่สามารถเช็คอินได้ กรุณาลองใหม่', 4000);
     }
   }
 
