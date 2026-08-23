@@ -45,6 +45,13 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
   post_surgery: 'หลังผ่าตัด',
 };
 
+// Statuses in which the patient may still write their review.
+const REVIEWABLE_STATUSES = new Set<ConfirmedBooking['status']>([
+  'completed',
+  'awaiting_release',
+  'needs_review',
+]);
+
 const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: string; bg: string; text: string }> = {
   pending: { label: 'รอตอบรับ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
   accepted: { label: 'รอชำระเงิน', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
@@ -319,7 +326,10 @@ export default function BookingDetailPage() {
     }
   };
 
-  const showReviewSection = booking.status === 'completed' && isPatient;
+  // Reviewing opens as soon as the caregiver checks out — the tracking view's
+  // "การดูแลเสร็จสิ้น" card invites it during awaiting_release / needs_review,
+  // i.e. before the payout lands and the booking flips to completed.
+  const showReviewSection = REVIEWABLE_STATUSES.has(booking.status) && isPatient;
   const canShowReviewPrompt = showReviewSection && !existingReview && !showReviewForm;
   const canShowSubmittedReview = showReviewSection && !!existingReview && !showReviewForm;
 
@@ -453,6 +463,11 @@ export default function BookingDetailPage() {
           onBack={() => navigate('/bookings')}
           onReportProblem={() => setShowDisputeModal(true)}
           onMessage={() => navigate('/messages')}
+          onWriteReview={handleReview}
+          onRebook={() => {
+            if (booking.caregiverId) navigate(`/caregivers/${booking.caregiverId}`);
+          }}
+          hasReviewed={!!existingReview}
         />
         {disputeModal}
         <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />

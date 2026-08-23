@@ -19,6 +19,8 @@ import Skeleton from '../../components/ui/Skeleton';
 import CheckInMap from './CheckInMap';
 import CaregiverCheckInPanel from './CaregiverCheckInPanel';
 import CaregiverServiceProgressPage from './CaregiverServiceProgressPage';
+import CheckOutSuccess from '../../components/caregiver/CheckOutSuccess';
+import type { ProofOfWorkSummary } from '../../lib/monitoring';
 import PatientSummaryCard from './checkin/PatientSummaryCard';
 import BookingDetailCard from './checkin/BookingDetailCard';
 
@@ -116,6 +118,8 @@ export default function CaregiverBookingDetailPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [previewPosition, setPreviewPosition] = useState<{ lat: number; lng: number } | null>(null);
+  /** มีค่าเมื่อเพิ่งปิดงานสำเร็จในรอบนี้ — ใช้สลับไปหน้าสรุปผลแทนหน้าความคืบหน้า */
+  const [checkedOutProof, setCheckedOutProof] = useState<ProofOfWorkSummary | null>(null);
 
   const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
   const [acceptBooking] = useMutation(ACCEPT_BOOKING);
@@ -171,6 +175,18 @@ export default function CaregiverBookingDetailPage() {
     );
   }
 
+  if (checkedOutProof) {
+    return (
+      <CheckOutSuccess
+        bookingRef={`REF-${booking.id.toUpperCase().replaceAll('-', '').slice(-6)}`}
+        bookingDateText={booking.bookingDate ? formatThaiDate(booking.bookingDate) : '—'}
+        price={booking.price}
+        proof={checkedOutProof}
+        onBack={() => navigate('/caregiver/bookings')}
+      />
+    );
+  }
+
   if (IN_PROGRESS_STATUSES.includes(booking.status)) {
     return (
       <div style={{ minHeight: '100vh', background: '#F6FAF9' }}>
@@ -185,7 +201,15 @@ export default function CaregiverBookingDetailPage() {
               กลับไปงานของฉัน
             </span>
           </button>
-          <CaregiverServiceProgressPage booking={booking} onCheckedOut={() => refetchBooking()} />
+          <CaregiverServiceProgressPage
+            booking={booking}
+            onCheckedOut={(proof) => {
+              // proof เป็น null = ดึงข้อมูลใหม่ไม่สำเร็จ → ไม่เด้งหน้าสรุป ปล่อยให้ refetch
+              // พาไปหน้าตามสถานะใหม่แทน ดีกว่าโชว์หน้าสรุปที่ตัวเลขว่าง
+              setCheckedOutProof(proof);
+              void refetchBooking();
+            }}
+          />
         </div>
       </div>
     );

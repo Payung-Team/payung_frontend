@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import type { ConfirmedBooking } from '../../context/BookingContext';
+import { useBooking, type ConfirmedBooking } from '../../context/BookingContext';
 import { useJobEvents } from '../../hooks/useJobEvents';
 import { ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
 
@@ -12,7 +12,7 @@ import { ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
 // care-log. Wire this up to the Supabase job_events subscription once the API
 // adds those fields.
 
-export type TrackingState = 'awaiting_checkin' | 'checked_in' | 'working';
+export type TrackingState = 'awaiting_checkin' | 'checked_in' | 'working' | 'checked_out';
 
 const SERVICE_TYPE_LABELS: Record<string, string> = {
   general_care: 'ดูแลทั่วไป',
@@ -66,6 +66,9 @@ const MOCK = {
   jobsCount: 142,
   yearsExperience: 8,
   careNote: 'ต้องวัดน้ำตาลก่อนเริ่มกายภาพทุกครั้ง',
+  // Note the caregiver types on check-out. proof.checkOut.note is the real field
+  // and always wins — this only keeps the card reviewable on test bookings.
+  checkOutNote: 'ลืมล้างจาน',
   tasks: [
     { id: 't1', name: 'วัดระดับน้ำตาล', done: false },
     { id: 't2', name: 'กายภาพบำบัดเบื้องต้น', done: false },
@@ -107,20 +110,19 @@ const CARE_LOG_CATEGORY: Record<string, { icon: string; label: string }> = {
 
 const LOG_PREVIEW_COUNT = 3;
 
-function buildProgressDetail(isCheckedIn: boolean, checkedOutAt: Date | null, elapsedStr: string): string {
-  if (!isCheckedIn) return '—';
-  return checkedOutAt ? `รวม ${elapsedStr}` : `มาแล้ว ${elapsedStr}`;
-}
-
-function getProgressState(isCheckedIn: boolean, checkedOutAt: Date | null): TimelineStep['state'] {
-  if (!isCheckedIn) return 'pending';
-  return checkedOutAt ? 'done' : 'active';
+// Only used while the job is still running — once the caregiver checks out the
+// timeline swaps this step for a "ปิดงาน" one.
+function buildProgressDetail(isCheckedIn: boolean, elapsedStr: string): string {
+  return isCheckedIn ? `มาแล้ว ${elapsedStr}` : '—';
 }
 
 const STATUS_PILL: Record<TrackingState, { label: string; bg: string; dot: string; text: string }> = {
   awaiting_checkin: { label: 'รอผู้ดูแลเช็คอิน', bg: '#F0F1F3', dot: '#575859', text: '#575859' },
   checked_in: { label: 'ผู้ดูแลกำลังทำงาน', bg: '#EFF6FF', dot: '#1D4ED8', text: '#1D4ED8' },
   working: { label: 'ผู้ดูแลกำลังทำงาน', bg: '#EFF6FF', dot: '#1D4ED8', text: '#1D4ED8' },
+  // Never rendered — the checked-out layout hides the pill and says "การดูแลเสร็จสิ้น"
+  // in the banner instead. Present only to keep the record exhaustive.
+  checked_out: { label: 'ดูแลเสร็จสิ้น', bg: '#ECFDF5', dot: '#059669', text: '#047857' },
 };
 
 // Stacked label-above-value field used by the booking-detail panel's 3-up grid.
@@ -191,6 +193,17 @@ function StatRow({ icon, iconColor, iconBg, label, value }: Readonly<{ icon: str
         <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E', margin: 0, lineHeight: '16px' }}>{label}</p>
         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '20px' }}>{value}</p>
       </div>
+    </div>
+  );
+}
+
+// Plain centred label/value column for the sidebar summary strip. `divided`
+// draws the hairline that separates it from the column on its left.
+function SummaryStat({ label, value, divided = false }: Readonly<{ label: string; value: string; divided?: boolean }>) {
+  return (
+    <div style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '0 8px', borderLeft: divided ? '0.8px solid #F0F1F3' : undefined }}>
+      <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E', margin: 0, lineHeight: '16px' }}>{label}</p>
+      <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: '#1A1A1A', margin: '2px 0 0', lineHeight: '20px' }}>{value}</p>
     </div>
   );
 }
@@ -386,14 +399,21 @@ export function BookingTrackingView({
   onBack,
   onReportProblem,
   onMessage,
+  onWriteReview,
+  onRebook,
+  hasReviewed = false,
 }: Readonly<{
   booking: ConfirmedBooking;
   onBack: () => void;
   onReportProblem: () => void;
   onMessage: () => void;
+  onWriteReview: () => void;
+  onRebook: () => void;
+  hasReviewed?: boolean;
 }>) {
   const [showDetails, setShowDetails] = useState(false);
   const [showAllLogs, setShowAllLogs] = useState(false);
+  const { toggleSaveCaregiver, isCaregiverSaved } = useBooking();
 
   // ── Live data ───────────────────────────────────────────────────────────────
   // proofOfWork is the source of truth for check-in/check-out. The care log and
@@ -405,7 +425,9 @@ export function BookingTrackingView({
   const { search } = useLocation();
   const mockParam = new URLSearchParams(search).get('mock');
   const mockState: TrackingState | null =
-    mockParam === 'checked_in' || mockParam === 'working' ? mockParam : null;
+    mockParam === 'checked_in' || mockParam === 'working' || mockParam === 'checked_out'
+      ? mockParam
+      : null;
 
   // Memoised on the raw timestamp string: a fresh Date every render would make the
   // clock effect below re-subscribe on every render.
@@ -421,15 +443,22 @@ export function BookingTrackingView({
   const statusSaysStarted = ACTIVE_JOB_STATUSES.has(booking.status);
   const hasStarted = checkedInAt !== null || statusSaysStarted;
 
+  // A real check-out timestamp is the end of the job, whatever the status says.
+  const hasCheckedOut = checkedOutAt !== null || mockState === 'checked_out';
+
   let state: TrackingState;
-  if (hasStarted) {
+  if (hasCheckedOut) {
+    state = 'checked_out';
+  } else if (hasStarted) {
     // 'working' vs 'checked_in' only decides whether the (still mocked) care log
     // renders, so the override keeps its say here.
     state = mockState === 'checked_in' ? 'checked_in' : 'working';
   } else {
     state = mockState ?? 'awaiting_checkin';
   }
-  const isWorking = state === 'working';
+  // The care log and task progress are history once the job ends, so they must
+  // keep rendering after check-out — not fall back to the empty state.
+  const isWorking = state === 'working' || state === 'checked_out';
   const isCheckedIn = state !== 'awaiting_checkin';
 
   // Mock clock, used only when `?mock=` is driving a state that has no real
@@ -437,14 +466,18 @@ export function BookingTrackingView({
   const [mockCheckedInAt] = useState(() => new Date(Date.now() - 42 * 60_000));
   const usingMockClock = checkedInAt === null && mockState !== null;
   const effectiveCheckedInAt = checkedInAt ?? (usingMockClock ? mockCheckedInAt : null);
+  const effectiveCheckedOutAt = checkedOutAt
+    ?? (mockState === 'checked_out' && effectiveCheckedInAt
+      ? new Date(effectiveCheckedInAt.getTime() + 31 * 60_000)
+      : null);
 
   // Live elapsed clock, anchored to the SERVER timestamp — never the device clock.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!isCheckedIn || checkedOutAt) return;
+    if (!isCheckedIn || hasCheckedOut) return;
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
-  }, [isCheckedIn, checkedOutAt]);
+  }, [isCheckedIn, hasCheckedOut]);
 
   // Show a dash rather than a guess while the real timestamps are loading.
   const checkInTimeStr = effectiveCheckedInAt ? formatThaiTime(effectiveCheckedInAt) : '—';
@@ -452,9 +485,20 @@ export function BookingTrackingView({
   if (proof?.actualMinutes != null) {
     elapsedStr = formatElapsed(proof.actualMinutes * 60_000);
   } else if (effectiveCheckedInAt) {
-    elapsedStr = formatElapsed(now - effectiveCheckedInAt.getTime());
+    // Freeze on the check-out timestamp once it exists — a still-ticking total
+    // after the job ended would be a lie.
+    const end = effectiveCheckedOutAt?.getTime() ?? now;
+    elapsedStr = formatElapsed(end - effectiveCheckedInAt.getTime());
   }
+  const checkOutTimeStr = effectiveCheckedOutAt ? formatThaiTime(effectiveCheckedOutAt) : '—';
   const pill = STATUS_PILL[state];
+
+  // Once the job is over, the plan and the care log are a record rather than a
+  // live feed — same dimming the pre-check-in state already uses.
+  const dimPastCards = !isCheckedIn || hasCheckedOut;
+  const checkOutNote = proof?.checkOut?.note ?? (hasCheckedOut ? MOCK.checkOutNote : null);
+  const canSaveCaregiver = Boolean(booking.caregiverId);
+  const isSaved = canSaveCaregiver && isCaregiverSaved(booking.caregiverId);
 
   // Hide the map when the booking has no coordinates — that is a gap in our data,
   // not the caregiver's fault, and an empty map would just look broken.
@@ -524,21 +568,24 @@ export function BookingTrackingView({
       detail: isCheckedIn ? checkInTimeStr : 'ยังไม่เช็คอิน',
       state: isCheckedIn ? 'done' : 'pending',
     },
-    {
-      key: 'in_progress',
-      icon: 'hourglass_top',
-      label: checkedOutAt ? 'ให้บริการเสร็จสิ้น' : 'กำลังให้บริการ',
-      detail: buildProgressDetail(isCheckedIn, checkedOutAt, elapsedStr),
-      state: getProgressState(isCheckedIn, checkedOutAt),
-    },
   ];
-  if (checkedOutAt) {
+  if (hasCheckedOut) {
+    // The job is over: "กำลังให้บริการ" would be a step about nothing, so the
+    // closing step carries the total on its own.
     timelineSteps.push({
       key: 'checkout',
       icon: 'logout',
-      label: 'ผู้ดูแลเช็คเอาท์',
-      detail: formatThaiTime(checkedOutAt),
+      label: 'ปิดงาน',
+      detail: checkOutTimeStr,
       state: 'done',
+    });
+  } else {
+    timelineSteps.push({
+      key: 'in_progress',
+      icon: 'hourglass_top',
+      label: 'กำลังให้บริการ',
+      detail: buildProgressDetail(isCheckedIn, elapsedStr),
+      state: isCheckedIn ? 'active' : 'pending',
     });
   }
 
@@ -658,8 +705,53 @@ export function BookingTrackingView({
 
         {/* Checked in → live location map (mocked). Hidden entirely when the
             booking has no coordinates. */}
-        {isCheckedIn && !hideMap && (
+        {isCheckedIn && !hideMap && !hasCheckedOut && (
           <CheckInMapCard checkInTime={checkInTimeStr} location={checkInAreaStr} />
+        )}
+
+        {/* Job finished → the only two things left to do are review or dispute,
+            both time-boxed by the payout window. */}
+        {hasCheckedOut && (
+          <div style={{ marginTop: 20, boxSizing: 'border-box', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 16, padding: 20, background: '#FFFFFF', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 18, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 22, background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span className="material-icons" style={{ fontSize: 24, color: '#059669' }}>task_alt</span>
+              </div>
+              <div>
+                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 17, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '26px' }}>
+                  การดูแลเสร็จสิ้น
+                </p>
+                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#575859', margin: 0, lineHeight: '18px' }}>
+                  รีวิวผู้ดูแล หรือแจ้งปัญหาได้ภายใน 24 ชั่วโมง ก่อนระบบโอนเงิน
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              {hasReviewed ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 20px', height: 44, background: '#ECFDF5', border: '0.8px solid rgba(16,185,129,0.3)', borderRadius: 12, boxSizing: 'border-box' }}>
+                  <span className="material-icons" style={{ fontSize: 18, color: '#047857' }}>check_circle</span>
+                  <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#047857', lineHeight: '21px' }}>คุณรีวิวแล้ว</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onWriteReview}
+                  style={{ boxSizing: 'border-box', display: 'inline-flex', flexDirection: 'row', alignItems: 'center', padding: '0 20px', gap: 8, height: 44, background: '#52B69A', border: 'none', boxShadow: '0px 4px 12px rgba(82,182,154,0.2)', borderRadius: 12, cursor: 'pointer' }}
+                >
+                  <span className="material-icons" style={{ fontSize: 18, color: '#FFFFFF' }}>star</span>
+                  <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#FFFFFF', lineHeight: '21px' }}>ให้คะแนนรีวิว</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onReportProblem}
+                style={{ boxSizing: 'border-box', display: 'inline-flex', flexDirection: 'row', alignItems: 'center', padding: '0 20px', gap: 8, height: 44, background: '#FFFFFF', border: '0.8px solid rgba(220,38,38,0.4)', borderRadius: 12, cursor: 'pointer' }}
+              >
+                <span className="material-icons" style={{ fontSize: 18, color: '#DC2626' }}>flag</span>
+                <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#DC2626', lineHeight: '21px' }}>แจ้งปัญหา</span>
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Not-started alert banner */}
@@ -695,8 +787,23 @@ export function BookingTrackingView({
           {/* Left column */}
           <div style={{ flex: '1 1 520px', minWidth: 320, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
+            {/* Note the caregiver left on check-out */}
+            {hasCheckedOut && checkOutNote && (
+              <div style={{ boxSizing: 'border-box', background: '#FFFFFF', border: '0.8px solid rgba(245,158,11,0.3)', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 18, padding: 20 }}>
+                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 17, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '26px' }}>
+                  โน้ตจากผู้ดูแล
+                </p>
+                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#1A1A1A', margin: '8px 0 0', lineHeight: '21px' }}>
+                  {checkOutNote}
+                </p>
+                <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: '#8A8C8E', margin: '8px 0 0', lineHeight: '16px' }}>
+                  ปิดงานเมื่อ {checkOutTimeStr}
+                </p>
+              </div>
+            )}
+
             {/* แผนงานที่ผู้ดูแลทำ */}
-            <div style={{ boxSizing: 'border-box', background: '#FFFFFF', opacity: isCheckedIn ? 1 : 0.7, boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 18, padding: 20 }}>
+            <div style={{ boxSizing: 'border-box', background: '#FFFFFF', opacity: dimPastCards ? 0.7 : 1, boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 18, padding: 20 }}>
               <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 17, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '26px' }}>
                 แผนงานที่ผู้ดูแลทำ
               </p>
@@ -768,7 +875,7 @@ export function BookingTrackingView({
             </div>
 
             {/* บันทึกการดูแล */}
-            <div style={{ boxSizing: 'border-box', background: '#FFFFFF', opacity: isCheckedIn ? 1 : 0.7, boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 18, padding: 20 }}>
+            <div style={{ boxSizing: 'border-box', background: '#FFFFFF', opacity: dimPastCards ? 0.7 : 1, boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 18, padding: 20 }}>
               <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                 <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 17, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '26px' }}>
                   {careLogs.length > 0 ? 'บันทึกจากผู้ดูแล' : 'บันทึกการดูแล'}
@@ -824,13 +931,17 @@ export function BookingTrackingView({
             <div style={{ boxSizing: 'border-box', background: '#FFFFFF', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 18 }}>
               <div style={{ padding: 20 }}>
                 <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-                  <CaregiverAvatar name={booking.caregiverName} avatarUrl={booking.caregiverAvatarUrl} online={isCheckedIn} />
+                  <CaregiverAvatar name={booking.caregiverName} avatarUrl={booking.caregiverAvatarUrl} online={isCheckedIn && !hasCheckedOut} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', height: 24.5, background: pill.bg, borderRadius: 9999 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: 3, background: pill.dot, flexShrink: 0 }} />
-                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, fontWeight: 700, color: pill.text, lineHeight: '16px' }}>{pill.label}</span>
-                    </span>
-                    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                    {/* After check-out the green banner above already states the
+                        outcome — a second live-looking pill here would fight it. */}
+                    {!hasCheckedOut && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', height: 24.5, background: pill.bg, borderRadius: 9999 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: 3, background: pill.dot, flexShrink: 0 }} />
+                        <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, fontWeight: 700, color: pill.text, lineHeight: '16px' }}>{pill.label}</span>
+                      </span>
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: hasCheckedOut ? 0 : 4 }}>
                       <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 17, fontWeight: 700, color: '#1A1A1A', lineHeight: '26px' }}>
                         {booking.caregiverName}
                       </span>
@@ -855,50 +966,79 @@ export function BookingTrackingView({
                 </div>
 
                 {/* Stats row */}
-                {isCheckedIn ? (
+                {hasCheckedOut && (
+                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: '0.8px solid #F0F1F3', display: 'flex', flexDirection: 'row' }}>
+                    <SummaryStat label="เช็คอิน" value={checkInTimeStr} />
+                    <SummaryStat label="เช็คเอาท์" value={checkOutTimeStr} divided />
+                    <SummaryStat label="ระยะเวลา" value={elapsedStr} divided />
+                  </div>
+                )}
+                {!hasCheckedOut && isCheckedIn && (
                   <div style={{ marginTop: 16, paddingTop: 16, borderTop: '0.8px solid #F0F1F3', display: 'flex', flexDirection: 'row', gap: 12 }}>
                     <StatRow icon="login" iconColor="#1D4ED8" iconBg="#EFF6FF" label="เริ่มงาน" value={checkInTimeStr} />
-                    <StatRow
-                      icon="hourglass_top"
-                      iconColor="#3A9A7E"
-                      iconBg="#E6F5ED"
-                      label={checkedOutAt ? 'รวมเวลา' : 'ระยะเวลา'}
-                      value={elapsedStr}
-                    />
+                    <StatRow icon="hourglass_top" iconColor="#3A9A7E" iconBg="#E6F5ED" label="ระยะเวลา" value={elapsedStr} />
                   </div>
-                ) : (
+                )}
+                {!hasCheckedOut && !isCheckedIn && (
                   <div style={{ marginTop: 16, paddingTop: 16, borderTop: '0.8px solid #F0F1F3', display: 'flex', flexDirection: 'row' }}>
-                    <div style={{ flex: 1, textAlign: 'center', padding: '0 8px' }}>
-                      <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E', margin: 0, lineHeight: '16px' }}>เช็คอิน</p>
-                      <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: '#1A1A1A', margin: '2px 0 0', lineHeight: '20px' }}>ยังไม่เริ่ม</p>
-                    </div>
-                    <div style={{ flex: 1, textAlign: 'center', padding: '0 8px', borderLeft: '0.8px solid #F0F1F3' }}>
-                      <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E', margin: 0, lineHeight: '16px' }}>ระยะเวลา</p>
-                      <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: '#1A1A1A', margin: '2px 0 0', lineHeight: '20px' }}>{durationStr}</p>
-                    </div>
+                    <SummaryStat label="เช็คอิน" value="ยังไม่เริ่ม" />
+                    <SummaryStat label="ระยะเวลา" value={durationStr} divided />
                   </div>
                 )}
 
                 {/* Actions */}
-                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'row', gap: 10 }}>
-                  <button
-                    type="button"
-                    onClick={onMessage}
-                    style={{ flex: 1, boxSizing: 'border-box', display: 'inline-flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: '0 12px', gap: 6, height: 40, background: '#52B69A', border: 'none', boxShadow: '0px 4px 12px rgba(82,182,154,0.2)', borderRadius: 12, cursor: 'pointer' }}
-                  >
-                    <span className="material-icons" style={{ fontSize: 16, color: '#FFFFFF' }}>chat_bubble</span>
-                    <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#FFFFFF', lineHeight: '20px' }}>ส่งข้อความ</span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!isCheckedIn}
-                    title={isCheckedIn ? undefined : 'ยังไม่รองรับการโทรในขณะนี้'}
-                    style={{ flex: 1, boxSizing: 'border-box', display: 'inline-flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: '0 12px', gap: 6, height: 40, background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 12, cursor: isCheckedIn ? 'pointer' : 'not-allowed', opacity: isCheckedIn ? 1 : 0.6 }}
-                  >
-                    <span className="material-icons" style={{ fontSize: 16, color: '#3B82F6' }}>call</span>
-                    <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#1A1A1A', lineHeight: '20px' }}>โทร</span>
-                  </button>
-                </div>
+                {hasCheckedOut ? (
+                  <div style={{ marginTop: 16, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <button
+                      type="button"
+                      onClick={onRebook}
+                      style={{ flex: 1, boxSizing: 'border-box', display: 'inline-flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: '0 12px', gap: 6, height: 40, background: '#52B69A', border: 'none', boxShadow: '0px 4px 12px rgba(82,182,154,0.2)', borderRadius: 12, cursor: 'pointer' }}
+                    >
+                      <span className="material-icons" style={{ fontSize: 16, color: '#FFFFFF' }}>event_repeat</span>
+                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#FFFFFF', lineHeight: '20px' }}>จองอีกครั้ง</span>
+                    </button>
+                    {canSaveCaregiver && (
+                      <button
+                        type="button"
+                        onClick={() => toggleSaveCaregiver({
+                          id: booking.caregiverId,
+                          fullName: booking.caregiverName,
+                          avatarUrl: booking.caregiverAvatarUrl,
+                          hourlyRate: booking.caregiverHourlyRate,
+                          skills: booking.draft.serviceTypes ?? [],
+                          province: booking.caregiverProvince ?? '',
+                        })}
+                        aria-pressed={isSaved}
+                        title={isSaved ? 'นำผู้ดูแลออกจากรายการบันทึก' : 'บันทึกผู้ดูแล'}
+                        style={{ boxSizing: 'border-box', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', width: 40, height: 40, flexShrink: 0, background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 12, cursor: 'pointer' }}
+                      >
+                        <span className="material-icons" style={{ fontSize: 18, color: isSaved ? '#F43F5E' : '#575859' }}>
+                          {isSaved ? 'favorite' : 'favorite_border'}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 16, display: 'flex', flexDirection: 'row', gap: 10 }}>
+                    <button
+                      type="button"
+                      onClick={onMessage}
+                      style={{ flex: 1, boxSizing: 'border-box', display: 'inline-flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: '0 12px', gap: 6, height: 40, background: '#52B69A', border: 'none', boxShadow: '0px 4px 12px rgba(82,182,154,0.2)', borderRadius: 12, cursor: 'pointer' }}
+                    >
+                      <span className="material-icons" style={{ fontSize: 16, color: '#FFFFFF' }}>chat_bubble</span>
+                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#FFFFFF', lineHeight: '20px' }}>ส่งข้อความ</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!isCheckedIn}
+                      title={isCheckedIn ? undefined : 'ยังไม่รองรับการโทรในขณะนี้'}
+                      style={{ flex: 1, boxSizing: 'border-box', display: 'inline-flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: '0 12px', gap: 6, height: 40, background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 12, cursor: isCheckedIn ? 'pointer' : 'not-allowed', opacity: isCheckedIn ? 1 : 0.6 }}
+                    >
+                      <span className="material-icons" style={{ fontSize: 16, color: '#3B82F6' }}>call</span>
+                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#1A1A1A', lineHeight: '20px' }}>โทร</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Progress timeline */}
@@ -912,7 +1052,7 @@ export function BookingTrackingView({
 
             {/* Once the amber banner is gone, "แจ้งปัญหา" lives here — it must stay
                 as prominent as the rest of the sidebar. */}
-            {isCheckedIn && (
+            {isCheckedIn && !hasCheckedOut && (
               <button
                 type="button"
                 onClick={onReportProblem}

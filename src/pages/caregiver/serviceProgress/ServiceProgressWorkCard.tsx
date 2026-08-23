@@ -1,10 +1,13 @@
 import ServiceProgressMap from './ServiceProgressMap';
 import TimeCards from './TimeCards';
-import CheckoutButton, { type CheckoutJobEvent } from './CheckoutButton';
+import CheckoutButton from './CheckoutButton';
 import { Icon } from '../../../components/ui/Icon';
+import type { JobEvent, ProofOfWorkSummary } from '../../../lib/monitoring';
 
 export interface ServiceProgressWorkCardProps {
   bookingId: string;
+  bookingRef: string;
+  proof: ProofOfWorkSummary;
   jobLat: number | null;
   jobLng: number | null;
   checkInServerTs: string | null;
@@ -12,7 +15,7 @@ export interface ServiceProgressWorkCardProps {
   bookedDurationText?: string;
   /** True when jobLat/jobLng were geocoded from the saved address rather than a dropped pin. */
   approximateLocation?: boolean;
-  onCheckedOut: (jobEvent: CheckoutJobEvent) => void;
+  onCheckedOut: (jobEvent: JobEvent) => void;
 }
 
 function formatTime(iso: string): string {
@@ -23,6 +26,8 @@ function formatTime(iso: string): string {
  * the Figma spec (a single Container with two internal dividers rather than three stacked cards). */
 export default function ServiceProgressWorkCard({
   bookingId,
+  bookingRef,
+  proof,
   jobLat,
   jobLng,
   checkInServerTs,
@@ -54,8 +59,20 @@ export default function ServiceProgressWorkCard({
               จบงานเรียบร้อยแล้ว
             </p>
           </div>
+        ) : !checkInServerTs ? (
+          /* CheckOutModal ต้องมีข้อมูลเช็คอินถึงจะเปิดได้ ถ้าปล่อยปุ่มไว้จะกลายเป็นปุ่มกดแล้วไม่มีอะไรขึ้น */
+          <p className="py-1.5 text-center text-sm text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+            เช็คอินก่อนจึงจะจบงานได้
+          </p>
         ) : (
-          <CheckoutButton bookingId={bookingId} onCheckedOut={onCheckedOut} />
+          <CheckoutButton
+            bookingId={bookingId}
+            bookingRef={bookingRef}
+            proof={proof}
+            jobLat={jobLat}
+            jobLng={jobLng}
+            onCheckedOut={onCheckedOut}
+          />
         )}
       </div>
     </div>

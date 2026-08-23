@@ -1,5 +1,5 @@
 import { useQuery } from '@apollo/client/react';
-import { GET_PROOF_OF_WORK } from '../../graphql/queries';
+import { PROOF_OF_WORK } from '../../graphql/queries';
 import { useJobCoordinates } from '../../hooks/useJobCoordinates';
 import type { Booking } from './CaregiverBookings';
 import ServiceProgressWorkCard from './serviceProgress/ServiceProgressWorkCard';
@@ -10,20 +10,25 @@ import EmergencyContactCard from './serviceProgress/EmergencyContactCard';
 import ExpandableSection from './serviceProgress/ExpandableSection';
 import { Icon } from '../../components/ui/Icon';
 import Skeleton from '../../components/ui/Skeleton';
+import type { ProofOfWorkSummary } from '../../lib/monitoring';
 
 export interface CaregiverServiceProgressPageProps {
   booking: Booking & { locationLat?: number | null; locationLng?: number | null };
-  onCheckedOut: () => void;
+  /** ได้ proof ที่ดึงใหม่หลังปิดงาน (null ถ้าดึงไม่สำเร็จ) เพื่อให้หน้าแม่พาไปหน้าสรุปผลได้ */
+  onCheckedOut: (proof: ProofOfWorkSummary | null) => void;
 }
 
 interface ProofOfWorkData {
-  proofOfWork: {
-    checkIn: { serverTs: string } | null;
-    checkOut: { serverTs: string } | null;
-  };
+  proofOfWork: ProofOfWorkSummary;
 }
 
 const PROFILE_SECTION_ID = 'service-progress-patient-profile';
+
+/** ยังไม่มี booking reference จริงจาก backend — ใช้ท้าย id เหมือนที่ CaregiverBookingDetailPage ทำ
+ *  เพื่อให้รหัสที่ผู้ใช้เห็นในหน้าเดียวกันตรงกัน */
+function bookingRefOf(bookingId: string): string {
+  return `REF-${bookingId.toUpperCase().replaceAll('-', '').slice(-6)}`;
+}
 
 function BookingDetailRow({ icon, label, value }: Readonly<{ icon: string; label: string; value: string }>) {
   return (
@@ -40,12 +45,24 @@ function BookingDetailRow({ icon, label, value }: Readonly<{ icon: string; label
 }
 
 export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: Readonly<CaregiverServiceProgressPageProps>) {
-  const { data, loading } = useQuery<ProofOfWorkData>(GET_PROOF_OF_WORK, {
+  const { data, loading, refetch } = useQuery<ProofOfWorkData>(PROOF_OF_WORK, {
     variables: { bookingId: booking.id },
   });
 
-  const checkInServerTs = data?.proofOfWork?.checkIn?.serverTs ?? null;
-  const checkOutServerTs = data?.proofOfWork?.checkOut?.serverTs ?? null;
+  const proof = data?.proofOfWork ?? null;
+  const checkInServerTs = proof?.checkIn?.serverTs ?? null;
+  const checkOutServerTs = proof?.checkOut?.serverTs ?? null;
+
+  /** ต้องดึง proof ใหม่ก่อนเสมอ — หน้าสรุปผลอ่าน actualMinutes/verdict/reviewReasons จากเซิร์ฟเวอร์
+   *  ค่าที่อยู่ในมือตอนนี้ยังเป็นก่อนปิดงาน จึงใช้แสดงผลไม่ได้ */
+  async function handleCheckedOut() {
+    try {
+      const result = await refetch();
+      onCheckedOut(result.data?.proofOfWork ?? null);
+    } catch {
+      onCheckedOut(null);
+    }
+  }
   const jobCoords = useJobCoordinates(booking.locationLat, booking.locationLng, booking.locationName);
 
   return (
@@ -64,18 +81,20 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
           </p>
         </div>
 
-        {loading ? (
+        {loading || !proof ? (
           <Skeleton height={260} />
         ) : (
           <ServiceProgressWorkCard
             bookingId={booking.id}
+            bookingRef={bookingRefOf(booking.id)}
+            proof={proof}
             jobLat={jobCoords.lat}
             jobLng={jobCoords.lng}
             checkInServerTs={checkInServerTs}
             checkOutServerTs={checkOutServerTs}
             bookedDurationText={booking.durationText}
             approximateLocation={jobCoords.source === 'geocoded'}
-            onCheckedOut={onCheckedOut}
+            onCheckedOut={handleCheckedOut}
           />
         )}
 
