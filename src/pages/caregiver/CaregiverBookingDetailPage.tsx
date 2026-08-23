@@ -120,16 +120,18 @@ export default function CaregiverBookingDetailPage() {
   const [previewPosition, setPreviewPosition] = useState<{ lat: number; lng: number } | null>(null);
   /** มีค่าเมื่อเพิ่งปิดงานสำเร็จในรอบนี้ — ใช้สลับไปหน้าสรุปผลแทนหน้าความคืบหน้า */
   const [checkedOutProof, setCheckedOutProof] = useState<ProofOfWorkSummary | null>(null);
+  /** เช็คอินสำเร็จ = backend เปลี่ยน status เป็น in_progress ไปแล้วแน่นอน จึงสลับหน้าได้เลย
+   *  ไม่ต้องรอ refetch — ไม่งั้นการ์ด "เช็คอินแล้ว" จะค้างอยู่ในหน้าเช็คอินระหว่างรอ network */
+  const [justCheckedIn, setJustCheckedIn] = useState(false);
 
   const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
   const [acceptBooking] = useMutation(ACCEPT_BOOKING);
   const [declineBooking] = useMutation(DECLINE_BOOKING);
   const [cancelAcceptance] = useMutation(CANCEL_ACCEPTANCE);
 
-  // caregiverBooking(id) is a planned backend addition (implementation plan §3.1) — this query
-  // errors on a backend that doesn't have it yet, which errorPolicy: 'all' tolerates. Until it
-  // ships, the page still works via stateBooking (the happy path: arriving from the list), it
-  // just can't survive a bare refresh/deep-link for a booking not present in router state.
+  // stateBooking (router state, from the list) is only a first-paint shortcut — the fetched copy
+  // wins so refetchBooking() after check-in/check-out actually moves the page to the next status.
+  // errorPolicy: 'all' stays so a network blip falls back to stateBooking instead of a blank page.
   const { data: fetchedData, loading: fetchingBooking, refetch: refetchBooking } = useQuery<{
     caregiverBooking: Record<string, unknown> | null;
   }>(GET_CAREGIVER_BOOKING, {
@@ -187,7 +189,7 @@ export default function CaregiverBookingDetailPage() {
     );
   }
 
-  if (IN_PROGRESS_STATUSES.includes(booking.status)) {
+  if (justCheckedIn || IN_PROGRESS_STATUSES.includes(booking.status)) {
     return (
       <div style={{ minHeight: '100vh', background: '#F6FAF9' }}>
         <div className="mx-auto max-w-275 px-5 py-6 pb-25">
@@ -500,7 +502,10 @@ export default function CaregiverBookingDetailPage() {
                       jobLng={jobCoords.lng}
                       bookingDate={booking.bookingDate}
                       startTime={booking.time ? booking.time.split(' - ')[0] : null}
-                      onCheckedIn={() => refetchBooking()}
+                      onCheckedIn={() => {
+                        setJustCheckedIn(true);
+                        void refetchBooking();
+                      }}
                       onPreviewPositionChange={setPreviewPosition}
                     />
                   </div>
