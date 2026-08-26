@@ -1,23 +1,45 @@
-import { NavLink } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 
-interface NavMenuItem {
+interface NavLeaf {
   to: string;
   label: string;
   icon: string;
   end: boolean;
-  minRole: number;
+  badgeKey?: 'kyc' | 'dispute';
 }
 
-const NAV_MENU: NavMenuItem[] = [
-  { to: '/admin',       label: 'Dashboard',    icon: 'dashboard',            end: true,  minRole: 3 },
-  { to: '/admin/kyc',   label: 'KYC Review',   icon: 'fact_check',           end: false, minRole: 3 },
-  { to: '/admin/users', label: 'จัดการผู้ใช้', icon: 'admin_panel_settings', end: false, minRole: 3 },
-  { to: '/admin/payments', label: 'Payments',  icon: 'payments',             end: false, minRole: 3 },
+interface NavGroup {
+  id: string;
+  label: string;
+  icon: string;
+  children: NavLeaf[];
+}
+
+type NavEntry = NavLeaf | NavGroup;
+
+function isGroup(entry: NavEntry): entry is NavGroup {
+  return (entry as NavGroup).children !== undefined;
+}
+
+const NAV_MENU: NavEntry[] = [
+  { to: '/admin', label: 'Dashboard', icon: 'dashboard', end: true },
+  { to: '/admin/kyc', label: 'KYC Review', icon: 'fact_check', end: false, badgeKey: 'kyc' },
+  { to: '/admin/users', label: 'จัดการผู้ใช้', icon: 'admin_panel_settings', end: false },
+  {
+    id: 'payment',
+    label: 'Payment',
+    icon: 'account_balance_wallet',
+    children: [
+      { to: '/admin/payments', label: 'Transaction', icon: 'receipt_long', end: false },
+      { to: '/admin/disputes', label: 'Dispute', icon: 'gavel', end: false, badgeKey: 'dispute' },
+    ],
+  },
 ];
 
 interface AdminSidebarProps {
   pendingKyc: number;
+  pendingDisputes?: number;
   displayName: string;
   onLogout: () => void;
   onClose?: () => void;
@@ -26,24 +48,20 @@ interface AdminSidebarProps {
 
 export default function AdminSidebar({
   pendingKyc,
+  pendingDisputes = 0,
   displayName,
   onLogout,
   onClose,
   collapsed = false,
 }: Readonly<AdminSidebarProps>) {
-  const { userRole } = useAuth();
+  const { pathname } = useLocation();
   const initial = displayName.charAt(0).toUpperCase() || 'A';
 
-  // AdminSidebar is only reachable inside RoleRoute([3,4]), so null means still loading — default to 3
-  const effectiveRole = userRole ?? 3;
-  const kycBadge = pendingKyc > 0 ? pendingKyc : null;
-
-  const navItems = NAV_MENU
-    .filter((item) => effectiveRole >= item.minRole)
-    .map((item) => ({
-      ...item,
-      badge: item.to === '/admin/kyc' ? kycBadge : null,
-    }));
+  const badgeFor = (key?: NavLeaf['badgeKey']): number | null => {
+    if (key === 'kyc') return pendingKyc > 0 ? pendingKyc : null;
+    if (key === 'dispute') return pendingDisputes > 0 ? pendingDisputes : null;
+    return null;
+  };
 
   return (
     <aside
@@ -117,68 +135,19 @@ export default function AdminSidebar({
       }
 
       {/* Nav items */}
-      {navItems.map(item => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={item.end}
-          title={collapsed ? item.label : undefined}
-          style={({ isActive }) => ({
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            gap: collapsed ? 0 : 10,
-            padding: collapsed ? '10px 0' : '10px 12px',
-            borderRadius: 8,
-            textDecoration: 'none',
-            background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
-            transition: 'background 0.15s',
-            position: 'relative',
-          })}
-        >
-          {({ isActive }) => (
-            <>
-              <span
-                className="material-icons"
-                style={{ fontSize: 18, color: 'white', opacity: isActive ? 1 : 0.5, flexShrink: 0 }}
-              >
-                {item.icon}
-              </span>
-
-              {!collapsed && (
-                <>
-                  <span style={{
-                    color: 'white',
-                    opacity: isActive ? 1 : 0.7,
-                    fontSize: 13,
-                    fontWeight: isActive ? 600 : 500,
-                    fontFamily: 'Inter,sans-serif',
-                    flex: 1,
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {item.label}
-                  </span>
-                  {item.badge !== null && (
-                    <span style={{ background: '#F59E0B', color: 'white', fontSize: 10, fontWeight: 700, borderRadius: 99, padding: '1px 6px', fontFamily: 'Inter,sans-serif' }}>
-                      {item.badge}
-                    </span>
-                  )}
-                </>
-              )}
-
-              {/* Badge dot when collapsed */}
-              {collapsed && item.badge !== null && (
-                <div style={{
-                  position: 'absolute', top: 5, right: 10,
-                  width: 7, height: 7, borderRadius: '50%',
-                  background: '#F59E0B',
-                  border: '1.5px solid #064E3B',
-                }} />
-              )}
-            </>
-          )}
-        </NavLink>
-      ))}
+      {NAV_MENU.map((entry) =>
+        isGroup(entry) ? (
+          <NavGroupItem
+            key={entry.id}
+            group={entry}
+            collapsed={collapsed}
+            activePath={pathname}
+            badgeFor={badgeFor}
+          />
+        ) : (
+          <NavLeafItem key={entry.to} leaf={entry} collapsed={collapsed} badge={badgeFor(entry.badgeKey)} />
+        ),
+      )}
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
@@ -233,5 +202,214 @@ export default function AdminSidebar({
         )}
       </button>
     </aside>
+  );
+}
+
+// ─── Orange/gray badge pill ──────────────────────────────────────────────────
+function Badge({ value, active }: { value: number; active: boolean }) {
+  return (
+    <span style={{
+      background: active ? 'rgba(255,255,255,0.25)' : '#F59E0B',
+      color: 'white',
+      fontSize: 10,
+      fontWeight: 700,
+      borderRadius: 99,
+      padding: '1px 6px',
+      fontFamily: 'Inter,sans-serif',
+      flexShrink: 0,
+    }}>
+      {value > 99 ? '99+' : value}
+    </span>
+  );
+}
+
+// ─── Top-level leaf (icon + label + badge) ───────────────────────────────────
+function NavLeafItem({ leaf, collapsed, badge }: { leaf: NavLeaf; collapsed: boolean; badge: number | null }) {
+  return (
+    <NavLink
+      to={leaf.to}
+      end={leaf.end}
+      title={collapsed ? leaf.label : undefined}
+      style={({ isActive }) => ({
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        gap: collapsed ? 0 : 10,
+        padding: collapsed ? '10px 0' : '10px 12px',
+        borderRadius: 8,
+        textDecoration: 'none',
+        background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
+        transition: 'background 0.15s',
+        position: 'relative',
+      })}
+    >
+      {({ isActive }) => (
+        <>
+          <span className="material-icons" style={{ fontSize: 18, color: 'white', opacity: isActive ? 1 : 0.5, flexShrink: 0 }}>
+            {leaf.icon}
+          </span>
+          {!collapsed && (
+            <>
+              <span style={{
+                color: 'white',
+                opacity: isActive ? 1 : 0.7,
+                fontSize: 13,
+                fontWeight: isActive ? 600 : 500,
+                fontFamily: 'Inter,sans-serif',
+                flex: 1,
+                whiteSpace: 'nowrap',
+              }}>
+                {leaf.label}
+              </span>
+              {badge !== null && <Badge value={badge} active={isActive} />}
+            </>
+          )}
+          {collapsed && badge !== null && (
+            <div style={{
+              position: 'absolute', top: 5, right: 10,
+              width: 7, height: 7, borderRadius: '50%',
+              background: '#F59E0B',
+              border: '1.5px solid #064E3B',
+            }} />
+          )}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
+// ─── Sub-nav child (dot + label + badge, green pill when active) ─────────────
+function NavChildItem({ child, badge }: { child: NavLeaf; badge: number | null }) {
+  return (
+    <NavLink
+      to={child.to}
+      end={child.end}
+      style={({ isActive }) => ({
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        height: 38,
+        padding: '0 12px',
+        borderRadius: 8,
+        textDecoration: 'none',
+        background: isActive ? '#1C6B4B' : 'transparent',
+        boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.25)' : 'none',
+        transition: 'background 0.15s',
+      })}
+    >
+      {({ isActive }) => (
+        <>
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: isActive ? 'white' : 'rgba(255,255,255,0.3)',
+            flexShrink: 0,
+          }} />
+          <span style={{
+            color: 'white',
+            opacity: isActive ? 1 : 0.7,
+            fontSize: 13,
+            fontWeight: isActive ? 600 : 500,
+            fontFamily: 'Inter,sans-serif',
+            flex: 1,
+            whiteSpace: 'nowrap',
+          }}>
+            {child.label}
+          </span>
+          {badge !== null && <Badge value={badge} active={isActive} />}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
+// ─── Collapsible group ───────────────────────────────────────────────────────
+function NavGroupItem({
+  group,
+  collapsed,
+  activePath,
+  badgeFor,
+}: {
+  group: NavGroup;
+  collapsed: boolean;
+  activePath: string;
+  badgeFor: (key?: NavLeaf['badgeKey']) => number | null;
+}) {
+  const hasActiveChild = group.children.some((c) => activePath === c.to || activePath.startsWith(`${c.to}/`));
+  const [open, setOpen] = useState(hasActiveChild);
+
+  // Collapsed rail: render children as icon-only leaves (no group header)
+  if (collapsed) {
+    return (
+      <>
+        {group.children.map((child) => (
+          <NavLeafItem key={child.to} leaf={child} collapsed badge={badgeFor(child.badgeKey)} />
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* Group header */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          height: 40,
+          padding: '0 12px',
+          borderRadius: 8,
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          width: '100%',
+        }}
+      >
+        <span className="material-icons" style={{ fontSize: 18, color: 'white', opacity: hasActiveChild ? 1 : 0.6, flexShrink: 0 }}>
+          {group.icon}
+        </span>
+        <span style={{
+          color: 'white',
+          opacity: hasActiveChild ? 1 : 0.85,
+          fontSize: 14,
+          fontWeight: 600,
+          fontFamily: 'Inter,sans-serif',
+          flex: 1,
+          textAlign: 'left',
+          whiteSpace: 'nowrap',
+        }}>
+          {group.label}
+        </span>
+        <span className="material-icons" style={{
+          fontSize: 18,
+          color: 'white',
+          opacity: 0.5,
+          flexShrink: 0,
+          transform: open ? 'rotate(0deg)' : 'rotate(-90deg)',
+          transition: 'transform 0.15s',
+        }}>
+          keyboard_arrow_down
+        </span>
+      </button>
+
+      {/* Children */}
+      {open && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          paddingLeft: 16,
+          marginLeft: 12,
+          marginTop: 2,
+          borderLeft: '1px solid rgba(255,255,255,0.1)',
+        }}>
+          {group.children.map((child) => (
+            <NavChildItem key={child.to} child={child} badge={badgeFor(child.badgeKey)} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

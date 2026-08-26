@@ -20,6 +20,8 @@ import KycReviewDetailPage from './pages/admin/KycReviewDetailPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminCaregiverDetailPage from './pages/admin/AdminCaregiverDetailPage';
 import AdminPaymentsPage from './pages/admin/AdminPaymentsPage';
+import AdminDisputesPage from './pages/admin/AdminDisputesPage';
+import AdminDisputeDetailPage from './pages/admin/AdminDisputeDetailPage';
 import AdminLayout from './components/layout/AdminLayout';
 import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
@@ -337,6 +339,8 @@ function App() {
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/users/:caregiverId" element={<AdminCaregiverDetailPage />} />
           <Route path="/admin/payments" element={<AdminPaymentsPage />} />
+          <Route path="/admin/disputes" element={<AdminDisputesPage />} />
+          <Route path="/admin/disputes/:id" element={<AdminDisputeDetailPage />} />
         </Route>
 
         {/* 404 - Not Found (must be last) */}

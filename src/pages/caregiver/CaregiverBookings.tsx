@@ -25,7 +25,16 @@ export interface Booking {
   patientName: string;
   price: number;
   notes?: string;
-  status: 'pending' | 'accepted' | 'confirmed' | 'declined' | 'completed' | 'cancelled';
+  status:
+    | 'pending'
+    | 'accepted'
+    | 'confirmed'
+    | 'declined'
+    | 'completed'
+    | 'cancelled'
+    | 'in_progress'
+    | 'awaiting_release'
+    | 'needs_review';
   declineReason?: string;
   createdAt: string;
   relation?: string;
@@ -38,6 +47,8 @@ export interface Booking {
   dayOfContactName?: string;
   dayOfContactPhone?: string;
   dayOfContactRelationship?: string;
+  locationLat?: number | null;
+  locationLng?: number | null;
 }
 
 type TabType = 'scheduled' | 'action_required' | 'history';
@@ -50,8 +61,11 @@ function serviceLocationLabel(loc: string): string {
   }
 }
 
-// Helper to convert backend booking summary to frontend Booking model
-function mapToBooking(summary: any): Booking {
+// Helper to convert backend booking summary to frontend Booking model. Exported so
+// CaregiverBookingDetailPage.tsx can reuse it for the single-booking query response instead of
+// duplicating the mapping logic.
+// eslint-disable-next-line react-refresh/only-export-components -- shared pure mapper, not a component
+export function mapToBooking(summary: any): Booking {
   const durationHours = summary.durationHours;
   const startTime = summary.startTime; // "HH:mm"
   
@@ -117,6 +131,8 @@ function mapToBooking(summary: any): Booking {
     dayOfContactName: summary.dayOfContactName ?? undefined,
     dayOfContactPhone: summary.dayOfContactPhone ?? undefined,
     dayOfContactRelationship: summary.dayOfContactRelationship ?? undefined,
+    locationLat: summary.locationLat ?? null,
+    locationLng: summary.locationLng ?? null,
   };
 }
 
@@ -153,6 +169,9 @@ export const CaregiverBookings: React.FC = () => {
 
   // Action Required Sub-filter state
   const [actionSubFilter, setActionSubFilter] = useState<'all' | 'new' | 'waiting'>('all');
+
+  // Scheduled tab Sub-filter state (due vs upcoming)
+  const [scheduledSubTab, setScheduledSubTab] = useState<'due' | 'upcoming'>('due');
 
   // Decline Modal state
   const [declineModalId, setDeclineModalId] = useState<string | null>(null);
@@ -197,6 +216,23 @@ export const CaregiverBookings: React.FC = () => {
     variables: { input: { status: 'CONFIRMED', limit: 50 } },
   });
 
+  // A checked-in job (and everything through checkout/admin-review) has no tab of its own — it's
+  // folded into "scheduled" alongside confirmed bookings, since without these three queries a
+  // caregiver who just checked in has no way to find their own in-progress job again (BookingStatus
+  // didn't cover these statuses until now — see the backend BookingStatusEnum comment).
+  const { data: inProgressData, loading: inProgressLoading, error: inProgressError } =
+    useQuery<CaregiverBookingsData>(GET_CAREGIVER_BOOKINGS, {
+      variables: { input: { status: 'IN_PROGRESS', limit: 50 } },
+    });
+  const { data: awaitingReleaseData, loading: awaitingReleaseLoading, error: awaitingReleaseError } =
+    useQuery<CaregiverBookingsData>(GET_CAREGIVER_BOOKINGS, {
+      variables: { input: { status: 'AWAITING_RELEASE', limit: 50 } },
+    });
+  const { data: needsReviewData, loading: needsReviewLoading, error: needsReviewError } =
+    useQuery<CaregiverBookingsData>(GET_CAREGIVER_BOOKINGS, {
+      variables: { input: { status: 'NEEDS_REVIEW', limit: 50 } },
+    });
+
   // History tab variables
   const [historyPage] = useState(1);
   const historyLimit = 50;
@@ -238,13 +274,17 @@ export const CaregiverBookings: React.FC = () => {
   const pendingList = pendingData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
   const acceptedList = acceptedData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
   const confirmedList = confirmedData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
+  const inProgressList = inProgressData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
+  const awaitingReleaseList = awaitingReleaseData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
+  const needsReviewList = needsReviewData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
+  const activeWorkList: Booking[] = [...confirmedList, ...inProgressList, ...awaitingReleaseList, ...needsReviewList];
   const historyList = historyData?.caregiverBookingHistory?.data?.map(mapToBooking) ?? [];
 
   const findBookingById = (id: string): Booking | null => {
     return (
       (pendingList as Booking[]).find((b: Booking) => b.id === id) ||
       (acceptedList as Booking[]).find((b: Booking) => b.id === id) ||
-      (confirmedList as Booking[]).find((b: Booking) => b.id === id) ||
+      (activeWorkList as Booking[]).find((b: Booking) => b.id === id) ||
       (historyList as Booking[]).find((b: Booking) => b.id === id) ||
       null
     );
@@ -339,14 +379,20 @@ export const CaregiverBookings: React.FC = () => {
     }
   };
 
-  const getDaysUntil = (dateStr: string) => {
+  // Shared date-diff helper (bookingDate vs. today), used both for the "days until" label
+  // and for splitting the scheduled tab into due / upcoming buckets.
+  const getDiffDays = (dateStr: string) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const targetDate = new Date(dateStr);
     targetDate.setHours(0, 0, 0, 0);
 
     const diffTime = targetDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const getDaysUntil = (dateStr: string) => {
+    const diffDays = getDiffDays(dateStr);
 
     if (diffDays < 0) return 'ผ่านแล้ว';
     if (diffDays === 0) return 'วันนี้';
@@ -354,11 +400,15 @@ export const CaregiverBookings: React.FC = () => {
     return `อีก ${diffDays} วัน`;
   };
 
+  // Scheduled tab: split confirmed bookings into "due" (today or overdue) and "upcoming"
+  const dueList = activeWorkList.filter((b) => getDiffDays(b.bookingDate) <= 0);
+  const upcomingList = activeWorkList.filter((b) => getDiffDays(b.bookingDate) > 0);
+
   // Helper to filter and sort bookings
   const getFilteredBookings = () => {
     let list: Booking[] = [];
     if (activeTab === 'scheduled') {
-      list = confirmedList;
+      list = scheduledSubTab === 'due' ? dueList : upcomingList;
     } else if (activeTab === 'action_required') {
       if (actionSubFilter === 'all') {
         list = [...pendingList, ...acceptedList];
@@ -373,11 +423,8 @@ export const CaregiverBookings: React.FC = () => {
     }
 
     if (activeTab === 'scheduled') {
-      return [...list].sort((a, b) => {
-        const diffA = Math.abs(new Date(a.bookingDate).getTime() - new Date().getTime());
-        const diffB = Math.abs(new Date(b.bookingDate).getTime() - new Date().getTime());
-        return diffA - diffB;
-      });
+      // Chronological order: most overdue first in "due", soonest first in "upcoming"
+      return [...list].sort((a, b) => new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime());
     }
 
     if (activeTab === 'history') {
@@ -395,7 +442,11 @@ export const CaregiverBookings: React.FC = () => {
 
   const filteredBookings = getFilteredBookings();
 
-  const scheduledCount = confirmedData?.caregiverBookings?.pagination?.total ?? confirmedList.length;
+  const scheduledCount =
+    (confirmedData?.caregiverBookings?.pagination?.total ?? confirmedList.length) +
+    (inProgressData?.caregiverBookings?.pagination?.total ?? inProgressList.length) +
+    (awaitingReleaseData?.caregiverBookings?.pagination?.total ?? awaitingReleaseList.length) +
+    (needsReviewData?.caregiverBookings?.pagination?.total ?? needsReviewList.length);
   const newRequestsCount = pendingData?.caregiverBookings?.pagination?.total ?? pendingList.length;
   const waitingConfirmCount = acceptedData?.caregiverBookings?.pagination?.total ?? acceptedList.length;
   const pendingCount = newRequestsCount + waitingConfirmCount;
@@ -404,8 +455,15 @@ export const CaregiverBookings: React.FC = () => {
     ?? historyCountData?.caregiverBookingHistory?.pagination?.total
     ?? historyList.length;
 
-  const isLoading = pendingLoading || acceptedLoading || confirmedLoading || (activeTab === 'history' && historyLoading);
-  const isError = !!(pendingError || acceptedError || confirmedError || (activeTab === 'history' && historyError));
+  const isLoading =
+    pendingLoading || acceptedLoading || confirmedLoading ||
+    inProgressLoading || awaitingReleaseLoading || needsReviewLoading ||
+    (activeTab === 'history' && historyLoading);
+  const isError = !!(
+    pendingError || acceptedError || confirmedError ||
+    inProgressError || awaitingReleaseError || needsReviewError ||
+    (activeTab === 'history' && historyError)
+  );
 
   // Style helper based on status badge
   const getStatusBadgeStyle = (status: Booking['status']) => {
@@ -444,6 +502,27 @@ export const CaregiverBookings: React.FC = () => {
           dot: 'bg-[#52B69A]',
           text: 'text-[#3A9A7E]',
           label: 'เสร็จสิ้น'
+        };
+      case 'in_progress':
+        return {
+          bg: 'bg-[#ECFDF5]',
+          dot: 'bg-[#10B981]',
+          text: 'text-[#047857]',
+          label: 'กำลังปฏิบัติงาน'
+        };
+      case 'awaiting_release':
+        return {
+          bg: 'bg-[#FFFBEB]',
+          dot: 'bg-[#F59E0B]',
+          text: 'text-[#B45309]',
+          label: 'รอปิดงาน'
+        };
+      case 'needs_review':
+        return {
+          bg: 'bg-[#FEF2F2]',
+          dot: 'bg-[#DC2626]',
+          text: 'text-[#B91C1C]',
+          label: 'รอแอดมินตรวจสอบ'
         };
       case 'cancelled':
       default:
@@ -531,6 +610,7 @@ export const CaregiverBookings: React.FC = () => {
                     onClick={() => {
                       setActiveTab('scheduled');
                       setExpandedCardId(null);
+                      setScheduledSubTab('due');
                     }}
                     className={`flex flex-row justify-center items-center py-2.5 px-2 sm:py-3 sm:px-4 gap-1.5 h-[38px] sm:h-[45px] flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-200 cursor-pointer ${activeTab === 'scheduled'
                         ? 'bg-[#52B69A] shadow-[0px_4px_12px_rgba(82,182,154,0.25)] text-white'
@@ -644,6 +724,48 @@ export const CaregiverBookings: React.FC = () => {
 
                 {/* Box Body List */}
                 <div className="w-full flex flex-col items-start p-6 gap-4 bg-[#FDFDFD] self-stretch min-h-[150px]">
+
+                  {/* Scheduled Sub-tabs (Due vs Upcoming) */}
+                  {activeTab === 'scheduled' && (
+                    <div className="w-full pb-2 flex flex-row items-center gap-1.5 p-1.5 bg-[#F3F4F6] rounded-xl self-stretch">
+                      <button
+                        type="button"
+                        onClick={() => setScheduledSubTab('due')}
+                        className={`flex-1 flex flex-row items-center justify-center gap-1.5 h-10 rounded-lg text-sm font-semibold cursor-pointer transition-all duration-200 ${
+                          scheduledSubTab === 'due'
+                            ? 'bg-white text-[#1A1A1A] shadow-sm'
+                            : 'text-[#6B7280] hover:text-[#1A1A1A]'
+                        }`}
+                      >
+                        ถึงกำหนดแล้ว
+                        <span
+                          className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold font-['Inter'] min-w-[20px] h-[20px] flex items-center justify-center ${
+                            scheduledSubTab === 'due' ? 'bg-[#EFF6FF] text-[#1D4ED8]' : 'bg-white text-[#6B7280]'
+                          }`}
+                        >
+                          {dueList.length}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setScheduledSubTab('upcoming')}
+                        className={`flex-1 flex flex-row items-center justify-center gap-1.5 h-10 rounded-lg text-sm font-semibold cursor-pointer transition-all duration-200 ${
+                          scheduledSubTab === 'upcoming'
+                            ? 'bg-white text-[#1A1A1A] shadow-sm'
+                            : 'text-[#6B7280] hover:text-[#1A1A1A]'
+                        }`}
+                      >
+                        ที่กำลังจะถึง
+                        <span
+                          className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold font-['Inter'] min-w-[20px] h-[20px] flex items-center justify-center ${
+                            scheduledSubTab === 'upcoming' ? 'bg-[#EFF6FF] text-[#1D4ED8]' : 'bg-white text-[#6B7280]'
+                          }`}
+                        >
+                          {upcomingList.length}
+                        </span>
+                      </button>
+                    </div>
+                  )}
 
                   {/* History Sub-filters */}
                   {activeTab === 'history' && (
@@ -770,6 +892,7 @@ export const CaregiverBookings: React.FC = () => {
                         getDaysUntil={getDaysUntil}
                         getAcceptedTimeText={getAcceptedTimeText}
                         getStatusBadgeStyle={getStatusBadgeStyle}
+                        isDueSection={activeTab === 'scheduled' && scheduledSubTab === 'due'}
                       />
                     ))
                   )}

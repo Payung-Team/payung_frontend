@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate, NavLink } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { useAuth } from '../../context/AuthContext';
-import { GET_USER, ADMIN_PENDING_COUNT } from '../../graphql/queries';
+import { GET_USER, ADMIN_PENDING_COUNT, ADMIN_DISPUTE_PENDING_COUNT } from '../../graphql/queries';
 import AdminSidebar from './AdminSidebar';
 
 interface UserData {
@@ -11,6 +11,10 @@ interface UserData {
 
 interface PendingCountData {
   pendingCount: { total: number };
+}
+
+interface DisputeCountData {
+  flaggedCount: { totalCount: number };
 }
 
 function formatThaiDate(date: Date): string {
@@ -29,6 +33,8 @@ function getPageInfo(pathname: string): { title: string; breadcrumb: string } {
   if (pathname === '/admin/users') return { title: 'จัดการผู้ใช้', breadcrumb: 'หน้าหลัก / จัดการผู้ใช้' };
   if (pathname.startsWith('/admin/users/')) return { title: 'รายละเอียดผู้ดูแล', breadcrumb: 'หน้าหลัก / จัดการผู้ใช้ / รายละเอียดผู้ดูแล' };
   if (pathname === '/admin/payments') return { title: 'Payments', breadcrumb: 'หน้าหลัก / Payments' };
+  if (pathname === '/admin/disputes') return { title: 'จัดการคำร้อง', breadcrumb: 'หน้าหลัก / จัดการคำร้อง' };
+  if (pathname.startsWith('/admin/disputes/')) return { title: 'ตรวจสอบคำร้อง', breadcrumb: 'หน้าหลัก / จัดการคำร้อง / รายละเอียด' };
   return { title: 'Admin', breadcrumb: 'หน้าหลัก / Admin' };
 }
 
@@ -37,6 +43,7 @@ const BOTTOM_NAV_ITEMS = [
   { to: '/admin/kyc',   label: 'KYC Review',   icon: 'fact_check',           end: false },
   { to: '/admin/users', label: 'จัดการผู้ใช้',  icon: 'admin_panel_settings', end: false },
   { to: '/admin/payments', label: 'Payments',  icon: 'payments',             end: false },
+  { to: '/admin/disputes', label: 'คำร้อง',     icon: 'gavel',                end: false },
 ];
 
 export default function AdminLayout() {
@@ -74,9 +81,14 @@ export default function AdminLayout() {
     fetchPolicy: 'cache-and-network',
     pollInterval: 60_000,
   });
+  const { data: disputeCountData } = useQuery<DisputeCountData>(ADMIN_DISPUTE_PENDING_COUNT, {
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 60_000,
+  });
 
   const displayName = userData?.me?.displayName || 'Admin';
   const pendingKyc = countData?.pendingCount?.total ?? 0;
+  const pendingDisputes = disputeCountData?.flaggedCount?.totalCount ?? 0;
   const { title, breadcrumb } = getPageInfo(pathname);
   const initial = displayName.charAt(0).toUpperCase() || 'A';
   const today = formatThaiDate(new Date());
@@ -100,6 +112,7 @@ export default function AdminLayout() {
       <div className="hidden lg:flex lg:flex-col lg:shrink-0">
         <AdminSidebar
           pendingKyc={pendingKyc}
+          pendingDisputes={pendingDisputes}
           displayName={displayName}
           onLogout={handleLogout}
           collapsed={collapsed}

@@ -697,6 +697,11 @@ function SearchPageContent() {
       const atHomeAddress = bookingDraft.locationDetails?.at_home?.address ?? '';
       const hospitalName  = bookingDraft.locationDetails?.accompany_outside?.hospitalName ?? '';
       const meetingPoint  = bookingDraft.locationDetails?.accompany_outside?.meetingPoint ?? '';
+      // The map pin the patient placed in BookingStep1 — was being built here but never sent to
+      // the backend, so every booking's location_lat/lng ended up NULL regardless of what was
+      // picked. Prefer at_home's coords (has a real pin); accompany_outside's are optional.
+      const pinLat = bookingDraft.locationDetails?.at_home?.lat ?? bookingDraft.locationDetails?.accompany_outside?.lat;
+      const pinLng = bookingDraft.locationDetails?.at_home?.lng ?? bookingDraft.locationDetails?.accompany_outside?.lng;
       const addrParts: string[] = [];
       if (serviceLocs.includes('at_home') && atHomeAddress) addrParts.push(atHomeAddress);
       if (serviceLocs.includes('accompany_outside') && hospitalName) {
@@ -719,6 +724,8 @@ function SearchPageContent() {
         startTime:      bookingDraft.dateTime?.startTime ? `${bookingDraft.dateTime.startTime}:00` : '09:00:00',
         durationHours:  bookingDraft.dateTime?.duration ?? 4,
         locationAddress: addrParts.length > 0 ? addrParts.join(' / ') : '-',
+        lat: pinLat,
+        lng: pinLng,
         bookingDate:    bookingDraft.dateTime?.date ?? new Date().toISOString().slice(0, 10),
         notes:          bookingDraft.jobDetails?.notes || undefined,
         dayOfContactName:         bookingDraft.contactPerson?.name         ?? undefined,

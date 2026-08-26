@@ -3,7 +3,7 @@ import { Icon } from './Icon';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 type ToastPosition = 'bottom-right' | 'top-center' | 'top-right';
-export type ToastVariant = 'default' | 'soft-card' | 'admin-toast' | 'booking-toast' | 'decline-toast';
+export type ToastVariant = 'default' | 'soft-card' | 'admin-toast' | 'booking-toast' | 'decline-toast' | 'dispute-toast';
 
 interface ToastProps {
   readonly message: React.ReactNode;
@@ -129,6 +129,34 @@ export function Toast({
             <Icon name="close" style={{ fontSize: '20px' }} />
           </button>
         )}
+      </div>
+    );
+  }
+
+  if (variant === 'dispute-toast') {
+    const bgClass = {
+      success: 'bg-[#059669]',
+      error: 'bg-[#DC2626]',
+      info: 'bg-[#2563EB]',
+      warning: 'bg-[#D97706]',
+    }[type];
+
+    const iconName = {
+      success: 'check',
+      error: 'close',
+      info: 'info',
+      warning: 'warning',
+    }[type];
+
+    return (
+      <div
+        className={`inline-flex items-center gap-2.5 rounded-xl ${bgClass} p-3 text-white shadow-lg transition-all duration-200 ${fadeClass}`}
+        style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+      >
+        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/20">
+          <Icon name={iconName} style={{ fontSize: '18px' }} color="#FFFFFF" />
+        </span>
+        <span className="text-[13px] font-bold leading-5">{message}</span>
       </div>
     );
   }

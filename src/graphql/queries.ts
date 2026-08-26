@@ -727,6 +727,8 @@ const CAREGIVER_BOOKING_SUMMARY_FIELDS = `
   durationHours
   estimatedCost
   locationAddress
+  locationLat
+  locationLng
   notes
   patient {
     id
@@ -754,6 +756,8 @@ export const GET_MY_BOOKING = gql`
       serviceLocations
       bookingDate
       locationAddress
+      locationLat
+      locationLng
       notes
       estimatedCost
       careRecipientName
@@ -778,6 +782,38 @@ export const GET_MY_BOOKING = gql`
     }
   }
 `;
+
+// PYG-361 — proof-of-work summary for the patient's live tracking view.
+// This is the single source of truth for check-in/check-out; the realtime
+// job_events subscription only tells us WHEN to refetch this, never what to show
+// (realtime delivers raw rows with no signed photo URL and no computed flags).
+// export const GET_PROOF_OF_WORK = gql`
+//   query GetProofOfWork($bookingId: ID!) {
+//     proofOfWork(bookingId: $bookingId) {
+//       checkIn {
+//         serverTs
+//         lat
+//         lng
+//         photoUrl
+//         note
+//       }
+//       checkOut {
+//         serverTs
+//         photoUrl
+//         note
+//       }
+//       actualMinutes
+//       bookedMinutes
+//       distanceInM
+//       distanceOutM
+//       noCheckout
+//       jobCoordsMissing
+//       reviewReasons
+//       disputed
+//       verdict
+//     }
+//   }
+// `;
 
 export const GET_MY_BOOKING_HISTORY = gql`
   query GetMyBookingHistory($input: BookingHistoryInput) {
@@ -866,6 +902,76 @@ export const GET_CAREGIVER_BOOKING_HISTORY = gql`
         total
         totalPages
       }
+    }
+  }
+`;
+
+// PYG-360 [FE] Caregiver check-in — single booking by id, with the day-of-contact fields the
+// check-in and service-progress screens need on top of the shared summary fields (which already
+// include locationLat/locationLng).
+// Backend: caregiverBooking(id) is a planned addition (see implementation plan §3.1) — not yet
+// deployed, so this query will error until it ships. The page handles that gracefully (falls
+// back to router state / shows the existing "not found" state).
+export const GET_CAREGIVER_BOOKING = gql`
+  query GetCaregiverBooking($id: ID!) {
+    caregiverBooking(id: $id) {
+      ${CAREGIVER_BOOKING_SUMMARY_FIELDS}
+      dayOfContactName
+      dayOfContactPhone
+      dayOfContactRelationship
+    }
+  }
+`;
+
+export const CHECK_IN_BOOKING = gql`
+  mutation CheckInBooking($input: CheckInInput!) {
+    checkInBooking(input: $input) {
+      id
+      bookingId
+      eventType
+      source
+      lat
+      lng
+      distanceM
+      accuracyM
+      serverTs
+      deviceTs
+      gpsAccuracyLow
+      jobCoordsMissing
+      withinWarnRadius
+      reviewReasons
+      alreadyCheckedIn
+    }
+  }
+`;
+
+export const GET_PROOF_OF_WORK = gql`
+  query GetProofOfWork($bookingId: ID!) {
+    proofOfWork(bookingId: $bookingId) {
+      checkIn {
+        serverTs
+        distanceM
+        accuracyM
+        reviewReasons
+        gpsAccuracyLow
+        withinWarnRadius
+      }
+      checkOut {
+        serverTs
+        distanceM
+        accuracyM
+        reviewReasons
+      }
+      actualMinutes
+      bookedMinutes
+      distanceInM
+      distanceOutM
+      durationOk
+      noCheckout
+      jobCoordsMissing
+      reviewReasons
+      disputed
+      verdict
     }
   }
 `;
@@ -970,6 +1076,17 @@ export const GET_PAYMENT_HISTORY = gql`
       reason
       changedBy
       createdAt
+    }
+  }
+`;
+
+export const GET_PAYMENT_BY_BOOKING = gql`
+  query GetPaymentByBooking($bookingId: ID!) {
+    paymentByBooking(bookingId: $bookingId) {
+      id
+      paymentStatus
+      paymentMethod
+      qrCodeUrl
     }
   }
 `;
@@ -1098,6 +1215,56 @@ export const ADMIN_REFUND_HISTORY = gql`
   }
 `;
 
+// PYG-317 — Admin Dispute Queue (ตรงตาม schema จริง: adminDisputes → DisputeSummaryConnection)
+export const ADMIN_DISPUTE_QUEUE = gql`
+  query AdminDisputeQueue(
+    $disputeStatus: DisputeStatus
+    $filedBy: DisputeFiledBy
+    $q: String
+    $sortBy: DisputeSortBy
+    $page: Int
+    $limit: Int
+  ) {
+    list: adminDisputes(input: {
+      disputeStatus: $disputeStatus
+      filedBy: $filedBy
+      q: $q
+      sortBy: $sortBy
+      page: $page
+      limit: $limit
+    }) {
+      nodes {
+        id
+        bookingId
+        filedBy
+        amount
+        currency
+        filedAt
+        slaDueAt
+        status
+        patient { id displayName email }
+        caregiver { id displayName email }
+      }
+      totalCount
+      page
+      limit
+      hasNextPage
+    }
+    allCount: adminDisputes(input: { page: 1, limit: 1 }) { totalCount }
+    flaggedCount: adminDisputes(input: { disputeStatus: flagged, page: 1, limit: 1 }) { totalCount }
+    resolvedCount: adminDisputes(input: { disputeStatus: resolved, page: 1, limit: 1 }) { totalCount }
+  }
+`;
+
+// PYG-317 — badge count คำร้องรอตรวจสอบ (สำหรับ sidebar)
+export const ADMIN_DISPUTE_PENDING_COUNT = gql`
+  query AdminDisputePendingCount {
+    flaggedCount: adminDisputes(input: { disputeStatus: flagged, page: 1, limit: 1 }) {
+      totalCount
+    }
+  }
+`;
+
 export const RESOLVE_DISPUTE = gql`
   mutation ResolveDispute($input: ResolveDisputeInput!) {
     resolveDispute(input: $input) {
@@ -1105,6 +1272,63 @@ export const RESOLVE_DISPUTE = gql`
       resolution
       amount
       resolvedAt
+    }
+  }
+`;
+
+// ══════════════════════════════════════════════════════════════════════════
+// PYG-358 — proof of work (เช็คอิน / เช็คเอาท์)
+// ══════════════════════════════════════════════════════════════════════════
+
+const JOB_EVENT_FIELDS = `
+  id
+  bookingId
+  eventType
+  source
+  lat
+  lng
+  distanceM
+  accuracyM
+  serverTs
+  deviceTs
+  note
+  photoUrl
+  gpsAccuracyLow
+  jobCoordsMissing
+  withinWarnRadius
+  reviewReasons
+  alreadyCheckedIn
+`;
+
+/**
+ * สรุปหลักฐานการทำงาน — "แหล่งความจริงเดียว" ของหน้าปิดงาน
+ *
+ * ★ เวลาเช็คอินและเวลาทำงานจริงต้องอ่านจากที่นี่เท่านั้น ห้ามคำนวณจากนาฬิกาเครื่อง
+ */
+export const PROOF_OF_WORK = gql`
+  query ProofOfWork($bookingId: ID!) {
+    proofOfWork(bookingId: $bookingId) {
+      checkIn { ${JOB_EVENT_FIELDS} }
+      checkOut { ${JOB_EVENT_FIELDS} }
+      actualMinutes
+      bookedMinutes
+      distanceInM
+      distanceOutM
+      durationOk
+      noCheckout
+      jobCoordsMissing
+      reviewReasons
+      disputed
+      verdict
+    }
+  }
+`;
+
+/** ผู้ดูแลกดปิดงานเอง — ผู้รับบริการไม่ต้องยืนยันอะไรอีก (ทีมตัดสินใจ 2026-07-27) */
+export const CHECK_OUT_BOOKING = gql`
+  mutation CheckOutBooking($input: CheckOutInput!) {
+    checkOutBooking(input: $input) {
+      ${JOB_EVENT_FIELDS}
     }
   }
 `;

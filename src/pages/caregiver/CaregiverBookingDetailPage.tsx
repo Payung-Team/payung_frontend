@@ -1,20 +1,38 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useMutation } from '@apollo/client/react';
-import type { Booking } from './CaregiverBookings';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import { useMutation, useQuery } from '@apollo/client/react';
+import { mapToBooking, type Booking } from './CaregiverBookings';
 import {
   ACCEPT_BOOKING,
   DECLINE_BOOKING,
   CANCEL_ACCEPTANCE,
-  COMPLETE_BOOKING,
+  GET_CAREGIVER_BOOKING,
   GET_CAREGIVER_BOOKINGS,
-  GET_CAREGIVER_BOOKING_HISTORY,
 } from '../../graphql/queries';
 import { DeclineModal } from '../../components/ui/DeclineModal';
 import { CancelAcceptanceModal } from '../../components/ui/CancelAcceptanceModal';
 import { AcceptBookingModal } from '../../components/ui/AcceptBookingModal';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
+import { useJobCoordinates } from '../../hooks/useJobCoordinates';
+import Skeleton from '../../components/ui/Skeleton';
+import CheckInMap from './CheckInMap';
+import CaregiverCheckInPanel from './CaregiverCheckInPanel';
+import CaregiverServiceProgressPage from './CaregiverServiceProgressPage';
+import CheckOutSuccess from '../../components/caregiver/CheckOutSuccess';
+import type { ProofOfWorkSummary } from '../../lib/monitoring';
+import PatientSummaryCard from './checkin/PatientSummaryCard';
+import BookingDetailCard from './checkin/BookingDetailCard';
+
+const IN_PROGRESS_STATUSES: ReadonlyArray<Booking['status']> = ['in_progress', 'awaiting_release', 'needs_review'];
+
+function isBookingToday(bookingDate: string): boolean {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = new Date(bookingDate);
+  day.setHours(0, 0, 0, 0);
+  return day.getTime() === today.getTime();
+}
 
 const SERVICE_TYPE_LABELS: Record<string, string> = {
   general_care: 'ดูแลทั่วไป',
@@ -37,6 +55,9 @@ const STATUS_BADGE: Record<string, { label: string; dot: string; bg: string; tex
   declined:  { label: 'ปฏิเสธแล้ว',         dot: '#EF4444', bg: '#FEF2F2', text: '#B91C1C' },
   completed: { label: 'เสร็จสิ้น',          dot: '#52B69A', bg: '#E6F5ED', text: '#3A9A7E' },
   cancelled: { label: 'ยกเลิกแล้ว',         dot: '#6B7280', bg: '#F3F4F6', text: '#374151' },
+  in_progress:      { label: 'กำลังปฏิบัติงาน',   dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
+  awaiting_release: { label: 'รอปิดงาน',          dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
+  needs_review:     { label: 'รอแอดมินตรวจสอบ',   dot: '#DC2626', bg: '#FEF2F2', text: '#B91C1C' },
 };
 
 const STATUS_BANNER: Record<string, { icon: string; iconColor: string; bg: string; border: string; textColor: string; message: (name: string) => string }> = {
@@ -46,6 +67,9 @@ const STATUS_BANNER: Record<string, { icon: string; iconColor: string; bg: strin
   declined:  { icon: 'cancel',              iconColor: '#DC2626', bg: '#FEF2F2', border: '#FECACA', textColor: '#991B1B', message: (n) => `คุณได้ปฏิเสธคำขอจองของ ${n}` },
   completed: { icon: 'task_alt',            iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: () => `งานนี้เสร็จสิ้นเรียบร้อยแล้ว` },
   cancelled: { icon: 'do_not_disturb_on',  iconColor: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', textColor: '#374151', message: () => `การจองนี้ถูกยกเลิกแล้ว` },
+  in_progress:      { icon: 'directions_run', iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: (n) => `คุณกำลังปฏิบัติงานให้ ${n}` },
+  awaiting_release: { icon: 'hourglass_top',  iconColor: '#B45309', bg: '#FFFBEB', border: '#FDE68A', textColor: '#92400E', message: () => `เช็คเอาท์แล้ว กำลังรอปิดงาน` },
+  needs_review:     { icon: 'flag',           iconColor: '#DC2626', bg: '#FEF2F2', border: '#FECACA', textColor: '#991B1B', message: () => `งานนี้ถูกส่งให้แอดมินตรวจสอบ` },
 };
 
 function Divider() {
@@ -87,17 +111,40 @@ function formatThaiDate(dateStr: string): string {
 export default function CaregiverBookingDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const booking = location.state?.booking as Booking | undefined;
+  const { id } = useParams<{ id: string }>();
+  const stateBooking = location.state?.booking as Booking | undefined;
 
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
+  const [previewPosition, setPreviewPosition] = useState<{ lat: number; lng: number } | null>(null);
+  /** มีค่าเมื่อเพิ่งปิดงานสำเร็จในรอบนี้ — ใช้สลับไปหน้าสรุปผลแทนหน้าความคืบหน้า */
+  const [checkedOutProof, setCheckedOutProof] = useState<ProofOfWorkSummary | null>(null);
+  /** เช็คอินสำเร็จ = backend เปลี่ยน status เป็น in_progress ไปแล้วแน่นอน จึงสลับหน้าได้เลย
+   *  ไม่ต้องรอ refetch — ไม่งั้นการ์ด "เช็คอินแล้ว" จะค้างอยู่ในหน้าเช็คอินระหว่างรอ network */
+  const [justCheckedIn, setJustCheckedIn] = useState(false);
 
   const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
   const [acceptBooking] = useMutation(ACCEPT_BOOKING);
   const [declineBooking] = useMutation(DECLINE_BOOKING);
   const [cancelAcceptance] = useMutation(CANCEL_ACCEPTANCE);
-  const [completeBooking] = useMutation(COMPLETE_BOOKING);
+
+  // stateBooking (router state, from the list) is only a first-paint shortcut — the fetched copy
+  // wins so refetchBooking() after check-in/check-out actually moves the page to the next status.
+  // errorPolicy: 'all' stays so a network blip falls back to stateBooking instead of a blank page.
+  const { data: fetchedData, loading: fetchingBooking, refetch: refetchBooking } = useQuery<{
+    caregiverBooking: Record<string, unknown> | null;
+  }>(GET_CAREGIVER_BOOKING, {
+    variables: { id: id ?? '' },
+    skip: !id,
+    errorPolicy: 'all',
+    fetchPolicy: 'cache-and-network',
+  });
+  const fetchedBooking = fetchedData?.caregiverBooking ? mapToBooking(fetchedData.caregiverBooking) : undefined;
+  const booking = fetchedBooking ?? stateBooking;
+  // Called unconditionally (rules of hooks) even though booking may still be undefined here —
+  // the hook itself tolerates undefined lat/lng/address.
+  const jobCoords = useJobCoordinates(booking?.locationLat, booking?.locationLng, booking?.locationName);
 
   const showToast = (message: string, isError = false) => {
     if (isError) showError(message, 3000);
@@ -106,6 +153,17 @@ export default function CaregiverBookingDetailPage() {
   };
 
   if (!booking) {
+    if (fetchingBooking) {
+      return (
+        <div style={{ minHeight: '100vh', background: '#F6FAF9' }}>
+          <div className="mx-auto max-w-180 px-6 py-7">
+            <Skeleton height={24} width={180} className="mb-4" />
+            <Skeleton height={140} className="mb-4" />
+            <Skeleton height={220} />
+          </div>
+        </div>
+      );
+    }
     return (
       <div style={{ minHeight: '100vh', background: '#F6FAF9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
@@ -114,6 +172,46 @@ export default function CaregiverBookingDetailPage() {
             style={{ marginTop: 16, padding: '8px 20px', background: '#52B69A', color: '#FFFFFF', border: 'none', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             กลับไปยังงานของฉัน
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (checkedOutProof) {
+    return (
+      <CheckOutSuccess
+        bookingRef={`REF-${booking.id.toUpperCase().replaceAll('-', '').slice(-6)}`}
+        bookingDateText={booking.bookingDate ? formatThaiDate(booking.bookingDate) : '—'}
+        price={booking.price}
+        proof={checkedOutProof}
+        onBack={() => navigate('/caregiver/bookings')}
+      />
+    );
+  }
+
+  if (justCheckedIn || IN_PROGRESS_STATUSES.includes(booking.status)) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F6FAF9' }}>
+        <div className="mx-auto max-w-275 px-5 py-6 pb-25">
+          <button
+            type="button"
+            onClick={() => navigate('/caregiver/bookings')}
+            className="mb-4 inline-flex items-center gap-1.5 rounded-lg text-[#575859] hover:text-[#52B69A] focus:outline-none focus:ring-2 focus:ring-[#52B69A]"
+          >
+            <span className="material-icons text-base">arrow_back</span>
+            <span className="text-sm font-semibold" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+              กลับไปงานของฉัน
+            </span>
+          </button>
+          <CaregiverServiceProgressPage
+            booking={booking}
+            onCheckedOut={(proof) => {
+              // proof เป็น null = ดึงข้อมูลใหม่ไม่สำเร็จ → ไม่เด้งหน้าสรุป ปล่อยให้ refetch
+              // พาไปหน้าตามสถานะใหม่แทน ดีกว่าโชว์หน้าสรุปที่ตัวเลขว่าง
+              setCheckedOutProof(proof);
+              void refetchBooking();
+            }}
+          />
         </div>
       </div>
     );
@@ -128,17 +226,16 @@ export default function CaregiverBookingDetailPage() {
   const tasks = booking.tasks ?? [];
   const tasksText = tasks.length > 0 ? tasks.join(', ') : null;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const bookingDay = new Date(booking.bookingDate);
-  bookingDay.setHours(0, 0, 0, 0);
-  const diffDays = Math.ceil((bookingDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  const isStartable = booking.status === 'confirmed' && diffDays <= 3;
+  // Matches the backend's own gate in checkInBooking (confirmed + payment held + same-day) —
+  // payment status isn't exposed on CaregiverBookingSummary, so that half is validated
+  // server-side only; if it fails, the mutation's Thai error surfaces via the existing toast.
+  const canCheckInToday = booking.status === 'confirmed' && isBookingToday(booking.bookingDate);
 
   const refetchActive = [
     { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'PENDING', limit: 50 } } },
     { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'ACCEPTED', limit: 50 } } },
     { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'CONFIRMED', limit: 50 } } },
+    ...(id ? [{ query: GET_CAREGIVER_BOOKING, variables: { id } }] : []),
   ];
 
   return (
@@ -240,7 +337,10 @@ export default function CaregiverBookingDetailPage() {
             </p>
           </div>
 
-          {/* Main card */}
+          {/* Main card — superseded by PatientSummaryCard + BookingDetailCard once the check-in
+              cards render below (same info, restyled to the Figma check-in spec), so it's hidden
+              for that branch to avoid showing everything twice. Still used for every other status. */}
+          {!canCheckInToday && (
           <div style={{ background: '#FFFFFF', border: '0.8px solid #E0E2E5', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 20, padding: 24 }}>
 
             {/* ── Section 1: ผู้จอง ── */}
@@ -331,6 +431,7 @@ export default function CaregiverBookingDetailPage() {
               </p>
             </div>
           </div>
+          )}
 
           {/* ── Action buttons ── */}
           <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
@@ -356,32 +457,66 @@ export default function CaregiverBookingDetailPage() {
               </button>
             )}
 
-            {booking.status === 'confirmed' && (
-              <button type="button"
-                disabled={!isStartable}
-                onClick={async () => {
-                  if (!isStartable) return;
-                  try {
-                    await completeBooking({
-                      variables: { bookingId: booking.id },
-                      refetchQueries: [
-                        { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'CONFIRMED', limit: 50 } } },
-                        { query: GET_CAREGIVER_BOOKING_HISTORY, variables: { input: { page: 1, limit: 50 } } },
-                      ],
-                      awaitRefetchQueries: true,
-                    });
-                    showToast('ส่งงานเสร็จสิ้นเรียบร้อยแล้ว');
-                  } catch {
-                    showToast('ไม่สามารถส่งงานได้ กรุณาลองใหม่', true);
-                  }
-                }}
-                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 50, padding: '0 40px', background: isStartable ? '#52B69A' : 'rgba(82,182,154,0.5)', border: 'none', borderRadius: 12, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 15, fontWeight: 700, color: '#FFFFFF', cursor: isStartable ? 'pointer' : 'not-allowed' }}>
-                <span className="material-icons" style={{ fontSize: 18 }}>event_available</span>
-                {isStartable ? 'ส่งการดูแล' : `ส่งการดูแลได้อีก ${diffDays - 3} วัน`}
-              </button>
-            )}
-
           </div>
+
+          {/* ── Check-in (PYG-360) ──
+              Replaces the old "ส่งการดูแล" / completeBooking flow for confirmed bookings — that
+              button jumped straight to completion and predates the check-in/check-out monitoring
+              module. Two competing primary actions for the same status didn't make sense, so this
+              is the only "start the job" affordance now. */}
+          {booking.status === 'confirmed' && (
+            <div className="mt-6">
+              {canCheckInToday ? (
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[621fr_414fr]">
+                  <div className="order-2 flex flex-col gap-5 lg:order-1">
+                    <CheckInMap
+                      jobLat={jobCoords.lat}
+                      jobLng={jobCoords.lng}
+                      caregiverLat={previewPosition?.lat ?? null}
+                      caregiverLng={previewPosition?.lng ?? null}
+                      approximate={jobCoords.source === 'geocoded'}
+                    />
+                    <PatientSummaryCard
+                      patientName={booking.patientName}
+                      careRecipientName={booking.careRecipientName}
+                    />
+                    <BookingDetailCard
+                      serviceLabel={svcLabel}
+                      dateText={dateStr}
+                      timeText={booking.time ? `${booking.time} น.` : '—'}
+                      durationText={booking.durationText}
+                      locationName={booking.locationName}
+                      serviceFormat={booking.serviceFormat}
+                      price={booking.price}
+                      tasks={tasks}
+                      notes={booking.notes}
+                      dayOfContactName={booking.dayOfContactName}
+                      dayOfContactPhone={booking.dayOfContactPhone}
+                      dayOfContactRelationship={booking.dayOfContactRelationship}
+                    />
+                  </div>
+                  <div className="order-1 lg:order-2">
+                    <CaregiverCheckInPanel
+                      bookingId={booking.id}
+                      jobLat={jobCoords.lat}
+                      jobLng={jobCoords.lng}
+                      bookingDate={booking.bookingDate}
+                      startTime={booking.time ? booking.time.split(' - ')[0] : null}
+                      onCheckedIn={() => {
+                        setJustCheckedIn(true);
+                        void refetchBooking();
+                      }}
+                      onPreviewPositionChange={setPreviewPosition}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <p className="text-center text-sm text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                  จะเช็คอินได้ในวันที่ {formatThaiDate(booking.bookingDate)}
+                </p>
+              )}
+            </div>
+          )}
 
         </div>
       </div>

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useMemo, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import type { BookingStatus } from '../utils/bookingStatus';
 
 export interface BookingRequest {
   serviceLocation: ('at_home' | 'accompany_outside')[];
@@ -86,7 +87,7 @@ export interface ConfirmedBooking {
   caregiverProvince?: string;
   draft: BookingRequest;
   confirmedAt: string;
-  status: 'pending' | 'awaiting_payment' | 'accepted' | 'rejected' | 'cancelled' | 'completed';
+  status: BookingStatus;
 }
 
 export interface Recipient {

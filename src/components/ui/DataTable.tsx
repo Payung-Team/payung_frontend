@@ -6,7 +6,16 @@ export interface DataTableColumn<TItem> {
   header: ReactNode;
   render: (item: TItem, index: number) => ReactNode;
   className?: string;
+  /** จัดแนวหัวคอลัมน์และเนื้อหาให้ตรงกันเสมอ (default: left) */
+  align?: 'left' | 'center' | 'right';
 }
+
+// badge/ปุ่มในตารางเป็น inline-flex → text-align คุมตำแหน่งได้ทั้ง text และ element
+const ALIGN_CLASS = {
+  left: 'text-left',
+  center: 'text-center',
+  right: 'text-right',
+} as const;
 
 interface DataTableProps<TItem> {
   columns: DataTableColumn<TItem>[];
@@ -43,7 +52,9 @@ export default function DataTable<TItem>({
           style={{ gridTemplateColumns }}
         >
           {columns.map((column) => (
-            <div key={column.key}>{column.header}</div>
+            <div key={column.key} className={ALIGN_CLASS[column.align ?? 'left']}>
+              {column.header}
+            </div>
           ))}
         </div>
 
@@ -62,7 +73,7 @@ export default function DataTable<TItem>({
                 style={{ gridTemplateColumns }}
               >
                 {columns.map((column) => (
-                  <div key={column.key} className={column.className}>
+                  <div key={column.key} className={cn(ALIGN_CLASS[column.align ?? 'left'], column.className)}>
                     {column.render(item, index)}
                   </div>
                 ))}

@@ -1,227 +1,12 @@
-import { useMemo, useState, useCallback } from 'react';
 import Icon from '../../components/ui/Icon';
-import DataTable, { type DataTableColumn } from '../../components/ui/DataTable';
-import FilterTabs, { type FilterTabItem } from '../../components/ui/FilterTabs';
-import Pagination from '../../components/ui/Pagination';
-import DisputeResolveModal, { type DisputeResolveMode } from '../../components/ui/DisputeResolveModal';
-import { useToast } from '../../hooks/useToast';
-import { ToastContainer } from '../../components/ui/Toast';
-// TODO: uncomment when backend is ready
-// import { useQuery, useMutation } from '@apollo/client/react';
-// import { ADMIN_PENDING_TRANSFERS, ADMIN_DISPUTES, ADMIN_REFUND_HISTORY, RESOLVE_DISPUTE } from '../../graphql/queries';
 
-// ─── Types ─────────────────────────────────────────────────────────────────
+// TODO: ดึงสถานะการเชื่อมต่อ/บัญชี/public key จริงจาก backend เมื่อพร้อม (ตอนนี้เป็น mock UI)
+const OMISE_ACCOUNT_NAME = 'Payung Co., Ltd.';
+const OMISE_MASKED_PUBLIC_KEY = 'pkey_test_••••4f2a';
+const OMISE_DASHBOARD_URL = 'https://dashboard.omise.co/v2/recipients';
 
-type PaymentTabKey = 'pending_transfers' | 'disputes' | 'refund_history';
-
-interface PendingTransfer {
-  id: string;
-  caregiverName: string;
-  bookingId: string;
-  amount: number;
-  serviceDate: string;
-  status: 'pending' | 'processing';
-}
-
-interface Dispute {
-  id: string;
-  bookingId: string;
-  patientName: string;
-  caregiverName: string;
-  reason: string;
-  flaggedAt: string;
-  paymentAmount: number;
-  serviceType: string;
-  bookingDate: string;
-  disputeReason: string;
-}
-
-interface RefundRecord {
-  id: string;
-  bookingId: string;
-  patientName: string;
-  amount: number;
-  resolution: 'refund_full' | 'refund_partial' | 'no_refund';
-  resolvedBy: string;
-  resolvedAt: string;
-}
-
-// ─── Mock Data ─────────────────────────────────────────────────────────────
-
-const MOCK_PENDING_TRANSFERS: PendingTransfer[] = [
-  { id: 'TRF-001', caregiverName: 'พรพิมล รักษ์ดี', bookingId: 'BK-2024-0891', amount: 1350, serviceDate: '2024-06-20', status: 'pending' },
-  { id: 'TRF-002', caregiverName: 'สมหญิง ใจงาม', bookingId: 'BK-2024-0895', amount: 1800, serviceDate: '2024-06-21', status: 'pending' },
-  { id: 'TRF-003', caregiverName: 'วิไล สุขใจ', bookingId: 'BK-2024-0902', amount: 2250, serviceDate: '2024-06-22', status: 'processing' },
-  { id: 'TRF-004', caregiverName: 'นภา แสงทอง', bookingId: 'BK-2024-0908', amount: 1500, serviceDate: '2024-06-23', status: 'pending' },
-  { id: 'TRF-005', caregiverName: 'กมล ศรีสุข', bookingId: 'BK-2024-0915', amount: 2700, serviceDate: '2024-06-24', status: 'pending' },
-];
-
-const MOCK_DISPUTES: Dispute[] = [
-  {
-    id: 'DSP-001', bookingId: 'BK-2024-0870', patientName: 'สมชาย ใจดี', caregiverName: 'พรพิมล รักษ์ดี',
-    reason: 'บริการไม่ตรงตามที่ตกลง', flaggedAt: '2024-06-18T10:30:00Z',
-    paymentAmount: 1500, serviceType: 'ดูแลผู้สูงอายุ', bookingDate: '2024-06-15',
-    disputeReason: 'ผู้ดูแลมาสาย 45 นาที และไม่ได้ทำกิจกรรมตามที่ระบุไว้ในการจอง ขอคืนเงินเต็มจำนวน',
-  },
-  {
-    id: 'DSP-002', bookingId: 'BK-2024-0875', patientName: 'วิภา สุขสันต์', caregiverName: 'สมหญิง ใจงาม',
-    reason: 'ผู้ดูแลไม่มาตามนัด', flaggedAt: '2024-06-19T14:15:00Z',
-    paymentAmount: 2000, serviceType: 'ดูแลผู้ป่วยติดเตียง', bookingDate: '2024-06-17',
-    disputeReason: 'ผู้ดูแลไม่มาตามนัดหมายเลย โทรหาไม่รับสาย ต้องการคืนเงิน',
-  },
-  {
-    id: 'DSP-003', bookingId: 'BK-2024-0880', patientName: 'ประเสริฐ มั่นคง', caregiverName: 'วิไล สุขใจ',
-    reason: 'คุณภาพบริการไม่ดี', flaggedAt: '2024-06-20T09:00:00Z',
-    paymentAmount: 1800, serviceType: 'ดูแลผู้สูงอายุ', bookingDate: '2024-06-18',
-    disputeReason: 'ผู้ดูแลทำงานไม่ครบเวลา ออกก่อนเวลา 1 ชั่วโมง ขอคืนเงินบางส่วน',
-  },
-  {
-    id: 'DSP-004', bookingId: 'BK-2024-0885', patientName: 'นิภา รักดี', caregiverName: 'นภา แสงทอง',
-    reason: 'เรียกเก็บเงินเกินจริง', flaggedAt: '2024-06-21T16:45:00Z',
-    paymentAmount: 2500, serviceType: 'ดูแลผู้ป่วยติดเตียง', bookingDate: '2024-06-19',
-    disputeReason: 'ถูกเรียกเก็บเงินเพิ่มเติมนอกเหนือจากที่ตกลงไว้ในแอป',
-  },
-  {
-    id: 'DSP-005', bookingId: 'BK-2024-0890', patientName: 'อรุณ แสงจันทร์', caregiverName: 'กมล ศรีสุข',
-    reason: 'พฤติกรรมไม่เหมาะสม', flaggedAt: '2024-06-22T11:20:00Z',
-    paymentAmount: 1200, serviceType: 'ดูแลผู้สูงอายุ', bookingDate: '2024-06-20',
-    disputeReason: 'ผู้ดูแลมีพฤติกรรมไม่เหมาะสมกับผู้สูงอายุ ขอคืนเงินเต็มจำนวน',
-  },
-];
-
-const MOCK_REFUND_HISTORY: RefundRecord[] = [
-  { id: 'RFD-001', bookingId: 'BK-2024-0850', patientName: 'สุดา มีสุข', amount: 1500, resolution: 'refund_full', resolvedBy: 'Admin สมศักดิ์', resolvedAt: '2024-06-10T15:00:00Z' },
-  { id: 'RFD-002', bookingId: 'BK-2024-0855', patientName: 'ชัยวัฒน์ ดีงาม', amount: 750, resolution: 'refund_partial', resolvedBy: 'Admin สมศักดิ์', resolvedAt: '2024-06-12T10:30:00Z' },
-  { id: 'RFD-003', bookingId: 'BK-2024-0860', patientName: 'มาลี รุ่งเรือง', amount: 0, resolution: 'no_refund', resolvedBy: 'Super Admin วิชัย', resolvedAt: '2024-06-14T09:15:00Z' },
-  { id: 'RFD-004', bookingId: 'BK-2024-0865', patientName: 'ธนา สว่างใจ', amount: 2000, resolution: 'refund_full', resolvedBy: 'Admin สมศักดิ์', resolvedAt: '2024-06-16T14:45:00Z' },
-  { id: 'RFD-005', bookingId: 'BK-2024-0868', patientName: 'พิมพ์ใจ อ่อนหวาน', amount: 500, resolution: 'refund_partial', resolvedBy: 'Admin นภา', resolvedAt: '2024-06-17T11:00:00Z' },
-];
-
-// ─── Constants ─────────────────────────────────────────────────────────────
-
-const PAGE_SIZE = 10;
-
-const TRANSFER_GRID = '120px minmax(140px,1.2fr) 130px 100px 120px 110px minmax(100px,auto)';
-const DISPUTE_GRID = '130px minmax(120px,1fr) minmax(120px,1fr) minmax(160px,1.5fr) 130px minmax(110px,auto)';
-const REFUND_GRID = '110px 130px minmax(120px,1fr) 100px 130px minmax(120px,1fr) 130px';
-
-const RESOLUTION_LABELS: Record<RefundRecord['resolution'], string> = {
-  refund_full: 'คืนเงินเต็ม',
-  refund_partial: 'คืนเงินบางส่วน',
-  no_refund: 'ไม่คืนเงิน',
-};
-
-const TRANSFER_STATUS_META: Record<PendingTransfer['status'], { label: string; badgeClass: string; dotClass: string }> = {
-  pending: { label: 'รอดำเนินการ', badgeClass: 'bg-[#FFF1E8] text-[#B4532A]', dotClass: 'bg-[#C65A3A]' },
-  processing: { label: 'กำลังดำเนินการ', badgeClass: 'bg-[#EFF6FF] text-[#2563EB]', dotClass: 'bg-[#2563EB]' },
-};
-
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
-function formatDate(value?: string | null) {
-  if (!value) return '-';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '-';
-  return new Intl.DateTimeFormat('th-TH-u-ca-gregory', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(d);
-}
-
-function formatCurrency(amount: number) {
-  if (amount === 0) return '-';
-  return `฿${amount.toLocaleString()}`;
-}
-
-function paginate<T>(items: T[], page: number, pageSize: number) {
-  const total = items.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const start = (page - 1) * pageSize;
-  return { items: items.slice(start, start + pageSize), total, totalPages };
-}
-
-// ─── Dispute Detail Panel ──────────────────────────────────────────────────
-
-interface DisputeDetailPanelProps {
-  dispute: Dispute;
-  onResolve: (mode: DisputeResolveMode) => void;
-  onClose: () => void;
-}
-
-function DisputeDetailPanel({ dispute, onResolve, onClose }: DisputeDetailPanelProps) {
-  return (
-    <div className="border-t border-gray-200 bg-[#F9FAFB] px-5 py-5">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-bold text-[#064E3B]">
-          รายละเอียดข้อพิพาท — {dispute.bookingId}
-        </h3>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 hover:bg-gray-200 hover:text-gray-600"
-          aria-label="ปิดรายละเอียด"
-        >
-          <span className="material-icons" style={{ fontSize: 18 }}>close</span>
-        </button>
-      </div>
-
-      <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-3">
-          <p className="text-xs text-gray-500">ผู้ป่วย</p>
-          <p className="mt-0.5 text-sm font-semibold text-gray-900">{dispute.patientName}</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-3">
-          <p className="text-xs text-gray-500">ผู้ดูแล</p>
-          <p className="mt-0.5 text-sm font-semibold text-gray-900">{dispute.caregiverName}</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-3">
-          <p className="text-xs text-gray-500">ประเภทบริการ</p>
-          <p className="mt-0.5 text-sm font-semibold text-gray-900">{dispute.serviceType}</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-3">
-          <p className="text-xs text-gray-500">ยอดชำระ</p>
-          <p className="mt-0.5 text-sm font-bold text-[#059669]">{formatCurrency(dispute.paymentAmount)}</p>
-        </div>
-      </div>
-
-      <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-        <p className="mb-1 text-xs font-semibold text-amber-700">เหตุผลจากผู้ป่วย</p>
-        <p className="text-sm leading-relaxed text-gray-700">{dispute.disputeReason}</p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => onResolve('refund_full')}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[#059669] px-4 py-2 text-xs font-semibold text-white hover:bg-[#047857]"
-        >
-          <span className="material-icons" style={{ fontSize: 14 }}>payments</span>
-          คืนเงินเต็ม
-        </button>
-        <button
-          type="button"
-          onClick={() => onResolve('refund_partial')}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[#D97706] bg-white px-4 py-2 text-xs font-semibold text-[#D97706] hover:bg-amber-50"
-        >
-          <span className="material-icons" style={{ fontSize: 14 }}>price_change</span>
-          คืนเงินบางส่วน
-        </button>
-        <button
-          type="button"
-          onClick={() => onResolve('no_refund')}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
-        >
-          <span className="material-icons" style={{ fontSize: 14 }}>block</span>
-          ไม่คืนเงิน
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Main Page ─────────────────────────────────────────────────────────────
-
+// PYG-320 — หน้า Payment Settings แสดงสถานะการเชื่อมต่อ Omise (แทนที่ mock transactions/disputes เดิม
+// ซึ่งย้ายไปอยู่ในหน้า Dispute Review แล้ว)
 export default function AdminPaymentsPage() {
   const { toasts, removeToast, success } = useToast();
 
@@ -384,60 +169,42 @@ export default function AdminPaymentsPage() {
 
   return (
     <div className="bg-[#F9FAFB] text-gray-900">
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
-
       <section className="mx-auto max-w-328 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mb-3">
-          <FilterTabs
-            items={filterTabs}
-            activeKey={activeTab}
-            onChange={handleTabChange}
-          />
-        </div>
+        <div className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <Icon name="account_balance" variant="outlined" size="medium" />
+            </span>
 
-        <DataTable
-          columns={tableConfig.columns}
-          items={items}
-          getRowKey={tableConfig.getRowKey}
-          gridTemplateColumns={tableConfig.grid}
-          renderEmpty={
-            <div className="flex min-h-80 flex-col items-center justify-center px-6 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-[#0D9488]">
-                <Icon name={tableConfig.icon} variant="outlined" />
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-bold text-gray-900">Omise Payment Gateway</h2>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                  <span>เชื่อมต่อแล้ว</span>
+                </span>
               </div>
-              <h2 className="mt-4 text-base font-semibold text-gray-900">{tableConfig.emptyTitle}</h2>
-              <p className="mt-1 max-w-md text-sm text-gray-500">{tableConfig.emptyBody}</p>
-            </div>
-          }
-          footer={
-            <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-gray-500">
-                แสดง {firstItem}-{lastItem} จาก {total} รายการ
-              </p>
-              <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-            </div>
-          }
-        />
 
-        {activeTab === 'disputes' && expandedDispute && (
-          <div className="mt-0 overflow-hidden rounded-b-xl border border-t-0 border-gray-200 bg-white shadow-sm">
-            <DisputeDetailPanel
-              dispute={expandedDispute}
-              onResolve={(mode) => setResolveModal({ dispute: expandedDispute, mode })}
-              onClose={() => setExpandedDisputeId(null)}
-            />
+              <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
+                <div>
+                  <p className="text-xs text-gray-400">บัญชี</p>
+                  <p className="text-sm font-semibold text-gray-900">{OMISE_ACCOUNT_NAME}</p>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-      </section>
 
-      <DisputeResolveModal
-        isOpen={resolveModal !== null}
-        mode={resolveModal?.mode ?? null}
-        originalAmount={resolveModal?.dispute.paymentAmount ?? 0}
-        isLoading={resolveLoading}
-        onClose={() => setResolveModal(null)}
-        onConfirm={handleResolveConfirm}
-      />
+          <a
+            href={OMISE_DASHBOARD_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-600"
+          >
+            เปิด Omise Dashboard
+            <Icon name="open_in_new" size="small" color="currentColor" />
+          </a>
+        </div>
+      </section>
     </div>
   );
 }
