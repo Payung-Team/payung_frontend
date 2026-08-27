@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { BookingStatus } from '../utils/bookingStatus';
 
@@ -114,6 +114,10 @@ interface BookingContextType {
   isCaregiverSaved: (id: string) => boolean;
   cancelBooking: (id: string) => void;
   resetBooking: () => void;
+  // Sticky nav — each step registers its own submit handler; parent's sticky
+  // bottom "Next" button invokes it via stepSubmit().
+  stepSubmit: (() => void) | null;
+  setStepSubmit: (fn: (() => void) | null) => void;
 }
 
 const BookingContext = createContext<BookingContextType | undefined>(undefined);
@@ -162,6 +166,11 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [step, setStep] = useState(1);
   const [confirmedBookings, setConfirmedBookings] = useState<ConfirmedBooking[]>([]);
   const [savedCaregivers, setSavedCaregivers] = useState<SavedCaregiver[]>([]);
+  const [stepSubmit, setStepSubmitState] = useState<(() => void) | null>(null);
+  const setStepSubmit = useCallback((fn: (() => void) | null) => {
+    // wrap so useState doesn't invoke `fn` as a state updater
+    setStepSubmitState(() => fn);
+  }, []);
   const [recipients, setRecipients] = useState<Recipient[]>([
     {
       id: 'member-1',
@@ -284,8 +293,9 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     confirmedBookings, addConfirmedBooking,
     savedCaregivers, toggleSaveCaregiver, isCaregiverSaved,
     cancelBooking, resetBooking,
+    stepSubmit, setStepSubmit,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [bookingDraft, recipients, step, confirmedBookings, savedCaregivers]);
+  }), [bookingDraft, recipients, step, confirmedBookings, savedCaregivers, stepSubmit]);
 
   return (
     <BookingContext.Provider value={value}>
