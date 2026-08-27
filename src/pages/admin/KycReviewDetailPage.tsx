@@ -11,6 +11,7 @@ import KycDocumentsPreview from '../../components/ui/KycDocumentsPreview';
 import KycHistoryCard from '../../components/ui/KycHistoryCard';
 import StatusBadge from '../../components/ui/StatusBadge';
 import ConfirmModal from '../../components/ui/ConfirmModal';
+import { getBankLabel } from '../../features/kyc/omiseBanks';
 
 type KycStatus = 'pending' | 'verified' | 'rejected' | 'none' | string;
 
@@ -64,6 +65,15 @@ interface CaregiverEditLog {
   fieldChanges?: Array<{ field: string; oldValue?: string; newValue?: string }> | null;
 }
 
+interface AdminPayoutAccountSummary {
+  bankCode: string;
+  accountName: string;
+  accountNumberLast4: string;
+  status: string;
+  recipientStatus: string;
+  hasOmiseRecipient: boolean;
+}
+
 interface AdminKycDetailResponse {
   adminKycDetail: {
     caregiver: CaregiverDetail;
@@ -71,8 +81,15 @@ interface AdminKycDetailResponse {
     resubmitCount: number;
     reviews: KycReview[];
     editHistory: CaregiverEditLog[];
+    payoutAccount?: AdminPayoutAccountSummary | null;
   };
 }
+
+const RECIPIENT_STATUS_META: Record<string, { label: string; className: string }> = {
+  unverified: { label: 'รอตรวจสอบ', className: 'bg-[#FFF7ED] text-[#C2410C]' },
+  verified: { label: 'ยืนยันแล้ว', className: 'bg-[#ECFDF5] text-[#047857]' },
+  failed: { label: 'ตรวจสอบไม่ผ่าน', className: 'bg-[#FEF2F2] text-[#DC2626]' },
+};
 
 
 const statusMeta: Record<string, { label: string; badge: string; dot: string }> = {
@@ -554,6 +571,7 @@ export default function KycReviewDetailPage() {
   const reviews = data?.adminKycDetail.reviews ?? [];
   const editHistory = data?.adminKycDetail.editHistory ?? [];
   const resubmitCount = data?.adminKycDetail.resubmitCount ?? caregiver?.resubmitCount ?? 0;
+  const payoutAccount = data?.adminKycDetail.payoutAccount ?? null;
   const isPending = caregiver?.kycStatus === 'pending';
 
 
@@ -708,7 +726,31 @@ export default function KycReviewDetailPage() {
                   </div>
                 ) : null}
               </article>
-              
+
+              {/*Payout Account (PYG-266)*/}
+              <article className="rounded-xl border border-[#E5E7EB] bg-white px-6 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                <h3 className="text-base font-semibold leading-5 text-[#064E3B]">บัญชีธนาคาร/ข้อมูลรับเงิน</h3>
+                {payoutAccount ? (
+                  <dl className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                    <CaregiverField label="ธนาคาร" value={getBankLabel(payoutAccount.bankCode)} />
+                    <CaregiverField label="ชื่อบัญชี (เทียบกับชื่อในบัตร)" value={payoutAccount.accountName} />
+                    <CaregiverField label="เลขบัญชี" value={`•••• ${payoutAccount.accountNumberLast4}`} />
+                    <div className="min-w-0">
+                      <dt className="text-[13px] font-medium leading-5 text-[#9CA3AF]">สถานะการยืนยันกับ Omise</dt>
+                      <dd className="mt-1">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                          (RECIPIENT_STATUS_META[payoutAccount.recipientStatus] ?? RECIPIENT_STATUS_META.unverified).className
+                        }`}>
+                          {(RECIPIENT_STATUS_META[payoutAccount.recipientStatus] ?? RECIPIENT_STATUS_META.unverified).label}
+                        </span>
+                      </dd>
+                    </div>
+                  </dl>
+                ) : (
+                  <p className="mt-3 text-[15px] text-[#9CA3AF]">ยังไม่มีข้อมูลบัญชี</p>
+                )}
+              </article>
+
               {/*KYC History*/}
               <KycHistoryCard
                 caregiver={caregiver}

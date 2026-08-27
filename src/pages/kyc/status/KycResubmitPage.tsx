@@ -6,6 +6,7 @@ import { useKyc } from '../../../context/KycContext';
 import KycStep1 from '../steps/KycStep1';
 import KycStep2 from '../steps/KycStep2';
 import KycStep3 from '../steps/KycStep3';
+import KycStep4 from '../steps/KycStep4';
 import KycRejectionList from '../../../components/ui/KycRejectionList';
 
 export default function KycResubmitPage() {
@@ -54,6 +55,13 @@ export default function KycResubmitPage() {
             fileName: d.fileName,
             fileUrl: d.signedUrl || d.fileUrl,
           })),
+          payout: kyc.payoutAccount
+            ? {
+                bankCode: kyc.payoutAccount.bankCode,
+                accountName: kyc.payoutAccount.accountName,
+                accountNumberLast4: kyc.payoutAccount.accountNumberLast4,
+              }
+            : null,
         });
         // Start at target step if provided in route state, otherwise Step 1
         const targetStep = location.state?.step || 1;
@@ -74,10 +82,13 @@ export default function KycResubmitPage() {
     let targetStep = 1;
     if (reason.documentType === 'ข้อมูลส่วนตัว') {
       targetStep = 1;
-    } else if (reason.documentType === 'บัตรประชาชน' || reason.documentType === 'รูปถ่ายคู่บัตรประชาชน') {
+    } else if (
+      reason.documentType === 'บัตรประชาชน' ||
+      reason.documentType === 'รูปถ่ายคู่บัตรประชาชน' ||
+      reason.documentType === 'ใบรับรองอบรม'
+    ) {
+      // เอกสารทั้งหมด (รวมใบรับรองอบรม) อยู่ที่ step 2 — step 3 คือบัญชีรับเงิน (PYG-266) ไม่เกี่ยวกับเอกสาร
       targetStep = 2;
-    } else if (reason.documentType === 'ใบรับรองอบรม') {
-      targetStep = 3;
     }
     goToStep(targetStep);
   };
@@ -117,6 +128,7 @@ export default function KycResubmitPage() {
           {step === 1 && <KycStep1 mode="resubmit" />}
           {step === 2 && <KycStep2 mode="resubmit" />}
           {step === 3 && <KycStep3 mode="resubmit" />}
+          {step === 4 && <KycStep4 mode="resubmit" />}
         </div>
       </div>
     </div>
