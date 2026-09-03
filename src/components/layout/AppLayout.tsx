@@ -129,7 +129,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
           isLoading={menuLoading}
           currentUserId={userData?.me?.id}
           homeRoute={homeRoute}
-          showSearchBar={currentRole !== 2}
           profileDropdown={
             currentRole === 2 ? (
               <CaregiverProfileDropdown

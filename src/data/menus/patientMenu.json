@@ -26,6 +26,14 @@
       "icon": "calendar-outline",
       "route": "/bookings",
       "allowedRoles": ["patient"]
+    },
+    {
+      "id": "family_group",
+      "type": "navigation",
+      "label": "กลุ่มครอบครัว",
+      "icon": "people-outline",
+      "route": "/family-group",
+      "allowedRoles": ["patient"]
     }
   ],
   "avatar": [

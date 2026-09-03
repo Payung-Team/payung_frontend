@@ -21,6 +21,7 @@ const iconMap: { [key: string]: string } = {
   'chatbubble-outline': 'chat',
   'checkmark-circle-outline': 'verified_user',
   'person-outline': 'person',
+  'people-outline': 'group',
   'create-outline': 'edit',
   'log-out-outline': 'logout',
   'settings-outline': 'settings',
