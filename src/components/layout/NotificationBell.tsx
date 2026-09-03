@@ -181,11 +181,20 @@ export default function NotificationBell({
         type="button"
         onClick={handleClickBell}
         className="relative w-9 h-9 flex items-center justify-center text-gray-600 hover:text-gray-900 cursor-pointer transition-colors rounded-full hover:bg-gray-100"
-        aria-label="เปิดการแจ้งเตือน"
+        aria-label={
+          unreadCount > 0
+            ? `เปิดการแจ้งเตือน (ยังไม่อ่าน ${unreadCount} รายการ)`
+            : 'เปิดการแจ้งเตือน'
+        }
       >
         <span className="material-icons text-base">notifications</span>
         {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#D4183D] rounded-full ring-2 ring-white" />
+          <span
+            className="absolute -top-0.5 -right-0.5 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[#D4183D] px-[4px] text-[10px] font-bold leading-none text-white ring-2 ring-white tabular-nums"
+            aria-hidden="true"
+          >
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
         )}
       </button>
 
