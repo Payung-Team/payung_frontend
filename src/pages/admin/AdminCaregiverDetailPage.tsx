@@ -28,7 +28,6 @@ const ADMIN_KYC_DETAIL_LOCAL = gql`
         id
         docType
         fileName
-        fileUrl
         fileSize
         mimeType
         signedUrl

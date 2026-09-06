@@ -53,7 +53,7 @@ export default function KycResubmitPage() {
             docId: d.id,
             docType: d.docType,
             fileName: d.fileName,
-            fileUrl: d.signedUrl || d.fileUrl,
+            previewUrl: d.signedUrl ?? '',
           })),
           payout: kyc.payoutAccount
             ? {

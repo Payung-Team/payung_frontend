@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { logGraphQLError } from '../lib/logGraphQLError';
 import { useApolloClient } from '@apollo/client/react';
 import { LOGOUT_USER } from '../graphql/queries';
 import type { User, Session, SignUpWithPasswordCredentials, SignInWithPasswordCredentials, AuthError, AuthChangeEvent } from '@supabase/supabase-js';
@@ -42,9 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, currentSession: Session | null) => {
-        console.log('[AuthContext] event:', event);
-        console.log('[AuthContext] user:', currentSession?.user ?? null);
-        console.log('[AuthContext] loading:', loading);
+        // ไม่ log user object — มี email/phone/user_metadata อยู่ในนั้น
+        console.log('[AuthContext] event:', event, '| session:', currentSession ? 'present' : 'none');
 
         if (event === 'PASSWORD_RECOVERY') {
           setPasswordRecoveryPending(true);
@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       } catch (err) {
         // ถ้า GraphQL logout ล้มเหลว ไม่ต้อง throw เพราะ Supabase signOut ส่วนใหญ่พอแล้ว
-        console.warn('GraphQL logout mutation failed:', err);
+        logGraphQLError('Logout', err);
       }
       
       // ขั้นตอนที่ 2: เรียก Supabase logout (client-side session invalidation)

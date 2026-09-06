@@ -89,7 +89,6 @@ export const UPLOAD_KYC_DOCUMENT = gql`
       id
       docType
       fileName
-      fileUrl
     }
   }
 `;
@@ -219,7 +218,6 @@ export const GET_KYC_STATUS = gql`
         id
         docType
         fileName
-        fileUrl
         signedUrl
         mimeType
       }
@@ -253,7 +251,7 @@ export const GET_KYC_DOCUMENTS = gql`
         id
         docType
         fileName
-        fileUrl
+        signedUrl
         fileSize
         mimeType
         uploadedAt
@@ -353,7 +351,6 @@ export const ADMIN_KYC_DETAIL = gql`
         id
         docType
         fileName
-        fileUrl
         fileSize
         mimeType
         signedUrl

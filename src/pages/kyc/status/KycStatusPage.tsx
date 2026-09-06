@@ -21,7 +21,7 @@ interface KycDocument {
   id: string;
   docType: string;
   fileName: string;
-  fileUrl: string;
+  /** BE PR #39: ใช้ signedUrl เท่านั้น (fileUrl เป็นสตริงว่างเสมอ) — อายุ 15 นาที */
   signedUrl?: string;
   mimeType: string;
 }
@@ -35,10 +35,12 @@ function DocumentItem({ doc, onPreview }: DocumentItemProps) {
   const isPdf = doc.mimeType === 'application/pdf' || doc.fileName.toLowerCase().endsWith('.pdf');
 
   const handleView = () => {
+    if (!doc.signedUrl) return;
+
     if (isPdf) {
-      window.open(doc.signedUrl || doc.fileUrl, '_blank');
+      window.open(doc.signedUrl, '_blank');
     } else {
-      onPreview(doc.signedUrl || doc.fileUrl, doc.fileName);
+      onPreview(doc.signedUrl, doc.fileName);
     }
   };
 
@@ -50,8 +52,8 @@ function DocumentItem({ doc, onPreview }: DocumentItemProps) {
           {isPdf ? (
             <Icon name="picture_as_pdf" color="#EF4444" size="large" />
           ) : (
-            (doc.signedUrl || doc.fileUrl) ? (
-              <img src={doc.signedUrl || doc.fileUrl} alt={doc.fileName} className="w-full h-full object-cover" />
+            doc.signedUrl ? (
+              <img src={doc.signedUrl} alt={doc.fileName} className="w-full h-full object-cover" />
             ) : (
               <Icon name="image" color="#94A3B8" size="large" />
             )
@@ -153,10 +155,9 @@ export default function KycStatusPage() {
   useEffect(() => {
     const refreshAll = async () => {
       const updated = await Promise.all(rawDocuments.map(async (doc: any) => {
-        if (doc.fileUrl.includes('/kyc-documents/') || doc.signedUrl?.includes('/kyc-documents/')) {
+        if (doc.signedUrl?.includes('/kyc-documents/')) {
           try {
-            const urlToSplit = doc.signedUrl || doc.fileUrl;
-            const parts = urlToSplit.split('/kyc-documents/');
+            const parts = doc.signedUrl.split('/kyc-documents/');
             const path = parts.length > 1 ? parts[1].split('?')[0] : null;
             if (path) {
               const { data: signData } = await supabase.storage

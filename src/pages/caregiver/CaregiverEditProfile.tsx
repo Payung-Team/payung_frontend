@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client/react';
+import { logGraphQLError } from '../../lib/logGraphQLError';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -210,7 +211,7 @@ const CaregiverEditProfile: React.FC = () => {
         setTimeout(() => navigate(-1), 2000);
       }
     } catch (error: any) {
-      console.error('Update profile error:', error);
+      logGraphQLError('UpdateCaregiverProfile', error);
       setToastMessage({ 
         type: 'error', 
         message: error?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' 

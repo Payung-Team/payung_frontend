@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { GET_USER } from '../../graphql/queries';
 import { useAuth } from '../../context/AuthContext';
 import { getPostLoginRedirect } from '../../utils/getRedirectPath';
+import { logGraphQLError } from '../../lib/logGraphQLError';
 
 interface MeResult {
   me: {
@@ -27,7 +28,8 @@ export default function AuthCallback() {
   useEffect(() => {
     const run = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      console.log('[AuthCallback] session:', session);
+      // ไม่ log session object — มี access token อยู่ในนั้น
+      console.log('[AuthCallback] session:', session ? 'present' : 'none');
 
       if (!session) {
         console.log('[AuthCallback] no session → /login');
@@ -49,12 +51,13 @@ export default function AuthCallback() {
             break;
           }
         } catch (err) {
-          console.warn(`[AuthCallback] GET_USER attempt ${attempt} failed:`, err);
+          logGraphQLError(`GetUser (attempt ${attempt})`, err);
           if (attempt < 3) await sleep(1000);
         }
       }
 
-      console.log('[AuthCallback] userData:', userData);
+      // ไม่ log userData ทั้งก้อน — มี phone/email อยู่ในนั้น
+      console.log('[AuthCallback] user role:', userData?.role ?? 'unknown');
 
       if (!userData) {
         console.log('[AuthCallback] could not fetch user after retries → /login');

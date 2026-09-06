@@ -42,9 +42,9 @@ interface KycDocument {
   id: string;
   docType: string;
   fileName: string;
-  fileUrl: string;
   fileSize: number;
   mimeType: string;
+  /** BE PR #39: ใช้ signedUrl เท่านั้น (fileUrl เป็นสตริงว่างเสมอ) — อายุ 15 นาที */
   signedUrl?: string | null;
   uploadedAt: string;
 }

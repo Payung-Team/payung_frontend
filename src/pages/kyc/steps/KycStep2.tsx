@@ -172,7 +172,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
       });
 
       const docId: string = (result.data as any)?.uploadKycDocument?.id;
-      saveDoc({ docId, docType, fileName: file.name, fileUrl: previewUrl });
+      saveDoc({ docId, docType, fileName: file.name, previewUrl });
       setDocState(docType, { status: 'success', fileName: file.name });
     } catch (err: any) {
       setDocState(docType, {
@@ -230,7 +230,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
       // Track old doc for cleanup on step 3 submit (storage + DB deleted together)
       addPendingDeleteDoc(oldDoc);
 
-      saveDoc({ docId, docType, fileName: file.name, fileUrl: previewUrl });
+      saveDoc({ docId, docType, fileName: file.name, previewUrl });
       setDocState(docType, { status: 'success', fileName: file.name });
     } catch (err: any) {
       setDocState(docType, {
@@ -244,7 +244,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
     const existing = uploadedDocs.find((u) => u.docType === docType);
     if (!existing) return;
 
-    let url = existing.fileUrl;
+    let url = existing.previewUrl;
 
     // Refresh signed URL for private bucket files
     if (url.includes('/kyc-documents/')) {
@@ -307,7 +307,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
     try {
       // 1. Delete from Supabase Storage first if path exists
       // The path starts after the bucket name 'kyc-documents/'
-      const parts = existing.fileUrl.split('/kyc-documents/');
+      const parts = existing.previewUrl.split('/kyc-documents/');
       const path = parts.length > 1 ? parts[1].split('?')[0] : null;
 
       if (path) {

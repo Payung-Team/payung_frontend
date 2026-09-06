@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { logGraphQLError } from '../../lib/logGraphQLError';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@apollo/client/react';
 import AuthLayout from '../../components/layout/AuthLayout';
@@ -60,10 +61,8 @@ export default function Login() {
       navigate(getPostLoginRedirect({ role, mustChangePassword }));
     },
     onError: (error) => {
-      console.error('Login mutation error details:', error);
-      console.error('Error message:', error.message);
-      console.error('GraphQL errors:', error.graphQLErrors);
-      console.error('Network error:', error.networkError);
+      // ห้าม log error object / graphQLErrors — message สะท้อน variables (อีเมล+รหัสผ่าน) กลับมาได้
+      logGraphQLError('Login', error);
       setFormError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
       setErrorCount(prev => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -105,7 +104,7 @@ export default function Login() {
           },
         });
       } catch (err) {
-        console.error('Login error:', err);
+        logGraphQLError('Login', err);
       }
     } else {
       setErrorCount(prev => prev + 1);
