@@ -8,6 +8,7 @@ import { COMPLETE_PASSWORD_CHANGE } from '../../graphql/queries';
 import { supabase } from '../../lib/supabase';
 import { Icon } from '../../components/ui/Icon';
 import { useAuth } from '../../context/AuthContext';
+import { logGraphQLError } from '../../lib/logGraphQLError';
 import { getPostLoginRedirect } from '../../utils/getRedirectPath';
 
 const PasswordIcon = <Icon name="lock" size="small" color="currentColor" />;
@@ -57,7 +58,7 @@ export default function ChangePasswordPage() {
     try {
       await completePasswordChange();
     } catch (err) {
-      console.error('completePasswordChange mutation error:', err);
+      logGraphQLError('CompletePasswordChange', err);
     }
 
     setMustChangePassword(false);

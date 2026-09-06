@@ -2,6 +2,7 @@ import { useMutation } from '@apollo/client/react';
 import { REGISTER_USER } from '../graphql/queries';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { logGraphQLError } from '../lib/logGraphQLError';
 
 export interface RegisterData {
   email: string;
@@ -52,11 +53,11 @@ export function useRegister() {
           });
         }
       }
-      console.log('Registration Mutation Response:', response);
+      // ไม่ log response — ในนั้นมี accessToken/refreshToken และข้อมูลผู้ใช้
 
       return { data: response.data, error: null };
     } catch (err: any) {
-      console.error('Registration Mutation Error:', err);
+      logGraphQLError('Register', err);
       const errorMessage = err.message || '';
       let displayError = 'เกิดข้อผิดพลาดในการลงทะเบียน';
       

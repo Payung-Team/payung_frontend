@@ -17,7 +17,11 @@ export interface UploadedDoc {
   docId: string;
   docType: string;
   fileName: string;
-  fileUrl: string;
+  /**
+   * URL สำหรับพรีวิวในหน้า wizard — client เซ็นเองจาก Supabase storage
+   * ไม่ใช่ `KycDocument.fileUrl` ของ backend (ตัวนั้นเป็นสตริงว่างเสมอตั้งแต่ PR #39)
+   */
+  previewUrl: string;
 }
 
 /** PYG-266: บัญชีธนาคารรับเงิน — เลขบัญชีเข้ารหัสฝั่ง backend ไม่มีทาง prefill ค่าจริงกลับมาได้ */

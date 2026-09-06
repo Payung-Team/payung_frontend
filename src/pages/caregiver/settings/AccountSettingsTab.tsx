@@ -91,7 +91,7 @@ export const AccountSettingsTab: React.FC = () => {
         id: string;
         docType: string;
         fileName: string;
-        fileUrl: string;
+        signedUrl?: string | null;
         fileSize?: number;
         mimeType?: string;
         uploadedAt?: string;

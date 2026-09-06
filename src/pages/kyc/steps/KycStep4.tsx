@@ -5,6 +5,8 @@ import { useKyc } from '../../../context/KycContext';
 import { useAuth } from '../../../context/AuthContext';
 import { SUBMIT_KYC, RESUBMIT_KYC, DELETE_KYC_DOCUMENT } from '../../../graphql/queries';
 import { getBankLabel } from '../../../features/kyc/omiseBanks';
+import { SEND_PAYOUT_ACCOUNT_WITH_KYC, PAYOUT_NOT_SAVED_NOTICE } from '../../../features/kyc/payoutAccountFlag';
+import { logGraphQLError } from '../../../lib/logGraphQLError';
 import Icon from '../../../components/ui/Icon';
 import Tooltip from '../../../components/ui/Tooltip';
 import { supabase } from '../../../lib/supabase';
@@ -37,16 +39,16 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
   useEffect(() => {
     const refreshAll = async () => {
       const updated = await Promise.all(uploadedDocs.map(async (doc) => {
-        if (doc.fileUrl.includes('/kyc-documents/')) {
+        if (doc.previewUrl.includes('/kyc-documents/')) {
           try {
-            const parts = doc.fileUrl.split('/kyc-documents/');
+            const parts = doc.previewUrl.split('/kyc-documents/');
             const path = parts.length > 1 ? parts[1].split('?')[0] : null;
             if (path) {
               const { data } = await supabase.storage
                 .from('kyc-documents')
                 .createSignedUrl(decodeURIComponent(path), 3600);
               if (data?.signedUrl) {
-                return { ...doc, fileUrl: data.signedUrl };
+                return { ...doc, previewUrl: data.signedUrl };
               }
             }
           } catch (err) {
@@ -111,7 +113,8 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
       };
 
       // PYG-266: ส่ง payoutAccount เฉพาะตอนที่ผู้ใช้กรอก/แก้ไขจริง (ไม่แตะ = ไม่ส่ง)
-      if (payoutData) {
+      // PYG-307: ปิดไว้ชั่วคราวจนกว่า BE PR #37 จะ merge (ดู payoutAccountFlag.ts)
+      if (SEND_PAYOUT_ACCOUNT_WITH_KYC && payoutData) {
         kycInput.payoutAccount = payoutData;
       }
 
@@ -123,7 +126,7 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
         // Delete old docs from storage + DB (permanent cleanup on submit)
         if (pendingDeleteDocs.length > 0) {
           await Promise.allSettled(pendingDeleteDocs.map(async (doc) => {
-            const parts = doc.fileUrl.split('/kyc-documents/');
+            const parts = doc.previewUrl.split('/kyc-documents/');
             const path = parts.length > 1 ? parts[1].split('?')[0] : null;
             if (path) {
               await supabase.storage.from('kyc-documents').remove([decodeURIComponent(path)]);
@@ -141,7 +144,8 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
         navigate('/kyc/success');
       }
     } catch (err) {
-      console.error('KYC Submission Error:', err);
+      // ห้าม log err ดิบ ๆ — message ของ GraphQL สะท้อน $input ที่มีเลขบัตร/เลขบัญชีกลับมาด้วย
+      logGraphQLError(mode === 'resubmit' ? 'ResubmitKyc' : 'SubmitKyc', err);
       alert('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง');
     }
   };
@@ -286,6 +290,15 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
                 <InfoRow label="ธนาคาร" value={getBankLabel(displayPayout.bankCode)} />
                 <InfoRow label="ชื่อบัญชี" value={displayPayout.accountName || '-'} />
                 <InfoRow label="เลขบัญชี" value={`•••• ${displayPayout.last4}`} border={false} />
+                {/* PYG-307: กรอกได้แต่ยังส่งขึ้น backend ไม่ได้ — ต้องบอกตามจริง */}
+                {!SEND_PAYOUT_ACCOUNT_WITH_KYC && payoutData && (
+                  <p
+                    className="pb-2.5 text-[12px] leading-[18px] text-[#BB7E1C]"
+                    style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+                  >
+                    {PAYOUT_NOT_SAVED_NOTICE}
+                  </p>
+                )}
               </>
             ) : (
               <div className="py-2.5">
@@ -396,8 +409,8 @@ function InfoRow({ label, value, border = true }: { label: string; value: string
   );
 }
 
-function DocRow({ label, file, border = true }: { label: string; file?: { fileName: string; fileUrl: string }; border?: boolean }) {
-  const isImage = file?.fileName.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i) || file?.fileUrl.includes('token=') || file?.fileUrl.includes('signedURL=');
+function DocRow({ label, file, border = true }: { label: string; file?: { fileName: string; previewUrl: string }; border?: boolean }) {
+  const isImage = file?.fileName.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i) || file?.previewUrl.includes('token=') || file?.previewUrl.includes('signedURL=');
 
   return (
     <div className={`flex justify-between items-center py-2.5 ${border ? 'border-b border-[#F1F5F9]' : ''}`}>
@@ -408,7 +421,7 @@ function DocRow({ label, file, border = true }: { label: string; file?: { fileNa
         {file ? (
           <div className="flex items-center gap-2 overflow-hidden bg-[#F1F5F9] rounded-lg px-2.5 py-1.5 min-w-[102px]">
             {isImage ? (
-              <img src={file.fileUrl} alt={file.fileName} className="w-8 h-8 rounded object-cover border border-white" />
+              <img src={file.previewUrl} alt={file.fileName} className="w-8 h-8 rounded object-cover border border-white" />
             ) : (
               <div className="w-5 h-5 bg-[#1B6B3A] rounded-sm flex items-center justify-center flex-shrink-0">
                 <Icon name="check" color="white" style={{ fontSize: '14px' }} />
