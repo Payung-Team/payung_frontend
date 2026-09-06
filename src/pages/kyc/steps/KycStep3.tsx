@@ -7,7 +7,6 @@ import Input from '../../../components/ui/Input';
 import Icon from '../../../components/ui/Icon';
 import KycStepper from '../KycStepper';
 import { OMISE_BANK_OPTIONS, getBankLabel } from '../../../features/kyc/omiseBanks';
-import { SEND_PAYOUT_ACCOUNT_WITH_KYC, PAYOUT_NOT_SAVED_NOTICE } from '../../../features/kyc/payoutAccountFlag';
 
 // ── Zod schema — ต้องตรงกับ backend PayoutAccountInput (@Matches /^\d{10}$/) ──
 const payoutSchema = z.object({
@@ -210,18 +209,6 @@ export default function KycStep3({ mode = 'create' }: { mode?: 'create' | 'resub
         <p className="text-sm text-[#717182] mb-8" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           ใช้สำหรับโอนค่าตอบแทนหลังทำงานเสร็จ (ไม่บังคับ — เพิ่มทีหลังได้)
         </p>
-
-        {/* PYG-307: ฟอร์มยังใช้ได้ปกติ แต่ยังส่งขึ้น backend ไม่ได้ — บอกผู้ใช้ตามจริง */}
-        {!SEND_PAYOUT_ACCOUNT_WITH_KYC && (
-          <div className="flex flex-row items-center gap-2.5 mb-6 p-[12px_16px] bg-[#FEF6E9] border border-[#BB7E1C] rounded-[10px]">
-            <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-              <Icon name="info" color="#BB7E1C" style={{ fontSize: '20px' }} />
-            </div>
-            <p className="text-[13px] leading-[19px] text-[#0F172A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-              {PAYOUT_NOT_SAVED_NOTICE}
-            </p>
-          </div>
-        )}
 
         {!isEditing && initialPayoutData ? (
           <div className="flex flex-col gap-4">

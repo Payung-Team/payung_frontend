@@ -5,7 +5,7 @@ import { useKyc } from '../../../context/KycContext';
 import { useAuth } from '../../../context/AuthContext';
 import { SUBMIT_KYC, RESUBMIT_KYC, DELETE_KYC_DOCUMENT } from '../../../graphql/queries';
 import { getBankLabel } from '../../../features/kyc/omiseBanks';
-import { SEND_PAYOUT_ACCOUNT_WITH_KYC, PAYOUT_NOT_SAVED_NOTICE } from '../../../features/kyc/payoutAccountFlag';
+import { SEND_PAYOUT_ACCOUNT_WITH_KYC } from '../../../features/kyc/payoutAccountFlag';
 import { logGraphQLError } from '../../../lib/logGraphQLError';
 import Icon from '../../../components/ui/Icon';
 import Tooltip from '../../../components/ui/Tooltip';
@@ -289,17 +289,7 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
               <>
                 <InfoRow label="ธนาคาร" value={getBankLabel(displayPayout.bankCode)} />
                 <InfoRow label="ชื่อบัญชี" value={displayPayout.accountName || '-'} />
-                <InfoRow label="เลขบัญชี" value={`•••• ${displayPayout.last4}`} border={false} />
-                {/* PYG-307: กรอกได้แต่ยังส่งขึ้น backend ไม่ได้ — ต้องบอกตามจริง */}
-                {!SEND_PAYOUT_ACCOUNT_WITH_KYC && payoutData && (
-                  <p
-                    className="pb-2.5 text-[12px] leading-[18px] text-[#BB7E1C]"
-                    style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-                  >
-                    {PAYOUT_NOT_SAVED_NOTICE}
-                  </p>
-                )}
-              </>
+                <InfoRow label="เลขบัญชี" value={`•••• ${displayPayout.last4}`} border={false} />              </>
             ) : (
               <div className="py-2.5">
                 <span className="text-[#94A3B8] text-[13px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
