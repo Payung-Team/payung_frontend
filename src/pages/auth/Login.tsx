@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { logGraphQLError } from '../../lib/logGraphQLError';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@apollo/client/react';
 import AuthLayout from '../../components/layout/AuthLayout';
 import AuthInput from '../../components/ui/AuthInput';
@@ -31,7 +31,14 @@ export default function Login() {
   const [formError, setFormError] = useState('');
   const [errorCount, setErrorCount] = useState(0);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { setUserRole, setMustChangePassword } = useAuth();
+
+  // Only honour internal same-origin paths (guards against open-redirect via ?redirect=).
+  const safeRedirect = (() => {
+    const r = searchParams.get('redirect');
+    return r && r.startsWith('/') && !r.startsWith('//') ? r : null;
+  })();
 
   const [loginMutation, { loading: isSubmitting }] = useMutation(LOGIN_USER, {
     onCompleted: async (data) => {
@@ -58,7 +65,13 @@ export default function Login() {
       setUserRole(role);
       setMustChangePassword(mustChangePassword);
 
-      navigate(getPostLoginRedirect({ role, mustChangePassword }));
+      // Return to a pending invite link (or other internal target) when one was passed,
+      // unless the account still has to change its password first.
+      if (safeRedirect && !mustChangePassword) {
+        navigate(safeRedirect, { replace: true });
+      } else {
+        navigate(getPostLoginRedirect({ role, mustChangePassword }));
+      }
     },
     onError: (error) => {
       // ห้าม log error object / graphQLErrors — message สะท้อน variables (อีเมล+รหัสผ่าน) กลับมาได้

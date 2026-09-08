@@ -11,6 +11,7 @@ import { GET_USER, UPDATE_PROFILE } from '../../graphql/queries';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { getPostLoginRedirect } from '../../utils/getRedirectPath';
+import { takePendingJoinPath } from '../family/joinRedirect';
 import ThaiAddressSelector from '../../components/ui/ThaiAddressSelector';
 
 const PhoneIcon = <Icon name="phone" size="small" color="currentColor" />;
@@ -97,10 +98,14 @@ export default function OnboardingPage() {
   const [updateProfile] = useMutation(UPDATE_PROFILE);
 
   const goToHome = () => {
-    const target = getPostLoginRedirect({
-      role: userRole ?? 1,
-      mustChangePassword: mustChangePassword ?? false,
-    });
+    // A registration that started from an invite link returns straight to /join.
+    const pendingJoin = takePendingJoinPath();
+    const target =
+      pendingJoin ??
+      getPostLoginRedirect({
+        role: userRole ?? 1,
+        mustChangePassword: mustChangePassword ?? false,
+      });
     navigate(target, { replace: true });
   };
 

@@ -1,5 +1,5 @@
 import React, { type ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getPostLoginRedirect } from '../utils/getRedirectPath';
 import Skeleton from './ui/Skeleton';
@@ -10,6 +10,7 @@ interface GuestRouteProps {
 
 const GuestRoute: React.FC<GuestRouteProps> = ({ children }) => {
   const { session, loading, userRole } = useAuth();
+  const [searchParams] = useSearchParams();
 
   if (loading) {
     return (
@@ -36,6 +37,13 @@ const GuestRoute: React.FC<GuestRouteProps> = ({ children }) => {
       // ห้ามลบ flag ตรงนี้ — render อาจถูกเรียกซ้ำ (React 18 StrictMode)
       // ให้หน้าปลายทาง (OnboardingPage / KYC) เป็นคนลบแทน
       return <Navigate to={role === 2 ? '/kyc' : '/onboarding'} replace />;
+    }
+
+    // Already signed in and arriving with an internal ?redirect= (e.g. an invite link) —
+    // honour it instead of the role home. Guards against open-redirect.
+    const redirect = searchParams.get('redirect');
+    if (redirect && redirect.startsWith('/') && !redirect.startsWith('//') && !mustChange) {
+      return <Navigate to={redirect} replace />;
     }
 
     return <Navigate to={getPostLoginRedirect({ role, mustChangePassword: mustChange })} replace />;

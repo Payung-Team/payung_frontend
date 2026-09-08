@@ -33,6 +33,8 @@ import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
 import BookingsPage from './pages/profile/BookingsPage';
 import BookingRequestPage from './pages/booking/BookingRequestPage';
 import FamilyGroupPage from './pages/family/FamilyGroupPage';
+import JoinGroupPage from './pages/family/JoinGroupPage';
+import FamilyGroupDemo from './pages/family/FamilyGroupDemo';
 import BookingDetailPage from './pages/profile/BookingDetailPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
@@ -125,6 +127,13 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
 
+        {/* Join a family group via invite link — public: the main audience is a
+            not-yet-signed-in invitee. The page handles both signed-in and signed-out. */}
+        <Route path="/join" element={<JoinGroupPage />} />
+
+        {/* Preview only: the dashboard against an in-memory mock backend (no login). */}
+        <Route path="/family-demo" element={<FamilyGroupDemo />} />
+
         {/* Change password — session required แต่ไม่ผ่าน MustChangePasswordGuard */}
         <Route path="/change-password" element={<ProtectedRoute><ChangePasswordPage /></ProtectedRoute>} />
 
@@ -174,15 +183,10 @@ function App() {
             }
           />
 
-          {/* Family Group */}
-          <Route
-            path="/family-group"
-            element={
-              <RoleRoute requiredRole={1}>
-                <FamilyGroupPage />
-              </RoleRoute>
-            }
-          />
+          {/* Family Group — any authenticated user can belong to a group (the backend
+              intentionally does not gate group membership by system role: caregivers have
+              their own relatives to care for too). Not wrapped in RoleRoute. */}
+          <Route path="/family-group" element={<FamilyGroupPage />} />
 
           {/* Caregiver home */}
           <Route

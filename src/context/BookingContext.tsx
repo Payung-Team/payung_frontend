@@ -188,6 +188,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const loadSavedCaregivers = async () => {
       const token = await getAuthToken();
       if (!token) { setSavedCaregivers([]); return; }
+      if (localStorage.getItem('userRole') !== '1') { setSavedCaregivers([]); return; }
       try {
         const res = await fetch(`${API_BASE}/api/v1/patient/saved-caregivers`, {
           headers: { Authorization: `Bearer ${token}` },

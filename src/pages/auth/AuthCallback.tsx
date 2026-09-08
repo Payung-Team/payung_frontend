@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { GET_USER } from '../../graphql/queries';
 import { useAuth } from '../../context/AuthContext';
 import { getPostLoginRedirect } from '../../utils/getRedirectPath';
+import { takePendingJoinPath } from '../family/joinRedirect';
 import { logGraphQLError } from '../../lib/logGraphQLError';
 
 interface MeResult {
@@ -77,9 +78,12 @@ export default function AuthCallback() {
 
       let targetPath: string;
       if (isRegistering) {
+        // New user: onboarding/kyc will consume any pending invite-link join afterwards.
         targetPath = role === ROLE_PATIENT ? '/onboarding' : '/kyc';
       } else {
-        targetPath = getPostLoginRedirect({ role, mustChangePassword: false });
+        // Returning user: if they arrived via an invite link, go straight to /join.
+        targetPath =
+          takePendingJoinPath() ?? getPostLoginRedirect({ role, mustChangePassword: false });
       }
 
       console.log('[AuthCallback] navigating to:', targetPath);
