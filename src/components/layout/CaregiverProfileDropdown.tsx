@@ -31,7 +31,9 @@ export default function CaregiverProfileDropdown({
     const result = await logout();
     if (!result.error) {
       showSuccess('ออกจากระบบสำเร็จ');
-      navigate('/login');
+      // Land on the public homepage; replace so Back does not return to the
+      // protected page we just left.
+      navigate('/', { replace: true });
     }
   };
 
