@@ -847,6 +847,20 @@ export const GET_MY_BOOKING_HISTORY = gql`
   }
 `;
 
+// ที่อยู่จากการจองล่าสุดของผู้ใช้ — ใช้เติมให้อัตโนมัติในขั้น "สถานที่" ของการจองครั้งถัดไป
+export const GET_LATEST_BOOKING_ADDRESS = gql`
+  query GetLatestBookingAddress {
+    myBookingHistory(input: { page: 1, limit: 1 }) {
+      data {
+        id
+        locationAddress
+        locationLat
+        locationLng
+      }
+    }
+  }
+`;
+
 export const GET_CAREGIVER_BOOKINGS = gql`
   query GetCaregiverBookings($input: CaregiverBookingsInput!) {
     caregiverBookings(input: $input) {

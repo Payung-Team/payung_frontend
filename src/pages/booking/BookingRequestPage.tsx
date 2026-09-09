@@ -129,6 +129,11 @@ export default function BookingRequestPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // เปลี่ยนขั้นแล้วเลื่อนกลับขึ้นบนสุดเสมอ (ทั้งปุ่มถัดไป ย้อนกลับ และแท็บขั้นตอน)
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [step]);
+
   const [isSearching, setIsSearching] = useState(false);
   const [showPlanDetail, setShowPlanDetail] = useState(false);
 
