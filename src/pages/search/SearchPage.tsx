@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { useQuery } from '@apollo/client/react';
+import { useQuery, useMutation } from '@apollo/client/react';
 import { useBooking } from '../../context/BookingContext';
 import { supabase } from '../../lib/supabase';
 import { SEARCH_CAREGIVERS } from '../../graphql/queries';
+import { CREATE_BOOKING_ON_BEHALF } from '../../graphql/familyGroup';
 import Pagination from '../../components/ui/Pagination';
 import Skeleton from '../../components/ui/Skeleton';
 import Avatar from '../../components/ui/Avatar';
@@ -682,6 +683,10 @@ function SearchPageContent() {
     setBookingCaregiver(cg);
   }, []);
 
+  // PYG-385: family "book on behalf" path — reuses this whole search/confirm flow, only the
+  // submit call differs (GraphQL createBookingOnBehalf instead of the personal REST create).
+  const [createOnBehalf] = useMutation(CREATE_BOOKING_ON_BEHALF);
+
   const handleConfirmBooking = useCallback(async () => {
     if (!bookingCaregiver || !bookingDraft) return;
     setIsSubmitting(true);
@@ -736,6 +741,66 @@ function SearchPageContent() {
           ? bookingDraft.recipient.selectedMemberId
           : undefined,
       };
+      // ── PYG-385: booking on behalf of a family-group member ──────────────────────
+      // Same payload, different endpoint: createBookingOnBehalf persists family_group_id +
+      // care_recipient_id + memberDetails, then the booker pays via the unchanged flow.
+      if (bookingDraft.onBehalf) {
+        const pd = bookingDraft.recipient?.patientDetails;
+        const memberDetails = {
+          conditions: pd?.conditions?.length ? pd.conditions : undefined,
+          medicines: pd?.medicines || undefined,
+          allergies: pd?.allergies || undefined,
+          careInstructions: pd?.careInstructions || undefined,
+        };
+        const hasDetails = Object.values(memberDetails).some((v) => v != null);
+        try {
+          const { data } = await createOnBehalf({
+            variables: {
+              input: {
+                groupId: bookingDraft.onBehalf.familyGroupId,
+                careRecipientId: bookingDraft.onBehalf.careRecipientId,
+                caregiverId: payload.caregiverId,
+                tasks: payload.tasks,
+                serviceLocations: payload.serviceLocations,
+                serviceType: payload.serviceType,
+                timeSlot: payload.timeSlot,
+                startTime: payload.startTime,
+                durationHours: payload.durationHours,
+                locationAddress: payload.locationAddress,
+                lat: payload.lat,
+                lng: payload.lng,
+                bookingDate: payload.bookingDate,
+                notes: payload.notes,
+                dayOfContactName: payload.dayOfContactName,
+                dayOfContactPhone: payload.dayOfContactPhone,
+                dayOfContactRelationship: payload.dayOfContactRelationship,
+                ...(hasDetails ? { memberDetails } : {}),
+              },
+            },
+          });
+          const created = (data as { createBookingOnBehalf?: { id: string } } | null)
+            ?.createBookingOnBehalf;
+          setBookingError(null);
+          setBookingCaregiver(null);
+          navigate('/booking/success', {
+            state: {
+              ref: created?.id,
+              caregiverName: bookingCaregiver.fullName,
+              onBehalfOf: bookingDraft.onBehalf.recipientName,
+            },
+          });
+        } catch (err) {
+          const gqlErr = err as { graphQLErrors?: { extensions?: { code?: string } }[] };
+          const code = gqlErr.graphQLErrors?.[0]?.extensions?.code;
+          if (code === 'RECIPIENT_NOT_IN_GROUP') {
+            setBookingError('ผู้รับบริการนี้ไม่ได้อยู่ในกลุ่มแล้ว ลองเลือกผู้รับบริการใหม่');
+          } else {
+            setBookingError('จองแทนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+          }
+        }
+        return;
+      }
+
       const apiBase = import.meta.env.VITE_GRAPHQL_URL?.replace('/graphql', '') ?? '';
       const res = await fetch(`${apiBase}/api/v1/bookings`, {
         method: 'POST',
@@ -765,7 +830,7 @@ function SearchPageContent() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [bookingCaregiver, bookingDraft, navigate]);
+  }, [bookingCaregiver, bookingDraft, navigate, createOnBehalf]);
 
   const handleViewProfile = useCallback((cg: CaregiverSummary) => {
     navigate(`/caregivers/${cg.id}`, { state: { caregiver: cg } });

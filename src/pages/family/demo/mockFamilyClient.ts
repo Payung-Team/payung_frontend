@@ -43,6 +43,7 @@ const store: {
   groups: MockGroup[];
   recipients: Record<string, { id: string; name: string; nickname: string | null; ownerUserId: string }[]>;
   links: Record<string, MockLink | undefined>;
+  bookings: Record<string, unknown[]>;
   seq: number;
 } = {
   groups: [
@@ -77,6 +78,36 @@ const store: {
   },
   links: {
     g1: { id: 'l1', url: 'https://payung.app/join?token=demo9f2a4c71b8', expiresAt: iso(7), maxUses: 10, usedCount: 3, memberLimit: 10 },
+  },
+  bookings: {
+    g1: [
+      {
+        __typename: 'GroupBookingSummary',
+        id: 'b1',
+        bookingDate: iso(3).slice(0, 10),
+        startTime: '09:00',
+        status: 'confirmed',
+        serviceType: 'elderly_care',
+        durationHours: 4,
+        careRecipientName: 'สมศรี วงศ์ดี',
+        caregiver: { __typename: 'CaregiverBrief', id: 'cg1', fullName: 'พยาบาลมาลี', avatarUrl: null },
+        bookedByName: 'ณัฐพล วงศ์ดี',
+        bookedByMe: true,
+      },
+      {
+        __typename: 'GroupBookingSummary',
+        id: 'b2',
+        bookingDate: iso(-2).slice(0, 10),
+        startTime: '13:00',
+        status: 'unmatched',
+        serviceType: 'general_care',
+        durationHours: 3,
+        careRecipientName: 'ประยูร วงศ์ดี',
+        caregiver: null,
+        bookedByName: 'ปาริชาต วงศ์ดี',
+        bookedByMe: false,
+      },
+    ],
   },
   seq: 100,
 };
@@ -148,6 +179,9 @@ function resolve(opName: string, vars: Vars): { data?: unknown; errors?: unknown
           })),
         },
       };
+
+    case 'GroupBookings':
+      return { data: { groupBookings: store.bookings[vars.groupId as string] ?? [] } };
 
     case 'GroupJoinLink': {
       const l = store.links[vars.groupId as string];

@@ -8,11 +8,16 @@ import {
   MY_FAMILY_GROUPS,
   GROUP_JOIN_LINK,
   CREATE_JOIN_LINK,
+  GROUP_CARE_RECIPIENTS,
+  GROUP_BOOKINGS,
   type FamilyGroup,
   type FamilyGroupJoinLink,
+  type GroupCareRecipient,
+  type GroupBookingSummary,
 } from '../../graphql/familyGroup';
+import type { BookingRequest } from '../../context/BookingContext';
 import { formatDate, useStrings } from './familyStrings';
-import { FONT, GroupAvatar, RoleBadge, ConfirmDialog } from './components/familyUi';
+import { FONT, GroupAvatar, RoleBadge, ConfirmDialog, ModalShell } from './components/familyUi';
 import MembersPanel from './components/MembersPanel';
 import InviteLinkModal from './components/InviteLinkModal';
 import {
@@ -104,7 +109,7 @@ export default function FamilyGroupPage() {
           {membersOpen && (
             <MembersPanel group={selected} onChanged={() => refetch()} onToast={toast} />
           )}
-          <MemberAppointments />
+          <MemberAppointments group={selected} />
         </div>
       ) : null}
 
@@ -640,20 +645,45 @@ function GroupSwitcher({
 // The group's shared booking feed. There is no group-appointment query yet, so this shows
 // the (real) empty state; "จองแทนสมาชิก" starts a booking via the caregiver search.
 
-function MemberAppointments() {
+// Badge tone per booking status — kept local since only this feed renders group bookings.
+function statusTone(status: string): string {
+  switch (status) {
+    case 'completed':
+      return 'bg-[#ECFDF5] text-[#047857]';
+    case 'cancelled':
+    case 'rejected':
+      return 'bg-[#FEF2F2] text-[#B42318]';
+    case 'unmatched':
+    case 'pending':
+      return 'bg-[#FEF6E7] text-[#B45309]';
+    default: // accepted / confirmed / in_progress / …
+      return 'bg-[#EFF6FF] text-[#1D4ED8]';
+  }
+}
+
+function MemberAppointments({ group }: { group: FamilyGroup }) {
   const s = useStrings();
-  const navigate = useNavigate();
+  const [picking, setPicking] = useState(false);
+
+  const { data, loading } = useQuery<{ groupBookings: GroupBookingSummary[] }>(
+    GROUP_BOOKINGS,
+    { variables: { groupId: group.id }, fetchPolicy: 'cache-and-network' },
+  );
+  const bookings = data?.groupBookings ?? [];
+  const hasBookings = bookings.length > 0;
 
   return (
     <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-[16px] font-bold text-[#064E3B]">{s.apptTitle}</h3>
-          <p className="mt-0.5 text-[13px] text-[#8A8C8E]">{s.apptNone}</p>
+          <p className="mt-0.5 text-[13px] text-[#8A8C8E]">
+            {hasBookings ? s.apptCount(bookings.length) : s.apptNone}
+          </p>
         </div>
         <button
           type="button"
-          onClick={() => navigate('/search')}
+          onClick={() => setPicking(true)}
           className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#009265] px-4 text-[14px] font-semibold text-white shadow-[0_4px_12px_rgba(0,146,101,0.2)] transition-colors hover:bg-[#007C55]"
         >
           <Icon name="event_available" size="small" color="#FFFFFF" />
@@ -661,16 +691,174 @@ function MemberAppointments() {
         </button>
       </div>
 
-      <div className="mt-6 flex flex-col items-center justify-center px-4 py-10 text-center">
-        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F0F4F3] text-[#8FA6A0]">
-          <Icon name="event_busy" size="large" />
-        </span>
-        <p className="mt-4 text-[15px] font-bold text-[#1A1A1A]">{s.apptEmptyTitle}</p>
-        <p className="mx-auto mt-1.5 max-w-[420px] text-[13px] leading-6 text-[#8A8C8E]">
-          {s.apptEmptyBody}
-        </p>
-      </div>
+      {loading && !hasBookings ? (
+        <div className="mt-5 space-y-2.5">
+          <div className="h-[68px] w-full animate-pulse rounded-xl bg-gray-100" />
+          <div className="h-[68px] w-full animate-pulse rounded-xl bg-gray-100" />
+        </div>
+      ) : !hasBookings ? (
+        <div className="mt-6 flex flex-col items-center justify-center px-4 py-10 text-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F0F4F3] text-[#8FA6A0]">
+            <Icon name="event_busy" size="large" />
+          </span>
+          <p className="mt-4 text-[15px] font-bold text-[#1A1A1A]">{s.apptEmptyTitle}</p>
+          <p className="mx-auto mt-1.5 max-w-[420px] text-[13px] leading-6 text-[#8A8C8E]">
+            {s.apptEmptyBody}
+          </p>
+        </div>
+      ) : (
+        <ul className="mt-5 space-y-2.5">
+          {bookings.map((b) => (
+            <li
+              key={b.id}
+              className="flex items-center gap-3 rounded-xl border border-gray-100 bg-[#FBFDFC] p-3"
+            >
+              <GroupAvatar name={b.careRecipientName} seed={b.id} size={42} />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
+                    {b.careRecipientName || '—'}
+                  </p>
+                  <span
+                    className={`inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[11px] font-semibold ${statusTone(
+                      b.status,
+                    )}`}
+                  >
+                    {s.bookingStatusLabel(b.status)}
+                  </span>
+                </div>
+                <p className="mt-0.5 truncate text-[12px] text-[#8A8C8E]">
+                  {formatDate(b.bookingDate)}
+                  {b.startTime && ` · ${b.startTime} น.`}
+                  {b.durationHours != null && ` · ${s.apptHours(b.durationHours)}`}
+                </p>
+                <p className="mt-0.5 truncate text-[12px] text-[#8A8C8E]">
+                  {b.bookedByMe ? s.bookedByYou : s.bookedBy(b.bookedByName || '—')}
+                  {b.caregiver?.fullName && ` · ${b.caregiver.fullName}`}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {picking && <BookOnBehalfModal group={group} onClose={() => setPicking(false)} />}
     </section>
+  );
+}
+
+/**
+ * PYG-385 — pick which shared care recipient to book for, then hand off to the normal
+ * booking flow. The flow itself (service → time → location → recipient details → review →
+ * caregiver → payment) is reused unchanged; we only seed the group + recipient context.
+ */
+function BookOnBehalfModal({
+  group,
+  onClose,
+}: {
+  group: FamilyGroup;
+  onClose: () => void;
+}) {
+  const s = useStrings();
+  const navigate = useNavigate();
+  const { data, loading } = useQuery<{ groupCareRecipients: GroupCareRecipient[] }>(
+    GROUP_CARE_RECIPIENTS,
+    { variables: { groupId: group.id }, fetchPolicy: 'cache-and-network' },
+  );
+  const recipients = data?.groupCareRecipients ?? [];
+  const [selected, setSelected] = useState<string>('');
+
+  const start = () => {
+    const r = recipients.find((x) => x.id === selected);
+    if (!r) return;
+    const seed: BookingRequest = {
+      serviceLocation: [],
+      serviceTypes: [],
+      recipient: {
+        type: 'member',
+        selectedMemberId: r.id,
+        patientDetails: { name: r.name, age: 0 },
+      },
+      onBehalf: {
+        familyGroupId: group.id,
+        careRecipientId: r.id,
+        recipientName: r.name,
+      },
+    };
+    navigate('/booking/new', { state: { onBehalfSeed: seed } });
+  };
+
+  return (
+    <ModalShell onClose={onClose} maxWidth={500} labelledBy="book-behalf-title" showClose>
+      <h2 id="book-behalf-title" className="text-xl font-bold text-[#064E3B]">
+        {s.bookOnBehalf}
+      </h2>
+      <p className="mt-1 text-sm text-gray-500">{s.bookPickRecipient}</p>
+
+      {loading && recipients.length === 0 ? (
+        <div className="mt-5 space-y-2">
+          <div className="h-16 w-full animate-pulse rounded-lg bg-gray-100" />
+          <div className="h-16 w-full animate-pulse rounded-lg bg-gray-100" />
+        </div>
+      ) : recipients.length === 0 ? (
+        <p className="mt-5 rounded-lg bg-[#F6FAF9] px-4 py-6 text-center text-[13px] leading-6 text-[#8A8C8E]">
+          {s.bookNoRecipients}
+        </p>
+      ) : (
+        <div className="mt-5 space-y-2">
+          {recipients.map((r) => {
+            const active = selected === r.id;
+            return (
+              <label
+                key={r.id}
+                className={`flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors ${
+                  active
+                    ? 'border-2 border-[#009265] bg-[#F0FAF4]'
+                    : 'border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="book-recipient"
+                  className="h-4 w-4 accent-[#009265]"
+                  checked={active}
+                  onChange={() => setSelected(r.id)}
+                />
+                <GroupAvatar name={r.nickname || r.name} seed={r.id} size={36} />
+                <div className="min-w-0">
+                  <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
+                    {r.name}
+                    {r.nickname && (
+                      <span className="ml-1.5 text-[12px] font-normal text-[#8A8C8E]">
+                        ({r.nickname})
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-10 min-w-[110px] rounded-lg border border-gray-200 px-4 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+        >
+          {s.cancel}
+        </button>
+        <button
+          type="button"
+          onClick={start}
+          disabled={!selected}
+          className="inline-flex h-10 min-w-[120px] items-center justify-center gap-2 rounded-lg bg-[#009265] px-4 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,146,101,0.2)] transition-colors hover:bg-[#007C55] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {s.bookContinue}
+        </button>
+      </div>
+    </ModalShell>
   );
 }
 

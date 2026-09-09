@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
+import type { BookingRequest } from '../../context/BookingContext';
 import BookingStepService from './steps/BookingStepService';
 import BookingStepDateTime from './steps/BookingStepDateTime';
 import BookingStepLocation from './steps/BookingStepLocation';
@@ -122,10 +123,15 @@ function SummaryRow({
 
 export default function BookingRequestPage() {
   const navigate = useNavigate();
-  const { step, goToStep, bookingDraft, resetBooking, stepSubmit } = useBooking();
+  const location = useLocation();
+  const { step, goToStep, bookingDraft, resetBooking, setBookingDraft, stepSubmit } = useBooking();
 
   useEffect(() => {
     resetBooking();
+    // PYG-385: when launched from a family group's "จองแทนสมาชิก", seed the draft with the
+    // chosen recipient + group context so the same 5-step flow runs, only booking on behalf.
+    const seed = (location.state as { onBehalfSeed?: BookingRequest } | null)?.onBehalfSeed;
+    if (seed) setBookingDraft(seed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

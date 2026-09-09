@@ -49,9 +49,17 @@ export interface Strings {
   seeMembers: string;
   apptTitle: string;
   apptNone: string;
+  apptCount: (n: number) => string;
   bookOnBehalf: string;
+  bookPickRecipient: string;
+  bookNoRecipients: string;
+  bookContinue: string;
   apptEmptyTitle: string;
   apptEmptyBody: string;
+  bookedByYou: string;
+  bookedBy: (name: string) => string;
+  apptHours: (n: number) => string;
+  bookingStatusLabel: (status: string) => string;
   emptyTitle: string;
   emptyBody: string;
   createGroup: string;
@@ -206,7 +214,28 @@ const S: Strings = {
   seeMembers: 'ดูสมาชิก',
   apptTitle: 'นัดหมายของสมาชิก',
   apptNone: 'ยังไม่มีรายการ',
+  apptCount: (n) => `${n} รายการ`,
   bookOnBehalf: 'จองแทนสมาชิก',
+  bookPickRecipient: 'เลือกผู้รับบริการที่จะจองให้ แล้วกรอกรายละเอียดในขั้นตอนถัดไป',
+  bookNoRecipients:
+    'ยังไม่มีผู้รับบริการที่แชร์ไว้ในกลุ่ม สมาชิกต้องแชร์โปรไฟล์ผู้รับบริการเข้ากลุ่มก่อน จึงจะจองแทนได้',
+  bookContinue: 'ถัดไป',
+  bookedByYou: 'จองโดยคุณ',
+  bookedBy: (name) => `จองโดย ${name}`,
+  apptHours: (n) => `${n} ชม.`,
+  bookingStatusLabel: (status) =>
+    ({
+      unmatched: 'รอจับคู่ผู้ดูแล',
+      pending: 'รอผู้ดูแลยืนยัน',
+      accepted: 'ยืนยันแล้ว',
+      confirmed: 'ยืนยันแล้ว',
+      in_progress: 'กำลังดูแล',
+      awaiting_release: 'รอปิดงาน',
+      needs_review: 'รอตรวจสอบ',
+      completed: 'เสร็จสิ้น',
+      cancelled: 'ยกเลิกแล้ว',
+      rejected: 'ถูกปฏิเสธ',
+    })[status] ?? status,
   apptEmptyTitle: 'ยังไม่มีนัดหมายในกลุ่ม',
   apptEmptyBody:
     'เมื่อคุณหรือสมาชิกจองผู้ดูแล รายการจะแสดงที่นี่ และทุกคนในกลุ่มจะติดตามได้พร้อมกัน',
