@@ -10,12 +10,49 @@ const API_BASE = ((import.meta.env.VITE_GRAPHQL_URL as string) || 'http://localh
 interface SavedRecipient {
   id: string;
   name: string;
+  /**
+   * ข้อมูลสุขภาพที่จะเติมให้อัตโนมัติเมื่อเลือกโปรไฟล์นี้
+   *
+   * ตอนนี้มีเฉพาะในข้อมูล mock — API จริงคืนแค่ id/name เพราะ DTO ฝั่ง
+   * backend ยังรับแค่ name + nickname (คอลัมน์ในตาราง care_recipients
+   * มีครบแล้ว รอขยาย DTO/service เท่านั้น)
+   */
+  details?: {
+    age: string;
+    gender: 'ชาย' | 'หญิง';
+    weight: string;
+    height: string;
+    supportLevel: string;
+    bloodGroup: string;
+    conditions: string[];
+    medicines: string;
+    allergies: string;
+    careInstructions: string;
+    regularHospital: string;
+  };
 }
 
 // MOCK — ใช้ระหว่างที่ API ยังไม่มีโปรไฟล์ที่บันทึกไว้ ให้เห็นหน้าตาลิสต์ก่อน
 // ลบทิ้งได้ทันทีเมื่อ GET /api/v1/patient/care-recipients คืนข้อมูลจริง
 const MOCK_RECIPIENTS: SavedRecipient[] = [
-  { id: 'mock-1', name: 'ปาริชาต วงศ์ดี' },
+  {
+    id: 'mock-1',
+    name: 'ปาริชาต วงศ์ดี',
+    details: {
+      age: '72',
+      gender: 'หญิง',
+      weight: '54',
+      height: '152',
+      supportLevel: 'ช่วยเหลือตัวเองได้เล็กน้อย / ต้องการการช่วยพยุงเดิน',
+      bloodGroup: 'O',
+      conditions: ['เบาหวาน', 'ความดันสูง'],
+      medicines: 'Metformin 500mg เช้า-เย็น, Amlodipine 5mg เช้า',
+      allergies: 'แพ้ยากลุ่มซัลฟา (ขึ้นผื่น)',
+      careInstructions:
+        'เดินต้องมีคนพยุงข้างซ้ายเสมอ ลุกจากเตียงช้า ๆ เพราะเวียนหัวง่าย วัดความดันก่อนนอนทุกวัน',
+      regularHospital: 'โรงพยาบาลรามาธิบดี',
+    },
+  },
   { id: 'mock-2', name: 'สมชาย วงศ์ดี' },
 ];
 
@@ -213,7 +250,7 @@ export default function BookingStepPatient() {
     contactRel,
   ]);
 
-  // เลือกโปรไฟล์ที่บันทึกไว้ — ระบบเก็บแค่ชื่อกับชื่อเล่น ที่เหลือต้องกรอกเอง
+  // เลือกโปรไฟล์ที่บันทึกไว้ — เติมทุกช่องที่โปรไฟล์นั้นมี ที่เหลือล้างให้ว่าง
   // กดซ้ำที่ใบเดิม = ยกเลิกการเลือก แล้วกลับไปกรอกเอง
   const handleSelectRecipient = (recipient: SavedRecipient) => {
     if (selectedRecipientId === recipient.id) {
@@ -223,6 +260,19 @@ export default function BookingStepPatient() {
     setSelectedRecipientId(recipient.id);
     setSaveAsProfile(false);
     setName(recipient.name);
+
+    const d = recipient.details;
+    setAge(d?.age ?? '');
+    setGender(d?.gender ?? '');
+    setWeight(d?.weight ?? '');
+    setHeight(d?.height ?? '');
+    setSupportLevel(d?.supportLevel ?? '');
+    setBloodGroup(d?.bloodGroup ?? '');
+    setConditions(d?.conditions ? [...d.conditions] : []);
+    setMedicines(d?.medicines ?? '');
+    setAllergies(d?.allergies ?? '');
+    setCareInstructions(d?.careInstructions ?? '');
+    setRegularHospital(d?.regularHospital ?? '');
   };
 
   // ลบรายชื่อที่บันทึกไว้ — ยืนยันผ่าน modal ก่อนเสมอ
