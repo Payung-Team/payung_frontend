@@ -53,7 +53,7 @@ const TASK_MAP: Record<string, string[]> = {
 };
 
 export default function BookingStepService() {
-  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit } = useBooking();
+  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit, setStepMissing } = useBooking();
 
   // Derive current "location option" (at_home / accompany_outside / both)
   const initialLocOption: LocOptionId | '' = (() => {
@@ -165,6 +165,16 @@ export default function BookingStepService() {
     setError('');
     goToStep(2);
   };
+
+  // Report missing required fields so the sticky "Next" button can disable itself
+  useEffect(() => {
+    const missing: string[] = [];
+    if (!locOption) missing.push('สถานที่ให้บริการ');
+    if (selectedServices.length === 0) missing.push('งานที่ต้องการ');
+    else if (activeTasksCount === 0) missing.push('งานย่อยอย่างน้อย 1 งาน');
+    setStepMissing(missing);
+    return () => setStepMissing([]);
+  }, [locOption, selectedServices, activeTasksCount, setStepMissing]);
 
   // Register submit for sticky bottom nav
   const submitRef = useRef<() => void>(() => {});

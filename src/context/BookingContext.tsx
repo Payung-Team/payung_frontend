@@ -118,6 +118,10 @@ interface BookingContextType {
   // bottom "Next" button invokes it via stepSubmit().
   stepSubmit: (() => void) | null;
   setStepSubmit: (fn: (() => void) | null) => void;
+  // Sticky nav — each step reports which required fields are still empty so the
+  // parent can disable "Next" and show what is missing.
+  stepMissing: string[];
+  setStepMissing: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 const BookingContext = createContext<BookingContextType | undefined>(undefined);
@@ -167,6 +171,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [confirmedBookings, setConfirmedBookings] = useState<ConfirmedBooking[]>([]);
   const [savedCaregivers, setSavedCaregivers] = useState<SavedCaregiver[]>([]);
   const [stepSubmit, setStepSubmitState] = useState<(() => void) | null>(null);
+  const [stepMissing, setStepMissing] = useState<string[]>([]);
   const setStepSubmit = useCallback((fn: (() => void) | null) => {
     // wrap so useState doesn't invoke `fn` as a state updater
     setStepSubmitState(() => fn);
@@ -295,8 +300,9 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     savedCaregivers, toggleSaveCaregiver, isCaregiverSaved,
     cancelBooking, resetBooking,
     stepSubmit, setStepSubmit,
+    stepMissing, setStepMissing,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [bookingDraft, recipients, step, confirmedBookings, savedCaregivers, stepSubmit]);
+  }), [bookingDraft, recipients, step, confirmedBookings, savedCaregivers, stepSubmit, stepMissing]);
 
   return (
     <BookingContext.Provider value={value}>

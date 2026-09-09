@@ -43,7 +43,7 @@ const SAVED_PROFILE = {
 };
 
 export default function BookingStepPatient() {
-  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit } = useBooking();
+  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit, setStepMissing } = useBooking();
 
   const [name, setName] = useState(bookingDraft?.recipient?.patientDetails?.name || '');
   const [age, setAge] = useState(
@@ -184,6 +184,29 @@ export default function BookingStepPatient() {
     setError(errs);
     if (Object.keys(errs).length === 0) goToStep(5);
   };
+
+  // Report missing required fields so the sticky "Next" button can disable itself
+  useEffect(() => {
+    const missing: string[] = [];
+    if (!name.trim()) missing.push('ชื่อคนไข้');
+    if (!age.trim()) missing.push('อายุ');
+    if (!gender) missing.push('เพศ');
+    if (!supportLevel) missing.push('ระดับการช่วยเหลือตนเอง');
+    if (!contactName.trim()) missing.push('ชื่อผู้ติดต่อ');
+    if (!contactPhone.trim() || contactPhone.length !== 10) missing.push('เบอร์โทรผู้ติดต่อ');
+    if (!contactRel) missing.push('ความสัมพันธ์');
+    setStepMissing(missing);
+    return () => setStepMissing([]);
+  }, [
+    name,
+    age,
+    gender,
+    supportLevel,
+    contactName,
+    contactPhone,
+    contactRel,
+    setStepMissing,
+  ]);
 
   const submitRef = useRef<() => void>(() => {});
   submitRef.current = handleSubmit;

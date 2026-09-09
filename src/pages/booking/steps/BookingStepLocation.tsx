@@ -14,7 +14,7 @@ const SAVED_ADDRESS = {
 };
 
 export default function BookingStepLocation() {
-  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit } = useBooking();
+  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit, setStepMissing } = useBooking();
 
   const serviceLocation = bookingDraft?.serviceLocation || [];
   const needHome = serviceLocation.includes('at_home');
@@ -109,6 +109,31 @@ export default function BookingStepLocation() {
     setError(errs);
     if (Object.keys(errs).length === 0) goToStep(4);
   };
+
+  // Report missing required fields so the sticky "Next" button can disable itself
+  useEffect(() => {
+    const missing: string[] = [];
+    if (needHome) {
+      if (!province) missing.push('จังหวัด');
+      if (!district) missing.push('อำเภอ/เขต');
+      if (!address.trim()) missing.push('ที่อยู่');
+    }
+    if (needOutside) {
+      if (!hospitalName.trim()) missing.push('สถานที่ปลายทาง');
+      if (!meetingPoint.trim()) missing.push('จุดนัดพบ');
+    }
+    setStepMissing(missing);
+    return () => setStepMissing([]);
+  }, [
+    needHome,
+    needOutside,
+    province,
+    district,
+    address,
+    hospitalName,
+    meetingPoint,
+    setStepMissing,
+  ]);
 
   const submitRef = useRef<() => void>(() => {});
   submitRef.current = handleSubmit;
