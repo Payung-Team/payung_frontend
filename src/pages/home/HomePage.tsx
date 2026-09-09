@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '../../components/ui/Icon';
 import heroImage from '../../assets/banner.png';
+import cardImage from '../../assets/caregiver_2.png';
 import careService1 from '../../assets/careservice_1.jpg';
 import careService2 from '../../assets/careservice_2.jpg';
 import careService3 from '../../assets/careservice_3.jpg';
@@ -285,7 +286,7 @@ const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
       {/* ═══ CTA ═══ Guests only: it asks for a sign-up they have not made yet. */}
       {isPublic && (
       <section className="max-w-[1200px] mx-auto px-6 pt-20">
-        <div className="bg-[#005C3E] rounded-2xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center p-12">
+        <div className="bg-[#005C3E] rounded-2xl grid grid-cols-1 lg:grid-cols-2 gap-6 items-center p-12">
           <div>
             <h2 className="text-[32px] leading-10 font-bold text-white">ให้เราช่วยดูแลคนที่คุณรัก</h2>
             <p className="mt-4 text-[15px] leading-7 text-white/80">
@@ -298,11 +299,10 @@ const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
               สร้างโปรไฟล์เพื่อเริ่มการจอง
             </Link>
           </div>
-          <div className="flex justify-center lg:justify-end">
-            <ImagePlaceholder
-              label="รูป CTA · 520 × 320"
-              className="w-full max-w-[520px] h-[320px] !bg-white/5 !border-white/25 [&_span]:!text-white/60"
-            />
+          <div className="flex justify-center">
+            {/* Square source with wide margins — fill the box height rather than
+                its width, or the figure ends up tiny and letterboxed. */}
+            <img src={cardImage} alt="" aria-hidden="true" className="h-[320px] w-auto max-w-full object-contain" />
           </div>
         </div>
       </section>
