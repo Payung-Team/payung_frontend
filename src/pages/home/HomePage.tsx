@@ -135,7 +135,7 @@ const footerServiceLinks = ['ดูแลผู้สูงอายุ', 'ด�
 const footerHelpLinks = ['คำถามที่พบบ่อย', 'ติดต่อเรา', 'เงื่อนไขการใช้บริการ', 'นโยบายความเป็นส่วนตัว'];
 
 interface HomePageProps {
-  /** Guest view: hides the signed-in-only quick actions and points the CTA at sign-up. */
+  /** Guest view: hides the signed-in-only quick actions and shows the sign-up CTA. */
   readonly isPublic?: boolean;
 }
 
@@ -282,7 +282,8 @@ const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
         </div>
       </section>
 
-      {/* ═══ CTA ═══ */}
+      {/* ═══ CTA ═══ Guests only: it asks for a sign-up they have not made yet. */}
+      {isPublic && (
       <section className="max-w-[1200px] mx-auto px-6 pt-20">
         <div className="bg-[#005C3E] rounded-2xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center p-12">
           <div>
@@ -291,7 +292,7 @@ const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
               เริ่มจองผู้ดูแลวันนี้ หรือชวนคนในครอบครัวเข้ากลุ่มเพื่อช่วยกันดูแลและจองแทนกันได้
             </p>
             <Link
-              to={isPublic ? '/register' : '/booking/new'}
+              to="/register"
               className="mt-8 inline-flex items-center rounded-lg bg-white px-6 py-3 text-sm font-semibold text-[#005C3E] no-underline transition-colors hover:bg-[#EAF4F0]"
             >
               สร้างโปรไฟล์เพื่อเริ่มการจอง
@@ -305,6 +306,7 @@ const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
           </div>
         </div>
       </section>
+      )}
 
       {/* ═══ FOOTER ═══ */}
       <footer className="mt-16 bg-[#005C3E] text-white">
