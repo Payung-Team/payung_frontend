@@ -27,7 +27,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   })();
   const homeRoute = (() => {
     if (userRole === 2) return '/caregiver-home';
-    if (userRole === 3) return '/';
+    if (userRole === 3 || userRole === 4) return '/admin';
     return '/patient-home';
   })();
   const { navItems, isLoading: menuLoading, error: menuError } = useFilteredMenu(menuName, userRole);

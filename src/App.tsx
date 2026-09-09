@@ -6,6 +6,7 @@ import PageSkeleton from './components/ui/PageSkeleton';
 import { useAuth } from './context/AuthContext';
 import { getPostLoginRedirect } from './utils/getRedirectPath';
 import AppLayout from './components/layout/AppLayout';
+import PublicLayout from './components/layout/PublicLayout';
 import CaregiverSearchWrapper from './components/CaregiverSearchWrapper';
 import { KycProvider } from './context/KycContext';
 import Login from './pages/auth/Login';
@@ -97,8 +98,17 @@ function CaregiverAvailabilityGuard() {
 }
 
 function HomeRedirect() {
-  const { userRole, mustChangePassword, loading } = useAuth();
-  if (loading || userRole === null) return <PageSkeleton />;
+  const { session, userRole, mustChangePassword, loading } = useAuth();
+  if (loading) return <PageSkeleton />;
+  // Guests have userRole === null too, so this has to come first.
+  if (!session) {
+    return (
+      <PublicLayout>
+        <PayungHome isPublic />
+      </PublicLayout>
+    );
+  }
+  if (userRole === null) return <PageSkeleton />;
   return <Navigate to={getPostLoginRedirect({ role: userRole, mustChangePassword: mustChangePassword ?? false })} replace />;
 }
 
@@ -120,6 +130,9 @@ function App() {
     <>
       <AuthEffects />
       <Routes>
+        {/* Landing page for guests; signed-in users are sent to their role's home */}
+        <Route path="/" element={<HomeRedirect />} />
+
         {/* Auth pages — redirect to / if already logged in */}
         <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
         <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
@@ -217,9 +230,6 @@ function App() {
               </RoleRoute>
             }
           />
-
-          {/* Home - redirect based on role */}
-          <Route path="/" element={<HomeRedirect />} />
 
           <Route path="/search" element={<CaregiverSearchWrapper />} />
           <Route path="/caregivers/:id" element={<CaregiverProfilePage />} />

@@ -12,6 +12,8 @@ interface HeaderProps {
   readonly isLoading?: boolean;
   readonly currentUserId?: string;
   readonly homeRoute?: string;
+  /** Replaces the whole signed-in right section (messages/notifications/profile). */
+  readonly rightSlot?: React.ReactNode;
 }
 
 export default function Header({
@@ -20,6 +22,7 @@ export default function Header({
   isLoading = false,
   currentUserId,
   homeRoute = '/',
+  rightSlot,
 }: HeaderProps) {
   const location = useLocation();
 
@@ -72,9 +75,11 @@ export default function Header({
         )}
 
         {/* Right Section - Notifications & Profile */}
-        {(profileDropdown || isLoading) && (
+        {(rightSlot || profileDropdown || isLoading) && (
           <div className="flex items-center gap-2 md:gap-4 ml-auto flex-shrink-0">
-            {isLoading ? (
+            {rightSlot ? (
+              rightSlot
+            ) : isLoading ? (
               <>
                 <Skeleton width={32} height={32} borderRadius="50%" circle />
                 <Skeleton width={120} height={32} borderRadius="8px" />

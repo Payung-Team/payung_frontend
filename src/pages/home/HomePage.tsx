@@ -1,7 +1,5 @@
-import React, { useEffect } from 'react';
-import { useQuery } from '@apollo/client/react';
-import { useNavigate, Link } from 'react-router-dom';
-import { GET_USER } from '../../graphql/queries';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { Icon } from '../../components/ui/Icon';
 import heroImage from '../../assets/banner.png';
 import careService1 from '../../assets/careservice_1.jpg';
@@ -12,19 +10,6 @@ import appScreenshot1 from '../../assets/step_1.png';
 import appScreenshot2 from '../../assets/step_2.png';
 import appScreenshot3 from '../../assets/step_3.png';
 
-
-interface UserData {
-  me: {
-    id: string;
-    email: string;
-    displayName?: string;
-    phone?: string;
-    address?: string;
-    bio?: string;
-    avatarUrl?: string;
-    role: number;
-  };
-}
 
 /** Dashed grey box standing in for artwork that has not been supplied yet. */
 const ImagePlaceholder: React.FC<{ label: string; className?: string }> = ({ label, className = '' }) => (
@@ -149,21 +134,12 @@ const steps = [
 const footerServiceLinks = ['ดูแลผู้สูงอายุ', 'ดูแลผู้ป่วยติดเตียง', 'กายภาพบำบัด', 'พาไปโรงพยาบาล'];
 const footerHelpLinks = ['คำถามที่พบบ่อย', 'ติดต่อเรา', 'เงื่อนไขการใช้บริการ', 'นโยบายความเป็นส่วนตัว'];
 
-const HomePage: React.FC = () => {
-  const navigate = useNavigate();
-  const { data, loading, error } = useQuery<UserData>(GET_USER);
+interface HomePageProps {
+  /** Guest view: hides the signed-in-only quick actions and points the CTA at sign-up. */
+  readonly isPublic?: boolean;
+}
 
-  // Redirect to login if unauthenticated
-  useEffect(() => {
-    if (!loading && !data?.me) {
-      navigate('/login');
-    }
-  }, [data, loading, navigate]);
-
-  if (error) {
-    console.error('Error fetching user data:', error);
-  }
-
+const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
   return (
     <div className="bg-[#F6FAF9] text-[#1A1A1A] antialiased" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
 
@@ -205,7 +181,9 @@ const HomePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick action card — overlaps the bottom of the hero */}
+        {/* Quick action card — overlaps the bottom of the hero. Signed-in only:
+            every destination requires a session. */}
+        {!isPublic && (
         <div className="relative max-w-[1200px] mx-auto px-6 -mt-28">
           <div className="mx-auto max-w-[1000px] grid grid-cols-1 md:grid-cols-3 bg-white rounded-2xl border border-[#F3F4F6] shadow-[0_10px_40px_rgba(0,0,0,0.08)] overflow-hidden">
             {quickActions.map((action, index) => (
@@ -229,6 +207,7 @@ const HomePage: React.FC = () => {
             ))}
           </div>
         </div>
+        )}
       </section>
 
       {/* ═══ SERVICES ═══ */}
@@ -312,7 +291,7 @@ const HomePage: React.FC = () => {
               เริ่มจองผู้ดูแลวันนี้ หรือชวนคนในครอบครัวเข้ากลุ่มเพื่อช่วยกันดูแลและจองแทนกันได้
             </p>
             <Link
-              to="/booking/new"
+              to={isPublic ? '/register' : '/booking/new'}
               className="mt-8 inline-flex items-center rounded-lg bg-white px-6 py-3 text-sm font-semibold text-[#005C3E] no-underline transition-colors hover:bg-[#EAF4F0]"
             >
               สร้างโปรไฟล์เพื่อเริ่มการจอง
