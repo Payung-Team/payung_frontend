@@ -264,6 +264,7 @@ export default function Register() {
     <AuthLayout
       tagline="การดูแลที่ดี เริ่มต้นจากความใส่ใจ"
       subtitle="Payung เชื่อมต่อผู้สูงอายุกับผู้ดูแลที่เหมาะสม เพื่อคุณภาพชีวิตที่ดีขึ้นในทุกวัน"
+      showBackToHome
     >
       <form onSubmit={handleSubmit} className="w-full max-w-[420px]" id="register-form" noValidate>
         {/* Heading */}
@@ -274,17 +275,8 @@ export default function Register() {
           กรอกข้อมูลด้านล่างเพื่อเริ่มต้นใช้งาน Payung
         </p>
 
-        {/* Google Sign Up */}
-        <div className="mt-6">
-          <GoogleAuthButton label="สมัครด้วย Google" onClick={handleGoogleSignIn} disabled={isSubmitting} />
-        </div>
-        <OrDivider />
-
-        {/* Global Error Banner */}
-        <Alert key={errorCount} message={formError || (hasValidationError ? 'กรุณากรอกข้อมูลให้ถูกต้องและครบถ้วน' : '')} id="register-error-banner" />
-
         {/* Role Selection */}
-        <div className={hasErrors ? 'mt-4' : 'mt-6'}>
+        <div className="mt-6">
           <label className="text-sm font-bold leading-6 text-[#575859]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
             ประเภทผู้ใช้
           </label>
@@ -314,6 +306,9 @@ export default function Register() {
           </div>
         </div>
 
+        {/* Global Error Banner */}
+        <Alert key={errorCount} message={formError || (hasValidationError ? 'กรุณากรอกข้อมูลให้ถูกต้องและครบถ้วน' : '')} id="register-error-banner" />
+
         <AuthInput
           id="register-email"
           label="อีเมล"
@@ -322,7 +317,8 @@ export default function Register() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="name@example.com"
           error={submitted ? errors.email : undefined}
-          wrapperClassName="mt-5"
+          // Tighter when the error banner (which carries its own mt-4) sits above
+          wrapperClassName={hasErrors ? 'mt-4' : 'mt-5'}
         />
 
         <div className="relative">
@@ -365,6 +361,10 @@ export default function Register() {
         >
           {isSubmitting ? 'กำลังสมัครสมาชิก...' : 'สมัครสมาชิก'}
         </button>
+
+        <OrDivider />
+
+        <GoogleAuthButton label="สมัครด้วย Google" onClick={handleGoogleSignIn} disabled={isSubmitting} />
 
         <p className="mt-5 text-center text-base font-bold leading-6 text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           มีบัญชีอยู่แล้ว?{' '}
