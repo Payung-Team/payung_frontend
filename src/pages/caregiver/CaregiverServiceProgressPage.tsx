@@ -11,6 +11,8 @@ import ExpandableSection from './serviceProgress/ExpandableSection';
 import { Icon } from '../../components/ui/Icon';
 import Skeleton from '../../components/ui/Skeleton';
 import type { ProofOfWorkSummary } from '../../lib/monitoring';
+import CaregiverQrScanPanel from './CaregiverQrScanPanel';
+import { QR_TEST_TOOLS_ENABLED } from '../../lib/qrTestTools';
 
 export interface CaregiverServiceProgressPageProps {
   booking: Booking & { locationLat?: number | null; locationLng?: number | null };
@@ -80,6 +82,20 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
             โปรดตรวจสอบข้อมูลผู้รับบริการในโปรไฟล์ก่อนเริ่มดูแล เพื่อความปลอดภัย
           </p>
         </div>
+
+        {/* ปิดงานก็ต้องสแกน QR ใบเดิมอีกครั้งเหมือนตอนเช็คอิน (backend บังคับเท่ากัน)
+            ซ่อนเมื่อปิดงานไปแล้ว — สแกนซ้ำหลังจบงานจะได้ ALREADY_COMPLETED เปล่า ๆ */}
+        {QR_TEST_TOOLS_ENABLED && checkOutServerTs === null && (
+          <CaregiverQrScanPanel
+            bookingId={booking.id}
+            onScanned={(result) => {
+              // เช็ค action ก่อน: หน้านี้เด้งไปหน้าสรุปผลได้เฉพาะตอนที่ "ปิดงาน" จริง
+              // ถ้าเป็น CHECK_IN (เข้าหน้านี้มาโดยที่ยังไม่เคยสแกน) แค่ดึงข้อมูลใหม่พอ
+              if (result.action === 'CHECK_OUT') void handleCheckedOut();
+              else void refetch();
+            }}
+          />
+        )}
 
         {loading || !proof ? (
           <Skeleton height={260} />

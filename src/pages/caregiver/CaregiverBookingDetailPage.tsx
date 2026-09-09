@@ -18,6 +18,8 @@ import { useJobCoordinates } from '../../hooks/useJobCoordinates';
 import Skeleton from '../../components/ui/Skeleton';
 import CheckInMap from './CheckInMap';
 import CaregiverCheckInPanel from './CaregiverCheckInPanel';
+import CaregiverQrScanPanel from './CaregiverQrScanPanel';
+import { QR_TEST_TOOLS_ENABLED } from '../../lib/qrTestTools';
 import CaregiverServiceProgressPage from './CaregiverServiceProgressPage';
 import CheckOutSuccess from '../../components/caregiver/CheckOutSuccess';
 import type { ProofOfWorkSummary } from '../../lib/monitoring';
@@ -495,7 +497,21 @@ export default function CaregiverBookingDetailPage() {
                       dayOfContactRelationship={booking.dayOfContactRelationship}
                     />
                   </div>
-                  <div className="order-1 lg:order-2">
+                  <div className="order-1 flex flex-col gap-5 lg:order-2">
+                    {/* สแกน QR = ทางเดียวที่เริ่มงานได้ สำหรับงานที่มี QR (backend บังคับ)
+                        ตอนนี้ยังเป็นแบบอัปโหลดรูป รอ scanner กล้องจาก PYG-438 มาแทน
+                        วางไว้ "เหนือ" ปุ่มเช็คอินเดิม เพราะเป็นขั้นตอนที่ต้องทำก่อน */}
+                    {QR_TEST_TOOLS_ENABLED && (
+                      <CaregiverQrScanPanel
+                        bookingId={booking.id}
+                        onScanned={() => {
+                          // การสแกนที่สำเร็จ = backend เช็คอินให้เรียบร้อยแล้ว
+                          // สลับหน้าเหมือนตอนกดปุ่มเช็คอินเดิมทุกประการ
+                          setJustCheckedIn(true);
+                          void refetchBooking();
+                        }}
+                      />
+                    )}
                     <CaregiverCheckInPanel
                       bookingId={booking.id}
                       jobLat={jobCoords.lat}
