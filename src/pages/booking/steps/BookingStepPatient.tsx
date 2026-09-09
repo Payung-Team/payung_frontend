@@ -1,5 +1,71 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useBooking } from '../../../context/BookingContext';
+import { supabase } from '../../../lib/supabase';
+import ConfirmModal from '../../../components/ui/ConfirmModal';
+
+const API_BASE = ((import.meta.env.VITE_GRAPHQL_URL as string) || 'http://localhost:3000/graphql')
+  .replace('/graphql', '');
+
+/** โปรไฟล์ผู้รับบริการที่ผู้ใช้เคยบันทึกไว้ — GET /api/v1/patient/care-recipients */
+interface SavedRecipient {
+  id: string;
+  name: string;
+}
+
+// MOCK — ใช้ระหว่างที่ API ยังไม่มีโปรไฟล์ที่บันทึกไว้ ให้เห็นหน้าตาลิสต์ก่อน
+// ลบทิ้งได้ทันทีเมื่อ GET /api/v1/patient/care-recipients คืนข้อมูลจริง
+const MOCK_RECIPIENTS: SavedRecipient[] = [
+  { id: 'mock-1', name: 'ปาริชาต วงศ์ดี' },
+  { id: 'mock-2', name: 'สมชาย วงศ์ดี' },
+];
+
+/** หนึ่งแถวในลิสต์ "ผู้รับบริการคือใคร" — วงกลมเลือก + ชื่อ + ปุ่มลบ */
+function RecipientRow({
+  selected,
+  title,
+  onSelect,
+  onDelete,
+}: {
+  selected: boolean;
+  title: string;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      className={`flex items-center rounded-xl border-2 transition ${
+        selected
+          ? 'border-[#1B5C48] bg-[#F0FAF4]'
+          : 'border-[#E0E2E5] bg-white hover:border-gray-300'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={selected}
+        className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3.5 text-left cursor-pointer"
+      >
+        <span
+          className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center ${
+            selected ? 'border-[#1B5C48]' : 'border-[#C7CDD2]'
+          }`}
+        >
+          {selected && <span className="w-2.5 h-2.5 rounded-full bg-[#1B5C48]" />}
+        </span>
+        <span className="flex-1 min-w-0 text-sm font-bold text-[#1A1A1A] truncate">{title}</span>
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label={`ลบ ${title}`}
+        title="ลบรายชื่อนี้"
+        className="shrink-0 px-4 py-3.5 text-sm font-semibold text-red-600 hover:text-red-700 hover:underline transition cursor-pointer"
+      >
+        ลบ
+      </button>
+    </div>
+  );
+}
 
 const PREDEFINED_CONDITIONS = ['เบาหวาน', 'ความดันสูง', 'โรคหัวใจ', 'สมองเสื่อม'];
 
@@ -25,22 +91,6 @@ const SUPPORT_LEVELS = [
 ];
 
 const BLOOD_GROUPS = ['A', 'B', 'AB', 'O', 'A+', 'B+', 'AB+', 'O+'];
-
-const SAVED_PROFILE = {
-  name: 'สมศรี วงศ์ดี',
-  age: '65',
-  gender: 'หญิง' as const,
-  weight: '58',
-  height: '155',
-  supportLevel: 'ช่วยเหลือตัวเองได้เล็กน้อย / ต้องการการช่วยพยุงเดิน',
-  conditions: ['เบาหวาน', 'ความดันสูง'],
-  medicines: 'ยาลดความดัน, ยาเบาหวาน',
-  allergies: 'แพ้ยาเพนิซิลิน',
-  bloodGroup: 'B',
-  careInstructions:
-    'เพิ่งผ่าตัดเปลี่ยนสะโพก 2 สัปดาห์ ยังช่วยพยุงเดินช้า จำเป็นต้องพลิกตัวสม่ำเสมอ',
-  regularHospital: 'รพ.รามาธิบดี',
-};
 
 export default function BookingStepPatient() {
   const { bookingDraft, setBookingDraft, goToStep, setStepSubmit, setStepMissing } = useBooking();
@@ -79,7 +129,6 @@ export default function BookingStepPatient() {
   const [regularHospital, setRegularHospital] = useState(
     bookingDraft?.recipient?.patientDetails?.regularHospital || '',
   );
-  const [showHealth, setShowHealth] = useState(false);
 
   // Contact person
   const [contactName, setContactName] = useState(bookingDraft?.contactPerson?.name || '');
@@ -90,7 +139,37 @@ export default function BookingStepPatient() {
 
   const [error, setError] = useState<Record<string, string>>({});
 
-  const isProfileFilled = useMemo(() => name === SAVED_PROFILE.name, [name]);
+  // โปรไฟล์ผู้รับบริการที่เคยบันทึกไว้ + ใบไหนที่ถูกเลือกอยู่
+  const [selectedRecipientId, setSelectedRecipientId] = useState<string | null>(null);
+  // กรอกเองโดยไม่ได้เลือกจากลิสต์ → ถามว่าจะบันทึกโปรไฟล์ไว้ใช้ครั้งหน้าไหม
+  const [saveAsProfile, setSaveAsProfile] = useState(false);
+  // รายชื่อที่กด "ลบ" ไว้ รอยืนยันใน modal
+  const [pendingDelete, setPendingDelete] = useState<SavedRecipient | null>(null);
+
+  const [savedRecipients, setSavedRecipients] = useState<SavedRecipient[]>(MOCK_RECIPIENTS);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/patient/care-recipients`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data: SavedRecipient[] = await res.json();
+        if (!cancelled && data.length > 0) setSavedRecipients(data);
+      } catch {
+        // ดึงไม่ได้ก็แค่ไม่แสดงการ์ดโปรไฟล์ที่บันทึกไว้
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Auto-save
   useEffect(() => {
@@ -134,36 +213,37 @@ export default function BookingStepPatient() {
     contactRel,
   ]);
 
-  const handleUseProfile = () => {
-    setName(SAVED_PROFILE.name);
-    setAge(SAVED_PROFILE.age);
-    setGender(SAVED_PROFILE.gender);
-    setWeight(SAVED_PROFILE.weight);
-    setHeight(SAVED_PROFILE.height);
-    setSupportLevel(SAVED_PROFILE.supportLevel);
-    setBloodGroup(SAVED_PROFILE.bloodGroup);
-    setConditions([...SAVED_PROFILE.conditions]);
-    setMedicines(SAVED_PROFILE.medicines);
-    setAllergies(SAVED_PROFILE.allergies);
-    setCareInstructions(SAVED_PROFILE.careInstructions);
-    setRegularHospital(SAVED_PROFILE.regularHospital);
+  // เลือกโปรไฟล์ที่บันทึกไว้ — ระบบเก็บแค่ชื่อกับชื่อเล่น ที่เหลือต้องกรอกเอง
+  // กดซ้ำที่ใบเดิม = ยกเลิกการเลือก แล้วกลับไปกรอกเอง
+  const handleSelectRecipient = (recipient: SavedRecipient) => {
+    if (selectedRecipientId === recipient.id) {
+      setSelectedRecipientId(null);
+      return;
+    }
+    setSelectedRecipientId(recipient.id);
+    setSaveAsProfile(false);
+    setName(recipient.name);
   };
 
-  const handleClearPatient = () => {
-    setName('');
-    setAge('');
-    setGender('');
-    setWeight('');
-    setHeight('');
-    setSupportLevel('');
-    setBloodGroup('');
-    setConditions([]);
-    setMedicines('');
-    setAllergies('');
-    setCareInstructions('');
-    setRegularHospital('');
-    setShowHealth(true);
+  // ลบรายชื่อที่บันทึกไว้ — ยืนยันผ่าน modal ก่อนเสมอ
+  // NOTE: backend ยังไม่มี DELETE /api/v1/patient/care-recipients/:id
+  // ตอนนี้จึงลบออกจากลิสต์ในหน้านี้เท่านั้น — ต่อ API จริงเมื่อมี endpoint แล้ว
+  const confirmDeleteRecipient = () => {
+    if (!pendingDelete) return;
+    setSavedRecipients((prev) => prev.filter((r) => r.id !== pendingDelete.id));
+    if (selectedRecipientId === pendingDelete.id) setSelectedRecipientId(null);
+    setPendingDelete(null);
   };
+
+  // แก้ชื่อเองเมื่อไหร่ = หลุดจากใบที่เลือกไว้
+  const handleNameChange = (value: string) => {
+    setName(value);
+    const picked = savedRecipients.find((r) => r.id === selectedRecipientId);
+    if (picked && picked.name !== value) setSelectedRecipientId(null);
+  };
+
+  // กรอกเอง (ไม่ได้เลือกจากลิสต์) และมีชื่อแล้ว → ค่อยถามเรื่องบันทึกโปรไฟล์
+  const isManualEntry = !selectedRecipientId && name.trim().length > 0;
 
   const toggleCondition = (cond: string) => {
     setConditions((prev) =>
@@ -217,43 +297,26 @@ export default function BookingStepPatient() {
 
   return (
     <div className="space-y-4">
-      {/* Hero: use profile vs new patient */}
-      <section className="bg-white p-6 rounded-2xl border border-gray-100">
-        <h2 className="text-lg font-bold text-[#1A1A1A]">ผู้รับบริการคือใคร</h2>
-        <p className="text-sm text-[#8A8C8E] mt-1">
-          ผู้ดูแลเห็นข้อมูลนี้ก่อนเริ่มงาน กรอกเท่าที่จำเป็นตอนนี้ก็ได้
-        </p>
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={handleUseProfile}
-            className={`flex flex-col items-start p-4 rounded-xl border-2 text-left transition cursor-pointer ${
-              isProfileFilled
-                ? 'border-[#52B69A] bg-[#F0FAF4]'
-                : 'border-[#E0E2E5] bg-white hover:border-gray-300'
-            }`}
-          >
-            <span className="material-icons text-[#52B69A]" style={{ fontSize: 24 }}>
-              badge
-            </span>
-            <span className="mt-2 text-sm font-bold text-[#1A1A1A]">สมศรี วงศ์ดี · 65 ปี</span>
-            <span className="mt-1 text-xs text-[#8A8C8E]">
-              โปรไฟล์ที่บันทึกไว้ · เติมครบทุกช่อง
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={handleClearPatient}
-            className="flex flex-col items-start p-4 rounded-xl border-2 border-[#E0E2E5] bg-white text-left hover:border-gray-300 transition cursor-pointer"
-          >
-            <span className="material-icons text-[#8A8C8E]" style={{ fontSize: 24 }}>
-              person_add
-            </span>
-            <span className="mt-2 text-sm font-bold text-[#1A1A1A]">กรอกคนไข้รายใหม่</span>
-            <span className="mt-1 text-xs text-[#8A8C8E]">ใช้เวลาประมาณ 1 นาที</span>
-          </button>
-        </div>
-      </section>
+      {/* เลือกจากโปรไฟล์ที่เคยบันทึกไว้ — ไม่เลือกก็กรอกเองได้ในการ์ดถัดไป */}
+      {savedRecipients.length > 0 && (
+        <section className="bg-white p-6 rounded-2xl border border-gray-100">
+          <h2 className="text-lg font-bold text-[#1A1A1A]">ผู้รับบริการคือใคร</h2>
+          <p className="text-sm text-[#8A8C8E] mt-1">
+            เลือกจากรายชื่อที่บันทึกไว้ หรือกรอกข้อมูลใหม่ด้านล่าง
+          </p>
+          <div className="mt-4 space-y-2">
+            {savedRecipients.map((r) => (
+              <RecipientRow
+                key={r.id}
+                selected={selectedRecipientId === r.id}
+                title={r.name}
+                onSelect={() => handleSelectRecipient(r)}
+                onDelete={() => setPendingDelete(r)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Patient info */}
       <section className="bg-white p-6 rounded-2xl border border-gray-100">
@@ -266,7 +329,7 @@ export default function BookingStepPatient() {
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => handleNameChange(e.target.value)}
               placeholder="ชื่อจริงตามบัตรประชาชน"
               className={`mt-1.5 w-full p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
                 error.name
@@ -384,27 +447,18 @@ export default function BookingStepPatient() {
           )}
         </div>
 
-        {/* Health section (collapsible) */}
-        <button
-          type="button"
-          onClick={() => setShowHealth((v) => !v)}
-          aria-expanded={showHealth}
-          className="mt-5 w-full flex items-center justify-between gap-3 p-4 bg-[#F6FAF9] border border-[#E0E2E5] rounded-xl text-left hover:bg-gray-50 transition cursor-pointer"
-        >
-          <span>
-            <span className="block text-sm font-bold text-[#1A1A1A]">ข้อมูลสุขภาพเพิ่มเติม</span>
-            <span className="block text-xs text-[#8A8C8E] mt-0.5">
-              โรคประจำตัว ยา การแพ้ยา — ไม่บังคับ แต่ช่วยให้ดูแลปลอดภัยขึ้น
-            </span>
-          </span>
-          <span className="material-icons text-[#575859]">
-            {showHealth ? 'expand_less' : 'expand_more'}
-          </span>
-        </button>
+        {/* Health section */}
+        <div className="mt-6 pt-5 border-t border-[#E0E2E5]">
+          <h3 className="text-base font-bold text-[#1A1A1A]">
+            ข้อมูลสุขภาพเพิ่มเติม <span className="font-semibold text-[#8A8C8E]">(ไม่บังคับ)</span>
+          </h3>
+          <p className="text-xs text-[#8A8C8E] mt-2">
+            โรคประจำตัว ยา การแพ้ยา กรอกข้อมูลเพื่อช่วยให้ผู้ดูแลดูแลคุณได้อย่างปลอดภัยมากขึ้น
+          </p>
+        </div>
 
-        {showHealth && (
-          <div className="mt-4 space-y-4">
-            {/* Blood group */}
+        <div className="mt-4 space-y-4">
+          {/* Blood group */}
             <div>
               <label className="text-xs font-semibold text-[#575859]">กรุ๊ปเลือด</label>
               <div className="mt-1.5 flex flex-wrap gap-2">
@@ -504,7 +558,26 @@ export default function BookingStepPatient() {
                 className="mt-1.5 w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A]"
               />
             </div>
-          </div>
+        </div>
+
+        {/* กรอกเองโดยไม่ได้เลือกจากลิสต์ → ถามว่าจะเก็บโปรไฟล์นี้ไว้ใช้ครั้งหน้าไหม */}
+        {isManualEntry && (
+          <label className="mt-5 flex items-start gap-3 p-4 bg-[#F6FAF9] border border-[#E0E2E5] rounded-xl cursor-pointer">
+            <input
+              type="checkbox"
+              checked={saveAsProfile}
+              onChange={(e) => setSaveAsProfile(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-[#52B69A] cursor-pointer shrink-0"
+            />
+            <span>
+              <span className="block text-sm font-bold text-[#1A1A1A]">
+                บันทึกผู้รับบริการรายนี้ไว้
+              </span>
+              <span className="block text-xs text-[#8A8C8E] mt-0.5">
+                ครั้งหน้าจะเลือกจากรายชื่อได้เลย ไม่ต้องกรอกใหม่
+              </span>
+            </span>
+          </label>
         )}
       </section>
 
@@ -585,6 +658,25 @@ export default function BookingStepPatient() {
           </div>
         </div>
       </section>
+
+      <ConfirmModal
+        isOpen={pendingDelete !== null}
+        isLoading={false}
+        title="ลบรายชื่อนี้?"
+        description={
+          <>
+            <span className="font-semibold text-[#1A1A1A]">{pendingDelete?.name}</span>{' '}
+            จะถูกลบออกจากรายชื่อที่บันทึกไว้ การจองที่ผ่านมาไม่ได้รับผลกระทบ
+          </>
+        }
+        confirmText="ลบ"
+        onClose={() => setPendingDelete(null)}
+        onConfirm={confirmDeleteRecipient}
+        iconName="delete"
+        iconBgColor="bg-red-500"
+        confirmBtnBgColor="bg-red-600"
+        confirmBtnHoverBgColor="hover:bg-red-700"
+      />
     </div>
   );
 }
