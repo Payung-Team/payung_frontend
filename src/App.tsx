@@ -45,7 +45,6 @@ import ChangePasswordPage from './pages/auth/ChangePasswordPage';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
 import AuthCallback from './pages/auth/AuthCallback';
-import MessagePage from './pages/profile/MessagePage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 import CaregiverProfilePage from './pages/search/CaregiverProfilePage';
 import BookingSuccessPage from './pages/booking/BookingSuccessPage';
@@ -261,7 +260,6 @@ function App() {
               </RoleRoute>
             }
           />
-          <Route path="/messages" element={<MessagePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
 
           {/* Caregiver settings */}

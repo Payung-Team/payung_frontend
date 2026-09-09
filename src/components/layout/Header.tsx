@@ -86,11 +86,6 @@ export default function Header({
               </>
             ) : (
               <>
-                {/* Messages Icon */}
-                <Link to="/messages" className="relative w-9 h-9 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:cursor-pointer transition-colors rounded-full hover:bg-gray-100">
-                  <Icon name="chat" size="medium" />
-                </Link>
-
                 {/* Notification Icon */}
                 <NotificationBell
                   currentUserId={currentUserId}

@@ -462,7 +462,6 @@ export default function BookingDetailPage() {
           booking={booking}
           onBack={() => navigate('/bookings')}
           onReportProblem={() => setShowDisputeModal(true)}
-          onMessage={() => navigate('/messages')}
           onWriteReview={handleReview}
           onRebook={() => {
             if (booking.caregiverId) navigate(`/caregivers/${booking.caregiverId}`);

@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom';
 import { Icon } from '../../../components/ui/Icon';
 
 export interface PatientHeaderCardProps {
@@ -13,8 +12,6 @@ export interface PatientHeaderCardProps {
  * EmergencyContactCard); a "อาการ/เงื่อนไข" condition tag is likewise omitted, since no such
  * data exists on Booking — showing either would mean faking data that isn't there. */
 export default function PatientHeaderCard({ patientName, careRecipientName, profileSectionId }: Readonly<PatientHeaderCardProps>) {
-  const navigate = useNavigate();
-
   function scrollToProfile() {
     document.getElementById(profileSectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -41,15 +38,6 @@ export default function PatientHeaderCard({ patientName, careRecipientName, prof
       </div>
 
       <div className="mt-4 flex gap-2.5">
-        <button
-          type="button"
-          onClick={() => navigate('/messages')}
-          className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#E5E7EB] text-xs font-bold text-[#575859] transition hover:bg-[#F7F8F9] focus:outline-none focus:ring-2 focus:ring-[#52B69A] focus:ring-offset-2"
-          style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-        >
-          <Icon name="chat" size="small" color="#575859" />
-          ส่งข้อความ
-        </button>
         <button
           type="button"
           onClick={scrollToProfile}
