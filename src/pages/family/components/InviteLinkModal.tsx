@@ -8,7 +8,7 @@ import {
   REVOKE_JOIN_LINK,
   type FamilyGroupJoinLink,
 } from '../../../graphql/familyGroup';
-import { formatDate, useStrings } from '../familyStrings';
+import { useStrings } from '../familyStrings';
 import { fgErrorMessage, getFgErrorCode, FG_ERROR } from '../familyErrors';
 import { ModalShell, ModalHeader, ConfirmDialog } from './familyUi';
 
@@ -136,7 +136,7 @@ export default function InviteLinkModal({
   }
 
   return (
-    <ModalShell onClose={onClose} maxWidth={520} labelledBy="invite-title">
+    <ModalShell onClose={onClose} maxWidth={520} labelledBy="invite-title" showClose>
       <ModalHeader
         icon="link"
         title={s.inviteTitle}
@@ -216,64 +216,26 @@ export default function InviteLinkModal({
                 {copied ? s.copied : s.copy}
               </button>
             </div>
-            {copied && (
-              <p className="mt-2 flex items-center gap-1.5 text-[13px] font-semibold text-[#047857]">
-                <Icon name="check_circle" size="small" color="#047857" />
-                {s.toastCopied}
-              </p>
-            )}
+            <p className="mt-2 text-[12px] leading-5 text-[#8A8C8E]">{s.inviteHelper}</p>
           </div>
 
-          <div className="mt-5 space-y-2.5 rounded-lg bg-[#F6FAF9] p-4">
-            <div className="flex items-start gap-2.5">
-              <Icon name="schedule" size="small" className="mt-0.5 text-[#8A8C8E]" />
-              <p className="text-[13px] leading-5 text-[#4B5563]">
-                {s.linkExpiresOn(formatDate(link.expiresAt))}
-              </p>
-            </div>
-            <div className="flex items-start gap-2.5">
-              <Icon name="group" size="small" className="mt-0.5 text-[#8A8C8E]" />
-              <p className="text-[13px] leading-5 text-[#4B5563]">
-                {link.remainingUses == null
-                  ? s.usesUnlimited
-                  : s.usesRemaining(link.remainingUses)}
-                <span className="text-[#8A8C8E]">
-                  {' · '}
-                  {s.memberLimitLine(link.memberCount, link.memberLimit)}
-                </span>
-              </p>
-            </div>
-            <div className="flex items-start gap-2.5">
-              <Icon name="shield" size="small" className="mt-0.5 text-[#B45309]" />
-              <p className="text-[13px] leading-5 text-[#B45309]">{s.shareWarning}</p>
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-              <button
-                type="button"
-                onClick={() => setConfirming('rotate')}
-                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#B45309] hover:underline"
-              >
-                <Icon name="autorenew" size="small" color="#B45309" />
-                {s.rotateLink}
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirming('revoke')}
-                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#DC2626] hover:underline"
-              >
-                <Icon name="link_off" size="small" color="#DC2626" />
-                {s.revokeLink}
-              </button>
-            </div>
+          {/* Link management kept quiet — the invite flow is the loud part (design SCR-FG2). */}
+          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-gray-100 pt-4">
             <button
               type="button"
-              onClick={onClose}
-              className="h-10 rounded-lg border border-gray-200 px-5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              onClick={() => setConfirming('rotate')}
+              className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#8A8C8E] transition-colors hover:text-[#B45309]"
             >
-              {s.close}
+              <Icon name="autorenew" size="small" />
+              {s.rotateLink}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming('revoke')}
+              className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#8A8C8E] transition-colors hover:text-[#DC2626]"
+            >
+              <Icon name="link_off" size="small" />
+              {s.revokeLink}
             </button>
           </div>
         </>

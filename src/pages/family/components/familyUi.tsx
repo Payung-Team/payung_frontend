@@ -76,11 +76,13 @@ export function ModalShell({
   children,
   maxWidth = 500,
   labelledBy,
+  showClose = false,
 }: {
   onClose: () => void;
   children: ReactNode;
   maxWidth?: number;
   labelledBy?: string;
+  showClose?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -114,9 +116,19 @@ export function ModalShell({
         aria-modal="true"
         aria-labelledby={labelledBy}
         tabIndex={-1}
-        className="fg-modal-card max-h-[88vh] w-full overflow-y-auto rounded-2xl border border-gray-100 bg-white p-6 shadow-2xl outline-none"
+        className="fg-modal-card relative max-h-[88vh] w-full overflow-y-auto rounded-2xl border border-gray-100 bg-white p-6 shadow-2xl outline-none"
         style={{ maxWidth }}
       >
+        {showClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="ปิด"
+            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          >
+            <Icon name="close" size="small" />
+          </button>
+        )}
         {children}
       </div>
     </div>
@@ -137,7 +149,7 @@ export function ModalHeader({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#009265] text-white">
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#009265] text-white">
         <Icon name={icon} />
       </span>
       <div className="min-w-0">
