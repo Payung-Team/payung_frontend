@@ -1,10 +1,15 @@
+import PatientProfileDetails from '../PatientProfileDetails';
+import type { PatientProfile } from '../../../lib/patientProfile';
+
 export interface PatientSummaryCardProps {
   patientName: string;
   careRecipientName?: string;
+  /** PYG-460 — ข้อมูลสุขภาพ ณ วันจอง · null/undefined ในการจองเก่า */
+  patientProfile?: PatientProfile | null;
 }
 
 /** Matches the Figma "ผู้รับบริการ" card on the check-in screen. */
-export default function PatientSummaryCard({ patientName, careRecipientName }: Readonly<PatientSummaryCardProps>) {
+export default function PatientSummaryCard({ patientName, careRecipientName, patientProfile }: Readonly<PatientSummaryCardProps>) {
   return (
     <div className="rounded-[18px] bg-white p-5 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
       <h2 className="text-[17px] font-bold text-[#1A1A1A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
@@ -28,6 +33,7 @@ export default function PatientSummaryCard({ patientName, careRecipientName }: R
           </p>
         </div>
       </div>
+      <PatientProfileDetails profile={patientProfile} />
     </div>
   );
 }

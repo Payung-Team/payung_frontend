@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
 import type { BookingStatus } from '../utils/bookingStatus';
 
 export interface BookingRequest {
@@ -32,9 +33,25 @@ export interface BookingRequest {
   recipient?: {
     type: 'self' | 'member';
     selectedMemberId?: string;
+    /**
+     * PYG-460 — id ของโปรไฟล์ที่ผู้ใช้เลือกจากลิสต์ใน BookingStepPatient
+     * (undefined/null = กรอกเอง ไม่ได้เลือกใบไหน) ส่งต่อเป็น careRecipientId
+     * ตอนยิง POST /bookings ซึ่งอยู่คนละหน้ากับหน้าที่กรอก
+     */
+    selectedRecipientId?: string | null;
+    /**
+     * PYG-460 — ผู้ใช้ติ๊ก "บันทึกผู้รับบริการรายนี้ไว้" หรือไม่
+     * BE จะสร้างโปรไฟล์ใน transaction เดียวกับ booking
+     */
+    saveAsProfile?: boolean;
     patientDetails?: {
       name: string;
-      age: number;
+      /**
+       * PYG-460 — เดิมเป็น `age: number` แล้ว BookingStepPatient เขียน
+       * `Number(age) || 0` ทำให้ช่องที่ว่างกลายเป็น 0 ซึ่ง BE รับเป็นอายุที่ถูกต้อง
+       * → เปลี่ยนเป็น optional เพื่อให้ "ไม่ได้กรอก" ต่างจาก "อายุ 0"
+       */
+      age?: number;
       nickname?: string;
       gender?: 'ชาย' | 'หญิง' | '';
       weight?: number;
@@ -158,6 +175,8 @@ function mapBackendToSaved(item: BackendSavedItem): SavedCaregiver {
   };
 }
 
+const ROLE_PATIENT = 1;
+
 async function getAuthToken(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession();
   return session?.access_token ?? null;
@@ -166,6 +185,9 @@ async function getAuthToken(): Promise<string | null> {
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { session, userRole } = useAuth();
+  const userId = session?.user?.id ?? null;
+
   const [bookingDraft, setBookingDraft] = useState<BookingRequest | null>(null);
   const [step, setStep] = useState(1);
   const [confirmedBookings, setConfirmedBookings] = useState<ConfirmedBooking[]>([]);
@@ -188,33 +210,34 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   ]);
 
-  // Load saved caregivers from backend; clear on logout
+  // Load saved caregivers from backend; clear when no patient is signed in.
+  // Endpoint is @Roles(PATIENT) on the backend — caregiver/admin sessions get 403,
+  // so gate on role instead of firing and swallowing the error.
+  // Keyed on user id (not an onAuthStateChange subscription) so a GoTrue token
+  // refresh, which re-emits SIGNED_IN, doesn't re-fetch on every refresh tick.
   useEffect(() => {
-    const loadSavedCaregivers = async () => {
+    if (!userId || userRole !== ROLE_PATIENT) { setSavedCaregivers([]); return; }
+
+    let cancelled = false;
+
+    (async () => {
       const token = await getAuthToken();
-      if (!token) { setSavedCaregivers([]); return; }
-      if (localStorage.getItem('userRole') !== '1') { setSavedCaregivers([]); return; }
+      if (!token) { if (!cancelled) setSavedCaregivers([]); return; }
       try {
         const res = await fetch(`${API_BASE}/api/v1/patient/saved-caregivers`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (cancelled) return;
         if (!res.ok) { setSavedCaregivers([]); return; }
         const data: BackendSavedItem[] = await res.json();
-        setSavedCaregivers(data.map(mapBackendToSaved));
+        if (!cancelled) setSavedCaregivers(data.map(mapBackendToSaved));
       } catch {
-        setSavedCaregivers([]);
+        if (!cancelled) setSavedCaregivers([]);
       }
-    };
+    })();
 
-    loadSavedCaregivers();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') loadSavedCaregivers();
-      if (event === 'SIGNED_OUT') setSavedCaregivers([]);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => { cancelled = true; };
+  }, [userId, userRole]);
 
   const addRecipient = (newRec: Omit<Recipient, 'id'>): Recipient => {
     const created: Recipient = { ...newRec, id: `member-${Date.now()}` };

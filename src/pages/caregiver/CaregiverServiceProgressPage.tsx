@@ -74,6 +74,7 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
           patientName={booking.patientName}
           careRecipientName={booking.careRecipientName}
           profileSectionId={PROFILE_SECTION_ID}
+          patientProfile={booking.patientProfile}
         />
 
         <div className="flex items-start gap-2.5 rounded-xl border border-[#FFEAA7] bg-[#FFF8E7] p-3.5">

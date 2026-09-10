@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import Icon from '../../components/ui/Icon';
+import type { PatientProfile } from '../../lib/patientProfile';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
 import { BookingCard } from '../../components/ui/BookingCard';
@@ -49,6 +50,8 @@ export interface Booking {
   dayOfContactRelationship?: string;
   locationLat?: number | null;
   locationLng?: number | null;
+  /** PYG-460 — snapshot ข้อมูลสุขภาพ ณ วันจอง · null ในการจองเก่าก่อน PYG-460 */
+  patientProfile?: PatientProfile | null;
 }
 
 type TabType = 'scheduled' | 'action_required' | 'history';
@@ -133,6 +136,7 @@ export function mapToBooking(summary: any): Booking {
     dayOfContactRelationship: summary.dayOfContactRelationship ?? undefined,
     locationLat: summary.locationLat ?? null,
     locationLng: summary.locationLng ?? null,
+    patientProfile: summary.patientProfile ?? null,
   };
 }
 
