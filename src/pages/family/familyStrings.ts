@@ -60,6 +60,27 @@ export interface Strings {
   bookedBy: (name: string) => string;
   apptHours: (n: number) => string;
   bookingStatusLabel: (status: string) => string;
+  // appointments feed — tabs, in-progress card, view-all
+  apptConfirmedCount: (n: number) => string;
+  tabConfirmed: string;
+  tabPending: string;
+  tabHistory: string;
+  tabCount: (n: number) => string;
+  apptEscrow: string;
+  apptCheckIn: string;
+  apptCheckOut: string;
+  apptInProgress: string;
+  apptStart: string;
+  apptLocationLabel: string;
+  apptServiceFormatLabel: string;
+  apptViewAll: string;
+  apptShowLess: string;
+  apptEmptyPendingTitle: string;
+  apptEmptyPendingBody: string;
+  apptEmptyHistoryTitle: string;
+  apptEmptyHistoryBody: string;
+  serviceTypeLabel: (t: string) => string;
+  serviceFormatLabel: (locs: string[]) => string;
   emptyTitle: string;
   emptyBody: string;
   createGroup: string;
@@ -82,17 +103,42 @@ export interface Strings {
   leaveGroup: string;
   deleteGroup: string;
   membersTitle: string;
+  membersSubtitle: (groupName: string, count: number) => string;
+  backToGroup: string;
+  membersListLabel: (n: number) => string;
   you: string;
   ownerCannotRemoveSelf: string;
   memberRowMenu: string;
   makeOwner: string;
   removeFromGroup: string;
+  bookForMember: string;
+  viewMemberBookings: string;
+  memberBookingsTitle: (name: string) => string;
+  memberBookingsEmpty: string;
   joinedOn: string;
   recipientsTitle: string;
   recipientsSubtitle: string;
   recipientsEmpty: string;
   addedByYou: string;
   addedByMember: string;
+  addRecipient: string;
+  editRecipient: string;
+  removeRecipient: string;
+  recipientMenu: string;
+  recipientNameLabel: string;
+  recipientNamePlaceholder: string;
+  nicknameLabel: string;
+  nicknamePlaceholder: string;
+  addRecipientTitle: string;
+  addRecipientSubtitle: string;
+  editRecipientTitle: string;
+  removeRecipientTitle: (name: string) => string;
+  removeRecipientBody: string;
+  add: string;
+  busyAdding: string;
+  toastRecipientAdded: string;
+  toastRecipientUpdated: string;
+  toastRecipientRemoved: (name: string) => string;
   inviteTitle: string;
   inviteSubtitle: string;
   inviteLinkLabel: string;
@@ -217,8 +263,7 @@ const S: Strings = {
   apptCount: (n) => `${n} รายการ`,
   bookOnBehalf: 'จองแทนสมาชิก',
   bookPickRecipient: 'เลือกผู้รับบริการที่จะจองให้ แล้วกรอกรายละเอียดในขั้นตอนถัดไป',
-  bookNoRecipients:
-    'ยังไม่มีผู้รับบริการที่แชร์ไว้ในกลุ่ม สมาชิกต้องแชร์โปรไฟล์ผู้รับบริการเข้ากลุ่มก่อน จึงจะจองแทนได้',
+  bookNoRecipients: 'ยังไม่มีผู้รับบริการในกลุ่ม เพิ่มคนที่คุณจะจองแทนเพื่อเริ่มต้น',
   bookContinue: 'ถัดไป',
   bookedByYou: 'จองโดยคุณ',
   bookedBy: (name) => `จองโดย ${name}`,
@@ -239,6 +284,44 @@ const S: Strings = {
   apptEmptyTitle: 'ยังไม่มีนัดหมายในกลุ่ม',
   apptEmptyBody:
     'เมื่อคุณหรือสมาชิกจองผู้ดูแล รายการจะแสดงที่นี่ และทุกคนในกลุ่มจะติดตามได้พร้อมกัน',
+  apptConfirmedCount: (n) => `${n} รายการที่ยืนยันแล้ว`,
+  tabConfirmed: 'ยืนยันแล้ว',
+  tabPending: 'รอยืนยันการจอง',
+  tabHistory: 'ประวัติ',
+  tabCount: (n) => `${n}`,
+  apptEscrow: 'พักเงินไว้',
+  apptCheckIn: 'เช็คอิน',
+  apptCheckOut: 'เช็คเอาท์',
+  apptInProgress: 'กำลังบริการ',
+  apptStart: 'เริ่ม',
+  apptLocationLabel: 'สถานที่',
+  apptServiceFormatLabel: 'รูปแบบบริการ',
+  apptViewAll: 'ดูการจองทั้งหมดของกลุ่ม',
+  apptShowLess: 'ย่อรายการ',
+  apptEmptyPendingTitle: 'ไม่มีรายการรอยืนยัน',
+  apptEmptyPendingBody: 'การจองที่รอผู้ดูแลจับคู่หรือยืนยันจะแสดงที่นี่',
+  apptEmptyHistoryTitle: 'ยังไม่มีประวัติการจอง',
+  apptEmptyHistoryBody: 'งานที่เสร็จสิ้นหรือยกเลิกแล้วจะย้ายมาเก็บที่นี่',
+  serviceTypeLabel: (t) =>
+    ({
+      general_care: 'ดูแลทั่วไป',
+      elderly_care: 'ดูแลผู้สูงอายุ',
+      bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
+      physiotherapy: 'กายภาพบำบัด',
+      medication: 'ช่วยจัดการยา',
+      companion: 'เป็นเพื่อน/พูดคุย',
+      nursing: 'พยาบาลวิชาชีพ',
+      basic_care: 'ดูแลเบื้องต้น',
+      home_health: 'สุขภาพที่บ้าน',
+      patient_transport: 'รับส่งผู้ป่วย',
+    })[t] ?? t,
+  serviceFormatLabel: (locs) => {
+    const home = locs.includes('at_home');
+    const out = locs.includes('accompany_outside');
+    if (home && out) return 'ดูแลที่บ้าน + พาไปนอกบ้าน';
+    if (out) return 'พาไปทำธุระนอกบ้าน';
+    return 'ดูแลที่บ้านผู้ป่วย';
+  },
   emptyTitle: 'คุณยังไม่มีกลุ่มครอบครัว',
   emptyBody:
     'สร้างกลุ่มเพื่อเชิญพี่น้องหรือญาติเข้ามาช่วยกันดูแล แชร์ข้อมูลผู้รับการดูแล และจองผู้ดูแลแทนกันได้ โดยที่ค่าบริการยังชำระโดยผู้จองเท่านั้น',
@@ -263,17 +346,43 @@ const S: Strings = {
   leaveGroup: 'ออกจากกลุ่ม',
   deleteGroup: 'ลบกลุ่ม',
   membersTitle: 'สมาชิกในกลุ่ม',
+  membersSubtitle: (groupName, count) => `${groupName} · ${count} สมาชิก`,
+  backToGroup: 'กลับไปหน้ากลุ่ม',
+  membersListLabel: (n) => `สมาชิก (${n})`,
   you: '(คุณ)',
   ownerCannotRemoveSelf: 'เจ้าของกลุ่มลบตัวเองไม่ได้',
   memberRowMenu: 'ตัวเลือกสมาชิก',
   makeOwner: 'ตั้งเป็นเจ้าของกลุ่ม',
   removeFromGroup: 'ลบออกจากกลุ่ม',
+  bookForMember: 'จองแทนสมาชิกรายนี้',
+  viewMemberBookings: 'ดูการจองของสมาชิก',
+  memberBookingsTitle: (name) => `การจองของ ${name}`,
+  memberBookingsEmpty: 'สมาชิกคนนี้ยังไม่มีการจองในกลุ่ม',
   joinedOn: 'เข้าร่วม',
   recipientsTitle: 'ผู้รับการดูแลในกลุ่ม',
   recipientsSubtitle: 'โปรไฟล์ที่สมาชิกแชร์ไว้เพื่อจองแทนกัน',
   recipientsEmpty: 'ยังไม่มีใครแชร์โปรไฟล์ผู้รับการดูแลในกลุ่มนี้',
   addedByYou: 'คุณเพิ่ม',
   addedByMember: 'สมาชิกเพิ่ม',
+  addRecipient: 'เพิ่มผู้รับบริการ',
+  editRecipient: 'แก้ไขข้อมูล',
+  removeRecipient: 'นำออกจากกลุ่ม',
+  recipientMenu: 'ตัวเลือกผู้รับบริการ',
+  recipientNameLabel: 'ชื่อ-นามสกุล',
+  recipientNamePlaceholder: 'เช่น สมศรี วงศ์ดี',
+  nicknameLabel: 'ชื่อเล่น (ถ้ามี)',
+  nicknamePlaceholder: 'เช่น ยายศรี',
+  addRecipientTitle: 'เพิ่มผู้รับบริการเข้ากลุ่ม',
+  addRecipientSubtitle: 'แชร์โปรไฟล์ให้สมาชิกในกลุ่มจองผู้ดูแลแทนกันได้',
+  editRecipientTitle: 'แก้ไขข้อมูลผู้รับบริการ',
+  removeRecipientTitle: (name) => `นำ ${name} ออกจากกลุ่ม?`,
+  removeRecipientBody:
+    'สมาชิกในกลุ่มจะจองแทนโปรไฟล์นี้ไม่ได้อีก โปรไฟล์จะยังอยู่เป็นของคุณ และนัดหมายที่จองไปแล้วยังอยู่ในประวัติ',
+  add: 'เพิ่ม',
+  busyAdding: 'กำลังเพิ่ม…',
+  toastRecipientAdded: 'เพิ่มผู้รับบริการเข้ากลุ่มแล้ว',
+  toastRecipientUpdated: 'แก้ไขข้อมูลผู้รับบริการแล้ว',
+  toastRecipientRemoved: (name) => `นำ ${name} ออกจากกลุ่มแล้ว`,
   inviteTitle: 'เชิญเข้ากลุ่ม',
   inviteSubtitle: 'แชร์ลิงก์นี้ให้คนในครอบครัว ใครมีลิงก์เข้าร่วมได้เลย',
   inviteLinkLabel: 'ลิงก์คำเชิญ',

@@ -75,6 +75,15 @@ export interface BookingRequest {
     careRecipientId: string;
     recipientName: string;
   };
+  /**
+   * Transient hint set when the flow is entered from a family group's "จองแทนสมาชิก" /
+   * "จองแทนสมาชิกรายนี้". Step 4 reads it to open in "book for a member" mode (and preselect
+   * `memberUserId` when given). The concrete `onBehalf` is resolved once a member is chosen.
+   */
+  groupContext?: {
+    groupId: string;
+    memberUserId?: string;
+  };
 }
 
 export interface SavedCaregiver {

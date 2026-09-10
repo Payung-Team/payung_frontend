@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
-import type { BookingRequest } from '../../context/BookingContext';
 import BookingStepService from './steps/BookingStepService';
 import BookingStepDateTime from './steps/BookingStepDateTime';
 import BookingStepLocation from './steps/BookingStepLocation';
@@ -128,10 +127,14 @@ export default function BookingRequestPage() {
 
   useEffect(() => {
     resetBooking();
-    // PYG-385: when launched from a family group's "จองแทนสมาชิก", seed the draft with the
-    // chosen recipient + group context so the same 5-step flow runs, only booking on behalf.
-    const seed = (location.state as { onBehalfSeed?: BookingRequest } | null)?.onBehalfSeed;
-    if (seed) setBookingDraft(seed);
+    // Launched from a family group's "จองแทนสมาชิก" / "จองแทนสมาชิกรายนี้": carry a lightweight
+    // hint so step 4 opens in "book for a member" mode (and preselects the member when given).
+    // The concrete recipient/onBehalf is resolved in step 4 once a member is chosen.
+    const gb = (location.state as { groupBooking?: { groupId: string; memberUserId?: string } } | null)
+      ?.groupBooking;
+    if (gb?.groupId) {
+      setBookingDraft({ serviceLocation: [], serviceTypes: [], groupContext: gb });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

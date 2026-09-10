@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ApolloProvider } from '@apollo/client/react';
 import FamilyGroupPage from './FamilyGroupPage';
+import MembersPage from './MembersPage';
 import { createMockFamilyClient } from './demo/mockFamilyClient';
 import { FONT } from './components/familyUi';
 
@@ -19,6 +20,25 @@ export default function FamilyGroupDemo() {
       </div>
       <ApolloProvider client={client}>
         <FamilyGroupPage />
+      </ApolloProvider>
+    </div>
+  );
+}
+
+/**
+ * `/family-demo/members` — the members page against the same in-memory mock backend. Preview
+ * only. The store is a module singleton, so remove / transfer / leave here change the same data
+ * the dashboard demo reads. Pass `?group=g1` (owner view) or `?group=g2` (member view).
+ */
+export function MembersPageDemo() {
+  const [client] = useState(createMockFamilyClient);
+  return (
+    <div className="min-h-screen bg-[#F6FAF9]" style={{ fontFamily: FONT }}>
+      <div className="flex items-center justify-center gap-2 bg-[#064E3B] px-4 py-2 text-center text-[12px] font-semibold text-white">
+        ตัวอย่างหน้าสมาชิกในกลุ่ม · ข้อมูลจำลอง (ไม่ได้เชื่อมต่อเซิร์ฟเวอร์จริง)
+      </div>
+      <ApolloProvider client={client}>
+        <MembersPage />
       </ApolloProvider>
     </div>
   );

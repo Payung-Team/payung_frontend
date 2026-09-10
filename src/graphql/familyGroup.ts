@@ -80,7 +80,13 @@ export const GROUP_BOOKINGS = gql`
         avatarUrl
       }
       bookedByName
+      bookedByUserId
       bookedByMe
+      estimatedCost
+      serviceLocations
+      locationAddress
+      paymentStatus
+      checkInTime
     }
   }
 `;
@@ -234,6 +240,39 @@ export const JOIN_GROUP_BY_LINK = gql`
   }
 `;
 
+// ── PYG-385: manage care recipients in a group (add / edit / remove) ──────────
+
+export const ADD_GROUP_CARE_RECIPIENT = gql`
+  mutation AddGroupCareRecipient($input: AddGroupCareRecipientInput!) {
+    addGroupCareRecipient(input: $input) {
+      id
+      name
+      nickname
+      ownerUserId
+    }
+  }
+`;
+
+export const UPDATE_GROUP_CARE_RECIPIENT = gql`
+  mutation UpdateGroupCareRecipient($input: UpdateGroupCareRecipientInput!) {
+    updateGroupCareRecipient(input: $input) {
+      id
+      name
+      nickname
+      ownerUserId
+    }
+  }
+`;
+
+export const REMOVE_GROUP_CARE_RECIPIENT = gql`
+  mutation RemoveGroupCareRecipient($input: RemoveGroupCareRecipientInput!) {
+    removeGroupCareRecipient(input: $input) {
+      recipientId
+      removed
+    }
+  }
+`;
+
 /**
  * PYG-385 — จองผู้ดูแลแทนผู้รับบริการที่แชร์อยู่ในกลุ่ม.
  * Returns the created booking (BookingSummary). The booker is the paying user; the existing
@@ -298,7 +337,13 @@ export interface GroupBookingSummary {
     avatarUrl?: string | null;
   } | null;
   bookedByName?: string | null;
+  bookedByUserId?: string | null;
   bookedByMe: boolean;
+  estimatedCost?: number | null;
+  serviceLocations?: string[] | null;
+  locationAddress?: string | null;
+  paymentStatus?: string | null;
+  checkInTime?: string | null;
 }
 
 export interface FamilyGroupJoinLink {

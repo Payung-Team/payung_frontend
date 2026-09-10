@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@apollo/client/react';
 import { useBooking } from '../../../context/BookingContext';
+import {
+  MY_FAMILY_GROUPS,
+  GROUP_CARE_RECIPIENTS,
+  type FamilyGroup,
+  type GroupCareRecipient,
+} from '../../../graphql/familyGroup';
+import { GroupAvatar } from '../../family/components/familyUi';
 
 const PREDEFINED_CONDITIONS = ['เบาหวาน', 'ความดันสูง', 'โรคหัวใจ', 'สมองเสื่อม'];
 
@@ -42,7 +50,419 @@ const SAVED_PROFILE = {
   regularHospital: 'รพ.รามาธิบดี',
 };
 
+const REL_OPTIONS = ['บุตร', 'คู่สมรส', 'ญาติ', 'ตัวคนไข้เอง'];
+
+/**
+ * Step 4 "ผู้รับบริการ". For a user in a family group it opens a chooser:
+ *   จองให้ตัวเอง  → the standard patient form (SelfPatientForm)
+ *   จองให้สมาชิกในกลุ่ม → pick a member whose profile is shared, booking on their behalf
+ * A user in no group only ever sees SelfPatientForm, unchanged.
+ */
 export default function BookingStepPatient() {
+  const { bookingDraft } = useBooking();
+  const gc = bookingDraft?.groupContext;
+
+  const { data } = useQuery<{ myFamilyGroups: FamilyGroup[] }>(MY_FAMILY_GROUPS, {
+    fetchPolicy: 'cache-and-network',
+  });
+  const groups = data?.myFamilyGroups ?? [];
+  const inAnyGroup = groups.length > 0;
+
+  // Entered from "จองแทนสมาชิก" → default to member mode; otherwise self.
+  const [mode, setMode] = useState<'self' | 'member'>(
+    gc || bookingDraft?.onBehalf ? 'member' : 'self',
+  );
+
+  const primaryGroup = groups.find((g) => g.id === gc?.groupId) ?? groups[0] ?? null;
+
+  return (
+    <div className="space-y-4">
+      {inAnyGroup && (
+        <section className="bg-white p-6 rounded-2xl border border-gray-100">
+          <h2 className="text-lg font-bold text-[#1A1A1A]">จองให้ใคร</h2>
+          <p className="text-sm text-[#8A8C8E] mt-1">เลือกผู้รับบริการสำหรับการจองครั้งนี้</p>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setMode('self')}
+              className={`flex items-center gap-3 p-4 rounded-xl border-2 text-left transition cursor-pointer ${
+                mode === 'self'
+                  ? 'border-[#52B69A] bg-[#F0FAF4]'
+                  : 'border-[#E0E2E5] bg-white hover:border-gray-300'
+              }`}
+            >
+              <span className="material-icons text-[#52B69A]" style={{ fontSize: 24 }}>
+                person
+              </span>
+              <span>
+                <span className="block text-sm font-bold text-[#1A1A1A]">จองให้ตัวเอง</span>
+                <span className="block text-xs text-[#8A8C8E] mt-0.5">ใช้ข้อมูลของคุณ</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('member')}
+              className={`flex items-center gap-3 p-4 rounded-xl border-2 text-left transition cursor-pointer ${
+                mode === 'member'
+                  ? 'border-[#52B69A] bg-[#F0FAF4]'
+                  : 'border-[#E0E2E5] bg-white hover:border-gray-300'
+              }`}
+            >
+              <span className="material-icons text-[#009265]" style={{ fontSize: 24 }}>
+                groups
+              </span>
+              <span>
+                <span className="block text-sm font-bold text-[#1A1A1A]">จองให้สมาชิกในกลุ่ม</span>
+                <span className="block text-xs text-[#8A8C8E] mt-0.5">
+                  {primaryGroup
+                    ? `${primaryGroup.name} · ${primaryGroup.memberCount} คน`
+                    : 'จองแทนสมาชิกในครอบครัว'}
+                </span>
+              </span>
+            </button>
+          </div>
+        </section>
+      )}
+
+      {inAnyGroup && mode === 'member' ? (
+        <MemberBookingSection groups={groups} gc={gc} />
+      ) : (
+        <SelfPatientForm />
+      )}
+    </div>
+  );
+}
+
+// ── Book on behalf of a group member ─────────────────────────────────────────
+// The person cared for is a member whose own profile is shared into the group; a member with
+// no shared profile can't be booked for yet. Health fields aren't returned by the API yet
+// (PYG-426) so the profile card shows the name + a note; per-booking notes go to memberDetails.
+
+function MemberBookingSection({
+  groups,
+  gc,
+}: {
+  groups: FamilyGroup[];
+  gc?: { groupId: string; memberUserId?: string };
+}) {
+  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit } = useBooking();
+
+  const [groupId, setGroupId] = useState<string>(
+    gc?.groupId ?? bookingDraft?.onBehalf?.familyGroupId ?? groups[0]?.id ?? '',
+  );
+  const group = groups.find((g) => g.id === groupId) ?? groups[0] ?? null;
+
+  const { data, loading } = useQuery<{ groupCareRecipients: GroupCareRecipient[] }>(
+    GROUP_CARE_RECIPIENTS,
+    { variables: { groupId: group?.id ?? '' }, skip: !group, fetchPolicy: 'cache-and-network' },
+  );
+  const recipients = useMemo(() => data?.groupCareRecipients ?? [], [data?.groupCareRecipients]);
+
+  // A member is bookable when they've shared a profile — map member → their care recipient.
+  const options = useMemo(() => {
+    const byUser = new Map<string, GroupCareRecipient>();
+    for (const r of recipients) if (r.ownerUserId) byUser.set(r.ownerUserId, r);
+    return (group?.members ?? [])
+      .filter((m) => !m.isMe)
+      .map((m) => ({ member: m, recipient: byUser.get(m.userId) }));
+  }, [group?.members, recipients]);
+
+  const [selectedUserId, setSelectedUserId] = useState<string>(gc?.memberUserId ?? '');
+  const selected = options.find((o) => o.member.userId === selectedUserId && o.recipient);
+
+  const [memberNote, setMemberNote] = useState(
+    bookingDraft?.recipient?.patientDetails?.careInstructions ?? '',
+  );
+  const [contactName, setContactName] = useState(bookingDraft?.contactPerson?.name ?? '');
+  const [contactPhone, setContactPhone] = useState(bookingDraft?.contactPerson?.phone ?? '');
+  const [contactRel, setContactRel] = useState(bookingDraft?.contactPerson?.relationship ?? '');
+  const [error, setError] = useState<Record<string, string>>({});
+
+  // Persist the on-behalf context whenever the selection / notes / contact change.
+  useEffect(() => {
+    if (!group || !selected?.recipient) return;
+    setBookingDraft((prev) => ({
+      ...(prev || { serviceLocation: [], serviceTypes: [] }),
+      onBehalf: {
+        familyGroupId: group.id,
+        careRecipientId: selected.recipient!.id,
+        recipientName: selected.recipient!.name,
+      },
+      recipient: {
+        type: 'member',
+        selectedMemberId: selected.recipient!.id,
+        patientDetails: {
+          name: selected.recipient!.name,
+          age: 0,
+          careInstructions: memberNote,
+        },
+      },
+      contactPerson: { name: contactName, phone: contactPhone, relationship: contactRel },
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [group?.id, selected?.recipient?.id, memberNote, contactName, contactPhone, contactRel]);
+
+  const handleSubmit = () => {
+    const errs: Record<string, string> = {};
+    if (!selected) errs.member = 'กรุณาเลือกสมาชิกที่จะจองให้';
+    if (!contactName.trim()) errs.contactName = 'กรุณากรอกชื่อผู้ติดต่อ';
+    if (!contactPhone.trim() || contactPhone.length !== 10)
+      errs.contactPhone = 'เบอร์โทรต้องมี 10 หลัก';
+    if (!contactRel) errs.contactRel = 'กรุณาเลือกความสัมพันธ์';
+    setError(errs);
+    if (Object.keys(errs).length === 0) goToStep(5);
+  };
+
+  const submitRef = useRef<() => void>(() => {});
+  submitRef.current = handleSubmit;
+  useEffect(() => {
+    setStepSubmit(() => submitRef.current());
+    return () => setStepSubmit(null);
+  }, [setStepSubmit]);
+
+  return (
+    <>
+      <section className="bg-white p-6 rounded-2xl border border-gray-100">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-base font-bold text-[#1A1A1A]">เลือกสมาชิกที่จะจองให้</h3>
+          {groups.length > 1 && (
+            <select
+              value={group?.id ?? ''}
+              onChange={(e) => {
+                setGroupId(e.target.value);
+                setSelectedUserId('');
+              }}
+              className="max-w-[200px] p-2 border border-[#E0E2E5] rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A]"
+            >
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {loading && recipients.length === 0 ? (
+          <div className="mt-4 space-y-2">
+            <div className="h-16 w-full animate-pulse rounded-xl bg-gray-100" />
+            <div className="h-16 w-full animate-pulse rounded-xl bg-gray-100" />
+          </div>
+        ) : options.length === 0 ? (
+          <p className="mt-4 rounded-xl bg-[#F6FAF9] px-4 py-6 text-center text-[13px] leading-6 text-[#8A8C8E]">
+            กลุ่มนี้ยังไม่มีสมาชิกคนอื่น เชิญสมาชิกเข้ากลุ่มก่อนจึงจะจองแทนได้
+          </p>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {options.map(({ member, recipient }) => {
+              const bookable = !!recipient;
+              const active = bookable && selectedUserId === member.userId;
+              return (
+                <label
+                  key={member.userId}
+                  className={`flex items-center gap-3 rounded-xl border p-3 transition ${
+                    !bookable
+                      ? 'border-gray-200 opacity-60 cursor-not-allowed'
+                      : active
+                        ? 'border-2 border-[#009265] bg-[#F0FAF4] cursor-pointer'
+                        : 'border-gray-200 hover:bg-gray-50 cursor-pointer'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="book-member"
+                    className="h-4 w-4 accent-[#009265]"
+                    disabled={!bookable}
+                    checked={active}
+                    onChange={() => setSelectedUserId(member.userId)}
+                  />
+                  <GroupAvatar name={member.displayName || member.email} seed={member.userId} size={40} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
+                      {member.displayName || member.email}
+                    </p>
+                    <p
+                      className={`truncate text-[12px] ${bookable ? 'text-[#8A8C8E]' : 'text-[#B45309]'}`}
+                    >
+                      {bookable
+                        ? 'มีข้อมูลผู้รับบริการแล้ว'
+                        : 'ยังไม่ได้กรอกข้อมูลผู้รับบริการ — จองแทนไม่ได้'}
+                    </p>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {selected?.recipient && (
+        <section className="bg-white p-6 rounded-2xl border border-gray-100">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold tracking-[0.7px] uppercase text-[#8A8C8E]">
+                ข้อมูลผู้รับบริการ
+              </p>
+              <h3 className="text-[16px] font-bold text-[#064E3B] mt-0.5">
+                {selected.recipient.name}
+                {selected.recipient.nickname && (
+                  <span className="ml-1.5 text-[13px] font-normal text-[#8A8C8E]">
+                    ({selected.recipient.nickname})
+                  </span>
+                )}
+              </h3>
+            </div>
+            <span className="inline-flex h-6 items-center gap-1.5 rounded-full px-3 text-xs font-semibold bg-[#EFF6FF] text-[#1D4ED8]">
+              <span className="material-icons" style={{ fontSize: 14 }}>
+                lock
+              </span>
+              ข้อมูลจากเจ้าตัว
+            </span>
+          </div>
+
+          <div className="mt-4 flex items-start gap-2.5 rounded-lg bg-[#F6FAF9] px-4 py-3">
+            <span className="material-icons text-[#8A8C8E]" style={{ fontSize: 18 }}>
+              info
+            </span>
+            <p className="text-[12px] leading-5 text-[#8A8C8E]">
+              ข้อมูลสุขภาพของผู้รับบริการมาจากโปรไฟล์ที่เจ้าตัวกรอกเอง คุณแก้ไม่ได้ —
+              หากไม่ถูกต้อง ให้แจ้งเจ้าตัวอัปเดตในโปรไฟล์
+            </p>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              อาการ/สิ่งที่ต้องดูแลเป็นพิเศษครั้งนี้
+            </label>
+            <textarea
+              rows={3}
+              value={memberNote}
+              onChange={(e) => setMemberNote(e.target.value)}
+              placeholder="เช่น เพิ่งผ่าตัดเข่า ต้องช่วยพยุงเดินและพลิกตัวทุก 2 ชม."
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl outline-none text-sm focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] resize-none"
+            />
+            <span className="text-xs text-[#8A8C8E]">
+              ใช้เฉพาะการจองครั้งนี้ ไม่บันทึกทับโปรไฟล์ของสมาชิก
+            </span>
+          </div>
+        </section>
+      )}
+
+      {error.member && !selected && (
+        <p className="text-[12px] text-red-500 font-semibold">{error.member}</p>
+      )}
+
+      <ContactPersonForm
+        name={contactName}
+        phone={contactPhone}
+        rel={contactRel}
+        error={error}
+        onName={setContactName}
+        onPhone={setContactPhone}
+        onRel={setContactRel}
+      />
+    </>
+  );
+}
+
+// ── Shared contact-person block (used by both self & member modes) ────────────
+
+function ContactPersonForm({
+  name,
+  phone,
+  rel,
+  error,
+  onName,
+  onPhone,
+  onRel,
+}: {
+  name: string;
+  phone: string;
+  rel: string;
+  error: Record<string, string>;
+  onName: (v: string) => void;
+  onPhone: (v: string) => void;
+  onRel: (v: string) => void;
+}) {
+  return (
+    <section className="bg-white p-6 rounded-2xl border border-gray-100">
+      <h3 className="text-base font-bold text-[#1A1A1A]">ติดต่อใครได้ในวันนัดหมาย</h3>
+      <p className="text-sm text-[#8A8C8E] mt-1">ผู้ดูแลจะโทรเบอร์นี้หากมีเหตุฉุกเฉิน</p>
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs font-semibold text-[#575859]">
+            ชื่อ-นามสกุล <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => onName(e.target.value)}
+            placeholder="สมบูรณ์ ดีจริง"
+            className={`mt-1.5 w-full p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
+              error.contactName
+                ? 'border-red-500 focus:ring-red-500'
+                : 'border-[#E0E2E5] focus:ring-[#52B69A]'
+            }`}
+          />
+          {error.contactName && (
+            <p className="mt-1 text-[11px] text-red-500 font-semibold">{error.contactName}</p>
+          )}
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-[#575859]">
+            เบอร์โทรศัพท์ <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="tel"
+            inputMode="numeric"
+            value={phone}
+            onChange={(e) => onPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+            placeholder="0891234567"
+            className={`mt-1.5 w-full p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
+              error.contactPhone
+                ? 'border-red-500 focus:ring-red-500'
+                : 'border-[#E0E2E5] focus:ring-[#52B69A]'
+            }`}
+          />
+          <p className="mt-1 text-[11px] text-[#8A8C8E]">
+            {error.contactPhone ? error.contactPhone : `ตัวเลข 10 หลัก · ${phone.length}/10`}
+          </p>
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-xs font-semibold text-[#575859]">
+            ความสัมพันธ์ <span className="text-red-500">*</span>
+          </label>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {REL_OPTIONS.map((r) => {
+              const active = rel === r;
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => onRel(r)}
+                  className={`px-4 py-2 rounded-full border text-sm font-semibold transition cursor-pointer ${
+                    active
+                      ? 'bg-[#F0FAF4] border-[#52B69A] text-[#1B5C48]'
+                      : 'bg-white border-[#E0E2E5] text-[#575859] hover:bg-gray-50'
+                  }`}
+                >
+                  {r}
+                </button>
+              );
+            })}
+          </div>
+          {error.contactRel && (
+            <p className="mt-1 text-[11px] text-red-500 font-semibold">{error.contactRel}</p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Self / personal patient form (the original step 4, unchanged behaviour) ───
+
+function SelfPatientForm() {
   const { bookingDraft, setBookingDraft, goToStep, setStepSubmit } = useBooking();
 
   const [name, setName] = useState(bookingDraft?.recipient?.patientDetails?.name || '');
@@ -92,10 +512,11 @@ export default function BookingStepPatient() {
 
   const isProfileFilled = useMemo(() => name === SAVED_PROFILE.name, [name]);
 
-  // Auto-save
+  // Auto-save. Clears any on-behalf context so a self booking never submits as booking-on-behalf.
   useEffect(() => {
     setBookingDraft((prev) => ({
       ...(prev || { serviceLocation: [], serviceTypes: [] }),
+      onBehalf: undefined,
       recipient: {
         type: 'self',
         patientDetails: {
@@ -193,7 +614,7 @@ export default function BookingStepPatient() {
   }, [setStepSubmit]);
 
   return (
-    <div className="space-y-4">
+    <>
       {/* Hero: use profile vs new patient */}
       <section className="bg-white p-6 rounded-2xl border border-gray-100">
         <h2 className="text-lg font-bold text-[#1A1A1A]">ผู้รับบริการคือใคร</h2>
@@ -431,9 +852,7 @@ export default function BookingStepPatient() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-semibold text-[#575859]">
-                  ยาที่ทานประจำ
-                </label>
+                <label className="text-xs font-semibold text-[#575859]">ยาที่ทานประจำ</label>
                 <input
                   type="text"
                   value={medicines}
@@ -443,9 +862,7 @@ export default function BookingStepPatient() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-[#575859]">
-                  แพ้ยา / แพ้อาหาร
-                </label>
+                <label className="text-xs font-semibold text-[#575859]">แพ้ยา / แพ้อาหาร</label>
                 <input
                   type="text"
                   value={allergies}
@@ -485,83 +902,15 @@ export default function BookingStepPatient() {
         )}
       </section>
 
-      {/* Contact person */}
-      <section className="bg-white p-6 rounded-2xl border border-gray-100">
-        <h3 className="text-base font-bold text-[#1A1A1A]">ติดต่อใครได้ในวันนัดหมาย</h3>
-        <p className="text-sm text-[#8A8C8E] mt-1">ผู้ดูแลจะโทรเบอร์นี้หากมีเหตุฉุกเฉิน</p>
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs font-semibold text-[#575859]">
-              ชื่อ-นามสกุล <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={contactName}
-              onChange={(e) => setContactName(e.target.value)}
-              placeholder="สมบูรณ์ ดีจริง"
-              className={`mt-1.5 w-full p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
-                error.contactName
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-[#E0E2E5] focus:ring-[#52B69A]'
-              }`}
-            />
-            {error.contactName && (
-              <p className="mt-1 text-[11px] text-red-500 font-semibold">{error.contactName}</p>
-            )}
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-[#575859]">
-              เบอร์โทรศัพท์ <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="tel"
-              inputMode="numeric"
-              value={contactPhone}
-              onChange={(e) =>
-                setContactPhone(e.target.value.replace(/\D/g, '').slice(0, 10))
-              }
-              placeholder="0891234567"
-              className={`mt-1.5 w-full p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
-                error.contactPhone
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-[#E0E2E5] focus:ring-[#52B69A]'
-              }`}
-            />
-            <p className="mt-1 text-[11px] text-[#8A8C8E]">
-              {error.contactPhone
-                ? error.contactPhone
-                : `ตัวเลข 10 หลัก · ${contactPhone.length}/10`}
-            </p>
-          </div>
-          <div className="md:col-span-2">
-            <label className="text-xs font-semibold text-[#575859]">
-              ความสัมพันธ์ <span className="text-red-500">*</span>
-            </label>
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              {['บุตร', 'คู่สมรส', 'ญาติ', 'ตัวคนไข้เอง'].map((r) => {
-                const active = contactRel === r;
-                return (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setContactRel(r)}
-                    className={`px-4 py-2 rounded-full border text-sm font-semibold transition cursor-pointer ${
-                      active
-                        ? 'bg-[#F0FAF4] border-[#52B69A] text-[#1B5C48]'
-                        : 'bg-white border-[#E0E2E5] text-[#575859] hover:bg-gray-50'
-                    }`}
-                  >
-                    {r}
-                  </button>
-                );
-              })}
-            </div>
-            {error.contactRel && (
-              <p className="mt-1 text-[11px] text-red-500 font-semibold">{error.contactRel}</p>
-            )}
-          </div>
-        </div>
-      </section>
-    </div>
+      <ContactPersonForm
+        name={contactName}
+        phone={contactPhone}
+        rel={contactRel}
+        error={error}
+        onName={setContactName}
+        onPhone={setContactPhone}
+        onRel={setContactRel}
+      />
+    </>
   );
 }

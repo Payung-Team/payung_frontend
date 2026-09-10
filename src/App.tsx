@@ -33,8 +33,9 @@ import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
 import BookingsPage from './pages/profile/BookingsPage';
 import BookingRequestPage from './pages/booking/BookingRequestPage';
 import FamilyGroupPage from './pages/family/FamilyGroupPage';
+import MembersPage from './pages/family/MembersPage';
 import JoinGroupPage from './pages/family/JoinGroupPage';
-import FamilyGroupDemo from './pages/family/FamilyGroupDemo';
+import FamilyGroupDemo, { MembersPageDemo } from './pages/family/FamilyGroupDemo';
 import BookingDetailPage from './pages/profile/BookingDetailPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
@@ -133,6 +134,7 @@ function App() {
 
         {/* Preview only: the dashboard against an in-memory mock backend (no login). */}
         <Route path="/family-demo" element={<FamilyGroupDemo />} />
+        <Route path="/family-demo/members" element={<MembersPageDemo />} />
 
         {/* Change password — session required แต่ไม่ผ่าน MustChangePasswordGuard */}
         <Route path="/change-password" element={<ProtectedRoute><ChangePasswordPage /></ProtectedRoute>} />
@@ -187,6 +189,7 @@ function App() {
               intentionally does not gate group membership by system role: caregivers have
               their own relatives to care for too). Not wrapped in RoleRoute. */}
           <Route path="/family-group" element={<FamilyGroupPage />} />
+          <Route path="/family-group/members" element={<MembersPage />} />
 
           {/* Caregiver home */}
           <Route

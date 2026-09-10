@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useLazyQuery, useMutation } from '@apollo/client/react';
 import { Icon } from '../../components/ui/Icon';
@@ -8,25 +8,21 @@ import {
   MY_FAMILY_GROUPS,
   GROUP_JOIN_LINK,
   CREATE_JOIN_LINK,
-  GROUP_CARE_RECIPIENTS,
   GROUP_BOOKINGS,
   type FamilyGroup,
   type FamilyGroupJoinLink,
-  type GroupCareRecipient,
   type GroupBookingSummary,
 } from '../../graphql/familyGroup';
-import type { BookingRequest } from '../../context/BookingContext';
 import { formatDate, useStrings } from './familyStrings';
-import { FONT, GroupAvatar, RoleBadge, ConfirmDialog, ModalShell } from './components/familyUi';
-import MembersPanel from './components/MembersPanel';
+import { FONT, GroupAvatar, RoleBadge, ConfirmDialog } from './components/familyUi';
 import InviteLinkModal from './components/InviteLinkModal';
 import {
   CreateGroupWizard,
   RenameGroupModal,
   TransferOwnershipModal,
   DeleteGroupModal,
+  LeaveGroupDialog,
 } from './components/GroupModals';
-import { LEAVE_FAMILY_GROUP } from '../../graphql/familyGroup';
 import { fgErrorMessage } from './familyErrors';
 
 type ModalKind =
@@ -41,6 +37,7 @@ type ModalKind =
 
 export default function FamilyGroupPage() {
   const s = useStrings();
+  const navigate = useNavigate();
   const { toasts, removeToast, success, error: toastError } = useToast();
   const toast = (message: string, kind: 'success' | 'error' = 'success') =>
     kind === 'success' ? success(message) : toastError(message);
@@ -54,7 +51,6 @@ export default function FamilyGroupPage() {
   // The user's explicit pick; may be null (initial) or stale (after leave/delete).
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalKind>(null);
-  const [membersOpen, setMembersOpen] = useState(false);
 
   // Derive the effective group rather than syncing state in an effect: a stale/empty pick
   // falls back to the first group, so create/leave/delete need no extra bookkeeping.
@@ -77,10 +73,7 @@ export default function FamilyGroupPage() {
             <GroupSwitcher
               groups={groups}
               selected={selected}
-              onSelect={(id) => {
-                setSelectedId(id);
-                setMembersOpen(false);
-              }}
+              onSelect={(id) => setSelectedId(id)}
               onCreate={() => setModal('create')}
             />
           </div>
@@ -96,8 +89,9 @@ export default function FamilyGroupPage() {
           {isSolo && <SoloBanner groupId={selected.id} onToast={toast} />}
           <GroupHeaderCard
             group={selected}
-            membersOpen={membersOpen}
-            onToggleMembers={() => setMembersOpen((v) => !v)}
+            onViewMembers={() =>
+              navigate(`/family-group/members?group=${selected.id}`)
+            }
             onInvite={() => setModal('invite')}
             onRename={() => setModal('rename')}
             onTransfer={() => setModal('transfer')}
@@ -106,9 +100,6 @@ export default function FamilyGroupPage() {
             }
             onDelete={() => setModal('delete')}
           />
-          {membersOpen && (
-            <MembersPanel group={selected} onChanged={() => refetch()} onToast={toast} />
-          )}
           <MemberAppointments group={selected} />
         </div>
       ) : null}
@@ -120,7 +111,6 @@ export default function FamilyGroupPage() {
           onToast={toast}
           onCreated={(g) => {
             setSelectedId(g.id);
-            setMembersOpen(false);
             setModal(null);
           }}
         />
@@ -293,53 +283,6 @@ function SoloBanner({
   );
 }
 
-// ── Leave (members only) ───────────────────────────────────────────────────────
-
-function LeaveGroupDialog({
-  group,
-  onClose,
-  onLeft,
-  onToast,
-}: {
-  group: FamilyGroup;
-  onClose: () => void;
-  onLeft: () => void;
-  onToast: (m: string, k?: 'success' | 'error') => void;
-}) {
-  const s = useStrings();
-  const [leave, { loading }] = useMutation<{
-    leaveFamilyGroup: { groupId: string; groupName: string; left: boolean };
-  }>(LEAVE_FAMILY_GROUP, {
-    refetchQueries: [{ query: MY_FAMILY_GROUPS }],
-  });
-  const submit = async () => {
-    try {
-      const res = await leave({ variables: { groupId: group.id } });
-      onToast(s.toastLeft(res.data?.leaveFamilyGroup?.groupName || group.name), 'success');
-      onLeft();
-    } catch (e) {
-      onToast(fgErrorMessage(e), 'error');
-    }
-  };
-  return (
-    <ConfirmDialog
-      onClose={onClose}
-      onConfirm={submit}
-      loading={loading}
-      icon="logout"
-      iconBg="bg-[#DC2626]"
-      confirmBg="bg-[#DC2626]"
-      confirmHover="hover:bg-[#B91C1C]"
-      title={s.leaveTitle(group.name)}
-      cancelText={s.cancel}
-      confirmText={s.leaveCta}
-      busyText={s.busyLeaving}
-    >
-      {s.leaveBody}
-    </ConfirmDialog>
-  );
-}
-
 // ── Header card ────────────────────────────────────────────────────────────────
 
 /** "created today · no appointments" — a relative "today" reads warmer than a bare date. */
@@ -356,8 +299,7 @@ function createdMeta(s: ReturnType<typeof useStrings>, iso: string): string {
 
 function GroupHeaderCard({
   group,
-  membersOpen,
-  onToggleMembers,
+  onViewMembers,
   onInvite,
   onRename,
   onTransfer,
@@ -365,8 +307,7 @@ function GroupHeaderCard({
   onDelete,
 }: {
   group: FamilyGroup;
-  membersOpen: boolean;
-  onToggleMembers: () => void;
+  onViewMembers: () => void;
   onInvite: () => void;
   onRename: () => void;
   onTransfer: () => void;
@@ -416,7 +357,7 @@ function GroupHeaderCard({
         </div>
       </div>
 
-      {/* Member avatar stack → toggles the full members list below the card. */}
+      {/* Member avatar stack → opens the full members list on its own page. */}
       <div className="mt-4 flex items-center gap-3 border-t border-gray-100 pt-4">
         <div className="flex items-center">
           {shown.map((m, i) => (
@@ -450,16 +391,11 @@ function GroupHeaderCard({
         </div>
         <button
           type="button"
-          onClick={onToggleMembers}
-          aria-expanded={membersOpen}
-          className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#1A1A1A] transition-colors hover:text-[#009265]"
+          onClick={onViewMembers}
+          className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[13px] font-semibold text-[#1A1A1A] transition-colors hover:bg-[#F0FAF4] hover:text-[#009265]"
         >
           {s.memberCount(group.memberCount)}
-          <Icon
-            name={membersOpen ? 'expand_less' : 'chevron_right'}
-            size="small"
-            className="text-gray-400"
-          />
+          <Icon name="chevron_right" size="small" className="text-gray-400" />
         </button>
       </div>
 
@@ -641,9 +577,20 @@ function GroupSwitcher({
   );
 }
 
-// ── Member appointments ─────────────────────────────────────────────────────
-// The group's shared booking feed. There is no group-appointment query yet, so this shows
-// the (real) empty state; "จองแทนสมาชิก" starts a booking via the caregiver search.
+// ── Member appointments feed ────────────────────────────────────────────────
+// The shared on-behalf booking feed, split into confirmed / pending / history so the group
+// sees active jobs first. In-progress jobs get an expanded card with a live shift timeline.
+
+type ApptTab = 'confirmed' | 'pending' | 'history';
+
+const PENDING_STATUSES = ['unmatched', 'pending'];
+const CONFIRMED_STATUSES = ['accepted', 'confirmed', 'in_progress', 'awaiting_release', 'needs_review'];
+
+function bucketOf(status: string): ApptTab {
+  if (PENDING_STATUSES.includes(status)) return 'pending';
+  if (CONFIRMED_STATUSES.includes(status)) return 'confirmed';
+  return 'history'; // completed / cancelled / rejected
+}
 
 // Badge tone per booking status — kept local since only this feed renders group bookings.
 function statusTone(status: string): string {
@@ -656,21 +603,83 @@ function statusTone(status: string): string {
     case 'unmatched':
     case 'pending':
       return 'bg-[#FEF6E7] text-[#B45309]';
-    default: // accepted / confirmed / in_progress / …
-      return 'bg-[#EFF6FF] text-[#1D4ED8]';
+    default: // accepted / confirmed / awaiting_release / …
+      return 'bg-[#ECFDF5] text-[#047857]';
   }
+}
+
+/** Display reference from the booking id — there is no real booking-code column yet. */
+function bookingRef(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return `#PYG-${h.toString(36).toUpperCase().padStart(6, '0').slice(0, 6)}`;
+}
+
+function formatBaht(n?: number | null): string {
+  return n == null ? '' : `฿${Math.round(n).toLocaleString('th-TH')}`;
+}
+
+/** "09:00" + 4h → "13:00" (same-day care shifts). */
+function plannedEnd(startTime?: string | null, hours?: number | null): string | null {
+  if (!startTime || hours == null) return null;
+  const [h, m] = startTime.split(':').map(Number);
+  if (Number.isNaN(h)) return null;
+  const total = h * 60 + (m || 0) + Math.round(hours * 60);
+  const hh = Math.floor(total / 60) % 24;
+  return `${String(hh).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/** How far through the shift we are now (kept 0.06–0.94 so the marker stays on the track). */
+function shiftProgress(b: GroupBookingSummary): number {
+  const end = plannedEnd(b.startTime, b.durationHours);
+  if (!b.startTime || !end) return 0.5;
+  const start = new Date(`${b.bookingDate}T${b.startTime}:00`).getTime();
+  const finish = new Date(`${b.bookingDate}T${end}:00`).getTime();
+  const span = finish - start;
+  if (!Number.isFinite(span) || span <= 0) return 0.5;
+  return Math.min(0.94, Math.max(0.06, (Date.now() - start) / span));
+}
+
+/** Month + day for the compact card's date block: { month: "ก.ย.", day: "4" }. */
+function monthDay(iso: string): { month: string; day: string } {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { month: '', day: '' };
+  return {
+    month: new Intl.DateTimeFormat('th-TH', { month: 'short' }).format(d),
+    day: new Intl.DateTimeFormat('th-TH', { day: 'numeric' }).format(d),
+  };
 }
 
 function MemberAppointments({ group }: { group: FamilyGroup }) {
   const s = useStrings();
-  const [picking, setPicking] = useState(false);
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<ApptTab>('confirmed');
+  const [expanded, setExpanded] = useState(false);
 
   const { data, loading } = useQuery<{ groupBookings: GroupBookingSummary[] }>(
     GROUP_BOOKINGS,
     { variables: { groupId: group.id }, fetchPolicy: 'cache-and-network' },
   );
-  const bookings = data?.groupBookings ?? [];
-  const hasBookings = bookings.length > 0;
+  const bookings = useMemo(() => data?.groupBookings ?? [], [data?.groupBookings]);
+
+  const buckets = useMemo(() => {
+    const acc: Record<ApptTab, GroupBookingSummary[]> = {
+      confirmed: [],
+      pending: [],
+      history: [],
+    };
+    for (const b of bookings) acc[bucketOf(b.status)].push(b);
+    return acc;
+  }, [bookings]);
+
+  const goTab = (next: ApptTab) => {
+    setTab(next);
+    setExpanded(false);
+  };
+
+  const list = buckets[tab];
+  const shown = expanded ? list : list.slice(0, 5);
+  const hasAny = bookings.length > 0;
 
   return (
     <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
@@ -678,12 +687,14 @@ function MemberAppointments({ group }: { group: FamilyGroup }) {
         <div>
           <h3 className="text-[16px] font-bold text-[#064E3B]">{s.apptTitle}</h3>
           <p className="mt-0.5 text-[13px] text-[#8A8C8E]">
-            {hasBookings ? s.apptCount(bookings.length) : s.apptNone}
+            {hasAny ? s.apptConfirmedCount(buckets.confirmed.length) : s.apptNone}
           </p>
         </div>
         <button
           type="button"
-          onClick={() => setPicking(true)}
+          onClick={() =>
+            navigate('/booking/new', { state: { groupBooking: { groupId: group.id } } })
+          }
           className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#009265] px-4 text-[14px] font-semibold text-white shadow-[0_4px_12px_rgba(0,146,101,0.2)] transition-colors hover:bg-[#007C55]"
         >
           <Icon name="event_available" size="small" color="#FFFFFF" />
@@ -691,174 +702,259 @@ function MemberAppointments({ group }: { group: FamilyGroup }) {
         </button>
       </div>
 
-      {loading && !hasBookings ? (
+      {/* Tabs — confirmed / pending, with a history toggle pinned right. */}
+      <div className="mt-4 flex items-center gap-4 border-b border-gray-100">
+        <ApptTabButton
+          label={s.tabConfirmed}
+          count={buckets.confirmed.length}
+          active={tab === 'confirmed'}
+          onClick={() => goTab('confirmed')}
+        />
+        <ApptTabButton
+          label={s.tabPending}
+          count={buckets.pending.length}
+          active={tab === 'pending'}
+          onClick={() => goTab('pending')}
+        />
+        <button
+          type="button"
+          onClick={() => goTab(tab === 'history' ? 'confirmed' : 'history')}
+          aria-pressed={tab === 'history'}
+          aria-label={s.tabHistory}
+          title={s.tabHistory}
+          className={`mb-1 ml-auto flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+            tab === 'history'
+              ? 'bg-[#F0FAF4] text-[#009265]'
+              : 'text-gray-400 hover:bg-gray-50 hover:text-[#009265]'
+          }`}
+        >
+          <Icon name="history" size="small" />
+        </button>
+      </div>
+
+      {loading && !hasAny ? (
         <div className="mt-5 space-y-2.5">
           <div className="h-[68px] w-full animate-pulse rounded-xl bg-gray-100" />
           <div className="h-[68px] w-full animate-pulse rounded-xl bg-gray-100" />
         </div>
-      ) : !hasBookings ? (
-        <div className="mt-6 flex flex-col items-center justify-center px-4 py-10 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F0F4F3] text-[#8FA6A0]">
-            <Icon name="event_busy" size="large" />
-          </span>
-          <p className="mt-4 text-[15px] font-bold text-[#1A1A1A]">{s.apptEmptyTitle}</p>
-          <p className="mx-auto mt-1.5 max-w-[420px] text-[13px] leading-6 text-[#8A8C8E]">
-            {s.apptEmptyBody}
-          </p>
-        </div>
+      ) : list.length === 0 ? (
+        <ApptEmpty tab={tab} />
       ) : (
-        <ul className="mt-5 space-y-2.5">
-          {bookings.map((b) => (
-            <li
-              key={b.id}
-              className="flex items-center gap-3 rounded-xl border border-gray-100 bg-[#FBFDFC] p-3"
+        <>
+          <ul className="mt-4 space-y-2.5">
+            {shown.map((b) =>
+              b.status === 'in_progress' ? (
+                <RichAppointmentCard key={b.id} b={b} />
+              ) : (
+                <CompactAppointmentCard key={b.id} b={b} />
+              ),
+            )}
+          </ul>
+          {list.length > 5 && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 py-2.5 text-[13px] font-semibold text-[#1A1A1A] transition-colors hover:bg-gray-50"
             >
-              <GroupAvatar name={b.careRecipientName} seed={b.id} size={42} />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
-                    {b.careRecipientName || '—'}
-                  </p>
-                  <span
-                    className={`inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[11px] font-semibold ${statusTone(
-                      b.status,
-                    )}`}
-                  >
-                    {s.bookingStatusLabel(b.status)}
-                  </span>
-                </div>
-                <p className="mt-0.5 truncate text-[12px] text-[#8A8C8E]">
-                  {formatDate(b.bookingDate)}
-                  {b.startTime && ` · ${b.startTime} น.`}
-                  {b.durationHours != null && ` · ${s.apptHours(b.durationHours)}`}
-                </p>
-                <p className="mt-0.5 truncate text-[12px] text-[#8A8C8E]">
-                  {b.bookedByMe ? s.bookedByYou : s.bookedBy(b.bookedByName || '—')}
-                  {b.caregiver?.fullName && ` · ${b.caregiver.fullName}`}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
+              {expanded ? s.apptShowLess : s.apptViewAll}
+              <Icon
+                name={expanded ? 'expand_less' : 'expand_more'}
+                size="small"
+                className="text-gray-400"
+              />
+            </button>
+          )}
+        </>
       )}
-
-      {picking && <BookOnBehalfModal group={group} onClose={() => setPicking(false)} />}
     </section>
   );
 }
 
-/**
- * PYG-385 — pick which shared care recipient to book for, then hand off to the normal
- * booking flow. The flow itself (service → time → location → recipient details → review →
- * caregiver → payment) is reused unchanged; we only seed the group + recipient context.
- */
-function BookOnBehalfModal({
-  group,
-  onClose,
+function ApptTabButton({
+  label,
+  count,
+  active,
+  onClick,
 }: {
-  group: FamilyGroup;
-  onClose: () => void;
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
 }) {
-  const s = useStrings();
-  const navigate = useNavigate();
-  const { data, loading } = useQuery<{ groupCareRecipients: GroupCareRecipient[] }>(
-    GROUP_CARE_RECIPIENTS,
-    { variables: { groupId: group.id }, fetchPolicy: 'cache-and-network' },
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2.5 text-[14px] font-semibold transition-colors ${
+        active
+          ? 'border-[#009265] text-[#009265]'
+          : 'border-transparent text-[#8A8C8E] hover:text-[#1A1A1A]'
+      }`}
+    >
+      {label}
+      <span
+        className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
+          active ? 'bg-[#009265] text-white' : 'bg-gray-100 text-[#8A8C8E]'
+        }`}
+      >
+        {count}
+      </span>
+    </button>
   );
-  const recipients = data?.groupCareRecipients ?? [];
-  const [selected, setSelected] = useState<string>('');
+}
 
-  const start = () => {
-    const r = recipients.find((x) => x.id === selected);
-    if (!r) return;
-    const seed: BookingRequest = {
-      serviceLocation: [],
-      serviceTypes: [],
-      recipient: {
-        type: 'member',
-        selectedMemberId: r.id,
-        patientDetails: { name: r.name, age: 0 },
-      },
-      onBehalf: {
-        familyGroupId: group.id,
-        careRecipientId: r.id,
-        recipientName: r.name,
-      },
-    };
-    navigate('/booking/new', { state: { onBehalfSeed: seed } });
-  };
+function ApptEmpty({ tab }: { tab: ApptTab }) {
+  const s = useStrings();
+  const copy =
+    tab === 'pending'
+      ? { icon: 'schedule', title: s.apptEmptyPendingTitle, body: s.apptEmptyPendingBody }
+      : tab === 'history'
+        ? { icon: 'history', title: s.apptEmptyHistoryTitle, body: s.apptEmptyHistoryBody }
+        : { icon: 'event_busy', title: s.apptEmptyTitle, body: s.apptEmptyBody };
+  return (
+    <div className="mt-4 flex flex-col items-center justify-center px-4 py-10 text-center">
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F0F4F3] text-[#8FA6A0]">
+        <Icon name={copy.icon} size="large" />
+      </span>
+      <p className="mt-4 text-[15px] font-bold text-[#1A1A1A]">{copy.title}</p>
+      <p className="mx-auto mt-1.5 max-w-[420px] text-[13px] leading-6 text-[#8A8C8E]">
+        {copy.body}
+      </p>
+    </div>
+  );
+}
+
+/** Price + optional "held in escrow" note — right-aligned column shared by both cards. */
+function ApptPrice({ b }: { b: GroupBookingSummary }) {
+  const s = useStrings();
+  return (
+    <div className="shrink-0 text-right">
+      <p className="text-[16px] font-bold text-[#1A1A1A]">{formatBaht(b.estimatedCost)}</p>
+      {b.paymentStatus === 'held' && (
+        <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-[#B45309]">
+          <Icon name="lock" size="small" style={{ fontSize: 13 }} />
+          {s.apptEscrow}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Expanded card for an in-progress job: live shift timeline + location details. */
+function RichAppointmentCard({ b }: { b: GroupBookingSummary }) {
+  const s = useStrings();
+  const end = plannedEnd(b.startTime, b.durationHours);
+  const pct = `${(shiftProgress(b) * 100).toFixed(1)}%`;
+  const startLabel = b.checkInTime
+    ? `${s.apptCheckIn} ${b.checkInTime}`
+    : b.startTime
+      ? `${s.apptStart} ${b.startTime}`
+      : '';
 
   return (
-    <ModalShell onClose={onClose} maxWidth={500} labelledBy="book-behalf-title" showClose>
-      <h2 id="book-behalf-title" className="text-xl font-bold text-[#064E3B]">
-        {s.bookOnBehalf}
-      </h2>
-      <p className="mt-1 text-sm text-gray-500">{s.bookPickRecipient}</p>
-
-      {loading && recipients.length === 0 ? (
-        <div className="mt-5 space-y-2">
-          <div className="h-16 w-full animate-pulse rounded-lg bg-gray-100" />
-          <div className="h-16 w-full animate-pulse rounded-lg bg-gray-100" />
+    <li className="rounded-xl border-2 border-[#F6D9A8] bg-[#FFFDF8] p-4">
+      <div className="flex items-start gap-3">
+        <GroupAvatar name={b.careRecipientName} seed={b.id} size={44} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] font-bold text-[#1A1A1A]">
+            {b.careRecipientName || '—'}
+          </p>
+          <p className="mt-0.5 truncate text-[12px] text-[#8A8C8E]">
+            {bookingRef(b.id)} · {s.serviceTypeLabel(b.serviceType)}
+            {b.durationHours != null && ` ${s.apptHours(b.durationHours)}`}
+          </p>
         </div>
-      ) : recipients.length === 0 ? (
-        <p className="mt-5 rounded-lg bg-[#F6FAF9] px-4 py-6 text-center text-[13px] leading-6 text-[#8A8C8E]">
-          {s.bookNoRecipients}
-        </p>
-      ) : (
-        <div className="mt-5 space-y-2">
-          {recipients.map((r) => {
-            const active = selected === r.id;
-            return (
-              <label
-                key={r.id}
-                className={`flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors ${
-                  active
-                    ? 'border-2 border-[#009265] bg-[#F0FAF4]'
-                    : 'border border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="book-recipient"
-                  className="h-4 w-4 accent-[#009265]"
-                  checked={active}
-                  onChange={() => setSelected(r.id)}
-                />
-                <GroupAvatar name={r.nickname || r.name} seed={r.id} size={36} />
-                <div className="min-w-0">
-                  <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
-                    {r.name}
-                    {r.nickname && (
-                      <span className="ml-1.5 text-[12px] font-normal text-[#8A8C8E]">
-                        ({r.nickname})
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </label>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="mt-6 flex justify-end gap-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-10 min-w-[110px] rounded-lg border border-gray-200 px-4 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-        >
-          {s.cancel}
-        </button>
-        <button
-          type="button"
-          onClick={start}
-          disabled={!selected}
-          className="inline-flex h-10 min-w-[120px] items-center justify-center gap-2 rounded-lg bg-[#009265] px-4 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,146,101,0.2)] transition-colors hover:bg-[#007C55] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {s.bookContinue}
-        </button>
+        <ApptPrice b={b} />
       </div>
-    </ModalShell>
+
+      {/* Live shift timeline. */}
+      <div className="mt-4">
+        <div className="flex items-center justify-between text-[12px]">
+          <span className="font-semibold text-[#C4841B]">{startLabel}</span>
+          {end && (
+            <span className="text-[#8A8C8E]">
+              {s.apptCheckOut} {end}
+            </span>
+          )}
+        </div>
+        <div className="relative mt-2 h-2 rounded-full bg-[#F0EADF]">
+          <div
+            className="absolute inset-y-0 left-0 rounded-full bg-[#E1912F]"
+            style={{ width: pct }}
+          />
+          <span
+            className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#E1912F] ring-[3px] ring-white shadow"
+            style={{ left: pct }}
+          />
+        </div>
+        <p className="mt-2 text-center text-[12px] font-semibold text-[#C4841B]">
+          {s.apptInProgress}
+        </p>
+      </div>
+
+      <div className="mt-4 space-y-2 border-t border-[#F1E7D3] pt-3">
+        {b.locationAddress && <ApptDetailRow icon="location_on" label={s.apptLocationLabel} value={b.locationAddress} />}
+        <ApptDetailRow
+          icon="home_health"
+          label={s.apptServiceFormatLabel}
+          value={s.serviceFormatLabel(b.serviceLocations ?? [])}
+        />
+      </div>
+    </li>
+  );
+}
+
+function ApptDetailRow({ icon, label, value }: { icon: string; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-2 text-[13px]">
+      <Icon name={icon} size="small" className="mt-0.5 text-[#8FA6A0]" />
+      <span className="shrink-0 text-[#8A8C8E]">{label}</span>
+      <span className="min-w-0 flex-1 text-[#1A1A1A]">{value}</span>
+    </div>
+  );
+}
+
+/** Compact row for confirmed / pending / past bookings. */
+function CompactAppointmentCard({ b }: { b: GroupBookingSummary }) {
+  const s = useStrings();
+  const { month, day } = monthDay(b.bookingDate);
+  return (
+    <li className="flex items-center gap-3 rounded-xl border border-gray-100 bg-[#FBFDFC] p-3">
+      <div className="flex w-12 shrink-0 flex-col items-center rounded-lg bg-white py-1.5 text-center ring-1 ring-gray-100">
+        <span className="text-[11px] font-medium text-[#8A8C8E]">{month}</span>
+        <span className="text-[18px] font-bold leading-tight text-[#1A1A1A]">{day}</span>
+        {b.startTime && <span className="text-[10px] text-[#8A8C8E]">{b.startTime}</span>}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
+            {b.careRecipientName || '—'}
+          </p>
+          <span
+            className={`inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[11px] font-semibold ${statusTone(
+              b.status,
+            )}`}
+          >
+            {s.bookingStatusLabel(b.status)}
+          </span>
+        </div>
+        <p className="mt-0.5 truncate text-[12px] text-[#8A8C8E]">
+          {bookingRef(b.id)}
+          {b.caregiver?.fullName && ` · ${b.caregiver.fullName}`}
+        </p>
+        <p className="mt-0.5 flex items-center gap-1 truncate text-[12px] text-[#8A8C8E]">
+          {b.locationAddress && (
+            <>
+              <Icon name="location_on" size="small" style={{ fontSize: 13 }} className="text-[#B4BCBA]" />
+              <span className="truncate">{b.locationAddress}</span>
+              <span className="text-gray-300">·</span>
+            </>
+          )}
+          {s.serviceFormatLabel(b.serviceLocations ?? [])}
+        </p>
+      </div>
+      <ApptPrice b={b} />
+    </li>
   );
 }
 
