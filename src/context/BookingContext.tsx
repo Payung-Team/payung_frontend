@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
 import type { BookingStatus } from '../utils/bookingStatus';
 
 export interface BookingRequest {
@@ -158,6 +159,8 @@ function mapBackendToSaved(item: BackendSavedItem): SavedCaregiver {
   };
 }
 
+const ROLE_PATIENT = 1;
+
 async function getAuthToken(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession();
   return session?.access_token ?? null;
@@ -166,6 +169,9 @@ async function getAuthToken(): Promise<string | null> {
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { session, userRole } = useAuth();
+  const userId = session?.user?.id ?? null;
+
   const [bookingDraft, setBookingDraft] = useState<BookingRequest | null>(null);
   const [step, setStep] = useState(1);
   const [confirmedBookings, setConfirmedBookings] = useState<ConfirmedBooking[]>([]);
@@ -188,33 +194,34 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   ]);
 
-  // Load saved caregivers from backend; clear on logout
+  // Load saved caregivers from backend; clear when no patient is signed in.
+  // Endpoint is @Roles(PATIENT) on the backend — caregiver/admin sessions get 403,
+  // so gate on role instead of firing and swallowing the error.
+  // Keyed on user id (not an onAuthStateChange subscription) so a GoTrue token
+  // refresh, which re-emits SIGNED_IN, doesn't re-fetch on every refresh tick.
   useEffect(() => {
-    const loadSavedCaregivers = async () => {
+    if (!userId || userRole !== ROLE_PATIENT) { setSavedCaregivers([]); return; }
+
+    let cancelled = false;
+
+    (async () => {
       const token = await getAuthToken();
-      if (!token) { setSavedCaregivers([]); return; }
-      if (localStorage.getItem('userRole') !== '1') { setSavedCaregivers([]); return; }
+      if (!token) { if (!cancelled) setSavedCaregivers([]); return; }
       try {
         const res = await fetch(`${API_BASE}/api/v1/patient/saved-caregivers`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (cancelled) return;
         if (!res.ok) { setSavedCaregivers([]); return; }
         const data: BackendSavedItem[] = await res.json();
-        setSavedCaregivers(data.map(mapBackendToSaved));
+        if (!cancelled) setSavedCaregivers(data.map(mapBackendToSaved));
       } catch {
-        setSavedCaregivers([]);
+        if (!cancelled) setSavedCaregivers([]);
       }
-    };
+    })();
 
-    loadSavedCaregivers();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') loadSavedCaregivers();
-      if (event === 'SIGNED_OUT') setSavedCaregivers([]);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => { cancelled = true; };
+  }, [userId, userRole]);
 
   const addRecipient = (newRec: Omit<Recipient, 'id'>): Recipient => {
     const created: Recipient = { ...newRec, id: `member-${Date.now()}` };
