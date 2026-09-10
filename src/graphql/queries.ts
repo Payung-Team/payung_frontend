@@ -1343,3 +1343,95 @@ export const CHECK_OUT_BOOKING = gql`
     }
   }
 `;
+
+// ──────────────────────────────────────────────────────────────────────────────
+// QR เช็คอิน/เช็คเอาท์ — ฝั่งผู้รับบริการ (PYG-437 · การ์ดแม่ PYG-433)
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * QR ของงาน 1 ใบ — ผู้รับบริการเปิดโชว์ให้ผู้ดูแลสแกน
+ *
+ * ★★ `token` คือ "ความลับ" ★★
+ *    ใครถือค่านี้ = เช็คอิน/เช็คเอาท์งานใบนั้นได้ (ผ่าน mutation scanJobQr)
+ *    → ห้าม console.log · ห้ามใส่ใน URL · ห้ามส่งต่อไปที่อื่น
+ *    → เอาไปวาดเป็นรูป QR "ทั้งสตริงตรง ๆ" ห้ามเติม prefix/URL ใด ๆ
+ *      เพราะฝั่ง backend จะ hash ค่าที่สแกนมาทั้งสตริงแล้วเทียบกับดีบี
+ *      เติมอะไรเข้าไปแม้แต่ตัวเดียว = hash ไม่ตรง = สแกนไม่ผ่านทุกครั้ง
+ *
+ * เฉพาะ patient เจ้าของ booking เท่านั้นที่ query นี้ผ่าน — ผู้ดูแลเรียกแล้วโดน 403
+ * (backend โยน error เป็นข้อความไทยที่เอามาแสดงผู้ใช้ได้ตรง ๆ)
+ */
+export const JOB_QR = gql`
+  query JobQr($bookingId: ID!) {
+    jobQr(bookingId: $bookingId) {
+      bookingId
+      token
+      status
+      validFrom
+      validUntil
+      isActive
+      nextAction
+      # PYG-437 — "QR ชุดนี้ออกเมื่อไหร่" ใช้บอกผู้ใช้ว่าปุ่มออกใหม่ทำงานแล้ว
+      tokenIssuedAt
+    }
+  }
+`;
+
+/**
+ * ออก QR ใบใหม่ให้งานนี้ — ★ ใบเก่าใช้ไม่ได้ทันที (PYG-437)
+ *
+ * ใช้ตอนไหน:
+ *   · QR หลุดไปในที่ที่ไม่ตั้งใจ (ถูกถ่ายรูป / ส่งต่อในแชต)
+ *   · ผู้ดูแลบอกว่าสแกนไม่ผ่านโดยไม่ทราบสาเหตุ → ออกใหม่แล้วลองอีกที
+ *
+ * ★ คืนก้อน JobQr หน้าตาเดียวกับ query ทุกฟิลด์ โดยตั้งใจ
+ *   Apollo จะเห็นว่าเป็น object เดิม (bookingId เท่ากัน) แล้วอัปเดตแคชให้เอง
+ *   → การ์ดบนหน้าจอเปลี่ยนเป็น QR ใบใหม่ทันทีโดยไม่ต้อง refetch
+ *
+ * ⚠ เฉพาะ patient เจ้าของงาน · งานที่ปิดแล้วออกใหม่ไม่ได้ (เซิร์ฟเวอร์ตอบ error)
+ */
+export const ROTATE_JOB_QR = gql`
+  mutation RotateJobQr($bookingId: ID!) {
+    rotateJobQr(bookingId: $bookingId) {
+      bookingId
+      token
+      status
+      validFrom
+      validUntil
+      isActive
+      nextAction
+      tokenIssuedAt
+    }
+  }
+`;
+
+/**
+ * ผู้ดูแลสแกน QR ของงาน — สแกนครั้งแรก = เช็คอิน, ครั้งที่สอง = เช็คเอาท์ (PYG-435)
+ *
+ * ★ ผู้เรียก "ไม่ได้เลือก" ว่าจะเช็คอินหรือเช็คเอาท์ — สถานะของ QR เป็นตัวตัดสิน
+ *   จึงไม่มีฟิลด์ action ให้ส่ง และไม่มี bookingId ด้วย (ตัว token บอกเองว่างานใบไหน)
+ *
+ * ★ การสแกนที่ถูกปฏิเสธ "ไม่ throw error" แต่คืน ok=false พร้อมรหัสเหตุผลใน `result`
+ *   → ให้เลือกหน้าจอจาก `result` เสมอ ส่วน `message` เอาไว้แสดงให้ผู้ใช้อ่านตรง ๆ
+ *   → รหัสที่เป็นไปได้: SUCCESS · TOKEN_NOT_FOUND · WRONG_CAREGIVER · NOT_A_CAREGIVER ·
+ *     BOOKING_INACTIVE · ALREADY_COMPLETED · WRONG_SEQUENCE · OUT_OF_WINDOW ·
+ *     TOO_SOON · DUPLICATE · JOB_NOT_READY
+ */
+export const SCAN_JOB_QR = gql`
+  mutation ScanJobQr($input: ScanJobQrInput!) {
+    scanJobQr(input: $input) {
+      ok
+      result
+      action
+      bookingId
+      sessionStatus
+      message
+      scannedAt
+      jobEvent {
+        serverTs
+        distanceM
+        reviewReasons
+      }
+    }
+  }
+`;

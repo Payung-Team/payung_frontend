@@ -31,6 +31,27 @@ export interface Strings {
   navFamily: string;
   dashboardTitle: string;
   dashboardSubtitle: string;
+  // create wizard
+  wizardStep: (n: number, total: number) => string;
+  wizardNameStep: string;
+  wizardInviteStep: string;
+  next: string;
+  editGroupName: string;
+  skipForNow: string;
+  enterGroupCta: string;
+  inviteHelper: string;
+  // dashboard: solo banner + group card meta + appointments
+  soloBannerTitle: string;
+  soloBannerBody: string;
+  copyInviteLink: string;
+  createdToday: string;
+  noAppointmentsYet: string;
+  seeMembers: string;
+  apptTitle: string;
+  apptNone: string;
+  bookOnBehalf: string;
+  apptEmptyTitle: string;
+  apptEmptyBody: string;
   emptyTitle: string;
   emptyBody: string;
   createGroup: string;
@@ -167,7 +188,28 @@ export interface Strings {
 const S: Strings = {
   navFamily: 'จัดการกลุ่ม',
   dashboardTitle: 'จัดการกลุ่ม',
-  dashboardSubtitle: 'ภาพรวมกลุ่ม สมาชิก และผู้รับการดูแล',
+  dashboardSubtitle: 'ภาพรวมกลุ่มและนัดหมายของสมาชิก',
+  wizardStep: (n, total) => `ขั้นที่ ${n} จาก ${total}`,
+  wizardNameStep: 'ตั้งชื่อกลุ่ม',
+  wizardInviteStep: 'ชวนคนเข้ากลุ่ม (ข้ามได้)',
+  next: 'ถัดไป',
+  editGroupName: 'แก้ไขชื่อกลุ่ม',
+  skipForNow: 'ข้ามไปก่อน',
+  enterGroupCta: 'เข้าสู่กลุ่ม',
+  inviteHelper: 'ลิงก์ใช้ได้ 7 วัน · ใครมีลิงก์เข้ากลุ่มได้ แชร์เฉพาะคนในครอบครัว',
+  soloBannerTitle: 'กลุ่มยังมีแค่คุณคนเดียว',
+  soloBannerBody:
+    'แชร์ลิงก์คำเชิญให้คนในครอบครัว เพื่อจองผู้ดูแลแทนกันและติดตามนัดหมายร่วมกัน',
+  copyInviteLink: 'คัดลอกลิงก์เชิญ',
+  createdToday: 'สร้างเมื่อวันนี้',
+  noAppointmentsYet: 'ยังไม่มีนัดหมาย',
+  seeMembers: 'ดูสมาชิก',
+  apptTitle: 'นัดหมายของสมาชิก',
+  apptNone: 'ยังไม่มีรายการ',
+  bookOnBehalf: 'จองแทนสมาชิก',
+  apptEmptyTitle: 'ยังไม่มีนัดหมายในกลุ่ม',
+  apptEmptyBody:
+    'เมื่อคุณหรือสมาชิกจองผู้ดูแล รายการจะแสดงที่นี่ และทุกคนในกลุ่มจะติดตามได้พร้อมกัน',
   emptyTitle: 'คุณยังไม่มีกลุ่มครอบครัว',
   emptyBody:
     'สร้างกลุ่มเพื่อเชิญพี่น้องหรือญาติเข้ามาช่วยกันดูแล แชร์ข้อมูลผู้รับการดูแล และจองผู้ดูแลแทนกันได้ โดยที่ค่าบริการยังชำระโดยผู้จองเท่านั้น',

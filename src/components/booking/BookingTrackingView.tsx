@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useBooking, type ConfirmedBooking } from '../../context/BookingContext';
 import { useJobEvents } from '../../hooks/useJobEvents';
 import { ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
+import { JobQrCard } from './JobQrCard';
 
 // ── Tracking Service view (PYG-361) ─────────────────────────────────────────────
 // Shown to patients once a confirmed booking's service date has arrived. Three
@@ -698,6 +699,16 @@ export function BookingTrackingView({
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* QR ให้ผู้ดูแลสแกน (PYG-437) — วางไว้บนสุดของเนื้อหาเพราะเป็น "สิ่งที่ผู้ใช้
+            ต้องลงมือทำ" บนหน้านี้ ส่วนการ์ดอื่นเป็นข้อมูลให้อ่าน
+            ซ่อนทั้งใบเมื่อเช็คเอาท์แล้ว — การ์ด "การดูแลเสร็จสิ้น" ด้านล่างพูดแทนแล้ว
+            (ตัวการ์ดเองก็กันอีกชั้น ถ้า job_session เป็น CHECKED_OUT จะไม่วาด QR อยู่ดี) */}
+        {!hasCheckedOut && (
+          <div style={{ marginTop: 20 }}>
+            <JobQrCard bookingId={booking.id} bookingStatus={booking.status} />
           </div>
         )}
 

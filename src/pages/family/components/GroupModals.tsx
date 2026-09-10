@@ -6,8 +6,10 @@ import {
   RENAME_FAMILY_GROUP,
   TRANSFER_OWNERSHIP,
   DELETE_FAMILY_GROUP,
+  CREATE_JOIN_LINK,
   MY_FAMILY_GROUPS,
   type FamilyGroup,
+  type FamilyGroupJoinLink,
 } from '../../../graphql/familyGroup';
 import { useStrings } from '../familyStrings';
 import { fgErrorMessage } from '../familyErrors';
@@ -15,9 +17,14 @@ import { ModalShell, ModalHeader, GroupAvatar } from './familyUi';
 
 const NAME_MAX = 80; // GROUP_NAME_MAX_LENGTH on the API
 
-// ── Create ───────────────────────────────────────────────────────────────────
+// ── Create (two-step wizard: name → invite) ───────────────────────────────────
+//
+// One modal, two steps. "Next" creates the group *and* mints its first invite link, so
+// step 2 can show a real, shareable link straight away (SCR-FG-CREATE). "แก้ไขชื่อกลุ่ม"
+// steps back and renames the already-created group rather than making a second one; both
+// step-2 exits ("skip" / "enter group") land on the dashboard with the new group selected.
 
-export function CreateGroupModal({
+export function CreateGroupWizard({
   onClose,
   onCreated,
   onToast,
@@ -27,12 +34,21 @@ export function CreateGroupModal({
   onToast: (message: string, kind?: 'success' | 'error') => void;
 }) {
   const s = useStrings();
+  const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState('');
   const [touched, setTouched] = useState(false);
-  const [create, { loading }] = useMutation<{ createFamilyGroup: FamilyGroup }>(
+  const [group, setGroup] = useState<FamilyGroup | null>(null);
+  const [link, setLink] = useState<FamilyGroupJoinLink | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const [create, { loading: creating }] = useMutation<{ createFamilyGroup: FamilyGroup }>(
     CREATE_FAMILY_GROUP,
     { refetchQueries: [{ query: MY_FAMILY_GROUPS }] },
   );
+  const [rename, { loading: renaming }] = useMutation(RENAME_FAMILY_GROUP);
+  const [createLink, { loading: linking }] = useMutation<{
+    createJoinLink: FamilyGroupJoinLink;
+  }>(CREATE_JOIN_LINK);
 
   const trimmed = name.trim();
   const localError = !trimmed
@@ -40,44 +56,150 @@ export function CreateGroupModal({
     : trimmed.length > NAME_MAX
       ? s.nameTooLong(NAME_MAX)
       : '';
+  const busy = creating || renaming || linking;
 
-  const submit = async () => {
+  const goToInvite = async () => {
     setTouched(true);
     if (localError) return;
     try {
-      const res = await create({ variables: { input: { name: trimmed } } });
-      if (res.data?.createFamilyGroup) onCreated(res.data.createFamilyGroup);
+      let g = group;
+      if (!g) {
+        const res = await create({ variables: { input: { name: trimmed } } });
+        g = res.data?.createFamilyGroup ?? null;
+        if (!g) return;
+        setGroup(g);
+        // Mint the first link so step 2 has something to share. Best-effort: if it fails,
+        // step 2 still opens and the invite modal on the dashboard can create one later.
+        try {
+          const lr = await createLink({ variables: { input: { groupId: g.id } } });
+          if (lr.data?.createJoinLink) setLink(lr.data.createJoinLink);
+        } catch {
+          /* non-fatal */
+        }
+      } else if (trimmed !== g.name) {
+        await rename({ variables: { input: { groupId: g.id, name: trimmed } } });
+        g = { ...g, name: trimmed };
+        setGroup(g);
+      }
+      setStep(2);
     } catch (e) {
       onToast(fgErrorMessage(e), 'error');
     }
   };
 
+  const copy = async () => {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link.url);
+      setCopied(true);
+      onToast(s.toastCopied, 'success');
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      onToast(s.copyFailed, 'error');
+    }
+  };
+
+  const finish = () => {
+    if (group) onCreated(group);
+    else onClose();
+  };
+
+  if (step === 1) {
+    return (
+      <ModalShell onClose={onClose} maxWidth={520} labelledBy="create-title">
+        <ModalHeader
+          icon="group_add"
+          title={s.createTitle}
+          subtitle={`${s.wizardStep(1, 2)} · ${s.wizardNameStep}`}
+          titleId="create-title"
+        />
+        <NameField
+          label={s.groupNameLabel}
+          placeholder={s.groupNamePlaceholder}
+          value={name}
+          onChange={setName}
+          onEnter={goToInvite}
+          error={touched ? localError : ''}
+          count={s.charCount([...trimmed].length, NAME_MAX)}
+          autoFocus
+        />
+        <FormActions
+          cancelText={s.cancel}
+          confirmText={s.next}
+          busyText={s.busyCreating}
+          loading={busy}
+          disabled={touched && !!localError}
+          onClose={onClose}
+          onConfirm={goToInvite}
+        />
+      </ModalShell>
+    );
+  }
+
   return (
-    <ModalShell onClose={onClose} maxWidth={500} labelledBy="create-title">
-      <ModalHeader
-        icon="group_add"
-        title={s.createTitle}
-        subtitle={s.createSubtitle}
-        titleId="create-title"
-      />
-      <NameField
-        label={s.groupNameLabel}
-        placeholder={s.groupNamePlaceholder}
-        value={name}
-        onChange={setName}
-        onEnter={submit}
-        error={touched ? localError : ''}
-        count={s.charCount([...trimmed].length, NAME_MAX)}
-      />
-      <FormActions
-        cancelText={s.cancel}
-        confirmText={s.create}
-        busyText={s.busyCreating}
-        loading={loading}
-        disabled={touched && !!localError}
-        onClose={onClose}
-        onConfirm={submit}
-      />
+    <ModalShell onClose={finish} maxWidth={520} labelledBy="invite-step-title">
+      <div className="flex items-start gap-3">
+        <GroupAvatar name={group?.name} seed={group?.id ?? 'new'} size={48} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <h2 id="invite-step-title" className="truncate text-xl font-bold text-[#064E3B]">
+              {group?.name}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="shrink-0 text-[13px] font-semibold text-gray-500 transition-colors hover:text-[#009265]"
+            >
+              {s.editGroupName}
+            </button>
+          </div>
+          <p className="mt-1 text-sm text-gray-500">
+            {s.wizardStep(2, 2)} · {s.wizardInviteStep}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <label htmlFor="wizard-link" className="text-sm font-medium text-gray-700">
+          {s.inviteLinkLabel}
+        </label>
+        <div className="mt-1 flex gap-2">
+          <input
+            id="wizard-link"
+            readOnly
+            value={link?.url ?? ''}
+            onFocus={(e) => e.currentTarget.select()}
+            className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-[#F6FAF9] px-3 py-2 font-mono text-[13px] text-[#4B5563] outline-none"
+          />
+          <button
+            type="button"
+            onClick={copy}
+            disabled={!link}
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-[#009265] px-4 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,146,101,0.2)] transition-colors hover:bg-[#007C55] disabled:opacity-60"
+          >
+            <Icon name={copied ? 'check' : 'content_copy'} size="small" color="#FFFFFF" />
+            {copied ? s.copied : s.copy}
+          </button>
+        </div>
+        <p className="mt-2 text-[12px] leading-5 text-[#8A8C8E]">{s.inviteHelper}</p>
+      </div>
+
+      <div className="mt-6 flex items-center justify-end gap-3">
+        <button
+          type="button"
+          onClick={finish}
+          className="h-10 rounded-lg px-4 text-sm font-semibold text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
+        >
+          {s.skipForNow}
+        </button>
+        <button
+          type="button"
+          onClick={finish}
+          className="inline-flex h-10 min-w-[120px] items-center justify-center rounded-lg bg-[#009265] px-4 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,146,101,0.2)] transition-colors hover:bg-[#007C55]"
+        >
+          {s.enterGroupCta}
+        </button>
+      </div>
     </ModalShell>
   );
 }
