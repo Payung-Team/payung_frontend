@@ -1,20 +1,46 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@apollo/client/react';
 import { useBooking } from '../../../context/BookingContext';
+import { GET_USER, GET_LATEST_BOOKING_ADDRESS } from '../../../graphql/queries';
 import ThaiAddressSelector from '../../../components/ui/ThaiAddressSelector';
 import MapPicker from '../MapPicker';
 
-const SAVED_ADDRESS = {
-  address: '123/45 ซอยลาดพร้าว 101 ถนนลาดพร้าว แขวงคลองจั่น เขตบางกะปิ กรุงเทพมหานคร 10240',
-  province: 'กรุงเทพมหานคร',
-  district: 'บางกะปิ',
-  subDistrict: 'คลองจั่น',
-  postalCode: '10240',
-  lat: 13.7659,
-  lng: 100.6478,
-};
+// ที่อยู่ที่เติมให้อัตโนมัติได้ — มาจากการจองครั้งล่าสุด ถ้ายังไม่เคยจองก็ใช้ที่อยู่ในโปรไฟล์
+// (ที่กรอกไว้ตอน onboard) และถ้าไม่มีทั้งสองอย่างจะไม่แสดงปุ่มนี้เลย
+interface PrefillAddress {
+  source: 'booking' | 'profile';
+  address: string;
+  province?: string;
+  district?: string;
+  subDistrict?: string;
+  postalCode?: string;
+  lat?: number;
+  lng?: number;
+}
+
+interface MeQueryResult {
+  me?: {
+    address?: string | null;
+    province?: string | null;
+    district?: string | null;
+    subDistrict?: string | null;
+    postalCode?: string | null;
+  } | null;
+}
+
+interface LatestBookingResult {
+  myBookingHistory?: {
+    data?: {
+      id: string;
+      locationAddress?: string | null;
+      locationLat?: number | null;
+      locationLng?: number | null;
+    }[];
+  } | null;
+}
 
 export default function BookingStepLocation() {
-  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit } = useBooking();
+  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit, setStepMissing } = useBooking();
 
   const serviceLocation = bookingDraft?.serviceLocation || [];
   const needHome = serviceLocation.includes('at_home');
@@ -85,14 +111,46 @@ export default function BookingStepLocation() {
     lngB,
   ]);
 
+  // แหล่งที่อยู่สำหรับเติมอัตโนมัติ — จองครั้งล่าสุดมาก่อน แล้วค่อยเป็นที่อยู่ในโปรไฟล์
+  const { data: meData } = useQuery<MeQueryResult>(GET_USER, { fetchPolicy: 'cache-first' });
+  const { data: latestBookingData } = useQuery<LatestBookingResult>(GET_LATEST_BOOKING_ADDRESS, {
+    fetchPolicy: 'cache-and-network',
+    skip: !needHome,
+  });
+
+  const prefill = useMemo<PrefillAddress | null>(() => {
+    const latest = latestBookingData?.myBookingHistory?.data?.[0];
+    if (latest?.locationAddress?.trim()) {
+      return {
+        source: 'booking',
+        address: latest.locationAddress,
+        lat: latest.locationLat ?? undefined,
+        lng: latest.locationLng ?? undefined,
+      };
+    }
+    const me = meData?.me;
+    if (me?.address?.trim()) {
+      return {
+        source: 'profile',
+        address: me.address,
+        province: me.province ?? undefined,
+        district: me.district ?? undefined,
+        subDistrict: me.subDistrict ?? undefined,
+        postalCode: me.postalCode ?? undefined,
+      };
+    }
+    return null;
+  }, [latestBookingData, meData]);
+
   const handleUseSavedAddress = () => {
-    setAddress(SAVED_ADDRESS.address);
-    setProvince(SAVED_ADDRESS.province);
-    setDistrict(SAVED_ADDRESS.district);
-    setSubDistrict(SAVED_ADDRESS.subDistrict);
-    setPostalCode(SAVED_ADDRESS.postalCode);
-    setLatA(SAVED_ADDRESS.lat);
-    setLngA(SAVED_ADDRESS.lng);
+    if (!prefill) return;
+    setAddress(prefill.address);
+    if (prefill.province) setProvince(prefill.province);
+    if (prefill.district) setDistrict(prefill.district);
+    if (prefill.subDistrict) setSubDistrict(prefill.subDistrict);
+    if (prefill.postalCode) setPostalCode(prefill.postalCode);
+    if (prefill.lat != null) setLatA(prefill.lat);
+    if (prefill.lng != null) setLngA(prefill.lng);
   };
 
   const handleSubmit = () => {
@@ -109,6 +167,31 @@ export default function BookingStepLocation() {
     setError(errs);
     if (Object.keys(errs).length === 0) goToStep(4);
   };
+
+  // Report missing required fields so the sticky "Next" button can disable itself
+  useEffect(() => {
+    const missing: string[] = [];
+    if (needHome) {
+      if (!province) missing.push('จังหวัด');
+      if (!district) missing.push('อำเภอ/เขต');
+      if (!address.trim()) missing.push('ที่อยู่');
+    }
+    if (needOutside) {
+      if (!hospitalName.trim()) missing.push('สถานที่ปลายทาง');
+      if (!meetingPoint.trim()) missing.push('จุดนัดพบ');
+    }
+    setStepMissing(missing);
+    return () => setStepMissing([]);
+  }, [
+    needHome,
+    needOutside,
+    province,
+    district,
+    address,
+    hospitalName,
+    meetingPoint,
+    setStepMissing,
+  ]);
 
   const submitRef = useRef<() => void>(() => {});
   submitRef.current = handleSubmit;
@@ -129,23 +212,27 @@ export default function BookingStepLocation() {
             </p>
           </div>
 
-          {/* Hero: use saved profile */}
-          <button
-            type="button"
-            onClick={handleUseSavedAddress}
-            className="w-full flex items-center gap-3 p-4 bg-[#F0FAF4] border border-[#52B69A]/40 rounded-xl text-left hover:bg-[#E6F5ED] transition cursor-pointer"
-          >
-            <span className="material-icons text-[#52B69A]">bookmark</span>
-            <span className="flex-1">
-              <span className="block text-sm font-bold text-[#1B5C48]">
-                ใช้ที่อยู่จากประวัติส่วนตัว
+          {/* Hero: เติมที่อยู่จากการจองล่าสุด หรือจากโปรไฟล์ — ไม่มีข้อมูลก็ไม่ต้องแสดง */}
+          {prefill && (
+            <button
+              type="button"
+              onClick={handleUseSavedAddress}
+              className="w-full flex items-center gap-3 p-4 bg-[#F0FAF4] border border-[#52B69A]/40 rounded-xl text-left hover:bg-[#E6F5ED] transition cursor-pointer"
+            >
+              <span className="material-icons text-[#52B69A]">bookmark</span>
+              <span className="flex-1">
+                <span className="block text-sm font-bold text-[#1B5C48]">
+                  {prefill.source === 'booking'
+                    ? 'ใช้ที่อยู่จากประวัติการจองครั้งล่าสุด'
+                    : 'ใช้ที่อยู่จากประวัติส่วนตัว'}
+                </span>
+                <span className="block text-xs text-[#575859] mt-0.5 leading-snug">
+                  {prefill.address}
+                </span>
               </span>
-              <span className="block text-xs text-[#575859] mt-0.5 leading-snug">
-                123/45 ซอยลาดพร้าว 101 · บางกะปิ กรุงเทพฯ
-              </span>
-            </span>
-            <span className="material-icons text-[#52B69A]">arrow_forward</span>
-          </button>
+              <span className="material-icons text-[#52B69A]">arrow_forward</span>
+            </button>
+          )}
 
           {/* Thai address selector */}
           <ThaiAddressSelector

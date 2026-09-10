@@ -95,7 +95,9 @@ export default function AdminLayout() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    // Land on the public homepage; replace so Back does not return to the
+    // protected page we just left.
+    navigate('/', { replace: true });
   };
 
   return (

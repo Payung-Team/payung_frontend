@@ -479,6 +479,7 @@ export default function CaregiverBookingDetailPage() {
                     <PatientSummaryCard
                       patientName={booking.patientName}
                       careRecipientName={booking.careRecipientName}
+                      patientProfile={booking.patientProfile}
                     />
                     <BookingDetailCard
                       serviceLabel={svcLabel}

@@ -122,12 +122,17 @@ function SummaryRow({
 
 export default function BookingRequestPage() {
   const navigate = useNavigate();
-  const { step, goToStep, bookingDraft, resetBooking, stepSubmit } = useBooking();
+  const { step, goToStep, bookingDraft, resetBooking, stepSubmit, stepMissing } = useBooking();
 
   useEffect(() => {
     resetBooking();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // เปลี่ยนขั้นแล้วเลื่อนกลับขึ้นบนสุดเสมอ (ทั้งปุ่มถัดไป ย้อนกลับ และแท็บขั้นตอน)
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [step]);
 
   const [isSearching, setIsSearching] = useState(false);
   const [showPlanDetail, setShowPlanDetail] = useState(false);
@@ -145,13 +150,18 @@ export default function BookingRequestPage() {
     : step === 4 ? 'ตรวจสอบรายละเอียด'
     : 'ถัดไป';
   const nextIcon = step === 5 ? 'search' : 'arrow_forward';
-  const nextHint =
-    step === 5
+  // ขั้นตรวจสอบไม่มีฟิลด์ให้กรอก จึงกดได้เสมอ
+  const nextDisabled = step < 5 && stepMissing.length > 0;
+  const nextHint = nextDisabled
+    ? `ยังขาด: ${stepMissing.join(', ')}`
+    : step === 5
       ? 'กดเพื่อเริ่มค้นหาผู้ดูแลที่ตรงกับคำขอของคุณ'
       : 'ข้อมูลถูกบันทึกอัตโนมัติทุกขั้น';
 
   // Sidebar summary values
-  const duration = bookingDraft?.dateTime?.duration || 4;
+  // duration จะมีค่าก็ต่อเมื่อผู้ใช้เลือกจำนวนชั่วโมงเองในขั้นวันเวลา
+  const selectedDuration = bookingDraft?.dateTime?.duration || 0;
+  const duration = selectedDuration;
   const averageHourlyRate = 250;
   const rawCost = averageHourlyRate * duration;
   const platformFee = Math.round(rawCost * 0.1);
@@ -346,20 +356,33 @@ export default function BookingRequestPage() {
                 />
               </div>
               <div className="border-t border-dashed border-[#E0E2E5] mt-4 pt-4 space-y-2 text-sm">
-                <div className="flex justify-between text-[#575859]">
-                  <span>ค่าดูแล {duration} ชม. × 250฿</span>
-                  <span>{rawCost.toLocaleString()} ฿</span>
-                </div>
-                <div className="flex justify-between text-[#575859]">
-                  <span>ค่าบริการแพลตฟอร์ม</span>
-                  <span>{platformFee.toLocaleString()} ฿</span>
-                </div>
-                <div className="flex justify-between font-bold text-base pt-1">
-                  <span>ประมาณการรวม</span>
-                  <span>{totalEstimated.toLocaleString()} ฿</span>
-                </div>
+                {selectedDuration ? (
+                  <>
+                    <div className="flex justify-between text-[#575859]">
+                      <span>ค่าดูแล {duration} ชม. × {averageHourlyRate}฿</span>
+                      <span>{rawCost.toLocaleString()} ฿</span>
+                    </div>
+                    <div className="flex justify-between text-[#575859]">
+                      <span>ค่าบริการแพลตฟอร์ม (10%)</span>
+                      <span>{platformFee.toLocaleString()} ฿</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-base pt-1">
+                      <span>ประมาณการรวม</span>
+                      <span>{totalEstimated.toLocaleString()} ฿</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between items-baseline font-bold text-[#1A1A1A]">
+                    <span>ค่าบริการเริ่มต้น</span>
+                    <span className="text-base">
+                      {averageHourlyRate} ฿<span className="text-xs font-semibold text-[#8A8C8E]">/ชั่วโมง</span>
+                    </span>
+                  </div>
+                )}
                 <p className="text-xs text-[#8A8C8E] leading-relaxed pt-1">
-                  ยังไม่ตัดเงิน — ชำระหลังผู้ดูแลรับงาน
+                  {selectedDuration
+                    ? 'ยังไม่ตัดเงิน — ชำระหลังผู้ดูแลรับงาน'
+                    : 'เลือกจำนวนชั่วโมงเพื่อดูประมาณการรวม'}
                 </p>
               </div>
             </div>
@@ -380,13 +403,23 @@ export default function BookingRequestPage() {
               <span className="hidden sm:inline">ย้อนกลับ</span>
             </button>
           )}
-          <span className="flex-1 text-xs text-[#8A8C8E] leading-snug hidden md:block">
+          <span
+            className={`flex-1 text-xs leading-snug ${
+              nextDisabled ? 'block font-semibold text-red-600' : 'hidden md:block text-[#8A8C8E]'
+            }`}
+          >
             {nextHint}
           </span>
           <button
             type="button"
             onClick={handleNext}
-            className="flex items-center justify-center gap-2 px-6 py-3 min-h-[48px] min-w-[140px] bg-[#52B69A] text-white rounded-xl font-bold text-sm shadow-md hover:bg-[#469e85] transition cursor-pointer"
+            disabled={nextDisabled}
+            title={nextDisabled ? nextHint : undefined}
+            className={`flex items-center justify-center gap-2 px-6 py-3 min-h-[48px] min-w-[140px] rounded-xl font-bold text-sm transition ${
+              nextDisabled
+                ? 'bg-[#CFE7DE] text-white cursor-not-allowed'
+                : 'bg-[#52B69A] text-white shadow-md hover:bg-[#469e85] cursor-pointer'
+            }`}
           >
             <span>{nextLabel}</span>
             <span className="material-icons text-base">{nextIcon}</span>

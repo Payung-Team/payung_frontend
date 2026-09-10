@@ -1,5 +1,74 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useBooking } from '../../../context/BookingContext';
+import { supabase } from '../../../lib/supabase';
+import type { PatientProfile } from '../../../lib/patientProfile';
+import ConfirmModal from '../../../components/ui/ConfirmModal';
+
+const API_BASE = ((import.meta.env.VITE_GRAPHQL_URL as string) || 'http://localhost:3000/graphql')
+  .replace('/graphql', '');
+
+/** โปรไฟล์ผู้รับบริการที่ผู้ใช้เคยบันทึกไว้ — GET /api/v1/patient/care-recipients */
+interface SavedRecipient {
+  id: string;
+  name: string;
+  nickname?: string;
+  /**
+   * ข้อมูลสุขภาพที่จะเติมให้อัตโนมัติเมื่อเลือกโปรไฟล์นี้
+   *
+   * ⚠ อาจไม่มีคีย์นี้เลย (ไม่ใช่ `{}`) ในโปรไฟล์ที่ไม่เคยกรอกข้อมูลสุขภาพ
+   * ⚠ age / weight / height เป็น number ตาม API — ไม่ใช่ string เหมือน input state
+   *   จึงต้อง String() ก่อนใส่ลงช่องกรอก (ดู handleSelectRecipient)
+   */
+  details?: PatientProfile;
+}
+
+/** หนึ่งแถวในลิสต์ "ผู้รับบริการคือใคร" — วงกลมเลือก + ชื่อ + ปุ่มลบ */
+function RecipientRow({
+  selected,
+  title,
+  onSelect,
+  onDelete,
+}: {
+  selected: boolean;
+  title: string;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      className={`flex items-center rounded-xl border-2 transition ${
+        selected
+          ? 'border-[#1B5C48] bg-[#F0FAF4]'
+          : 'border-[#E0E2E5] bg-white hover:border-gray-300'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={selected}
+        className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3.5 text-left cursor-pointer"
+      >
+        <span
+          className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center ${
+            selected ? 'border-[#1B5C48]' : 'border-[#C7CDD2]'
+          }`}
+        >
+          {selected && <span className="w-2.5 h-2.5 rounded-full bg-[#1B5C48]" />}
+        </span>
+        <span className="flex-1 min-w-0 text-sm font-bold text-[#1A1A1A] truncate">{title}</span>
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label={`ลบ ${title}`}
+        title="ลบรายชื่อนี้"
+        className="shrink-0 px-4 py-3.5 text-sm font-semibold text-red-600 hover:text-red-700 hover:underline transition cursor-pointer"
+      >
+        ลบ
+      </button>
+    </div>
+  );
+}
 
 const PREDEFINED_CONDITIONS = ['เบาหวาน', 'ความดันสูง', 'โรคหัวใจ', 'สมองเสื่อม'];
 
@@ -26,24 +95,8 @@ const SUPPORT_LEVELS = [
 
 const BLOOD_GROUPS = ['A', 'B', 'AB', 'O', 'A+', 'B+', 'AB+', 'O+'];
 
-const SAVED_PROFILE = {
-  name: 'สมศรี วงศ์ดี',
-  age: '65',
-  gender: 'หญิง' as const,
-  weight: '58',
-  height: '155',
-  supportLevel: 'ช่วยเหลือตัวเองได้เล็กน้อย / ต้องการการช่วยพยุงเดิน',
-  conditions: ['เบาหวาน', 'ความดันสูง'],
-  medicines: 'ยาลดความดัน, ยาเบาหวาน',
-  allergies: 'แพ้ยาเพนิซิลิน',
-  bloodGroup: 'B',
-  careInstructions:
-    'เพิ่งผ่าตัดเปลี่ยนสะโพก 2 สัปดาห์ ยังช่วยพยุงเดินช้า จำเป็นต้องพลิกตัวสม่ำเสมอ',
-  regularHospital: 'รพ.รามาธิบดี',
-};
-
 export default function BookingStepPatient() {
-  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit } = useBooking();
+  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit, setStepMissing } = useBooking();
 
   const [name, setName] = useState(bookingDraft?.recipient?.patientDetails?.name || '');
   const [age, setAge] = useState(
@@ -79,7 +132,6 @@ export default function BookingStepPatient() {
   const [regularHospital, setRegularHospital] = useState(
     bookingDraft?.recipient?.patientDetails?.regularHospital || '',
   );
-  const [showHealth, setShowHealth] = useState(false);
 
   // Contact person
   const [contactName, setContactName] = useState(bookingDraft?.contactPerson?.name || '');
@@ -90,17 +142,60 @@ export default function BookingStepPatient() {
 
   const [error, setError] = useState<Record<string, string>>({});
 
-  const isProfileFilled = useMemo(() => name === SAVED_PROFILE.name, [name]);
+  // โปรไฟล์ผู้รับบริการที่เคยบันทึกไว้ + ใบไหนที่ถูกเลือกอยู่
+  const [selectedRecipientId, setSelectedRecipientId] = useState<string | null>(null);
+  // กรอกเองโดยไม่ได้เลือกจากลิสต์ → ถามว่าจะบันทึกโปรไฟล์ไว้ใช้ครั้งหน้าไหม
+  const [saveAsProfile, setSaveAsProfile] = useState(false);
+  // รายชื่อที่กด "ลบ" ไว้ รอยืนยันใน modal
+  const [pendingDelete, setPendingDelete] = useState<SavedRecipient | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [savedRecipients, setSavedRecipients] = useState<SavedRecipient[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/patient/care-recipients`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data: SavedRecipient[] = await res.json();
+        // ตั้งค่าแม้ลิสต์ว่าง — เดิมกันด้วย data.length > 0 เพราะต้องกัน MOCK ไม่ให้หาย
+        // ตอนนี้ไม่มี MOCK แล้ว ถ้ายังกันอยู่ ลบโปรไฟล์ใบสุดท้ายแล้วลิสต์จะไม่อัปเดต
+        if (!cancelled) setSavedRecipients(data);
+      } catch {
+        // ดึงไม่ได้ก็แค่ไม่แสดงการ์ดโปรไฟล์ที่บันทึกไว้
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Auto-save
+  //
+  // ⚠ ต้องเก็บ selectedRecipientId / saveAsProfile ลง draft ด้วย ไม่ใช่แค่ state ในหน้านี้
+  //   เพราะขั้นยิง POST /bookings อยู่คนละหน้า (SearchPage / CaregiverProfilePage)
+  //   สองค่านี้เคยตายอยู่ในหน้านี้ ทำให้ติ๊ก "บันทึกไว้" แล้วไม่เกิดอะไรขึ้น
+  //   และ booking ไม่เคยผูกกับโปรไฟล์ที่เลือก
   useEffect(() => {
     setBookingDraft((prev) => ({
       ...(prev || { serviceLocation: [], serviceTypes: [] }),
       recipient: {
         type: 'self',
+        selectedRecipientId,
+        saveAsProfile,
         patientDetails: {
           name,
-          age: Number(age) || 0,
+          // เดิมเป็น `Number(age) || 0` — ช่องที่ว่างกลายเป็นอายุ 0 ปีซึ่ง BE รับเป็น
+          // ค่าที่ถูกต้อง (0-130 เพราะผู้รับบริการอาจเป็นทารก) แล้วบันทึกไปเงียบ ๆ
+          age: age.trim() ? Number(age) : undefined,
           gender,
           weight: weight ? Number(weight) : undefined,
           height: height ? Number(height) : undefined,
@@ -132,38 +227,84 @@ export default function BookingStepPatient() {
     contactName,
     contactPhone,
     contactRel,
+    selectedRecipientId,
+    saveAsProfile,
   ]);
 
-  const handleUseProfile = () => {
-    setName(SAVED_PROFILE.name);
-    setAge(SAVED_PROFILE.age);
-    setGender(SAVED_PROFILE.gender);
-    setWeight(SAVED_PROFILE.weight);
-    setHeight(SAVED_PROFILE.height);
-    setSupportLevel(SAVED_PROFILE.supportLevel);
-    setBloodGroup(SAVED_PROFILE.bloodGroup);
-    setConditions([...SAVED_PROFILE.conditions]);
-    setMedicines(SAVED_PROFILE.medicines);
-    setAllergies(SAVED_PROFILE.allergies);
-    setCareInstructions(SAVED_PROFILE.careInstructions);
-    setRegularHospital(SAVED_PROFILE.regularHospital);
+  // เลือกโปรไฟล์ที่บันทึกไว้ — เติมทุกช่องที่โปรไฟล์นั้นมี ที่เหลือล้างให้ว่าง
+  // กดซ้ำที่ใบเดิม = ยกเลิกการเลือก แล้วกลับไปกรอกเอง
+  const handleSelectRecipient = (recipient: SavedRecipient) => {
+    if (selectedRecipientId === recipient.id) {
+      setSelectedRecipientId(null);
+      return;
+    }
+    setSelectedRecipientId(recipient.id);
+    setSaveAsProfile(false);
+    setName(recipient.name);
+
+    // ⚠ API คืน age/weight/height เป็น number แต่ช่องกรอกเป็น controlled input
+    //   ที่รับ string — ต้อง String() ก่อน ไม่งั้น React เตือนเรื่องชนิดของ value
+    //   หรือช่องขึ้นว่างแบบไม่มี error ให้เห็น
+    //   ใช้ != null เพื่อให้อายุ 0 (ทารก) ที่บันทึกไว้แล้วยังเติมกลับได้
+    const d = recipient.details;
+    setAge(d?.age != null ? String(d.age) : '');
+    setGender(d?.gender ?? '');
+    setWeight(d?.weight != null ? String(d.weight) : '');
+    setHeight(d?.height != null ? String(d.height) : '');
+    // 'ใช้รถเข็น' ไม่มีปุ่มในฟอร์ม → ไม่มีปุ่มไหนถูกไฮไลต์ เป็นพฤติกรรมที่ตั้งใจ
+    // validation จะบังคับให้ผู้ใช้เลือกใหม่เอง ห้ามเดาแทน
+    setSupportLevel(d?.supportLevel ?? '');
+    setBloodGroup(d?.bloodGroup ?? '');
+    setConditions(d?.conditions ? [...d.conditions] : []);
+    setMedicines(d?.medicines ?? '');
+    setAllergies(d?.allergies ?? '');
+    setCareInstructions(d?.careInstructions ?? '');
+    setRegularHospital(d?.regularHospital ?? '');
   };
 
-  const handleClearPatient = () => {
-    setName('');
-    setAge('');
-    setGender('');
-    setWeight('');
-    setHeight('');
-    setSupportLevel('');
-    setBloodGroup('');
-    setConditions([]);
-    setMedicines('');
-    setAllergies('');
-    setCareInstructions('');
-    setRegularHospital('');
-    setShowHealth(true);
+  // ลบรายชื่อที่บันทึกไว้ — ยืนยันผ่าน modal ก่อนเสมอ
+  // BE ใช้ soft delete + snapshot: การจองที่ผ่านมายังอยู่และยังแสดงข้อมูลคนไข้ได้
+  const confirmDeleteRecipient = async () => {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error('no session');
+
+      const res = await fetch(`${API_BASE}/api/v1/patient/care-recipients/${target.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // 204 = ลบแล้ว · 404 = หายไปอยู่แล้ว (กดซ้ำ / ลบจากอีกแท็บ) ถือว่าสำเร็จทั้งคู่
+      // เป้าหมายของผู้ใช้คือ "ให้มันหายไป" ซึ่งบรรลุแล้วทั้งสองกรณี
+      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
+    } catch {
+      setDeleteError(`ลบ "${target.name}" ไม่สำเร็จ กรุณาลองอีกครั้ง`);
+      setDeleting(false);
+      return;
+    }
+
+    setSavedRecipients((prev) => prev.filter((r) => r.id !== target.id));
+    if (selectedRecipientId === target.id) setSelectedRecipientId(null);
+    setDeleting(false);
+    setPendingDelete(null);
   };
+
+  // แก้ชื่อเองเมื่อไหร่ = หลุดจากใบที่เลือกไว้
+  const handleNameChange = (value: string) => {
+    setName(value);
+    const picked = savedRecipients.find((r) => r.id === selectedRecipientId);
+    if (picked && picked.name !== value) setSelectedRecipientId(null);
+  };
+
+  // กรอกเอง (ไม่ได้เลือกจากลิสต์) และมีชื่อแล้ว → ค่อยถามเรื่องบันทึกโปรไฟล์
+  const isManualEntry = !selectedRecipientId && name.trim().length > 0;
 
   const toggleCondition = (cond: string) => {
     setConditions((prev) =>
@@ -185,6 +326,29 @@ export default function BookingStepPatient() {
     if (Object.keys(errs).length === 0) goToStep(5);
   };
 
+  // Report missing required fields so the sticky "Next" button can disable itself
+  useEffect(() => {
+    const missing: string[] = [];
+    if (!name.trim()) missing.push('ชื่อคนไข้');
+    if (!age.trim()) missing.push('อายุ');
+    if (!gender) missing.push('เพศ');
+    if (!supportLevel) missing.push('ระดับการช่วยเหลือตนเอง');
+    if (!contactName.trim()) missing.push('ชื่อผู้ติดต่อ');
+    if (!contactPhone.trim() || contactPhone.length !== 10) missing.push('เบอร์โทรผู้ติดต่อ');
+    if (!contactRel) missing.push('ความสัมพันธ์');
+    setStepMissing(missing);
+    return () => setStepMissing([]);
+  }, [
+    name,
+    age,
+    gender,
+    supportLevel,
+    contactName,
+    contactPhone,
+    contactRel,
+    setStepMissing,
+  ]);
+
   const submitRef = useRef<() => void>(() => {});
   submitRef.current = handleSubmit;
   useEffect(() => {
@@ -194,43 +358,32 @@ export default function BookingStepPatient() {
 
   return (
     <div className="space-y-4">
-      {/* Hero: use profile vs new patient */}
-      <section className="bg-white p-6 rounded-2xl border border-gray-100">
-        <h2 className="text-lg font-bold text-[#1A1A1A]">ผู้รับบริการคือใคร</h2>
-        <p className="text-sm text-[#8A8C8E] mt-1">
-          ผู้ดูแลเห็นข้อมูลนี้ก่อนเริ่มงาน กรอกเท่าที่จำเป็นตอนนี้ก็ได้
-        </p>
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={handleUseProfile}
-            className={`flex flex-col items-start p-4 rounded-xl border-2 text-left transition cursor-pointer ${
-              isProfileFilled
-                ? 'border-[#52B69A] bg-[#F0FAF4]'
-                : 'border-[#E0E2E5] bg-white hover:border-gray-300'
-            }`}
-          >
-            <span className="material-icons text-[#52B69A]" style={{ fontSize: 24 }}>
-              badge
-            </span>
-            <span className="mt-2 text-sm font-bold text-[#1A1A1A]">สมศรี วงศ์ดี · 65 ปี</span>
-            <span className="mt-1 text-xs text-[#8A8C8E]">
-              โปรไฟล์ที่บันทึกไว้ · เติมครบทุกช่อง
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={handleClearPatient}
-            className="flex flex-col items-start p-4 rounded-xl border-2 border-[#E0E2E5] bg-white text-left hover:border-gray-300 transition cursor-pointer"
-          >
-            <span className="material-icons text-[#8A8C8E]" style={{ fontSize: 24 }}>
-              person_add
-            </span>
-            <span className="mt-2 text-sm font-bold text-[#1A1A1A]">กรอกคนไข้รายใหม่</span>
-            <span className="mt-1 text-xs text-[#8A8C8E]">ใช้เวลาประมาณ 1 นาที</span>
-          </button>
-        </div>
-      </section>
+      {/* เลือกจากโปรไฟล์ที่เคยบันทึกไว้ — ไม่เลือกก็กรอกเองได้ในการ์ดถัดไป */}
+      {savedRecipients.length > 0 && (
+        <section className="bg-white p-6 rounded-2xl border border-gray-100">
+          <h2 className="text-lg font-bold text-[#1A1A1A]">ผู้รับบริการคือใคร</h2>
+          <p className="text-sm text-[#8A8C8E] mt-1">
+            เลือกจากรายชื่อที่บันทึกไว้ หรือกรอกข้อมูลใหม่ด้านล่าง
+          </p>
+          <div className="mt-4 space-y-2">
+            {savedRecipients.map((r) => (
+              <RecipientRow
+                key={r.id}
+                selected={selectedRecipientId === r.id}
+                title={r.name}
+                onSelect={() => handleSelectRecipient(r)}
+                onDelete={() => {
+                  setDeleteError(null);
+                  setPendingDelete(r);
+                }}
+              />
+            ))}
+          </div>
+          {deleteError && (
+            <p className="mt-3 text-[11px] font-semibold text-red-500">{deleteError}</p>
+          )}
+        </section>
+      )}
 
       {/* Patient info */}
       <section className="bg-white p-6 rounded-2xl border border-gray-100">
@@ -243,7 +396,7 @@ export default function BookingStepPatient() {
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => handleNameChange(e.target.value)}
               placeholder="ชื่อจริงตามบัตรประชาชน"
               className={`mt-1.5 w-full p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
                 error.name
@@ -361,27 +514,18 @@ export default function BookingStepPatient() {
           )}
         </div>
 
-        {/* Health section (collapsible) */}
-        <button
-          type="button"
-          onClick={() => setShowHealth((v) => !v)}
-          aria-expanded={showHealth}
-          className="mt-5 w-full flex items-center justify-between gap-3 p-4 bg-[#F6FAF9] border border-[#E0E2E5] rounded-xl text-left hover:bg-gray-50 transition cursor-pointer"
-        >
-          <span>
-            <span className="block text-sm font-bold text-[#1A1A1A]">ข้อมูลสุขภาพเพิ่มเติม</span>
-            <span className="block text-xs text-[#8A8C8E] mt-0.5">
-              โรคประจำตัว ยา การแพ้ยา — ไม่บังคับ แต่ช่วยให้ดูแลปลอดภัยขึ้น
-            </span>
-          </span>
-          <span className="material-icons text-[#575859]">
-            {showHealth ? 'expand_less' : 'expand_more'}
-          </span>
-        </button>
+        {/* Health section */}
+        <div className="mt-6 pt-5 border-t border-[#E0E2E5]">
+          <h3 className="text-base font-bold text-[#1A1A1A]">
+            ข้อมูลสุขภาพเพิ่มเติม <span className="font-semibold text-[#8A8C8E]">(ไม่บังคับ)</span>
+          </h3>
+          <p className="text-xs text-[#8A8C8E] mt-2">
+            โรคประจำตัว ยา การแพ้ยา กรอกข้อมูลเพื่อช่วยให้ผู้ดูแลดูแลคุณได้อย่างปลอดภัยมากขึ้น
+          </p>
+        </div>
 
-        {showHealth && (
-          <div className="mt-4 space-y-4">
-            {/* Blood group */}
+        <div className="mt-4 space-y-4">
+          {/* Blood group */}
             <div>
               <label className="text-xs font-semibold text-[#575859]">กรุ๊ปเลือด</label>
               <div className="mt-1.5 flex flex-wrap gap-2">
@@ -481,7 +625,26 @@ export default function BookingStepPatient() {
                 className="mt-1.5 w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A]"
               />
             </div>
-          </div>
+        </div>
+
+        {/* กรอกเองโดยไม่ได้เลือกจากลิสต์ → ถามว่าจะเก็บโปรไฟล์นี้ไว้ใช้ครั้งหน้าไหม */}
+        {isManualEntry && (
+          <label className="mt-5 flex items-start gap-3 p-4 bg-[#F6FAF9] border border-[#E0E2E5] rounded-xl cursor-pointer">
+            <input
+              type="checkbox"
+              checked={saveAsProfile}
+              onChange={(e) => setSaveAsProfile(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-[#52B69A] cursor-pointer shrink-0"
+            />
+            <span>
+              <span className="block text-sm font-bold text-[#1A1A1A]">
+                บันทึกผู้รับบริการรายนี้ไว้
+              </span>
+              <span className="block text-xs text-[#8A8C8E] mt-0.5">
+                ครั้งหน้าจะเลือกจากรายชื่อได้เลย ไม่ต้องกรอกใหม่
+              </span>
+            </span>
+          </label>
         )}
       </section>
 
@@ -562,6 +725,25 @@ export default function BookingStepPatient() {
           </div>
         </div>
       </section>
+
+      <ConfirmModal
+        isOpen={pendingDelete !== null}
+        isLoading={deleting}
+        title="ลบรายชื่อนี้?"
+        description={
+          <>
+            <span className="font-semibold text-[#1A1A1A]">{pendingDelete?.name}</span>{' '}
+            จะถูกลบออกจากรายชื่อที่บันทึกไว้ การจองที่ผ่านมาไม่ได้รับผลกระทบ
+          </>
+        }
+        confirmText="ลบ"
+        onClose={() => !deleting && setPendingDelete(null)}
+        onConfirm={confirmDeleteRecipient}
+        iconName="delete"
+        iconBgColor="bg-red-500"
+        confirmBtnBgColor="bg-red-600"
+        confirmBtnHoverBgColor="hover:bg-red-700"
+      />
     </div>
   );
 }

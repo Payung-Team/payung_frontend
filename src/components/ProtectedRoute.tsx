@@ -14,9 +14,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <PageSkeleton />;
   }
 
-  // ไม่มี session → redirect ไป login
+  // ไม่มี session → กลับหน้าหลักแบบ guest (ไม่ใช่ /login)
+  // logout เคลียร์ session ก่อนที่ handler จะ navigate ทัน guard ตัวนี้จึงชิงพาไป
+  // ก่อนเสมอ — ปลายทางที่ถูกต้องต้องอยู่ตรงนี้ ไม่ใช่แค่ในปุ่ม logout
   if (!session) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   // มี session → render children

@@ -144,6 +144,7 @@ export default function Login() {
     <AuthLayout
       tagline="การดูแลที่ดี เริ่มต้นจากความใส่ใจ"
       subtitle="ยินดีต้อนรับกลับ เข้าสู่ระบบเพื่อจัดการนัดหมาย และบริการดูแลผู้สูงอายุของคุณ"
+      showBackToHome
     >
       <form onSubmit={handleSubmit} className="w-full max-w-[420px]" id="login-form" noValidate>
         {/* Heading */}

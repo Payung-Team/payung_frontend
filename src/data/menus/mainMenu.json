@@ -38,7 +38,7 @@
     {
       "id": "search_caregivers",
       "type": "navigation",
-      "label": "ค้นหาผู้ดูแล",
+      "label": "จองผู้ดูแล",
       "icon": "person-outline",
       "route": "/booking/new",
       "allowedRoles": ["patient"]

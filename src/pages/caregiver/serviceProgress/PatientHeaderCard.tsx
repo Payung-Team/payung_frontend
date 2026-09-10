@@ -1,18 +1,25 @@
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../../../components/ui/Icon';
+import PatientProfileDetails from '../PatientProfileDetails';
+import type { PatientProfile } from '../../../lib/patientProfile';
 
 export interface PatientHeaderCardProps {
   patientName: string;
   careRecipientName?: string | null;
   /** Anchors to the "ดูโปรไฟล์ผู้รับบริการ" ExpandableSection further down the page. */
   profileSectionId: string;
+  /** PYG-460 — ข้อมูลสุขภาพ ณ วันจอง · null/undefined ในการจองเก่า */
+  patientProfile?: PatientProfile | null;
 }
 
 /** Patient identity card with real actions only — a "โทร" button is intentionally omitted here
  * since Booking has no direct patient phone field (only dayOfContact*, already surfaced by
- * EmergencyContactCard); a "อาการ/เงื่อนไข" condition tag is likewise omitted, since no such
- * data exists on Booking — showing either would mean faking data that isn't there. */
-export default function PatientHeaderCard({ patientName, careRecipientName, profileSectionId }: Readonly<PatientHeaderCardProps>) {
+ * EmergencyContactCard).
+ *
+ * PYG-460 — เงื่อนไข/อาการเคยถูกตัดออกเพราะ "ไม่มีข้อมูลนั้นบน Booking" ซึ่งจริงในตอนนั้น
+ * ตอนนี้ patientProfile เป็น snapshot จริงจากที่ผู้ใช้กรอก จึงแสดงได้แล้ว
+ * ไม่ใช่การเดาข้อมูล — และ PatientProfileDetails จะไม่ render อะไรเลยถ้าไม่มีข้อมูล */
+export default function PatientHeaderCard({ patientName, careRecipientName, profileSectionId, patientProfile }: Readonly<PatientHeaderCardProps>) {
   const navigate = useNavigate();
 
   function scrollToProfile() {
@@ -39,6 +46,8 @@ export default function PatientHeaderCard({ patientName, careRecipientName, prof
           </p>
         </div>
       </div>
+
+      <PatientProfileDetails profile={patientProfile} />
 
       <div className="mt-4 flex gap-2.5">
         <button
