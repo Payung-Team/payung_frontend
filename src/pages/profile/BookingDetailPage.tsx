@@ -17,6 +17,7 @@ import { PaymentInfoSection } from '../../components/payment/PaymentInfoSection'
 import type { PaymentInfo } from '../../components/payment/PaymentInfoSection';
 import { Divider, SectionTitle, InfoRow } from '../../components/booking/BookingDetailFields';
 import { BookingTrackingView } from '../../components/booking/BookingTrackingView';
+import { JobQrCard } from '../../components/booking/JobQrCard';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -462,7 +463,6 @@ export default function BookingDetailPage() {
           booking={booking}
           onBack={() => navigate('/bookings')}
           onReportProblem={() => setShowDisputeModal(true)}
-          onMessage={() => navigate('/messages')}
           onWriteReview={handleReview}
           onRebook={() => {
             if (booking.caregiverId) navigate(`/caregivers/${booking.caregiverId}`);
@@ -587,6 +587,17 @@ export default function BookingDetailPage() {
               {banner.message(caregiverDisplayName)}
             </p>
           </div>
+
+          {/* QR ให้ผู้ดูแลสแกน (PYG-437)
+              หน้านี้คือมุมมอง "ยังไม่ถึงวันนัด" — พอถึงวันจะสลับไปหน้า BookingTrackingView
+              ซึ่งมีการ์ดใบเดียวกันนี้อยู่แล้ว ที่นี่จึงมักแสดงสถานะ "ยังไม่ถึงเวลาใช้ QR"
+              ★ เช็ค isPatient ด้วย เพราะเส้นทาง /bookings/:id ผู้ดูแลก็เปิดได้
+                และ query jobQr เปิดให้เฉพาะเจ้าของ booking (ผู้ดูแลเรียกแล้วโดน 403) */}
+          {isPatient && (
+            <div style={{ marginBottom: 18 }}>
+              <JobQrCard bookingId={booking.id} bookingStatus={booking.status} />
+            </div>
+          )}
 
           {/* Main card */}
           <div style={{ background: '#FFFFFF', border: '0.8px solid #E0E2E5', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 20, padding: 24 }}>

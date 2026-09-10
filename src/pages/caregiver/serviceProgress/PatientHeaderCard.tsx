@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom';
 import { Icon } from '../../../components/ui/Icon';
 import PatientProfileDetails from '../PatientProfileDetails';
 import type { PatientProfile } from '../../../lib/patientProfile';
@@ -20,8 +19,6 @@ export interface PatientHeaderCardProps {
  * ตอนนี้ patientProfile เป็น snapshot จริงจากที่ผู้ใช้กรอก จึงแสดงได้แล้ว
  * ไม่ใช่การเดาข้อมูล — และ PatientProfileDetails จะไม่ render อะไรเลยถ้าไม่มีข้อมูล */
 export default function PatientHeaderCard({ patientName, careRecipientName, profileSectionId, patientProfile }: Readonly<PatientHeaderCardProps>) {
-  const navigate = useNavigate();
-
   function scrollToProfile() {
     document.getElementById(profileSectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -50,15 +47,6 @@ export default function PatientHeaderCard({ patientName, careRecipientName, prof
       <PatientProfileDetails profile={patientProfile} />
 
       <div className="mt-4 flex gap-2.5">
-        <button
-          type="button"
-          onClick={() => navigate('/messages')}
-          className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#E5E7EB] text-xs font-bold text-[#575859] transition hover:bg-[#F7F8F9] focus:outline-none focus:ring-2 focus:ring-[#52B69A] focus:ring-offset-2"
-          style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-        >
-          <Icon name="chat" size="small" color="#575859" />
-          ส่งข้อความ
-        </button>
         <button
           type="button"
           onClick={scrollToProfile}

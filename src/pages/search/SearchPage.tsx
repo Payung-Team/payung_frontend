@@ -632,11 +632,6 @@ function SearchPageContent() {
   const [page, setPage] = useState(1);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
-  const districts = useMemo(
-    () => getDistricts(pendingFilters.province),
-    [pendingFilters.province, getDistricts]
-  );
-
   const applyFilters = useCallback(() => {
     setAppliedFilters(pendingFilters);
     setPage(1);

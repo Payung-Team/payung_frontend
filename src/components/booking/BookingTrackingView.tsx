@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useBooking, type ConfirmedBooking } from '../../context/BookingContext';
 import { useJobEvents } from '../../hooks/useJobEvents';
 import { ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
+import { JobQrCard } from './JobQrCard';
 
 // ── Tracking Service view (PYG-361) ─────────────────────────────────────────────
 // Shown to patients once a confirmed booking's service date has arrived. Three
@@ -398,7 +399,6 @@ export function BookingTrackingView({
   booking,
   onBack,
   onReportProblem,
-  onMessage,
   onWriteReview,
   onRebook,
   hasReviewed = false,
@@ -406,7 +406,6 @@ export function BookingTrackingView({
   booking: ConfirmedBooking;
   onBack: () => void;
   onReportProblem: () => void;
-  onMessage: () => void;
   onWriteReview: () => void;
   onRebook: () => void;
   hasReviewed?: boolean;
@@ -700,6 +699,16 @@ export function BookingTrackingView({
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* QR ให้ผู้ดูแลสแกน (PYG-437) — วางไว้บนสุดของเนื้อหาเพราะเป็น "สิ่งที่ผู้ใช้
+            ต้องลงมือทำ" บนหน้านี้ ส่วนการ์ดอื่นเป็นข้อมูลให้อ่าน
+            ซ่อนทั้งใบเมื่อเช็คเอาท์แล้ว — การ์ด "การดูแลเสร็จสิ้น" ด้านล่างพูดแทนแล้ว
+            (ตัวการ์ดเองก็กันอีกชั้น ถ้า job_session เป็น CHECKED_OUT จะไม่วาด QR อยู่ดี) */}
+        {!hasCheckedOut && (
+          <div style={{ marginTop: 20 }}>
+            <JobQrCard bookingId={booking.id} bookingStatus={booking.status} />
           </div>
         )}
 
@@ -1020,14 +1029,6 @@ export function BookingTrackingView({
                   </div>
                 ) : (
                   <div style={{ marginTop: 16, display: 'flex', flexDirection: 'row', gap: 10 }}>
-                    <button
-                      type="button"
-                      onClick={onMessage}
-                      style={{ flex: 1, boxSizing: 'border-box', display: 'inline-flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: '0 12px', gap: 6, height: 40, background: '#52B69A', border: 'none', boxShadow: '0px 4px 12px rgba(82,182,154,0.2)', borderRadius: 12, cursor: 'pointer' }}
-                    >
-                      <span className="material-icons" style={{ fontSize: 16, color: '#FFFFFF' }}>chat_bubble</span>
-                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#FFFFFF', lineHeight: '20px' }}>ส่งข้อความ</span>
-                    </button>
                     <button
                       type="button"
                       disabled={!isCheckedIn}

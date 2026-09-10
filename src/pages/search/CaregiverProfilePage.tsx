@@ -545,15 +545,8 @@ const CaregiverProfilePage: React.FC = () => {
                 จองบริการ
               </button>
 
-              {/* Secondary buttons — แชท + บันทึก side-by-side */}
+              {/* Secondary button — บันทึก */}
               <div className="flex items-center gap-2 mt-2">
-                <button
-                  type="button"
-                  className="flex-1 flex items-center justify-center gap-1.5 transition-colors duration-150 cursor-pointer hover:bg-gray-50"
-                  style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, height: 40, background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 8, color: '#575859' }}
-                >
-                  <span className="material-icons" style={{ fontSize: 16, color: '#575859' }}>chat</span>{' '}แชท
-                </button>
                 <button
                   type="button"
                   onClick={() => {

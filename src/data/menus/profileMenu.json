@@ -20,14 +20,6 @@
       "allowedRoles": ["patient"]
     },
     {
-      "id": "profile_messages",
-      "type": "navigation",
-      "label": "Messages",
-      "icon": "chatbubble-outline",
-      "route": "/profile/messages",
-      "allowedRoles": ["patient", "caregiver"]
-    },
-    {
       "id": "profile_reviews",
       "type": "navigation",
       "label": "Reviews",
