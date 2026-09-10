@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBooking } from '../../../context/BookingContext';
 import { supabase } from '../../../lib/supabase';
+import type { PatientProfile } from '../../../lib/patientProfile';
 import ConfirmModal from '../../../components/ui/ConfirmModal';
 
 const API_BASE = ((import.meta.env.VITE_GRAPHQL_URL as string) || 'http://localhost:3000/graphql')
@@ -10,51 +11,16 @@ const API_BASE = ((import.meta.env.VITE_GRAPHQL_URL as string) || 'http://localh
 interface SavedRecipient {
   id: string;
   name: string;
+  nickname?: string;
   /**
    * ข้อมูลสุขภาพที่จะเติมให้อัตโนมัติเมื่อเลือกโปรไฟล์นี้
    *
-   * ตอนนี้มีเฉพาะในข้อมูล mock — API จริงคืนแค่ id/name เพราะ DTO ฝั่ง
-   * backend ยังรับแค่ name + nickname (คอลัมน์ในตาราง care_recipients
-   * มีครบแล้ว รอขยาย DTO/service เท่านั้น)
+   * ⚠ อาจไม่มีคีย์นี้เลย (ไม่ใช่ `{}`) ในโปรไฟล์ที่ไม่เคยกรอกข้อมูลสุขภาพ
+   * ⚠ age / weight / height เป็น number ตาม API — ไม่ใช่ string เหมือน input state
+   *   จึงต้อง String() ก่อนใส่ลงช่องกรอก (ดู handleSelectRecipient)
    */
-  details?: {
-    age: string;
-    gender: 'ชาย' | 'หญิง';
-    weight: string;
-    height: string;
-    supportLevel: string;
-    bloodGroup: string;
-    conditions: string[];
-    medicines: string;
-    allergies: string;
-    careInstructions: string;
-    regularHospital: string;
-  };
+  details?: PatientProfile;
 }
-
-// MOCK — ใช้ระหว่างที่ API ยังไม่มีโปรไฟล์ที่บันทึกไว้ ให้เห็นหน้าตาลิสต์ก่อน
-// ลบทิ้งได้ทันทีเมื่อ GET /api/v1/patient/care-recipients คืนข้อมูลจริง
-const MOCK_RECIPIENTS: SavedRecipient[] = [
-  {
-    id: 'mock-1',
-    name: 'ปาริชาต วงศ์ดี',
-    details: {
-      age: '72',
-      gender: 'หญิง',
-      weight: '54',
-      height: '152',
-      supportLevel: 'ช่วยเหลือตัวเองได้เล็กน้อย / ต้องการการช่วยพยุงเดิน',
-      bloodGroup: 'O',
-      conditions: ['เบาหวาน', 'ความดันสูง'],
-      medicines: 'Metformin 500mg เช้า-เย็น, Amlodipine 5mg เช้า',
-      allergies: 'แพ้ยากลุ่มซัลฟา (ขึ้นผื่น)',
-      careInstructions:
-        'เดินต้องมีคนพยุงข้างซ้ายเสมอ ลุกจากเตียงช้า ๆ เพราะเวียนหัวง่าย วัดความดันก่อนนอนทุกวัน',
-      regularHospital: 'โรงพยาบาลรามาธิบดี',
-    },
-  },
-  { id: 'mock-2', name: 'สมชาย วงศ์ดี' },
-];
 
 /** หนึ่งแถวในลิสต์ "ผู้รับบริการคือใคร" — วงกลมเลือก + ชื่อ + ปุ่มลบ */
 function RecipientRow({
@@ -182,8 +148,10 @@ export default function BookingStepPatient() {
   const [saveAsProfile, setSaveAsProfile] = useState(false);
   // รายชื่อที่กด "ลบ" ไว้ รอยืนยันใน modal
   const [pendingDelete, setPendingDelete] = useState<SavedRecipient | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const [savedRecipients, setSavedRecipients] = useState<SavedRecipient[]>(MOCK_RECIPIENTS);
+  const [savedRecipients, setSavedRecipients] = useState<SavedRecipient[]>([]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -198,7 +166,9 @@ export default function BookingStepPatient() {
         });
         if (!res.ok) return;
         const data: SavedRecipient[] = await res.json();
-        if (!cancelled && data.length > 0) setSavedRecipients(data);
+        // ตั้งค่าแม้ลิสต์ว่าง — เดิมกันด้วย data.length > 0 เพราะต้องกัน MOCK ไม่ให้หาย
+        // ตอนนี้ไม่มี MOCK แล้ว ถ้ายังกันอยู่ ลบโปรไฟล์ใบสุดท้ายแล้วลิสต์จะไม่อัปเดต
+        if (!cancelled) setSavedRecipients(data);
       } catch {
         // ดึงไม่ได้ก็แค่ไม่แสดงการ์ดโปรไฟล์ที่บันทึกไว้
       }
@@ -209,14 +179,23 @@ export default function BookingStepPatient() {
   }, []);
 
   // Auto-save
+  //
+  // ⚠ ต้องเก็บ selectedRecipientId / saveAsProfile ลง draft ด้วย ไม่ใช่แค่ state ในหน้านี้
+  //   เพราะขั้นยิง POST /bookings อยู่คนละหน้า (SearchPage / CaregiverProfilePage)
+  //   สองค่านี้เคยตายอยู่ในหน้านี้ ทำให้ติ๊ก "บันทึกไว้" แล้วไม่เกิดอะไรขึ้น
+  //   และ booking ไม่เคยผูกกับโปรไฟล์ที่เลือก
   useEffect(() => {
     setBookingDraft((prev) => ({
       ...(prev || { serviceLocation: [], serviceTypes: [] }),
       recipient: {
         type: 'self',
+        selectedRecipientId,
+        saveAsProfile,
         patientDetails: {
           name,
-          age: Number(age) || 0,
+          // เดิมเป็น `Number(age) || 0` — ช่องที่ว่างกลายเป็นอายุ 0 ปีซึ่ง BE รับเป็น
+          // ค่าที่ถูกต้อง (0-130 เพราะผู้รับบริการอาจเป็นทารก) แล้วบันทึกไปเงียบ ๆ
+          age: age.trim() ? Number(age) : undefined,
           gender,
           weight: weight ? Number(weight) : undefined,
           height: height ? Number(height) : undefined,
@@ -248,6 +227,8 @@ export default function BookingStepPatient() {
     contactName,
     contactPhone,
     contactRel,
+    selectedRecipientId,
+    saveAsProfile,
   ]);
 
   // เลือกโปรไฟล์ที่บันทึกไว้ — เติมทุกช่องที่โปรไฟล์นั้นมี ที่เหลือล้างให้ว่าง
@@ -261,11 +242,17 @@ export default function BookingStepPatient() {
     setSaveAsProfile(false);
     setName(recipient.name);
 
+    // ⚠ API คืน age/weight/height เป็น number แต่ช่องกรอกเป็น controlled input
+    //   ที่รับ string — ต้อง String() ก่อน ไม่งั้น React เตือนเรื่องชนิดของ value
+    //   หรือช่องขึ้นว่างแบบไม่มี error ให้เห็น
+    //   ใช้ != null เพื่อให้อายุ 0 (ทารก) ที่บันทึกไว้แล้วยังเติมกลับได้
     const d = recipient.details;
-    setAge(d?.age ?? '');
+    setAge(d?.age != null ? String(d.age) : '');
     setGender(d?.gender ?? '');
-    setWeight(d?.weight ?? '');
-    setHeight(d?.height ?? '');
+    setWeight(d?.weight != null ? String(d.weight) : '');
+    setHeight(d?.height != null ? String(d.height) : '');
+    // 'ใช้รถเข็น' ไม่มีปุ่มในฟอร์ม → ไม่มีปุ่มไหนถูกไฮไลต์ เป็นพฤติกรรมที่ตั้งใจ
+    // validation จะบังคับให้ผู้ใช้เลือกใหม่เอง ห้ามเดาแทน
     setSupportLevel(d?.supportLevel ?? '');
     setBloodGroup(d?.bloodGroup ?? '');
     setConditions(d?.conditions ? [...d.conditions] : []);
@@ -276,12 +263,36 @@ export default function BookingStepPatient() {
   };
 
   // ลบรายชื่อที่บันทึกไว้ — ยืนยันผ่าน modal ก่อนเสมอ
-  // NOTE: backend ยังไม่มี DELETE /api/v1/patient/care-recipients/:id
-  // ตอนนี้จึงลบออกจากลิสต์ในหน้านี้เท่านั้น — ต่อ API จริงเมื่อมี endpoint แล้ว
-  const confirmDeleteRecipient = () => {
+  // BE ใช้ soft delete + snapshot: การจองที่ผ่านมายังอยู่และยังแสดงข้อมูลคนไข้ได้
+  const confirmDeleteRecipient = async () => {
     if (!pendingDelete) return;
-    setSavedRecipients((prev) => prev.filter((r) => r.id !== pendingDelete.id));
-    if (selectedRecipientId === pendingDelete.id) setSelectedRecipientId(null);
+    const target = pendingDelete;
+
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error('no session');
+
+      const res = await fetch(`${API_BASE}/api/v1/patient/care-recipients/${target.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // 204 = ลบแล้ว · 404 = หายไปอยู่แล้ว (กดซ้ำ / ลบจากอีกแท็บ) ถือว่าสำเร็จทั้งคู่
+      // เป้าหมายของผู้ใช้คือ "ให้มันหายไป" ซึ่งบรรลุแล้วทั้งสองกรณี
+      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
+    } catch {
+      setDeleteError(`ลบ "${target.name}" ไม่สำเร็จ กรุณาลองอีกครั้ง`);
+      setDeleting(false);
+      return;
+    }
+
+    setSavedRecipients((prev) => prev.filter((r) => r.id !== target.id));
+    if (selectedRecipientId === target.id) setSelectedRecipientId(null);
+    setDeleting(false);
     setPendingDelete(null);
   };
 
@@ -361,10 +372,16 @@ export default function BookingStepPatient() {
                 selected={selectedRecipientId === r.id}
                 title={r.name}
                 onSelect={() => handleSelectRecipient(r)}
-                onDelete={() => setPendingDelete(r)}
+                onDelete={() => {
+                  setDeleteError(null);
+                  setPendingDelete(r);
+                }}
               />
             ))}
           </div>
+          {deleteError && (
+            <p className="mt-3 text-[11px] font-semibold text-red-500">{deleteError}</p>
+          )}
         </section>
       )}
 
@@ -711,7 +728,7 @@ export default function BookingStepPatient() {
 
       <ConfirmModal
         isOpen={pendingDelete !== null}
-        isLoading={false}
+        isLoading={deleting}
         title="ลบรายชื่อนี้?"
         description={
           <>
@@ -720,7 +737,7 @@ export default function BookingStepPatient() {
           </>
         }
         confirmText="ลบ"
-        onClose={() => setPendingDelete(null)}
+        onClose={() => !deleting && setPendingDelete(null)}
         onConfirm={confirmDeleteRecipient}
         iconName="delete"
         iconBgColor="bg-red-500"

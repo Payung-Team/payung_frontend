@@ -736,6 +736,22 @@ const CAREGIVER_BOOKING_SUMMARY_FIELDS = `
   confirmedAt
   rejectionReason
   createdAt
+  # PYG-460 — snapshot ข้อมูลสุขภาพ ณ วันจอง (อ่านจาก bookings.member_details)
+  # ทุกฟิลด์ nullable · การจองเก่าก่อน PYG-460 จะได้ null ทั้งก้อน
+  # ค่า gender / supportLevel เป็นข้อความไทยตามที่ผู้ใช้กรอก ไม่ใช่ enum
+  patientProfile {
+    age
+    gender
+    weight
+    height
+    supportLevel
+    bloodGroup
+    conditions
+    medicines
+    allergies
+    careInstructions
+    regularHospital
+  }
 `;
 
 export const GET_MY_BOOKING = gql`

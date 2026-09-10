@@ -33,9 +33,25 @@ export interface BookingRequest {
   recipient?: {
     type: 'self' | 'member';
     selectedMemberId?: string;
+    /**
+     * PYG-460 — id ของโปรไฟล์ที่ผู้ใช้เลือกจากลิสต์ใน BookingStepPatient
+     * (undefined/null = กรอกเอง ไม่ได้เลือกใบไหน) ส่งต่อเป็น careRecipientId
+     * ตอนยิง POST /bookings ซึ่งอยู่คนละหน้ากับหน้าที่กรอก
+     */
+    selectedRecipientId?: string | null;
+    /**
+     * PYG-460 — ผู้ใช้ติ๊ก "บันทึกผู้รับบริการรายนี้ไว้" หรือไม่
+     * BE จะสร้างโปรไฟล์ใน transaction เดียวกับ booking
+     */
+    saveAsProfile?: boolean;
     patientDetails?: {
       name: string;
-      age: number;
+      /**
+       * PYG-460 — เดิมเป็น `age: number` แล้ว BookingStepPatient เขียน
+       * `Number(age) || 0` ทำให้ช่องที่ว่างกลายเป็น 0 ซึ่ง BE รับเป็นอายุที่ถูกต้อง
+       * → เปลี่ยนเป็น optional เพื่อให้ "ไม่ได้กรอก" ต่างจาก "อายุ 0"
+       */
+      age?: number;
       nickname?: string;
       gender?: 'ชาย' | 'หญิง' | '';
       weight?: number;
