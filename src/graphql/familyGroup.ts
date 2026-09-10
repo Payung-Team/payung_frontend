@@ -60,6 +60,37 @@ export const GROUP_CARE_RECIPIENTS = gql`
   }
 `;
 
+/**
+ * PYG-385: shared feed of on-behalf bookings for a group — every ACTIVE member sees the same
+ * list, newest first. Empty array (not an error) when the group has no bookings yet.
+ */
+export const GROUP_BOOKINGS = gql`
+  query GroupBookings($groupId: ID!) {
+    groupBookings(groupId: $groupId) {
+      id
+      bookingDate
+      startTime
+      status
+      serviceType
+      durationHours
+      careRecipientName
+      caregiver {
+        id
+        fullName
+        avatarUrl
+      }
+      bookedByName
+      bookedByUserId
+      bookedByMe
+      estimatedCost
+      serviceLocations
+      locationAddress
+      paymentStatus
+      checkInTime
+    }
+  }
+`;
+
 /** The current usable join link (OWNER only). Throws JOIN_LINK_NOT_FOUND when the group has none. */
 export const GROUP_JOIN_LINK = gql`
   query GroupJoinLink($groupId: ID!) {
@@ -209,6 +240,56 @@ export const JOIN_GROUP_BY_LINK = gql`
   }
 `;
 
+// ── PYG-385: manage care recipients in a group (add / edit / remove) ──────────
+
+export const ADD_GROUP_CARE_RECIPIENT = gql`
+  mutation AddGroupCareRecipient($input: AddGroupCareRecipientInput!) {
+    addGroupCareRecipient(input: $input) {
+      id
+      name
+      nickname
+      ownerUserId
+    }
+  }
+`;
+
+export const UPDATE_GROUP_CARE_RECIPIENT = gql`
+  mutation UpdateGroupCareRecipient($input: UpdateGroupCareRecipientInput!) {
+    updateGroupCareRecipient(input: $input) {
+      id
+      name
+      nickname
+      ownerUserId
+    }
+  }
+`;
+
+export const REMOVE_GROUP_CARE_RECIPIENT = gql`
+  mutation RemoveGroupCareRecipient($input: RemoveGroupCareRecipientInput!) {
+    removeGroupCareRecipient(input: $input) {
+      recipientId
+      removed
+    }
+  }
+`;
+
+/**
+ * PYG-385 — จองผู้ดูแลแทนผู้รับบริการที่แชร์อยู่ในกลุ่ม.
+ * Returns the created booking (BookingSummary). The booker is the paying user; the existing
+ * payment flow runs afterwards unchanged. RECIPIENT_NOT_IN_GROUP if the recipient isn't shared
+ * into this group.
+ */
+export const CREATE_BOOKING_ON_BEHALF = gql`
+  mutation CreateBookingOnBehalf($input: CreateBookingOnBehalfInput!) {
+    createBookingOnBehalf(input: $input) {
+      id
+      status
+      bookingDate
+      careRecipientName
+    }
+  }
+`;
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type GroupRole = 'OWNER' | 'MEMBER';
@@ -240,6 +321,29 @@ export interface GroupCareRecipient {
   name: string;
   nickname?: string | null;
   ownerUserId: string;
+}
+
+export interface GroupBookingSummary {
+  id: string;
+  bookingDate: string;
+  startTime?: string | null;
+  status: string;
+  serviceType: string;
+  durationHours?: number | null;
+  careRecipientName?: string | null;
+  caregiver?: {
+    id: string;
+    fullName?: string | null;
+    avatarUrl?: string | null;
+  } | null;
+  bookedByName?: string | null;
+  bookedByUserId?: string | null;
+  bookedByMe: boolean;
+  estimatedCost?: number | null;
+  serviceLocations?: string[] | null;
+  locationAddress?: string | null;
+  paymentStatus?: string | null;
+  checkInTime?: string | null;
 }
 
 export interface FamilyGroupJoinLink {

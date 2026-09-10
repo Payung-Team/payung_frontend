@@ -7,13 +7,14 @@ import {
   TRANSFER_OWNERSHIP,
   DELETE_FAMILY_GROUP,
   CREATE_JOIN_LINK,
+  LEAVE_FAMILY_GROUP,
   MY_FAMILY_GROUPS,
   type FamilyGroup,
   type FamilyGroupJoinLink,
 } from '../../../graphql/familyGroup';
 import { useStrings } from '../familyStrings';
 import { fgErrorMessage } from '../familyErrors';
-import { ModalShell, ModalHeader, GroupAvatar } from './familyUi';
+import { ModalShell, ModalHeader, GroupAvatar, ConfirmDialog } from './familyUi';
 
 const NAME_MAX = 80; // GROUP_NAME_MAX_LENGTH on the API
 
@@ -281,15 +282,21 @@ export function TransferOwnershipModal({
   onClose,
   onDone,
   onToast,
+  preselectUserId,
 }: {
   group: FamilyGroup;
   onClose: () => void;
   onDone: () => void;
   onToast: (message: string, kind?: 'success' | 'error') => void;
+  /** Seed the selection — set when opened from a member row's "make owner" action. */
+  preselectUserId?: string;
 }) {
   const s = useStrings();
   const others = group.members.filter((m) => !m.isMe && m.role !== 'OWNER');
-  const [selected, setSelected] = useState(others[0]?.userId ?? '');
+  const preselected = others.some((m) => m.userId === preselectUserId)
+    ? preselectUserId!
+    : others[0]?.userId ?? '';
+  const [selected, setSelected] = useState(preselected);
   const [transfer, { loading }] = useMutation(TRANSFER_OWNERSHIP);
 
   const submit = async () => {
@@ -538,5 +545,54 @@ function FormActions({
         {loading ? busyText : confirmText}
       </button>
     </div>
+  );
+}
+
+// ── Leave (members only) ───────────────────────────────────────────────────────
+// A plain member leaves the group. Owners are routed elsewhere (they must transfer or
+// delete first), so this dialog is never shown to the last owner.
+
+export function LeaveGroupDialog({
+  group,
+  onClose,
+  onLeft,
+  onToast,
+}: {
+  group: FamilyGroup;
+  onClose: () => void;
+  onLeft: () => void;
+  onToast: (m: string, k?: 'success' | 'error') => void;
+}) {
+  const s = useStrings();
+  const [leave, { loading }] = useMutation<{
+    leaveFamilyGroup: { groupId: string; groupName: string; left: boolean };
+  }>(LEAVE_FAMILY_GROUP, {
+    refetchQueries: [{ query: MY_FAMILY_GROUPS }],
+  });
+  const submit = async () => {
+    try {
+      const res = await leave({ variables: { groupId: group.id } });
+      onToast(s.toastLeft(res.data?.leaveFamilyGroup?.groupName || group.name), 'success');
+      onLeft();
+    } catch (e) {
+      onToast(fgErrorMessage(e), 'error');
+    }
+  };
+  return (
+    <ConfirmDialog
+      onClose={onClose}
+      onConfirm={submit}
+      loading={loading}
+      icon="logout"
+      iconBg="bg-[#DC2626]"
+      confirmBg="bg-[#DC2626]"
+      confirmHover="hover:bg-[#B91C1C]"
+      title={s.leaveTitle(group.name)}
+      cancelText={s.cancel}
+      confirmText={s.leaveCta}
+      busyText={s.busyLeaving}
+    >
+      {s.leaveBody}
+    </ConfirmDialog>
   );
 }

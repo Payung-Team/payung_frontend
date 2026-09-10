@@ -81,6 +81,26 @@ export interface BookingRequest {
     platformFee: number;
     total: number;
   };
+  /**
+   * PYG-385: set only when a family-group member is booking on behalf of a shared care
+   * recipient. Its presence switches the submit path to `createBookingOnBehalf` (GraphQL) so
+   * family_group_id + care_recipient_id + memberDetails get persisted; the booker still pays,
+   * and the payment flow after this is untouched.
+   */
+  onBehalf?: {
+    familyGroupId: string;
+    careRecipientId: string;
+    recipientName: string;
+  };
+  /**
+   * Transient hint set when the flow is entered from a family group's "จองแทนสมาชิก" /
+   * "จองแทนสมาชิกรายนี้". Step 4 reads it to open in "book for a member" mode (and preselect
+   * `memberUserId` when given). The concrete `onBehalf` is resolved once a member is chosen.
+   */
+  groupContext?: {
+    groupId: string;
+    memberUserId?: string;
+  };
 }
 
 export interface SavedCaregiver {

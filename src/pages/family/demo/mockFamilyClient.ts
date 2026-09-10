@@ -43,6 +43,7 @@ const store: {
   groups: MockGroup[];
   recipients: Record<string, { id: string; name: string; nickname: string | null; ownerUserId: string }[]>;
   links: Record<string, MockLink | undefined>;
+  bookings: Record<string, unknown[]>;
   seq: number;
 } = {
   groups: [
@@ -77,6 +78,146 @@ const store: {
   },
   links: {
     g1: { id: 'l1', url: 'https://payung.app/join?token=demo9f2a4c71b8', expiresAt: iso(7), maxUses: 10, usedCount: 3, memberLimit: 10 },
+  },
+  bookings: {
+    g1: [
+      // In-progress today → the expanded card with a live shift timeline.
+      {
+        __typename: 'GroupBookingSummary',
+        id: 'b1',
+        bookingDate: iso(0).slice(0, 10),
+        startTime: '09:00',
+        status: 'in_progress',
+        serviceType: 'elderly_care',
+        durationHours: 4,
+        careRecipientName: 'สมศรี วงศ์ดี',
+        caregiver: { __typename: 'CaregiverBrief', id: 'cg1', fullName: 'พยาบาลมาลี', avatarUrl: null },
+        bookedByName: 'ณัฐพล วงศ์ดี',
+        bookedByMe: true,
+        bookedByUserId: 'u-me',
+        estimatedCost: 1760,
+        serviceLocations: ['at_home'],
+        locationAddress: '123/45 ซอยลาดพร้าว 101 ถนนลาดพร้าว แขวงคลองจั่น เขตบางกะปิ กรุงเทพมหานคร 10240',
+        paymentStatus: 'held',
+        checkInTime: '09:04',
+      },
+      {
+        __typename: 'GroupBookingSummary',
+        id: 'b2',
+        bookingDate: iso(2).slice(0, 10),
+        startTime: '09:00',
+        status: 'confirmed',
+        serviceType: 'elderly_care',
+        durationHours: 4,
+        careRecipientName: 'สมศรี วงศ์ดี',
+        caregiver: { __typename: 'CaregiverBrief', id: 'cg2', fullName: 'ธนพร ว.', avatarUrl: null },
+        bookedByName: 'ปาริชาต วงศ์ดี',
+        bookedByMe: false,
+        bookedByUserId: 'u-parichat',
+        estimatedCost: 1760,
+        serviceLocations: ['at_home'],
+        locationAddress: '123/45 ซอยลาดพร้าว 101 เขตบางกะปิ',
+        paymentStatus: 'held',
+        checkInTime: null,
+      },
+      {
+        __typename: 'GroupBookingSummary',
+        id: 'b3',
+        bookingDate: iso(-6).slice(0, 10),
+        startTime: '09:00',
+        status: 'confirmed',
+        serviceType: 'general_care',
+        durationHours: 4,
+        careRecipientName: 'ปาริชาต วงศ์ดี',
+        caregiver: { __typename: 'CaregiverBrief', id: 'cg3', fullName: 'มาลี ก.', avatarUrl: null },
+        bookedByName: 'ปาริชาต วงศ์ดี',
+        bookedByMe: false,
+        bookedByUserId: 'u-parichat',
+        estimatedCost: 1760,
+        serviceLocations: ['at_home'],
+        locationAddress: '88/12 ซอยเพชรเกษม 48 เขตภาษีเจริญ',
+        paymentStatus: 'captured',
+        checkInTime: null,
+      },
+      {
+        __typename: 'GroupBookingSummary',
+        id: 'b4',
+        bookingDate: iso(-4).slice(0, 10),
+        startTime: '13:00',
+        status: 'accepted',
+        serviceType: 'bedridden_care',
+        durationHours: 6,
+        careRecipientName: 'ประยูร วงศ์ดี',
+        caregiver: { __typename: 'CaregiverBrief', id: 'cg4', fullName: 'สมหญิง ด.', avatarUrl: null },
+        bookedByName: 'ณัฐพล วงศ์ดี',
+        bookedByMe: true,
+        bookedByUserId: 'u-me',
+        estimatedCost: 2640,
+        serviceLocations: ['at_home', 'accompany_outside'],
+        locationAddress: '456 หมู่บ้านสุขใจ เขตประเวศ',
+        paymentStatus: 'held',
+        checkInTime: null,
+      },
+      {
+        __typename: 'GroupBookingSummary',
+        id: 'b5',
+        bookingDate: iso(-8).slice(0, 10),
+        startTime: '10:00',
+        status: 'confirmed',
+        serviceType: 'physiotherapy',
+        durationHours: 2,
+        careRecipientName: 'สมศรี วงศ์ดี',
+        caregiver: { __typename: 'CaregiverBrief', id: 'cg5', fullName: 'ธีรพงษ์ น.', avatarUrl: null },
+        bookedByName: 'ปาริชาต วงศ์ดี',
+        bookedByMe: false,
+        bookedByUserId: 'u-parichat',
+        estimatedCost: 900,
+        serviceLocations: ['at_home'],
+        locationAddress: '123/45 ซอยลาดพร้าว 101 เขตบางกะปิ',
+        paymentStatus: 'captured',
+        checkInTime: null,
+      },
+      // Pending → "รอยืนยันการจอง" tab (no caregiver matched yet).
+      {
+        __typename: 'GroupBookingSummary',
+        id: 'b6',
+        bookingDate: iso(4).slice(0, 10),
+        startTime: '13:00',
+        status: 'unmatched',
+        serviceType: 'general_care',
+        durationHours: 3,
+        careRecipientName: 'ประยูร วงศ์ดี',
+        caregiver: null,
+        bookedByName: 'ปาริชาต วงศ์ดี',
+        bookedByMe: false,
+        bookedByUserId: 'u-parichat',
+        estimatedCost: 1320,
+        serviceLocations: ['accompany_outside'],
+        locationAddress: '88/12 ซอยเพชรเกษม 48 เขตภาษีเจริญ',
+        paymentStatus: 'pending',
+        checkInTime: null,
+      },
+      // Completed → "ประวัติ" (history icon).
+      {
+        __typename: 'GroupBookingSummary',
+        id: 'b7',
+        bookingDate: iso(-20).slice(0, 10),
+        startTime: '09:00',
+        status: 'completed',
+        serviceType: 'elderly_care',
+        durationHours: 4,
+        careRecipientName: 'สมศรี วงศ์ดี',
+        caregiver: { __typename: 'CaregiverBrief', id: 'cg1', fullName: 'พยาบาลมาลี', avatarUrl: null },
+        bookedByName: 'ณัฐพล วงศ์ดี',
+        bookedByMe: true,
+        bookedByUserId: 'u-me',
+        estimatedCost: 1760,
+        serviceLocations: ['at_home'],
+        locationAddress: '123/45 ซอยลาดพร้าว 101 เขตบางกะปิ',
+        paymentStatus: 'transferred',
+        checkInTime: null,
+      },
+    ],
   },
   seq: 100,
 };
@@ -148,6 +289,54 @@ function resolve(opName: string, vars: Vars): { data?: unknown; errors?: unknown
           })),
         },
       };
+
+    case 'GroupBookings':
+      return { data: { groupBookings: store.bookings[vars.groupId as string] ?? [] } };
+
+    case 'AddGroupCareRecipient': {
+      const input = vars.input as { groupId: string; name: string; nickname?: string };
+      const rec = {
+        id: `r${++store.seq}`,
+        name: input.name,
+        nickname: input.nickname ?? null,
+        ownerUserId: ME,
+      };
+      (store.recipients[input.groupId] ??= []).push(rec);
+      return { data: { addGroupCareRecipient: { __typename: 'GroupCareRecipient', ...rec } } };
+    }
+
+    case 'UpdateGroupCareRecipient': {
+      const input = vars.input as {
+        groupId: string;
+        recipientId: string;
+        name?: string;
+        nickname?: string;
+      };
+      const rec = (store.recipients[input.groupId] ?? []).find((r) => r.id === input.recipientId);
+      if (rec) {
+        if (input.name !== undefined) rec.name = input.name;
+        if (input.nickname !== undefined) rec.nickname = input.nickname || null;
+      }
+      return {
+        data: { updateGroupCareRecipient: { __typename: 'GroupCareRecipient', ...rec } },
+      };
+    }
+
+    case 'RemoveGroupCareRecipient': {
+      const input = vars.input as { groupId: string; recipientId: string };
+      store.recipients[input.groupId] = (store.recipients[input.groupId] ?? []).filter(
+        (r) => r.id !== input.recipientId,
+      );
+      return {
+        data: {
+          removeGroupCareRecipient: {
+            __typename: 'RemoveGroupCareRecipientResult',
+            recipientId: input.recipientId,
+            removed: true,
+          },
+        },
+      };
+    }
 
     case 'GroupJoinLink': {
       const l = store.links[vars.groupId as string];
@@ -276,3 +465,4 @@ const mockLink = new ApolloLink(
 export function createMockFamilyClient() {
   return new ApolloClient({ link: mockLink, cache: new InMemoryCache() });
 }
+

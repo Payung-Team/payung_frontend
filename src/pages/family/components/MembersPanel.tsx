@@ -3,13 +3,13 @@ import { useMutation } from '@apollo/client/react';
 import { Icon } from '../../../components/ui/Icon';
 import {
   REMOVE_MEMBER,
-  TRANSFER_OWNERSHIP,
   type FamilyGroup,
   type FamilyGroupMember,
 } from '../../../graphql/familyGroup';
 import { formatDate, useStrings } from '../familyStrings';
 import { fgErrorMessage } from '../familyErrors';
 import { GroupAvatar, RoleBadge, ConfirmDialog } from './familyUi';
+import { TransferOwnershipModal } from './GroupModals';
 
 /**
  * Members list with roles. Owner-only per-row actions (make owner / remove) are hidden for
@@ -20,10 +20,14 @@ export default function MembersPanel({
   group,
   onChanged,
   onToast,
+  onBookForMember,
+  onViewMemberBookings,
 }: {
   group: FamilyGroup;
   onChanged: () => void;
   onToast: (message: string, kind?: 'success' | 'error') => void;
+  onBookForMember: (member: FamilyGroupMember) => void;
+  onViewMemberBookings: (member: FamilyGroupMember) => void;
 }) {
   const s = useStrings();
   const isOwner = group.myRole === 'OWNER';
@@ -33,7 +37,6 @@ export default function MembersPanel({
   } | null>(null);
 
   const [removeMember, { loading: removing }] = useMutation(REMOVE_MEMBER);
-  const [transfer, { loading: transferring }] = useMutation(TRANSFER_OWNERSHIP);
 
   const doRemove = async (m: FamilyGroupMember) => {
     try {
@@ -49,24 +52,10 @@ export default function MembersPanel({
     }
   };
 
-  const doMakeOwner = async (m: FamilyGroupMember) => {
-    try {
-      await transfer({
-        variables: { input: { groupId: group.id, newOwnerUserId: m.userId } },
-      });
-      setPending(null);
-      onToast(s.toastTransferred(m.displayName || m.email), 'success');
-      onChanged();
-    } catch (e) {
-      setPending(null);
-      onToast(fgErrorMessage(e), 'error');
-    }
-  };
-
   return (
-    <section className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm md:p-5">
+    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
       <p className="px-1 pb-2 text-[11px] font-bold uppercase tracking-[0.7px] text-[#8A8C8E]">
-        {s.membersTitle} ({group.memberCount})
+        {s.membersListLabel(group.memberCount)}
       </p>
       <ul>
         {group.members.map((m) => (
@@ -92,10 +81,8 @@ export default function MembersPanel({
             <RowActions
               member={m}
               isOwner={isOwner}
-              labelMenu={s.memberRowMenu}
-              labelMakeOwner={s.makeOwner}
-              labelRemove={s.removeFromGroup}
-              ownerCannotRemoveSelf={s.ownerCannotRemoveSelf}
+              onBook={() => onBookForMember(m)}
+              onViewBookings={() => onViewMemberBookings(m)}
               onMakeOwner={() => setPending({ kind: 'makeOwner', member: m })}
               onRemove={() => setPending({ kind: 'remove', member: m })}
             />
@@ -121,48 +108,44 @@ export default function MembersPanel({
         </ConfirmDialog>
       )}
       {pending?.kind === 'makeOwner' && (
-        <ConfirmDialog
+        <TransferOwnershipModal
+          group={group}
+          preselectUserId={pending.member.userId}
           onClose={() => setPending(null)}
-          onConfirm={() => doMakeOwner(pending.member)}
-          loading={transferring}
-          icon="swap_horiz"
-          iconBg="bg-[#009265]"
-          confirmBg="bg-[#009265]"
-          confirmHover="hover:bg-[#007C55]"
-          title={s.transferTitle}
-          cancelText={s.cancel}
-          confirmText={s.transferCta}
-          busyText={s.busyTransferring}
-        >
-          {s.transferSubtitle}
-        </ConfirmDialog>
+          onToast={onToast}
+          onDone={() => {
+            setPending(null);
+            onChanged();
+          }}
+        />
       )}
     </section>
   );
 }
 
-/** Per-row overflow menu. Only owners acting on OTHER members get actions. */
+/**
+ * Per-row overflow menu. Everyone gets booking actions (จองแทน / ดูการจอง); the owner also
+ * gets make-owner / remove on OTHER members' rows (server re-checks either way).
+ */
 function RowActions({
   member,
   isOwner,
-  labelMenu,
-  labelMakeOwner,
-  labelRemove,
-  ownerCannotRemoveSelf,
+  onBook,
+  onViewBookings,
   onMakeOwner,
   onRemove,
 }: {
   member: FamilyGroupMember;
   isOwner: boolean;
-  labelMenu: string;
-  labelMakeOwner: string;
-  labelRemove: string;
-  ownerCannotRemoveSelf: string;
+  onBook: () => void;
+  onViewBookings: () => void;
   onMakeOwner: () => void;
   onRemove: () => void;
 }) {
+  const s = useStrings();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const showOwnerActions = isOwner && !member.isMe;
 
   useEffect(() => {
     if (!open) return;
@@ -173,25 +156,32 @@ function RowActions({
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
 
-  // The owner's own row: a disabled control that explains why (can't remove self).
-  if (member.isMe && isOwner) {
-    return (
-      <button
-        type="button"
-        disabled
-        title={ownerCannotRemoveSelf}
-        aria-label={ownerCannotRemoveSelf}
-        className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-lg text-gray-300"
-      >
-        <Icon name="more_vert" />
-      </button>
-    );
-  }
-
-  // Members (or the owner's view of themselves as a non-owner) get no row actions.
-  if (!isOwner || member.isMe) {
-    return <span className="h-9 w-9" aria-hidden="true" />;
-  }
+  const item = (
+    icon: string,
+    label: string,
+    onClick: () => void,
+    danger = false,
+  ) => (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={() => {
+        setOpen(false);
+        onClick();
+      }}
+      className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[14px] ${
+        danger ? 'text-[#DC2626] hover:bg-[#FEF2F2]' : 'text-[#1A1A1A] hover:bg-gray-50'
+      }`}
+    >
+      <Icon
+        name={icon}
+        size="small"
+        className={danger ? '' : 'text-gray-400'}
+        color={danger ? '#DC2626' : undefined}
+      />
+      {label}
+    </button>
+  );
 
   return (
     <div className="relative" ref={ref}>
@@ -200,7 +190,7 @@ function RowActions({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={labelMenu}
+        aria-label={s.memberRowMenu}
         className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100"
       >
         <Icon name="more_vert" />
@@ -208,32 +198,13 @@ function RowActions({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-30 mt-1 w-[210px] rounded-xl border border-gray-100 bg-white p-1.5 shadow-lg"
+          className="absolute right-0 z-30 mt-1 w-[230px] rounded-xl border border-gray-100 bg-white p-1.5 shadow-lg"
         >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              onMakeOwner();
-            }}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[14px] text-[#1A1A1A] hover:bg-gray-50"
-          >
-            <Icon name="workspace_premium" size="small" className="text-gray-400" />
-            {labelMakeOwner}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              onRemove();
-            }}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[14px] text-[#DC2626] hover:bg-[#FEF2F2]"
-          >
-            <Icon name="person_remove" size="small" color="#DC2626" />
-            {labelRemove}
-          </button>
+          {item('event_available', s.bookForMember, onBook)}
+          {item('receipt_long', s.viewMemberBookings, onViewBookings)}
+          {showOwnerActions && <div className="my-1.5 h-px bg-gray-100" />}
+          {showOwnerActions && item('workspace_premium', s.makeOwner, onMakeOwner)}
+          {showOwnerActions && item('person_remove', s.removeFromGroup, onRemove, true)}
         </div>
       )}
     </div>
