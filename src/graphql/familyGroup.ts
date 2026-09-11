@@ -56,6 +56,7 @@ export const GROUP_CARE_RECIPIENTS = gql`
       name
       nickname
       ownerUserId
+      selfReported
     }
   }
 `;
@@ -321,6 +322,8 @@ export interface GroupCareRecipient {
   name: string;
   nickname?: string | null;
   ownerUserId: string;
+  /** PYG-500: true = ข้อมูลจากเจ้าตัว, false = คนอื่นในกลุ่มกรอกให้ */
+  selfReported: boolean;
 }
 
 export interface GroupBookingSummary {

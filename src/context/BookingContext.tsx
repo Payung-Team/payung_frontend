@@ -72,7 +72,13 @@ export interface BookingRequest {
    */
   onBehalf?: {
     familyGroupId: string;
-    careRecipientId: string;
+    /**
+     * PYG-500 — โมเดล "สมาชิก = patient": ระบุสมาชิกที่เป็นผู้รับบริการด้วย memberUserId
+     * แล้ว backend หา/สร้างโปรไฟล์ในกลุ่มให้เอง. `careRecipientId` เก็บไว้เผื่อเส้นทางเดิม
+     * (โปรไฟล์ที่แชร์ในกลุ่มอยู่แล้ว) — ส่งอย่างใดอย่างหนึ่งก็พอ
+     */
+    memberUserId?: string;
+    careRecipientId?: string;
     recipientName: string;
   };
   /**

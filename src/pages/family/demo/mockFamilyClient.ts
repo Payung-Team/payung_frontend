@@ -41,7 +41,7 @@ interface MockLink {
 
 const store: {
   groups: MockGroup[];
-  recipients: Record<string, { id: string; name: string; nickname: string | null; ownerUserId: string }[]>;
+  recipients: Record<string, { id: string; name: string; nickname: string | null; ownerUserId: string; selfReported?: boolean }[]>;
   links: Record<string, MockLink | undefined>;
   bookings: Record<string, unknown[]>;
   seq: number;
@@ -71,10 +71,10 @@ const store: {
   ],
   recipients: {
     g1: [
-      { id: 'r1', name: 'สมศรี วงศ์ดี', nickname: 'ยายศรี', ownerUserId: ME },
-      { id: 'r2', name: 'ประยูร วงศ์ดี', nickname: null, ownerUserId: 'u-parichat' },
+      { id: 'r1', name: 'สมศรี วงศ์ดี', nickname: 'ยายศรี', ownerUserId: ME, selfReported: true },
+      { id: 'r2', name: 'ประยูร วงศ์ดี', nickname: null, ownerUserId: 'u-parichat', selfReported: true },
     ],
-    g2: [{ id: 'r3', name: 'สมจิตร ใจดี', nickname: 'ยาย', ownerUserId: 'u-aunt' }],
+    g2: [{ id: 'r3', name: 'สมจิตร ใจดี', nickname: 'ยาย', ownerUserId: 'u-aunt', selfReported: true }],
   },
   links: {
     g1: { id: 'l1', url: 'https://payung.app/join?token=demo9f2a4c71b8', expiresAt: iso(7), maxUses: 10, usedCount: 3, memberLimit: 10 },
@@ -300,6 +300,7 @@ function resolve(opName: string, vars: Vars): { data?: unknown; errors?: unknown
         name: input.name,
         nickname: input.nickname ?? null,
         ownerUserId: ME,
+        selfReported: true,
       };
       (store.recipients[input.groupId] ??= []).push(rec);
       return { data: { addGroupCareRecipient: { __typename: 'GroupCareRecipient', ...rec } } };

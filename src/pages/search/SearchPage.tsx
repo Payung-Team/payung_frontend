@@ -758,7 +758,11 @@ function SearchPageContent() {
             variables: {
               input: {
                 groupId: bookingDraft.onBehalf.familyGroupId,
+                // PYG-500: โมเดล "สมาชิก = patient" — ส่ง memberUserId (backend หา/สร้างโปรไฟล์ให้)
+                // patientName ใช้เฉพาะกรณีสมาชิกยังไม่มีข้อมูลแล้วคนจองกรอกให้
+                memberUserId: bookingDraft.onBehalf.memberUserId,
                 careRecipientId: bookingDraft.onBehalf.careRecipientId,
+                patientName: bookingDraft.onBehalf.recipientName,
                 caregiverId: payload.caregiverId,
                 tasks: payload.tasks,
                 serviceLocations: payload.serviceLocations,
