@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { useQuery } from '@apollo/client/react';
+import { useQuery, useMutation } from '@apollo/client/react';
 import { useBooking } from '../../context/BookingContext';
 import { CAREGIVER_REVIEWS } from '../../graphql/queries';
+import { CREATE_BOOKING_ON_BEHALF } from '../../graphql/familyGroup';
 import { RatingDistribution } from '../../components/ui/RatingDistribution';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 import BookingConfirmModal from '../../components/ui/BookingConfirmModal';
@@ -253,6 +254,11 @@ const CaregiverProfilePage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
+  // PYG-385: family "จองแทน" path — same flow as SearchPage, only the submit call differs
+  // (GraphQL createBookingOnBehalf instead of the personal REST create). Without this branch a
+  // booking started in a family group and confirmed from the profile page is written with
+  // family_group_id = null, so it never appears in the group feed.
+  const [createOnBehalf] = useMutation(CREATE_BOOKING_ON_BEHALF);
   const [avail, setAvail] = useState<boolean[][]>(EMPTY_AVAIL);
   const [completedBookingCount, setCompletedBookingCount] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -314,6 +320,69 @@ const CaregiverProfilePage: React.FC = () => {
       // PYG-460 — payload สร้างที่ buildBookingPayload ที่เดียว ใช้ร่วมกับ SearchPage
       // (เดิมโค้ดชุดนี้ถูกคัดลอกไว้สองที่ แก้ที่เดียวก็ยังผิดอีกที่)
       const payload = buildBookingPayload(bookingDraft, cg.id);
+
+      // ── PYG-385: booking on behalf of a family-group member ──────────────────────
+      // Same payload, different endpoint: createBookingOnBehalf persists family_group_id +
+      // care_recipient_id + memberDetails, then the booker pays via the unchanged flow.
+      if (bookingDraft.onBehalf) {
+        const pd = bookingDraft.recipient?.patientDetails;
+        const memberDetails = {
+          conditions: pd?.conditions?.length ? pd.conditions : undefined,
+          medicines: pd?.medicines || undefined,
+          allergies: pd?.allergies || undefined,
+          careInstructions: pd?.careInstructions || undefined,
+        };
+        const hasDetails = Object.values(memberDetails).some((v) => v != null);
+        try {
+          const { data } = await createOnBehalf({
+            variables: {
+              input: {
+                groupId: bookingDraft.onBehalf.familyGroupId,
+                // PYG-500: ส่ง memberUserId (backend หา/สร้างโปรไฟล์ในกลุ่มให้)
+                memberUserId: bookingDraft.onBehalf.memberUserId,
+                careRecipientId: bookingDraft.onBehalf.careRecipientId,
+                patientName: bookingDraft.onBehalf.recipientName,
+                caregiverId: payload.caregiverId,
+                tasks: payload.tasks,
+                serviceLocations: payload.serviceLocations,
+                serviceType: payload.serviceType,
+                timeSlot: payload.timeSlot,
+                startTime: payload.startTime,
+                durationHours: payload.durationHours,
+                locationAddress: payload.locationAddress,
+                lat: payload.lat,
+                lng: payload.lng,
+                bookingDate: payload.bookingDate,
+                notes: payload.notes,
+                dayOfContactName: payload.dayOfContactName,
+                dayOfContactPhone: payload.dayOfContactPhone,
+                dayOfContactRelationship: payload.dayOfContactRelationship,
+                ...(hasDetails ? { memberDetails } : {}),
+              },
+            },
+          });
+          const created = (data as { createBookingOnBehalf?: { id: string } } | null)
+            ?.createBookingOnBehalf;
+          setBookingError(null);
+          setShowModal(false);
+          navigate('/booking/success', {
+            state: {
+              ref: created?.id,
+              caregiverName: cg.fullName,
+              onBehalfOf: bookingDraft.onBehalf.recipientName,
+            },
+          });
+        } catch (err) {
+          const gqlErr = err as { graphQLErrors?: { extensions?: { code?: string } }[] };
+          const code = gqlErr.graphQLErrors?.[0]?.extensions?.code;
+          if (code === 'RECIPIENT_NOT_IN_GROUP') {
+            setBookingError('ผู้รับบริการนี้ไม่ได้อยู่ในกลุ่มแล้ว ลองเลือกผู้รับบริการใหม่');
+          } else {
+            setBookingError('จองแทนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+          }
+        }
+        return;
+      }
 
       const apiBase = import.meta.env.VITE_GRAPHQL_URL?.replace('/graphql', '') ?? '';
       const res = await fetch(`${apiBase}/api/v1/bookings`, {
