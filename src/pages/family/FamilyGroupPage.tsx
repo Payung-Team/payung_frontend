@@ -16,6 +16,7 @@ import {
 import { formatDate, useStrings } from './familyStrings';
 import { FONT, GroupAvatar, RoleBadge, ConfirmDialog } from './components/familyUi';
 import InviteLinkModal from './components/InviteLinkModal';
+import ActivityPanel from './components/ActivityPanel';
 import {
   CreateGroupWizard,
   RenameGroupModal,
@@ -101,6 +102,7 @@ export default function FamilyGroupPage() {
             onDelete={() => setModal('delete')}
           />
           <MemberAppointments group={selected} />
+          <ActivityPanel group={selected} />
         </div>
       ) : null}
 

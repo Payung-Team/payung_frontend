@@ -12,6 +12,7 @@ import { ApolloClient, ApolloLink, InMemoryCache, Observable } from '@apollo/cli
 const ME = 'u-me';
 const DAY = 86_400_000;
 const iso = (offsetDays: number) => new Date(Date.now() + offsetDays * DAY).toISOString();
+const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 
 interface MockMember {
   id: string;
@@ -36,6 +37,23 @@ interface MockLink {
   usedCount: number;
   memberLimit: number;
 }
+interface MockActivity {
+  id: string;
+  action: string;
+  targetType: string | null;
+  metadata: Record<string, string> | null;
+  createdAt: string;
+  actorUserId: string;
+}
+
+/** Names for activity actors — including people who have since left the group. */
+const PEOPLE: Record<string, { displayName: string; email: string }> = {
+  [ME]: { displayName: 'ณัฐพล วงศ์ดี', email: 'nattapon@example.com' },
+  'u-parichat': { displayName: 'ปาริชาต วงศ์ดี', email: 'parichat@example.com' },
+  'u-somchai': { displayName: 'สมชาย วงศ์ดี', email: 'somchai@example.com' },
+  'u-aunt': { displayName: 'สมใจ ใจดี', email: 'somjai@example.com' },
+  'u-wilai': { displayName: 'วิไล วงศ์ดี', email: 'wilai@example.com' },
+};
 
 // ── Seed ─────────────────────────────────────────────────────────────────────
 
@@ -44,6 +62,7 @@ const store: {
   recipients: Record<string, { id: string; name: string; nickname: string | null; ownerUserId: string }[]>;
   links: Record<string, MockLink | undefined>;
   bookings: Record<string, unknown[]>;
+  activity: Record<string, MockActivity[]>;
   seq: number;
 } = {
   groups: [
@@ -219,8 +238,70 @@ const store: {
       },
     ],
   },
+  activity: {},
   seq: 100,
 };
+
+/** Seeded history, oldest last. 16 rows on g1 so the feed pages twice at PAGE_SIZE=15. */
+function seedActivity(
+  groupId: string,
+  rows: [action: string, actorUserId: string, hours: number, metadata?: Record<string, string>][],
+) {
+  store.activity[groupId] = rows.map(([action, actorUserId, hours, metadata], i) => ({
+    id: `${groupId}-a${i + 1}`,
+    action,
+    targetType: null,
+    metadata: metadata ?? null,
+    createdAt: hoursAgo(hours),
+    actorUserId,
+  }));
+}
+
+seedActivity('g1', [
+  ['MEMBER_JOINED', 'u-somchai', 2],
+  ['JOIN_LINK_ROTATED', ME, 5],
+  ['BOOKING_CREATED_ON_BEHALF', 'u-parichat', 26, { recipientName: 'สมศรี วงศ์ดี' }],
+  ['RECIPIENT_SHARED', 'u-parichat', 30, { recipientName: 'ประยูร วงศ์ดี' }],
+  ['GROUP_RENAMED', ME, 50, { oldName: 'ครอบครัวของฉัน', newName: 'ครอบครัววงศ์ดี' }],
+  ['MEMBER_REMOVED', ME, 74, { memberName: 'วิไล วงศ์ดี' }],
+  ['JOIN_LINK_REVOKED', ME, 76],
+  ['BOOKING_CANCELLED', ME, 100, { recipientName: 'สมศรี วงศ์ดี' }],
+  ['MEMBER_REJOINED', 'u-wilai', 120],
+  ['RECIPIENT_SHARED', ME, 140, { recipientName: 'สมศรี วงศ์ดี' }],
+  ['BOOKING_CREATED_ON_BEHALF', ME, 160, { recipientName: 'สมศรี วงศ์ดี' }],
+  ['MEMBER_LEFT', 'u-wilai', 300],
+  ['MEMBER_JOINED', 'u-wilai', 400],
+  ['MEMBER_JOINED', 'u-parichat', 600],
+  // Deliberately dirty metadata: a BE that puts the raw token/URL on a join-link row must not
+  // leak it into the feed. readActivityMeta() drops both — TC-BS-07 can check this row.
+  ['JOIN_LINK_CREATED', ME, 640, { token: 'demo9f2a4c71b8e35d0197', url: 'https://payung.app/join?token=demo9f2a4c71b8' }],
+  ['GROUP_CREATED', ME, 648, { groupName: 'ครอบครัววงศ์ดี' }],
+]);
+
+seedActivity('g2', [
+  ['MEMBER_JOINED', ME, 960],
+  ['RECIPIENT_SHARED', 'u-aunt', 1400, { recipientName: 'สมจิตร ใจดี' }],
+  ['JOIN_LINK_CREATED', 'u-aunt', 1430],
+  ['GROUP_CREATED', 'u-aunt', 1440, { groupName: 'บ้านคุณยายสมจิตร' }],
+]);
+
+/** Append a row for something the demo user just did, so the feed reacts like the real one. */
+function logActivity(
+  groupId: string,
+  action: string,
+  metadata: Record<string, string> | null = null,
+  actorUserId: string = ME,
+) {
+  if (!store.activity[groupId]) store.activity[groupId] = [];
+  store.activity[groupId].unshift({
+    id: `a${++store.seq}`,
+    action,
+    targetType: null,
+    metadata,
+    createdAt: new Date().toISOString(),
+    actorUserId,
+  });
+}
 
 // ── Shapers (add __typename so the InMemoryCache is happy) ──────────────────────
 
@@ -268,6 +349,29 @@ function linkOut(groupId: string, l: MockLink) {
     createdAt: iso(0),
   };
 }
+
+/** `metadata` goes out as a JSON *string* — the schema has no JSON scalar (see PYG-421 note). */
+function activityOut(a: MockActivity) {
+  const person = PEOPLE[a.actorUserId];
+  return {
+    __typename: 'FamilyGroupActivityItem',
+    id: a.id,
+    action: a.action,
+    targetType: a.targetType,
+    metadata: a.metadata ? JSON.stringify(a.metadata) : null,
+    createdAt: a.createdAt,
+    actor: {
+      __typename: 'FamilyGroupActivityActor',
+      userId: a.actorUserId,
+      displayName: person?.displayName ?? null,
+      email: person?.email ?? null,
+      avatarUrl: null,
+    },
+  };
+}
+
+/** Opaque keyset cursor — the real one encodes (created_at, id) the same way. */
+const cursorOf = (a: MockActivity) => `${a.createdAt}|${a.id}`;
 
 const gqlError = (message: string, code: string) => ({ message, extensions: { code } });
 
@@ -344,6 +448,52 @@ function resolve(opName: string, vars: Vars): { data?: unknown; errors?: unknown
       return { data: { groupJoinLink: linkOut(vars.groupId as string, l) } };
     }
 
+    // Keyset pagination: newest first, `after` is the previous page's last cursor. Rows added
+    // while paging shift nothing, which is the whole point of keyset over OFFSET.
+    case 'FamilyGroupActivity': {
+      const groupId = vars.groupId as string;
+      if (!findGroup(groupId)) {
+        return { errors: [gqlError('คุณไม่ได้เป็นสมาชิกของกลุ่มนี้', 'NOT_A_MEMBER')] };
+      }
+      const first = Math.min(Math.max(Number(vars.first ?? 15) || 15, 1), 50);
+      const after = (vars.after as string | undefined) ?? null;
+      const all = [...(store.activity[groupId] ?? [])].sort(
+        (a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
+      );
+
+      let start = 0;
+      if (after) {
+        const at = all.findIndex((a) => cursorOf(a) === after);
+        if (at === -1) {
+          // Cursor points at a row that no longer exists — end the feed rather than restart it.
+          return {
+            data: {
+              familyGroupActivity: {
+                __typename: 'FamilyGroupActivityConnection',
+                nodes: [],
+                hasNextPage: false,
+                endCursor: null,
+              },
+            },
+          };
+        }
+        start = at + 1;
+      }
+
+      const page = all.slice(start, start + first);
+      const last = page[page.length - 1];
+      return {
+        data: {
+          familyGroupActivity: {
+            __typename: 'FamilyGroupActivityConnection',
+            nodes: page.map(activityOut),
+            hasNextPage: start + page.length < all.length,
+            endCursor: last ? cursorOf(last) : null,
+          },
+        },
+      };
+    }
+
     case 'CreateFamilyGroup': {
       const input = vars.input as { name: string };
       const id = `g${++store.seq}`;
@@ -357,13 +507,16 @@ function resolve(opName: string, vars: Vars): { data?: unknown; errors?: unknown
         ],
       });
       store.recipients[id] = [];
+      logActivity(id, 'GROUP_CREATED', { groupName: input.name });
       return { data: { createFamilyGroup: groupOut(findGroup(id)!) } };
     }
 
     case 'RenameFamilyGroup': {
       const input = vars.input as { groupId: string; name: string };
       const g = findGroup(input.groupId);
+      const oldName = g?.name ?? '';
       if (g) g.name = input.name;
+      logActivity(input.groupId, 'GROUP_RENAMED', { oldName, newName: input.name });
       return { data: { renameFamilyGroup: groupOut(g!) } };
     }
 
@@ -372,6 +525,7 @@ function resolve(opName: string, vars: Vars): { data?: unknown; errors?: unknown
       store.groups = store.groups.filter((g) => g.id !== id);
       delete store.links[id];
       delete store.recipients[id];
+      delete store.activity[id];
       return { data: { deleteFamilyGroup: { __typename: 'DeleteFamilyGroupResult', id, deleted: true } } };
     }
 
@@ -386,19 +540,27 @@ function resolve(opName: string, vars: Vars): { data?: unknown; errors?: unknown
     case 'RemoveMember': {
       const input = vars.input as { groupId: string; userId: string };
       const g = findGroup(input.groupId);
+      const removed = g?.members.find((m) => m.userId === input.userId);
       if (g) g.members = g.members.filter((m) => m.userId !== input.userId);
+      logActivity(input.groupId, 'MEMBER_REMOVED', {
+        memberName: removed?.displayName || removed?.email || '',
+      });
       return { data: { removeMember: groupOut(g!) } };
     }
 
     case 'TransferOwnership': {
       const input = vars.input as { groupId: string; newOwnerUserId: string };
       const g = findGroup(input.groupId);
+      let newOwnerName = '';
       if (g) {
         g.members.forEach((m) => {
-          if (m.userId === input.newOwnerUserId) m.role = 'OWNER';
-          else if (m.role === 'OWNER') m.role = 'MEMBER';
+          if (m.userId === input.newOwnerUserId) {
+            m.role = 'OWNER';
+            newOwnerName = m.displayName || m.email;
+          } else if (m.role === 'OWNER') m.role = 'MEMBER';
         });
       }
+      logActivity(input.groupId, 'OWNERSHIP_TRANSFERRED', { newOwnerName });
       return { data: { transferOwnership: groupOut(g!) } };
     }
 
@@ -413,12 +575,16 @@ function resolve(opName: string, vars: Vars): { data?: unknown; errors?: unknown
         usedCount: 0,
         memberLimit: 10,
       };
-      const key = opName === 'CreateJoinLink' ? 'createJoinLink' : 'rotateJoinLink';
+      const rotated = opName === 'RotateJoinLink';
+      logActivity(input.groupId, rotated ? 'JOIN_LINK_ROTATED' : 'JOIN_LINK_CREATED');
+      const key = rotated ? 'rotateJoinLink' : 'createJoinLink';
       return { data: { [key]: linkOut(input.groupId, store.links[input.groupId]!) } };
     }
 
     case 'RevokeJoinLink': {
-      delete store.links[vars.groupId as string];
+      const groupId = vars.groupId as string;
+      delete store.links[groupId];
+      logActivity(groupId, 'JOIN_LINK_REVOKED');
       return { data: { revokeJoinLink: true } };
     }
 

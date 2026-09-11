@@ -128,6 +128,42 @@ export const JOIN_LINK_PREVIEW = gql`
   }
 `;
 
+/**
+ * Group activity feed — newest first, keyset paginated on createdAt DESC (PYG-422).
+ *
+ * ⚠ Backend contract is PYG-421 and NOT deployed yet — the running schema has no
+ *   `familyGroupActivity` field, so this query fails validation until it ships and the
+ *   ActivityPanel renders its "unavailable" state instead of breaking the dashboard.
+ *
+ *   The shape below is the one PYG-421 describes (actor · action · targetType · metadata ·
+ *   createdAt) expressed in this schema's house style: a flat `nodes` list plus paging info,
+ *   like PaymentConnection / DisputeSummaryConnection, rather than Relay `edges`/`node`.
+ *   `id` is requested on top of the card's field list because a connection node without one
+ *   cannot be normalised by InMemoryCache. If BE lands a different shape, this file and
+ *   `activityCopy.ts` are the only two places that need to change.
+ */
+export const FAMILY_GROUP_ACTIVITY = gql`
+  query FamilyGroupActivity($groupId: ID!, $first: Int, $after: String) {
+    familyGroupActivity(groupId: $groupId, first: $first, after: $after) {
+      nodes {
+        id
+        action
+        targetType
+        metadata
+        createdAt
+        actor {
+          userId
+          displayName
+          email
+          avatarUrl
+        }
+      }
+      hasNextPage
+      endCursor
+    }
+  }
+`;
+
 // ── Mutations ────────────────────────────────────────────────────────────────
 
 export const CREATE_FAMILY_GROUP = gql`
@@ -372,4 +408,57 @@ export interface JoinLinkPreview {
   isUsable: boolean;
   unusableReason?: JoinLinkUnusableReason | null;
   alreadyMember: boolean;
+}
+
+/**
+ * Actions the activity feed knows how to phrase. Kept as a union of literals plus an escape
+ * hatch: the server owns this list and may add to it, so an unknown code must still render
+ * (as a generic line) rather than crash the feed.
+ *
+ * `MEMBER_INVITED` is deliberately absent — SCR-FG2-001 replaced per-email invites with a
+ * group join link, so that action no longer exists (see PYG-408 / PYG-422 comments).
+ */
+export type FamilyGroupActivityAction =
+  | 'GROUP_CREATED'
+  | 'GROUP_RENAMED'
+  | 'MEMBER_JOINED'
+  | 'MEMBER_REJOINED'
+  | 'MEMBER_LEFT'
+  | 'MEMBER_REMOVED'
+  | 'OWNERSHIP_TRANSFERRED'
+  | 'JOIN_LINK_CREATED'
+  | 'JOIN_LINK_ROTATED'
+  | 'JOIN_LINK_REVOKED'
+  | 'RECIPIENT_SHARED'
+  | 'RECIPIENT_UNSHARED'
+  | 'BOOKING_CREATED_ON_BEHALF'
+  | 'BOOKING_CANCELLED'
+  | (string & {});
+
+/** Who did it. Nullable throughout: a removed user's row still has to render. */
+export interface FamilyGroupActivityActor {
+  userId?: string | null;
+  displayName?: string | null;
+  email?: string | null;
+  avatarUrl?: string | null;
+}
+
+export interface FamilyGroupActivity {
+  id: string;
+  action: FamilyGroupActivityAction;
+  targetType?: string | null;
+  /**
+   * Per-action detail. The schema has no JSON scalar today, so this arrives as a JSON
+   * *string*; typed loosely because BE may later add one. Never render it raw — read it
+   * through `readActivityMeta()`, which allow-lists fields and drops tokens/URLs.
+   */
+  metadata?: string | Record<string, unknown> | null;
+  createdAt: string;
+  actor?: FamilyGroupActivityActor | null;
+}
+
+export interface FamilyGroupActivityConnection {
+  nodes: FamilyGroupActivity[];
+  hasNextPage: boolean;
+  endCursor?: string | null;
 }
