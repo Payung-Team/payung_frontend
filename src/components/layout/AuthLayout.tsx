@@ -47,51 +47,8 @@ export default function AuthLayout({ children, tagline, subtitle, showBackToHome
           </div>
         )}
 
-        {/* Stats */}
-        <div className="relative z-10 flex gap-14 px-12 pb-8">
-          <div>
-            <p
-              className="text-[22px] font-bold leading-[27px] text-[#FFC570]"
-              style={{ fontFamily: "'Inter', sans-serif" }}
-            >
-              1,200+
-            </p>
-            <p
-              className="mt-1 text-xs font-medium text-white"
-              style={{ fontFamily: "'Inter', sans-serif" }}
-            >
-              ผู้ดูแล
-            </p>
-          </div>
-          <div>
-            <p
-              className="text-[22px] font-bold leading-[27px] text-[#FFC570]"
-              style={{ fontFamily: "'Inter', sans-serif" }}
-            >
-              5,000+
-            </p>
-            <p
-              className="mt-1 text-xs font-medium text-white"
-              style={{ fontFamily: "'Inter', sans-serif" }}
-            >
-              ผู้ใช้งาน
-            </p>
-          </div>
-          <div>
-            <p
-              className="text-[22px] font-bold leading-[27px] text-[#FFC570]"
-              style={{ fontFamily: "'Inter', sans-serif" }}
-            >
-              4.9
-            </p>
-            <p
-              className="mt-1 text-xs font-medium text-white"
-              style={{ fontFamily: "'Inter', sans-serif" }}
-            >
-              คะแนนรีวิว
-            </p>
-          </div>
-        </div>
+        {/* Bottom spacer — keeps the tagline in place under justify-between */}
+        <div className="pb-8" aria-hidden="true" />
       </div>
 
       {/* ===== Right Form Panel ===== */}

@@ -20,7 +20,9 @@ export default function ProfileDropdown({
   displayName,
 }: ProfileDropdownProps) {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, userRole, logout } = useAuth();
+  // Patients only get the menu items that actually work (profile + logout).
+  const isPatient = userRole === 1;
   const { success: showSuccess } = useToast();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -91,6 +93,8 @@ export default function ProfileDropdown({
               </button>
             )}
 
+            {!isPatient && (
+            <>
             <button
               className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
             >
@@ -126,6 +130,8 @@ export default function ProfileDropdown({
                 <p className="text-xs text-gray-500">การแจ้งเตือน, ภาษา, ธีม</p>
               </div>
             </button>
+            </>
+            )}
 
             <div className="border-t border-gray-200 my-2" />
 
