@@ -334,6 +334,48 @@ function GroupHeaderCard({
             <RoleBadge role={group.myRole} />
           </div>
           <p className="mt-1 text-[13px] text-[#8A8C8E]">{createdMeta(s, group.createdAt)}</p>
+
+          {/* Member avatar stack → opens the full members list on its own page. */}
+      <div className="mt-4 flex items-center gap-3">
+        <div className="flex items-center">
+          {shown.map((m, i) => (
+            <span
+              key={m.id}
+              className="rounded-full ring-2 ring-white"
+              style={{ marginLeft: i === 0 ? 0 : -8 }}
+            >
+              <GroupAvatar name={m.displayName || m.email} seed={m.userId} size={30} />
+            </span>
+          ))}
+          {extra > 0 && (
+            <span
+              className="flex h-7.5 w-7.5 items-center justify-center rounded-full bg-[#EEF2F1] text-[11px] font-bold text-[#5B7A70] ring-2 ring-white"
+              style={{ marginLeft: -8 }}
+            >
+              +{extra}
+            </span>
+          )}
+          {isOwner && (
+            <button
+              type="button"
+              onClick={onInvite}
+              aria-label={s.invite}
+              className="flex h-7.5 w-7.5 items-center justify-center rounded-full border border-dashed border-[#B7D9CD] bg-white text-[#009265] ring-2 ring-white transition-colors hover:bg-[#F0FAF4]"
+              style={{ marginLeft: -8 }}
+            >
+              <Icon name="person_add" size="small" color="#009265" />
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onViewMembers}
+          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[13px] font-semibold text-[#1A1A1A] transition-colors hover:bg-[#F0FAF4] hover:text-[#009265]"
+        >
+          {s.memberCount(group.memberCount)}
+          <Icon name="chevron_right" size="small" className="text-gray-400" />
+        </button>
+      </div>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
@@ -357,51 +399,11 @@ function GroupHeaderCard({
         </div>
       </div>
 
-      {/* Member avatar stack → opens the full members list on its own page. */}
-      <div className="mt-4 flex items-center gap-3 border-t border-gray-100 pt-4">
-        <div className="flex items-center">
-          {shown.map((m, i) => (
-            <span
-              key={m.id}
-              className="rounded-full ring-2 ring-white"
-              style={{ marginLeft: i === 0 ? 0 : -8 }}
-            >
-              <GroupAvatar name={m.displayName || m.email} seed={m.userId} size={30} />
-            </span>
-          ))}
-          {extra > 0 && (
-            <span
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[#EEF2F1] text-[11px] font-bold text-[#5B7A70] ring-2 ring-white"
-              style={{ marginLeft: -8 }}
-            >
-              +{extra}
-            </span>
-          )}
-          {isOwner && (
-            <button
-              type="button"
-              onClick={onInvite}
-              aria-label={s.invite}
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-full border border-dashed border-[#B7D9CD] bg-white text-[#009265] ring-2 ring-white transition-colors hover:bg-[#F0FAF4]"
-              style={{ marginLeft: -8 }}
-            >
-              <Icon name="person_add" size="small" color="#009265" />
-            </button>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={onViewMembers}
-          className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[13px] font-semibold text-[#1A1A1A] transition-colors hover:bg-[#F0FAF4] hover:text-[#009265]"
-        >
-          {s.memberCount(group.memberCount)}
-          <Icon name="chevron_right" size="small" className="text-gray-400" />
-        </button>
-      </div>
+      
 
       {!isOwner && (
-        <div className="mt-4 flex items-start gap-2 border-t border-gray-100 pt-4">
-          <Icon name="info" size="small" className="mt-0.5 text-gray-400" />
+        <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-4">
+          <Icon name="info" size="small" className="mt-0.5 color-[#8A8C8E] text-[#8A8C8E]" />
           <p className="text-[12px] leading-5 text-[#8A8C8E]">{s.memberNotice}</p>
         </div>
       )}
