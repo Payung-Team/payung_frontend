@@ -38,7 +38,15 @@ const SETTINGS_TAB_PATHS: Record<SettingsMenu, string> = {
   billing: '/caregiver/settings/billing',
 };
 
+// ซ่อนเมนูชั่วคราว — ลบออกจาก set นี้เพื่อเปิดใช้งานอีกครั้ง
+const HIDDEN_MENUS: ReadonlySet<SettingsMenu> = new Set<SettingsMenu>(['language', 'billing']);
+
 function resolveSettingsMenu(pathname: string, search: string): SettingsMenu {
+  const menu = resolveRawSettingsMenu(pathname, search);
+  return HIDDEN_MENUS.has(menu) ? 'account' : menu;
+}
+
+function resolveRawSettingsMenu(pathname: string, search: string): SettingsMenu {
   const tabParam = new URLSearchParams(search).get('tab');
   if (tabParam === 'notifications') {
     return 'notifications';
@@ -106,18 +114,22 @@ const CaregiverSettings: React.FC = () => {
               isActive={activeMenu === 'notifications'}
               onClick={() => navigateToMenu('notifications')}
             />
-            <SettingsTab
-              icon="language"
-              label="ภาษา"
-              isActive={activeMenu === 'language'}
-              onClick={() => navigateToMenu('language')}
-            />
-            <SettingsTab
-              icon="payment"
-              label="Billing"
-              isActive={activeMenu === 'billing'}
-              onClick={() => navigateToMenu('billing')}
-            />
+            {!HIDDEN_MENUS.has('language') && (
+              <SettingsTab
+                icon="language"
+                label="ภาษา"
+                isActive={activeMenu === 'language'}
+                onClick={() => navigateToMenu('language')}
+              />
+            )}
+            {!HIDDEN_MENUS.has('billing') && (
+              <SettingsTab
+                icon="payment"
+                label="Billing"
+                isActive={activeMenu === 'billing'}
+                onClick={() => navigateToMenu('billing')}
+              />
+            )}
           </div>
         </div>
 

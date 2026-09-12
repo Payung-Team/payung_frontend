@@ -178,7 +178,7 @@ function BookingCard({ booking, onViewDetail, isDueSection }: Readonly<{ booking
       tabIndex={0}
       onClick={onViewDetail}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onViewDetail?.(); } }}
-      className="flex cursor-pointer items-center gap-5 rounded-2xl border border-gray-100 bg-[#FBFDFC] px-5 py-4 transition-colors hover:border-[#D1FAE5] hover:bg-[#F0FAF4]"
+      className="flex cursor-pointer items-center gap-5 rounded-2xl border border-gray-100 bg-[#FBFDFC] px-5 py-4 transition-colors hover:border-[#DCE3EA] hover:bg-[#F3F6F9]"
       style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
     >
       <div className="flex w-14 shrink-0 flex-col items-center gap-0.5 text-center">
