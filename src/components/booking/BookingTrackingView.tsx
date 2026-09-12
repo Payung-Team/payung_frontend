@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useBooking, type ConfirmedBooking } from '../../context/BookingContext';
+import type { ConfirmedBooking } from '../../context/BookingContext';
 import { useJobEvents } from '../../hooks/useJobEvents';
 import { ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
 import { QRCodeSVG } from 'qrcode.react';
@@ -53,9 +53,6 @@ function formatElapsed(ms: number): string {
 // column and no release cron yet (PYG-366 / PYG-367), so any number would be a guess.
 const MOCK = {
   careNote: 'ต้องวัดน้ำตาลก่อนเริ่มกายภาพทุกครั้ง',
-  // Note the caregiver types on check-out. proof.checkOut.note is the real field
-  // and always wins — this only keeps the card reviewable on test bookings.
-  checkOutNote: 'ลืมล้างจาน',
   tasks: [
     { id: 't1', name: 'วัดระดับน้ำตาล', done: false },
     { id: 't2', name: 'กายภาพบำบัดเบื้องต้น', done: false },
@@ -92,21 +89,6 @@ const CARE_LOG_CATEGORY: Record<string, { icon: string; label: string; bg: strin
 };
 
 const LOG_PREVIEW_COUNT = 3;
-
-// Only used while the job is still running — once the caregiver checks out the
-// timeline swaps this step for a "ปิดงาน" one.
-function buildProgressDetail(isCheckedIn: boolean, elapsedStr: string): string {
-  return isCheckedIn ? `มาแล้ว ${elapsedStr}` : '—';
-}
-
-const STATUS_PILL: Record<TrackingState, { label: string; bg: string; dot: string; text: string }> = {
-  awaiting_checkin: { label: 'รอผู้ดูแลเช็คอิน', bg: '#F0F1F3', dot: '#575859', text: '#575859' },
-  checked_in: { label: 'ผู้ดูแลกำลังทำงาน', bg: '#EFF6FF', dot: '#1D4ED8', text: '#1D4ED8' },
-  working: { label: 'ผู้ดูแลกำลังทำงาน', bg: '#EFF6FF', dot: '#1D4ED8', text: '#1D4ED8' },
-  // Never rendered — the checked-out layout hides the pill and says "การดูแลเสร็จสิ้น"
-  // in the banner instead. Present only to keep the record exhaustive.
-  checked_out: { label: 'ดูแลเสร็จสิ้น', bg: '#ECFDF5', dot: '#059669', text: '#047857' },
-};
 
 // Stacked label-above-value field used by the booking-detail panel's 3-up grid.
 // (InfoRow in BookingDetailFields puts the value on the right instead.)
@@ -165,32 +147,6 @@ function CaregiverAvatar({
           }}
         />
       )}
-    </div>
-  );
-}
-
-// Sidebar stat: icon bubble + label above value.
-function StatRow({ icon, iconColor, iconBg, label, value }: Readonly<{ icon: string; iconColor: string; iconBg: string; label: string; value: string }>) {
-  return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 }}>
-      <div style={{ width: 36, height: 36, borderRadius: 18, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <span className="material-icons" style={{ fontSize: 17, color: iconColor }}>{icon}</span>
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E', margin: 0, lineHeight: '16px' }}>{label}</p>
-        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '20px' }}>{value}</p>
-      </div>
-    </div>
-  );
-}
-
-// Plain centred label/value column for the sidebar summary strip. `divided`
-// draws the hairline that separates it from the column on its left.
-function SummaryStat({ label, value, divided = false }: Readonly<{ label: string; value: string; divided?: boolean }>) {
-  return (
-    <div style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '0 8px', borderLeft: divided ? '0.8px solid #F0F1F3' : undefined }}>
-      <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E', margin: 0, lineHeight: '16px' }}>{label}</p>
-      <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: '#1A1A1A', margin: '2px 0 0', lineHeight: '20px' }}>{value}</p>
     </div>
   );
 }
@@ -769,6 +725,15 @@ function CheckoutQrModal({
   );
 }
 
+function FinishedTime({ label, value }: Readonly<{ label: string; value: string }>) {
+  return (
+    <div style={{ textAlign: 'right' }}>
+      <p style={{ fontFamily: FONT_TH, fontSize: 11, color: '#8A8C8E', margin: 0, lineHeight: '16px' }}>{label}</p>
+      <p style={{ fontFamily: FONT_TH, fontSize: 15, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '19px' }}>{value}</p>
+    </div>
+  );
+}
+
 const IN_PROGRESS_CARD: CSSProperties = {
   boxSizing: 'border-box',
   background: '#FFFFFF',
@@ -786,6 +751,7 @@ function InProgressView({
   planTasks,
   lastTaskUpdate,
   careLogs,
+  finished,
   onBack,
   onReportProblem,
 }: Readonly<{
@@ -798,6 +764,14 @@ function InProgressView({
   planTasks: Array<{ id: string; name: string; done: boolean }>;
   lastTaskUpdate: string | null;
   careLogs: CareLogEntry[];
+  /** มีค่า = ปิดงานแล้ว → การ์ดบนเป็น "การดูแลเสร็จสิ้น" + เวลาเริ่ม/สิ้นสุด, งานเป็นสีเทา, ไม่มีแถบล่าง */
+  finished?: {
+    checkInTimeStr: string;
+    checkOutTimeStr: string;
+    checkOutNote: string | null;
+    hasReviewed: boolean;
+    onWriteReview: () => void;
+  };
   onBack: () => void;
   onReportProblem: () => void;
 }>) {
@@ -805,6 +779,10 @@ function InProgressView({
   const [showAllLogs, setShowAllLogs] = useState(false);
   const doneCount = planTasks.filter((t) => t.done).length;
   const visibleLogs = showAllLogs ? careLogs : careLogs.slice(0, LOG_PREVIEW_COUNT);
+  // งานที่ทำเสร็จ: ระหว่างทำงานเป็นสีเขียว หลังปิดงานเป็นสีเทา (เป็นประวัติแล้ว)
+  const doneTask = finished
+    ? { bg: '#D1D5DB', dot: '#9CA3AF', text: '#4B5563' }
+    : { bg: '#F0FBF5', dot: '#009265', text: '#047857' };
 
   return (
     <div style={{ minHeight: '100vh', background: '#F6FAF9', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -835,18 +813,47 @@ function InProgressView({
           <button
             type="button"
             onClick={onReportProblem}
-            style={{ boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 16px', height: 40, background: '#FFFFFF', border: '0.8px solid #E5E7EB', borderRadius: 8, cursor: 'pointer', flexShrink: 0 }}
+            style={{ boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 16px', height: 40, background: '#FFFFFF', border: `0.8px solid ${finished ? '#FCA5A5' : '#E5E7EB'}`, borderRadius: 8, cursor: 'pointer', flexShrink: 0 }}
           >
             <span className="material-icons" style={{ fontSize: 17, color: '#DC2626' }}>flag</span>
             <span style={{ fontFamily: FONT_TH, fontSize: 13, fontWeight: 600, color: '#DC2626', lineHeight: '20px' }}>แจ้งปัญหา</span>
           </button>
         </div>
 
-        {/* Stepper + caregiver */}
+        {/* Stepper (หรือแถบ "การดูแลเสร็จสิ้น" หลังปิดงาน) + caregiver */}
         <div style={{ ...IN_PROGRESS_CARD, marginTop: 20, borderRadius: 16 }}>
-          <div style={{ padding: '24px 40px 20px', borderBottom: '0.8px solid #F3F4F6' }}>
-            <InProgressStepper steps={steps} />
-          </div>
+          {finished ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '20px 24px', borderBottom: '0.8px solid #F3F4F6', flexWrap: 'wrap' }}>
+              <span style={{ width: 44, height: 44, borderRadius: 9999, background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span className="material-icons" style={{ fontSize: 22, color: '#009265' }}>check_circle</span>
+              </span>
+              <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                <p style={{ fontFamily: FONT_TH, fontSize: 17, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '26px' }}>การดูแลเสร็จสิ้น</p>
+                <p style={{ fontFamily: FONT_TH, fontSize: 13, color: '#8A8C8E', margin: '2px 0 0', lineHeight: '20px' }}>
+                  รีวิวผู้ดูแล หรือแจ้งปัญหาได้ภายใน 24 ชั่วโมง ก่อนระบบโอนเงิน
+                </p>
+              </div>
+              {finished.hasReviewed ? (
+                <span style={{ boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 20px', height: 44, background: '#ECFDF5', border: '0.8px solid rgba(16,185,129,0.3)', borderRadius: 12, flexShrink: 0 }}>
+                  <span className="material-icons" style={{ fontSize: 18, color: '#047857' }}>check_circle</span>
+                  <span style={{ fontFamily: FONT_TH, fontSize: 14, fontWeight: 700, color: '#047857', lineHeight: '21px' }}>คุณรีวิวแล้ว</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={finished.onWriteReview}
+                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '0 20px', height: 44, background: '#F59E0B', border: 'none', borderRadius: 12, cursor: 'pointer', flexShrink: 0 }}
+                >
+                  <span className="material-icons" style={{ fontSize: 18, color: '#FFFFFF' }}>star</span>
+                  <span style={{ fontFamily: FONT_TH, fontSize: 14, fontWeight: 700, color: '#FFFFFF', lineHeight: '21px' }}>ให้คะแนนรีวิว</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div style={{ padding: '24px 40px 20px', borderBottom: '0.8px solid #F3F4F6' }}>
+              <InProgressStepper steps={steps} />
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 24px', flexWrap: 'wrap' }}>
             <CaregiverAvatar
               name={booking.caregiverName}
@@ -866,18 +873,30 @@ function InProgressView({
                 <CaregiverStats booking={booking} />
               </div>
             </div>
+            {finished && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20, paddingLeft: 16, flexShrink: 0 }}>
+                <FinishedTime label="เริ่มงาน" value={finished.checkInTimeStr} />
+                <span aria-hidden style={{ width: 1, height: 32, background: '#F3F4F6' }} />
+                <FinishedTime label="สิ้นสุดงาน" value={finished.checkOutTimeStr} />
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-              <CallCaregiverButton phone={booking.caregiverPhone} />
+              {!finished && <CallCaregiverButton phone={booking.caregiverPhone} />}
               <button
                 type="button"
                 onClick={onToggleDetails}
                 aria-expanded={showDetails}
-                style={{ boxSizing: 'border-box', height: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0 24px', background: '#009265', border: 'none', borderRadius: 12, cursor: 'pointer' }}
+                style={{
+                  boxSizing: 'border-box', height: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, cursor: 'pointer',
+                  ...(finished
+                    ? { padding: '0 20px', background: '#FFFFFF', border: '0.8px solid #E5E7EB' }
+                    : { padding: '0 24px', background: '#009265', border: 'none' }),
+                }}
               >
-                <span style={{ fontFamily: FONT_TH, fontSize: 14, fontWeight: 700, color: '#FFFFFF', lineHeight: '21px' }}>รายละเอียดการจอง</span>
+                <span style={{ fontFamily: FONT_TH, fontSize: 14, fontWeight: finished ? 600 : 700, color: finished ? '#1A1A1A' : '#FFFFFF', lineHeight: '21px' }}>รายละเอียดการจอง</span>
                 <span
                   className="material-icons"
-                  style={{ fontSize: 18, color: '#FFFFFF', transition: 'transform 0.15s ease', transform: showDetails ? 'rotate(180deg)' : 'none' }}
+                  style={{ fontSize: 18, color: finished ? '#1A1A1A' : '#FFFFFF', transition: 'transform 0.15s ease', transform: showDetails ? 'rotate(180deg)' : 'none' }}
                 >
                   expand_more
                 </span>
@@ -887,6 +906,14 @@ function InProgressView({
         </div>
 
         {showDetails && detailsPanel}
+
+        {/* โน้ตที่ผู้ดูแลพิมพ์ตอนปิดงาน — แสดงเฉพาะเมื่อมีจริง (ดีไซน์ไม่ได้วาด แต่ไม่อยากทิ้งข้อมูลนี้) */}
+        {finished?.checkOutNote && (
+          <div style={{ ...IN_PROGRESS_CARD, marginTop: 16, borderRadius: 12, padding: 24, borderColor: 'rgba(245,158,11,0.3)' }}>
+            <h3 style={{ fontFamily: FONT_TH, fontSize: 17, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '26px' }}>โน้ตจากผู้ดูแล</h3>
+            <p style={{ fontFamily: FONT_TH, fontSize: 14, color: '#1A1A1A', margin: '8px 0 0', lineHeight: '21px' }}>{finished.checkOutNote}</p>
+          </div>
+        )}
 
         {/* แผนงานที่ผู้ดูแลทำ */}
         <div style={{ ...IN_PROGRESS_CARD, marginTop: 16, borderRadius: 12, padding: 24 }}>
@@ -915,7 +942,7 @@ function InProgressView({
                 key={task.id}
                 style={{
                   boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 12,
-                  background: task.done ? '#F0FBF5' : '#FFFFFF',
+                  background: task.done ? doneTask.bg : '#FFFFFF',
                   border: task.done ? '0.8px solid rgba(82,182,154,0.35)' : '0.8px solid #E5E7EB',
                 }}
               >
@@ -924,7 +951,7 @@ function InProgressView({
                   style={{
                     boxSizing: 'border-box', width: 24, height: 24, borderRadius: 9999, flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: task.done ? '#009265' : '#FFFFFF',
+                    background: task.done ? doneTask.dot : '#FFFFFF',
                     border: task.done ? 'none' : '1.6px solid #E5E7EB',
                   }}
                 >
@@ -934,7 +961,7 @@ function InProgressView({
                   style={{
                     fontFamily: FONT_TH, fontSize: 14, lineHeight: '21px',
                     fontWeight: task.done ? 700 : 400,
-                    color: task.done ? '#047857' : '#1A1A1A',
+                    color: task.done ? doneTask.text : '#1A1A1A',
                     textDecoration: task.done ? 'line-through' : 'none',
                   }}
                 >
@@ -995,7 +1022,8 @@ function InProgressView({
         </div>
       </div>
 
-      {/* Fixed action bar */}
+      {/* Fixed action bar — เฉพาะระหว่างทำงาน ปิดงานแล้วไม่มีอะไรให้กด */}
+      {!finished && (
       <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, background: '#FFFFFF', borderTop: '0.8px solid #F3F4F6', boxShadow: '0px -4px 16px rgba(0,0,0,0.04)' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '12px 24px', boxSizing: 'border-box', display: 'flex', gap: 16 }}>
           <button
@@ -1015,6 +1043,7 @@ function InProgressView({
           </a>
         </div>
       </div>
+      )}
 
       {showQr && (
         <CheckoutQrModal bookingId={booking.id} bookingStatus={booking.status} onClose={() => setShowQr(false)} />
@@ -1040,67 +1069,22 @@ function StarRating({ rating }: Readonly<{ rating: number }>) {
   );
 }
 
-interface TimelineStep {
-  key: string;
-  icon: string;
-  label: string;
-  detail: string;
-  state: 'done' | 'active' | 'pending';
-}
-
-const TIMELINE_STYLE: Record<TimelineStep['state'], { dotBg: string; iconColor: string; lineColor: string; labelColor: string }> = {
-  done: { dotBg: '#10B981', iconColor: '#FFFFFF', lineColor: 'rgba(16,185,129,0.4)', labelColor: '#1A1A1A' },
-  active: { dotBg: '#52B69A', iconColor: '#FFFFFF', lineColor: 'rgba(16,185,129,0.4)', labelColor: '#3A9A7E' },
-  pending: { dotBg: '#E8EBEF', iconColor: '#8A8C8E', lineColor: '#E5E7EB', labelColor: '#1A1A1A' },
-};
-
-function ProgressTimeline({ steps }: Readonly<{ steps: TimelineStep[] }>) {
-  return (
-    <div>
-      {steps.map((step, idx) => {
-        const isLast = idx === steps.length - 1;
-        const { dotBg, iconColor: dotIconColor, lineColor, labelColor } = TIMELINE_STYLE[step.state];
-        return (
-          <div key={step.key} style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-              <div style={{ width: 24, height: 24, borderRadius: 12, background: dotBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <span className="material-icons" style={{ fontSize: 12, color: dotIconColor }}>{step.icon}</span>
-              </div>
-              {!isLast && <div style={{ width: 1, flex: 1, minHeight: 24, background: lineColor, marginTop: 2 }} />}
-            </div>
-            <div style={{ paddingBottom: isLast ? 0 : 12, flex: 1 }}>
-              <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, fontWeight: 700, color: labelColor, margin: 0, lineHeight: '18px' }}>
-                {step.label}
-              </p>
-              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: '#8A8C8E', margin: '2px 0 0', lineHeight: '16px' }}>
-                {step.detail}
-              </p>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export function BookingTrackingView({
   booking,
   onBack,
   onReportProblem,
   onWriteReview,
-  onRebook,
   hasReviewed = false,
 }: Readonly<{
   booking: ConfirmedBooking;
   onBack: () => void;
   onReportProblem: () => void;
   onWriteReview: () => void;
-  onRebook: () => void;
+  /** No longer rendered — the finished layout has no rebook button. Kept optional so callers still compile. */
+  onRebook?: () => void;
   hasReviewed?: boolean;
 }>) {
   const [showDetails, setShowDetails] = useState(false);
-  const [showAllLogs, setShowAllLogs] = useState(false);
-  const { toggleSaveCaregiver, isCaregiverSaved } = useBooking();
 
   // ── Live data ───────────────────────────────────────────────────────────────
   // proofOfWork is the source of truth for check-in/check-out. The care log and
@@ -1178,14 +1162,6 @@ export function BookingTrackingView({
     elapsedStr = formatElapsed(end - effectiveCheckedInAt.getTime());
   }
   const checkOutTimeStr = effectiveCheckedOutAt ? formatThaiTime(effectiveCheckedOutAt) : '—';
-  const pill = STATUS_PILL[state];
-
-  // Once the job is over, the plan and the care log are a record rather than a
-  // live feed — same dimming the pre-check-in state already uses.
-  const dimPastCards = !isCheckedIn || hasCheckedOut;
-  const checkOutNote = proof?.checkOut?.note ?? (hasCheckedOut ? MOCK.checkOutNote : null);
-  const canSaveCaregiver = Boolean(booking.caregiverId);
-  const isSaved = canSaveCaregiver && isCaregiverSaved(booking.caregiverId);
 
   const dt = booking.draft.dateTime;
   const est = booking.draft.estimatedCost;
@@ -1219,14 +1195,11 @@ export function BookingTrackingView({
   const careInstructionsStr = pd?.careInstructions ?? h.careInstructions;
   const tasks = booking.draft.jobDetails?.tasks ?? [];
   const tasksText = tasks.length > 0 ? tasks.map((t) => t.name).join(', ') : null;
-  const confirmedAtStr = formatThaiDate(booking.confirmedAt);
 
   // Mock progress: in the working state the caregiver has ticked off all but
   // the last task.
-  const planTasks = MOCK.tasks.map((t, i) => ({ ...t, done: isWorking && i < MOCK.tasks.length - 1 }));
-  const doneCount = planTasks.filter((t) => t.done).length;
-  const totalCount = planTasks.length;
-  const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+  // After check-out every task is done.
+  const planTasks = MOCK.tasks.map((t, i) => ({ ...t, done: hasCheckedOut || (isWorking && i < MOCK.tasks.length - 1) }));
 
   // Still mocked — there is no care_logs table yet. Timestamps are derived from
   // the real check-in time so they at least stay coherent with the rest.
@@ -1236,38 +1209,7 @@ export function BookingTrackingView({
         time: formatThaiTime(new Date(effectiveCheckedInAt.getTime() + l.minutesAfterCheckIn * 60_000)),
       }))
     : [];
-  const visibleLogs = showAllLogs ? careLogs : careLogs.slice(0, LOG_PREVIEW_COUNT);
   const lastTaskUpdate = careLogs.length > 1 ? careLogs[1].time : null;
-
-  const timelineSteps: TimelineStep[] = [
-    { key: 'confirmed', icon: 'event_available', label: 'ยืนยันการจอง', detail: dt?.date ? `${confirmedAtStr} · ${timeStr}` : confirmedAtStr, state: 'done' },
-    {
-      key: 'checkin',
-      icon: 'login',
-      label: 'ผู้ดูแลเช็คอิน',
-      detail: isCheckedIn ? checkInTimeStr : 'ยังไม่เช็คอิน',
-      state: isCheckedIn ? 'done' : 'pending',
-    },
-  ];
-  if (hasCheckedOut) {
-    // The job is over: "กำลังให้บริการ" would be a step about nothing, so the
-    // closing step carries the total on its own.
-    timelineSteps.push({
-      key: 'checkout',
-      icon: 'logout',
-      label: 'ปิดงาน',
-      detail: checkOutTimeStr,
-      state: 'done',
-    });
-  } else {
-    timelineSteps.push({
-      key: 'in_progress',
-      icon: 'hourglass_top',
-      label: 'กำลังให้บริการ',
-      detail: buildProgressDetail(isCheckedIn, elapsedStr),
-      state: isCheckedIn ? 'active' : 'pending',
-    });
-  }
 
   // Shared by both layouts (awaiting check-in and the live/finished one).
   const detailsPanel = (
@@ -1356,379 +1298,40 @@ export function BookingTrackingView({
     );
   }
 
-  if (!hasCheckedOut) {
-    // เวลาจบที่คาดไว้: ใช้เวลาจบจากการจองก่อน ถ้าไม่มีค่อยคำนวณจากเวลาเช็คอิน + ระยะเวลาที่จอง
-    let expectedEndStr = '—';
-    if (dt?.endTime) {
-      expectedEndStr = `${dt.endTime} น. (คาดว่า)`;
-    } else if (effectiveCheckedInAt && dt?.duration) {
-      expectedEndStr = `${formatThaiTime(new Date(effectiveCheckedInAt.getTime() + Number(dt.duration) * 3_600_000))} (คาดว่า)`;
-    }
-    const inProgressSteps: InProgressStep[] = [
-      { key: 'checkin', icon: 'check', label: 'เช็คอิน', detail: checkInTimeStr, state: 'done' },
-      { key: 'caring', icon: 'volunteer_activism', label: 'กำลังดูแล', detail: elapsedStr === '—' ? '—' : `ผ่านไป ${elapsedStr}`, state: 'active' },
-      { key: 'done', icon: 'logout', label: 'การดูแลเสร็จสิ้น', detail: expectedEndStr, state: 'pending' },
-    ];
-
-    return (
-      <InProgressView
-        booking={booking}
-        steps={inProgressSteps}
-        detailsPanel={detailsPanel}
-        showDetails={showDetails}
-        onToggleDetails={() => setShowDetails((v) => !v)}
-        careNote={noteToCaregiver || MOCK.careNote}
-        planTasks={planTasks}
-        lastTaskUpdate={lastTaskUpdate}
-        careLogs={careLogs}
-        onBack={onBack}
-        onReportProblem={onReportProblem}
-      />
-    );
+  // เวลาจบที่คาดไว้: ใช้เวลาจบจากการจองก่อน ถ้าไม่มีค่อยคำนวณจากเวลาเช็คอิน + ระยะเวลาที่จอง
+  let expectedEndStr = '—';
+  if (dt?.endTime) {
+    expectedEndStr = `${dt.endTime} น. (คาดว่า)`;
+  } else if (effectiveCheckedInAt && dt?.duration) {
+    expectedEndStr = `${formatThaiTime(new Date(effectiveCheckedInAt.getTime() + Number(dt.duration) * 3_600_000))} (คาดว่า)`;
   }
+  const inProgressSteps: InProgressStep[] = [
+    { key: 'checkin', icon: 'check', label: 'เช็คอิน', detail: checkInTimeStr, state: 'done' },
+    { key: 'caring', icon: 'volunteer_activism', label: 'กำลังดูแล', detail: elapsedStr === '—' ? '—' : `ผ่านไป ${elapsedStr}`, state: 'active' },
+    { key: 'done', icon: 'logout', label: 'การดูแลเสร็จสิ้น', detail: expectedEndStr, state: 'pending' },
+  ];
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F6FAF9', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 1000, padding: '24px 20px 100px', boxSizing: 'border-box' }}>
-
-        {/* Back link */}
-        <button
-          type="button"
-          onClick={onBack}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: '4px 0', cursor: 'pointer', marginBottom: 18 }}
-        >
-          <span className="material-icons" style={{ fontSize: 18, color: '#575859' }}>arrow_back</span>
-          <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#575859', lineHeight: '20px' }}>
-            กลับไปนัดหมายของฉัน
-          </span>
-        </button>
-
-        {/* Header */}
-        <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-          <div>
-            <h1 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 800, color: '#1A1A1A', margin: 0, lineHeight: '33px', letterSpacing: 0.55 }}>
-              {booking.ref}
-            </h1>
-            <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E', margin: '4px 0 0', lineHeight: '20px' }}>
-              ติดตามการทำงานของผู้ดูแล
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowDetails((v) => !v)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginTop: 6 }}
-          >
-            <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#3A9A7E', textDecoration: 'underline', lineHeight: '20px' }}>
-              รายละเอียดการจอง
-            </span>
-            <span
-              className="material-icons"
-              style={{ fontSize: 16, color: '#3A9A7E', transition: 'transform 0.15s ease', transform: showDetails ? 'rotate(180deg)' : 'none' }}
-            >
-              expand_more
-            </span>
-          </button>
-        </div>
-
-        {/* Collapsible booking details panel */}
-        {showDetails && detailsPanel}
-
-        {/* Job finished → the only two things left to do are review or dispute,
-            both time-boxed by the payout window. */}
-        {hasCheckedOut && (
-          <div style={{ marginTop: 20, boxSizing: 'border-box', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 16, padding: 20, background: '#FFFFFF', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 18, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 22, background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <span className="material-icons" style={{ fontSize: 24, color: '#059669' }}>task_alt</span>
-              </div>
-              <div>
-                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 17, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '26px' }}>
-                  การดูแลเสร็จสิ้น
-                </p>
-                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#575859', margin: 0, lineHeight: '18px' }}>
-                  รีวิวผู้ดูแล หรือแจ้งปัญหาได้ภายใน 24 ชั่วโมง ก่อนระบบโอนเงิน
-                </p>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              {hasReviewed ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 20px', height: 44, background: '#ECFDF5', border: '0.8px solid rgba(16,185,129,0.3)', borderRadius: 12, boxSizing: 'border-box' }}>
-                  <span className="material-icons" style={{ fontSize: 18, color: '#047857' }}>check_circle</span>
-                  <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#047857', lineHeight: '21px' }}>คุณรีวิวแล้ว</span>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onWriteReview}
-                  style={{ boxSizing: 'border-box', display: 'inline-flex', flexDirection: 'row', alignItems: 'center', padding: '0 20px', gap: 8, height: 44, background: '#52B69A', border: 'none', boxShadow: '0px 4px 12px rgba(82,182,154,0.2)', borderRadius: 12, cursor: 'pointer' }}
-                >
-                  <span className="material-icons" style={{ fontSize: 18, color: '#FFFFFF' }}>star</span>
-                  <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#FFFFFF', lineHeight: '21px' }}>ให้คะแนนรีวิว</span>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={onReportProblem}
-                style={{ boxSizing: 'border-box', display: 'inline-flex', flexDirection: 'row', alignItems: 'center', padding: '0 20px', gap: 8, height: 44, background: '#FFFFFF', border: '0.8px solid rgba(220,38,38,0.4)', borderRadius: 12, cursor: 'pointer' }}
-              >
-                <span className="material-icons" style={{ fontSize: 18, color: '#DC2626' }}>flag</span>
-                <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#DC2626', lineHeight: '21px' }}>แจ้งปัญหา</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Two-column layout */}
-        <div style={{ marginTop: 20, display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
-
-          {/* Left column */}
-          <div style={{ flex: '1 1 520px', minWidth: 320, display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-            {/* Note the caregiver left on check-out */}
-            {hasCheckedOut && checkOutNote && (
-              <div style={{ boxSizing: 'border-box', background: '#FFFFFF', border: '0.8px solid rgba(245,158,11,0.3)', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 18, padding: 20 }}>
-                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 17, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '26px' }}>
-                  โน้ตจากผู้ดูแล
-                </p>
-                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#1A1A1A', margin: '8px 0 0', lineHeight: '21px' }}>
-                  {checkOutNote}
-                </p>
-                <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: '#8A8C8E', margin: '8px 0 0', lineHeight: '16px' }}>
-                  ปิดงานเมื่อ {checkOutTimeStr}
-                </p>
-              </div>
-            )}
-
-            {/* แผนงานที่ผู้ดูแลทำ */}
-            <div style={{ boxSizing: 'border-box', background: '#FFFFFF', opacity: dimPastCards ? 0.7 : 1, boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 18, padding: 20 }}>
-              <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 17, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '26px' }}>
-                แผนงานที่ผู้ดูแลทำ
-              </p>
-
-              <div style={{ marginTop: 12, boxSizing: 'border-box', background: '#FFFBEB', border: '0.8px solid rgba(245,158,11,0.3)', borderRadius: 12, padding: '12px 14px' }}>
-                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, fontWeight: 700, color: '#D97706', margin: 0, lineHeight: '16px' }}>
-                  ข้อควรระวัง / หมายเหตุที่คุณแจ้งไว้
-                </p>
-                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#1A1A1A', margin: '2px 0 0', lineHeight: '21px' }}>
-                  {MOCK.careNote}
-                </p>
-              </div>
-
-              <div style={{ marginTop: 16 }}>
-                <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, fontWeight: 600, color: '#575859', lineHeight: '18px' }}>
-                    ทำแล้ว {doneCount} จาก {totalCount} รายการ
-                  </span>
-                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: '#3A9A7E', lineHeight: '18px' }}>
-                    {pct}%
-                  </span>
-                </div>
-                <div style={{ marginTop: 12, width: '100%', height: 6, background: '#F0F1F3', borderRadius: 9999, overflow: 'hidden' }}>
-                  <div style={{ width: `${pct}%`, height: 6, background: '#52B69A' }} />
-                </div>
-
-                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {planTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      style={{
-                        boxSizing: 'border-box', display: 'flex', flexDirection: 'row', alignItems: 'center',
-                        padding: '12px 14px', gap: 12, borderRadius: 12,
-                        background: task.done ? '#ECFDF5' : '#FFFFFF',
-                        border: task.done ? '0.8px solid rgba(16,185,129,0.3)' : '0.8px solid #E5E7EB',
-                      }}
-                    >
-                      <span
-                        aria-hidden
-                        style={{
-                          boxSizing: 'border-box', width: 20, height: 20, borderRadius: 8, flexShrink: 0,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: task.done ? '#059669' : '#FFFFFF',
-                          border: task.done ? '0.8px solid #059669' : '0.8px solid #E0E2E5',
-                        }}
-                      >
-                        {task.done && <span className="material-icons" style={{ fontSize: 14, color: '#FFFFFF' }}>check</span>}
-                      </span>
-                      <span
-                        style={{
-                          fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, lineHeight: '20px',
-                          fontWeight: task.done ? 600 : 400,
-                          color: task.done ? '#047857' : '#1A1A1A',
-                          textDecoration: task.done ? 'line-through' : 'none',
-                        }}
-                      >
-                        {task.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {lastTaskUpdate && (
-                <p style={{ marginTop: 16, paddingTop: 12, borderTop: '0.8px solid #F0F1F3', fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#C6C8CB', textAlign: 'right', marginBottom: 0, lineHeight: '16px' }}>
-                  บันทึกเมื่อ {lastTaskUpdate}
-                </p>
-              )}
-            </div>
-
-            {/* บันทึกการดูแล */}
-            <div style={{ boxSizing: 'border-box', background: '#FFFFFF', opacity: dimPastCards ? 0.7 : 1, boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 18, padding: 20 }}>
-              <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 17, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '26px' }}>
-                  {careLogs.length > 0 ? 'บันทึกจากผู้ดูแล' : 'บันทึกการดูแล'}
-                </p>
-                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: '#8A8C8E', lineHeight: '18px' }}>
-                  {careLogs.length} รายการ
-                </span>
-              </div>
-
-              {careLogs.length > 0 ? (
-                <>
-                  <div style={{ marginTop: 12 }}>
-                    {visibleLogs.map((entry, idx) => (
-                      <CareLogItem key={entry.id} entry={entry} isLast={idx === visibleLogs.length - 1} />
-                    ))}
-                  </div>
-                  {careLogs.length > LOG_PREVIEW_COUNT && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllLogs((v) => !v)}
-                      style={{ marginTop: 16, boxSizing: 'border-box', width: '100%', display: 'inline-flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: '10px 0', gap: 6, background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 10, cursor: 'pointer' }}
-                    >
-                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#3A9A7E', lineHeight: '20px' }}>
-                        {showAllLogs ? 'ย่อบันทึก' : `ดูบันทึกทั้งหมด (${careLogs.length})`}
-                      </span>
-                      <span
-                        className="material-icons"
-                        style={{ fontSize: 18, color: '#3A9A7E', transition: 'transform 0.15s ease', transform: showAllLogs ? 'rotate(180deg)' : 'none' }}
-                      >
-                        expand_more
-                      </span>
-                    </button>
-                  )}
-                </>
-              ) : (
-                <div style={{ marginTop: 12, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 16px', background: '#F9FAFB', border: '0.8px dashed #E0E2E5', borderRadius: 12 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 22, background: '#F0F1F3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span className="material-icons" style={{ fontSize: 22, color: '#8A8C8E' }}>event_note</span>
-                  </div>
-                  <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#575859', margin: '10px 0 0', lineHeight: '20px', textAlign: 'center' }}>
-                    ยังไม่มีบันทึกการดูแล
-                  </p>
-                  <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#8A8C8E', margin: '4px 0 0', lineHeight: '20px', textAlign: 'center' }}>
-                    บันทึกที่ผู้ดูแลส่งจะแสดงให้คุณเห็นทันที
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right column — caregiver sidebar */}
-          <div style={{ flex: '0 1 374px', minWidth: 300, position: 'sticky', top: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div style={{ boxSizing: 'border-box', background: '#FFFFFF', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 18 }}>
-              <div style={{ padding: 20 }}>
-                <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-                  <CaregiverAvatar name={booking.caregiverName} avatarUrl={booking.caregiverAvatarUrl} online={isCheckedIn && !hasCheckedOut} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    {/* After check-out the green banner above already states the
-                        outcome — a second live-looking pill here would fight it. */}
-                    {!hasCheckedOut && (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', height: 24.5, background: pill.bg, borderRadius: 9999 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: 3, background: pill.dot, flexShrink: 0 }} />
-                        <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, fontWeight: 700, color: pill.text, lineHeight: '16px' }}>{pill.label}</span>
-                      </span>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: hasCheckedOut ? 0 : 4 }}>
-                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 17, fontWeight: 700, color: '#1A1A1A', lineHeight: '26px' }}>
-                        {booking.caregiverName}
-                      </span>
-                      <span className="material-icons" style={{ fontSize: 17, color: '#3A9A7E' }}>verified</span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
-                      <CaregiverStats booking={booking} size="sm" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Stats row */}
-                {hasCheckedOut && (
-                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: '0.8px solid #F0F1F3', display: 'flex', flexDirection: 'row' }}>
-                    <SummaryStat label="เช็คอิน" value={checkInTimeStr} />
-                    <SummaryStat label="เช็คเอาท์" value={checkOutTimeStr} divided />
-                    <SummaryStat label="ระยะเวลา" value={elapsedStr} divided />
-                  </div>
-                )}
-                {!hasCheckedOut && isCheckedIn && (
-                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: '0.8px solid #F0F1F3', display: 'flex', flexDirection: 'row', gap: 12 }}>
-                    <StatRow icon="login" iconColor="#1D4ED8" iconBg="#EFF6FF" label="เริ่มงาน" value={checkInTimeStr} />
-                    <StatRow icon="hourglass_top" iconColor="#3A9A7E" iconBg="#E6F5ED" label="ระยะเวลา" value={elapsedStr} />
-                  </div>
-                )}
-
-                {/* Actions */}
-                {hasCheckedOut ? (
-                  <div style={{ marginTop: 16, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <button
-                      type="button"
-                      onClick={onRebook}
-                      style={{ flex: 1, boxSizing: 'border-box', display: 'inline-flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: '0 12px', gap: 6, height: 40, background: '#52B69A', border: 'none', boxShadow: '0px 4px 12px rgba(82,182,154,0.2)', borderRadius: 12, cursor: 'pointer' }}
-                    >
-                      <span className="material-icons" style={{ fontSize: 16, color: '#FFFFFF' }}>event_repeat</span>
-                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#FFFFFF', lineHeight: '20px' }}>จองอีกครั้ง</span>
-                    </button>
-                    {canSaveCaregiver && (
-                      <button
-                        type="button"
-                        onClick={() => toggleSaveCaregiver({
-                          id: booking.caregiverId,
-                          fullName: booking.caregiverName,
-                          avatarUrl: booking.caregiverAvatarUrl,
-                          hourlyRate: booking.caregiverHourlyRate,
-                          skills: booking.draft.serviceTypes ?? [],
-                          province: booking.caregiverProvince ?? '',
-                        })}
-                        aria-pressed={isSaved}
-                        title={isSaved ? 'นำผู้ดูแลออกจากรายการบันทึก' : 'บันทึกผู้ดูแล'}
-                        style={{ boxSizing: 'border-box', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', width: 40, height: 40, flexShrink: 0, background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 12, cursor: 'pointer' }}
-                      >
-                        <span className="material-icons" style={{ fontSize: 18, color: isSaved ? '#F43F5E' : '#575859' }}>
-                          {isSaved ? 'favorite' : 'favorite_border'}
-                        </span>
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ marginTop: 16, display: 'flex', flexDirection: 'row', gap: 10 }}>
-                    <CallCaregiverButton phone={booking.caregiverPhone} variant="full" />
-                  </div>
-                )}
-              </div>
-
-              {/* Progress timeline */}
-              <div style={{ boxSizing: 'border-box', padding: '16px 20px', background: '#F9FAFB', borderTop: '0.8px solid #F0F1F3', borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }}>
-                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 10, fontWeight: 700, color: '#8A8C8E', margin: '0 0 12px', letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                  ความคืบหน้า
-                </p>
-                <ProgressTimeline steps={timelineSteps} />
-              </div>
-            </div>
-
-            {/* Once the amber banner is gone, "แจ้งปัญหา" lives here — it must stay
-                as prominent as the rest of the sidebar. */}
-            {isCheckedIn && !hasCheckedOut && (
-              <button
-                type="button"
-                onClick={onReportProblem}
-                style={{ boxSizing: 'border-box', width: '100%', display: 'inline-flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: '0 20px', gap: 8, height: 44, background: '#FFFFFF', border: '0.8px solid rgba(220,38,38,0.4)', borderRadius: 12, cursor: 'pointer' }}
-              >
-                <span className="material-icons" style={{ fontSize: 18, color: '#DC2626' }}>flag</span>
-                <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#DC2626', lineHeight: '21px' }}>แจ้งปัญหา</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    <InProgressView
+      booking={booking}
+      steps={inProgressSteps}
+      detailsPanel={detailsPanel}
+      showDetails={showDetails}
+      onToggleDetails={() => setShowDetails((v) => !v)}
+      careNote={noteToCaregiver || MOCK.careNote}
+      planTasks={planTasks}
+      lastTaskUpdate={lastTaskUpdate}
+      careLogs={careLogs}
+      finished={hasCheckedOut ? {
+        checkInTimeStr,
+        checkOutTimeStr,
+        checkOutNote: proof?.checkOut?.note ?? null,
+        hasReviewed,
+        onWriteReview,
+      } : undefined}
+      onBack={onBack}
+      onReportProblem={onReportProblem}
+    />
   );
 }
 
