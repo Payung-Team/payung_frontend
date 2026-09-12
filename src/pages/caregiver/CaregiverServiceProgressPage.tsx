@@ -1,6 +1,5 @@
 import { useQuery } from '@apollo/client/react';
 import { PROOF_OF_WORK } from '../../graphql/queries';
-import { useJobCoordinates } from '../../hooks/useJobCoordinates';
 import type { Booking } from './CaregiverBookings';
 import ServiceProgressWorkCard from './serviceProgress/ServiceProgressWorkCard';
 import PatientHeaderCard from './serviceProgress/PatientHeaderCard';
@@ -24,12 +23,6 @@ interface ProofOfWorkData {
 }
 
 const PROFILE_SECTION_ID = 'service-progress-patient-profile';
-
-/** ยังไม่มี booking reference จริงจาก backend — ใช้ท้าย id เหมือนที่ CaregiverBookingDetailPage ทำ
- *  เพื่อให้รหัสที่ผู้ใช้เห็นในหน้าเดียวกันตรงกัน */
-function bookingRefOf(bookingId: string): string {
-  return `REF-${bookingId.toUpperCase().replaceAll('-', '').slice(-6)}`;
-}
 
 function BookingDetailRow({ icon, label, value }: Readonly<{ icon: string; label: string; value: string }>) {
   return (
@@ -64,8 +57,6 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
       onCheckedOut(null);
     }
   }
-  const jobCoords = useJobCoordinates(booking.locationLat, booking.locationLng, booking.locationName);
-
   const workSection =
     loading || !proof ? (
       <div className="p-4">
@@ -73,15 +64,9 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
       </div>
     ) : (
       <ServiceProgressWorkCard
-        bookingId={booking.id}
-        bookingRef={bookingRefOf(booking.id)}
-        proof={proof}
-        jobLat={jobCoords.lat}
-        jobLng={jobCoords.lng}
         checkInServerTs={checkInServerTs}
         checkOutServerTs={checkOutServerTs}
         bookedDurationText={booking.durationText}
-        onCheckedOut={handleCheckedOut}
       />
     );
 
@@ -102,9 +87,8 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
           </p>
         </div>
 
-        {/* ปิดงานก็ต้องสแกน QR ใบเดิมอีกครั้งเหมือนตอนเช็คอิน (backend บังคับเท่ากัน)
-            แสดงทุก environment เพราะเป็นทางเดียวที่เช็คอิน/ปิดงานได้ (การ์ดเช็คอิน GPS ถูกเอาออกแล้ว)
-            เวลาเช็คอิน/เช็คเอาท์ + ปุ่มจบงาน อยู่ท้ายการ์ดนี้ แทนการ์ดแผนที่เดิม */}
+        {/* ปิดงานด้วยโทเค็น/QR ใบเดิมเหมือนตอนเช็คอิน โดยเวลาเช็คอิน/เช็คเอาท์
+            แสดงท้ายการ์ดนี้ และไม่มีปุ่มปิดงานทางลัด */}
         {checkOutServerTs === null ? (
           <CaregiverQrScanPanel
             bookingId={booking.id}
