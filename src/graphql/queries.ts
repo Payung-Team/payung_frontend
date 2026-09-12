@@ -799,6 +799,11 @@ export const GET_MY_BOOKING = gql`
         fullName
         avatarUrl
         hourlyRate
+        averageRating
+        reviewCount
+        completedJobs
+        experienceYears
+        phone
       }
       payment {
         id

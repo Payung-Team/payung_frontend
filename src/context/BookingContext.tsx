@@ -128,6 +128,13 @@ export interface ConfirmedBooking {
   caregiverAvatarUrl?: string | null;
   caregiverHourlyRate: number;
   caregiverProvince?: string;
+  /** สถิติจริงของผู้ดูแล (myBooking) — undefined/null = ไม่มีข้อมูล ห้ามเดาค่าแทน */
+  caregiverRating?: number | null;
+  caregiverReviewCount?: number | null;
+  caregiverCompletedJobs?: number | null;
+  caregiverExperienceYears?: number | null;
+  /** BE ส่งให้เฉพาะหลังชำระเงิน (confirmed → needs_review) */
+  caregiverPhone?: string | null;
   draft: BookingRequest;
   confirmedAt: string;
   status: BookingStatus;
