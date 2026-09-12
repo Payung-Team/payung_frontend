@@ -1,6 +1,6 @@
 import React from 'react';
 import Icon from './Icon';
-import type { Booking } from '../../pages/caregiver/CaregiverBookings';
+import { getPatientDisplayName, type Booking } from '../../pages/caregiver/CaregiverBookings';
 
 interface AcceptBookingModalProps {
   readonly isOpen: boolean;
@@ -55,7 +55,7 @@ export const AcceptBookingModal: React.FC<AcceptBookingModalProps> = ({
               {/* Row 1: Patient Name */}
               <div className="flex flex-row justify-between items-start p-0 w-[412px] h-[19.5px] self-stretch">
                 <span className="font-normal text-[13px] leading-[20px] text-[#8A8C8E]">คนไข้:</span>
-                <span className="font-bold text-[13px] leading-[20px] text-[#1A1A1A]">{booking.patientName}</span>
+                <span className="font-bold text-[13px] leading-[20px] text-[#1A1A1A]">{getPatientDisplayName(booking)}</span>
               </div>
 
               {/* Row 2: Service Date */}

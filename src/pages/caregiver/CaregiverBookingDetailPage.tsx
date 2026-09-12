@@ -20,6 +20,7 @@ import CheckInMap from './CheckInMap';
 import CaregiverCheckInPanel from './CaregiverCheckInPanel';
 import CaregiverQrScanPanel from './CaregiverQrScanPanel';
 import { QR_TEST_TOOLS_ENABLED } from '../../lib/qrTestTools';
+import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import CaregiverServiceProgressPage from './CaregiverServiceProgressPage';
 import CheckOutSuccess from '../../components/caregiver/CheckOutSuccess';
 import type { ProofOfWorkSummary } from '../../lib/monitoring';
@@ -35,20 +36,6 @@ function isBookingToday(bookingDate: string): boolean {
   day.setHours(0, 0, 0, 0);
   return day.getTime() === today.getTime();
 }
-
-const SERVICE_TYPE_LABELS: Record<string, string> = {
-  general_care: 'ดูแลทั่วไป',
-  bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
-  physiotherapy: 'กายภาพบำบัด',
-  medication: 'ช่วยจัดการยา',
-  companion: 'เป็นเพื่อน/พูดคุย',
-  nursing: 'พยาบาลวิชาชีพ',
-  basic_care: 'ดูแลเบื้องต้น',
-  elderly_care: 'ดูแลผู้สูงอายุ',
-  home_health: 'สุขภาพที่บ้าน',
-  patient_transport: 'รับส่งผู้ป่วย',
-  post_surgery: 'หลังผ่าตัด',
-};
 
 const STATUS_BADGE: Record<string, { label: string; dot: string; bg: string; text: string }> = {
   pending:   { label: 'คำขอใหม่',           dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
@@ -223,7 +210,7 @@ export default function CaregiverBookingDetailPage() {
   const ref = `REF-${idSuffix}`;
   const badge = STATUS_BADGE[booking.status] ?? STATUS_BADGE.cancelled;
   const banner = STATUS_BANNER[booking.status] ?? STATUS_BANNER.cancelled;
-  const svcLabel = SERVICE_TYPE_LABELS[booking.serviceType] ?? booking.serviceType ?? '—';
+  const svcLabel = serviceTypeLabel(booking.serviceType);
   const dateStr = booking.bookingDate ? formatThaiDate(booking.bookingDate) : '—';
   const tasks = booking.tasks ?? [];
   const tasksText = tasks.length > 0 ? tasks.join(', ') : null;

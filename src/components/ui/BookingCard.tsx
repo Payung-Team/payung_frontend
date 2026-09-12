@@ -1,6 +1,7 @@
 import React from 'react';
 import Icon from './Icon';
-import type { Booking } from '../../pages/caregiver/CaregiverBookings';
+import { getPatientDisplayName, type Booking } from '../../pages/caregiver/CaregiverBookings';
+import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 
 interface BookingCardProps {
   booking: Booking;
@@ -36,6 +37,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   const badge = isDueConfirmed
     ? { bg: 'bg-[#EFF6FF]', dot: 'bg-[#3B82F6]', text: 'text-[#1D4ED8]', label: 'ถึงกำหนดบริการแล้ว' }
     : getStatusBadgeStyle(booking.status);
+  const displayPatientName = getPatientDisplayName(booking);
 
   return (
     <div
@@ -91,7 +93,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
           <div className="flex flex-col items-start p-0 grow shrink-0 basis-auto w-full md:w-auto">
             <div className="flex flex-col items-start p-0 w-full h-auto">
               <h3 className="font-['Inter'] font-extrabold text-base md:text-lg leading-7 tracking-[0.5px] text-[#1A1A1A] truncate max-w-full">
-                REF-{booking.id.slice(-6).toUpperCase()} <span className="font-sans font-bold text-sm text-gray-500">· {booking.serviceType}</span>
+                REF-{booking.id.slice(-6).toUpperCase()} <span className="font-sans font-bold text-sm text-gray-500">· {serviceTypeLabel(booking.serviceType)}</span>
               </h3>
             </div>
 
@@ -101,7 +103,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                 {/* Patient Name */}
                 <div className="flex flex-row items-center gap-1.5">
                   <Icon name="person" color="#3B82F6" style={{ fontSize: '13px' }} className="flex-shrink-0" />
-                  <span>{booking.patientName}</span>
+                  <span>{displayPatientName}</span>
                 </div>
 
                 <span className="text-[#D1D5DB] font-semibold text-[11px]">·</span>
@@ -155,16 +157,13 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                 {/* Avatar */}
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#52B69A] to-[#76C893] flex items-center justify-center flex-shrink-0">
                   <span className="font-['Bai_Jamjuree'] font-bold text-[15.38px] text-white">
-                    {booking.patientName ? booking.patientName.charAt(0) : 'พ'}
+                    {displayPatientName ? displayPatientName.charAt(0) : 'พ'}
                   </span>
                 </div>
                 {/* Text Info */}
                 <div className="flex flex-col items-start p-0">
                   <span className="font-['Bai_Jamjuree'] font-bold text-[15px] leading-[22px] text-[#1A1A1A]">
-                    {booking.patientName}
-                  </span>
-                  <span className="font-['Bai_Jamjuree'] font-normal text-xs leading-[18px] text-[#8A8C8E] mt-0.5">
-                    สำหรับ: {booking.relation || 'สำหรับตัวเอง'}
+                    {displayPatientName}
                   </span>
                 </div>
               </div>
@@ -185,7 +184,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                     <Icon name="medical_services" color="#8A8C8E" style={{ fontSize: '16px' }} />
                   </div>
                   <span className="w-[90px] text-[#8A8C8E] flex-shrink-0 font-['Bai_Jamjuree']">ประเภทบริการ</span>
-                  <span className="text-[#1A1A1A] font-semibold font-['Bai_Jamjuree']">{booking.serviceType}</span>
+                  <span className="text-[#1A1A1A] font-semibold font-['Bai_Jamjuree']">{serviceTypeLabel(booking.serviceType)}</span>
                 </div>
 
                 {/* Date */}

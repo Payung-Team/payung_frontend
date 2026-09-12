@@ -56,6 +56,12 @@ export interface Booking {
 
 type TabType = 'scheduled' | 'action_required' | 'history';
 
+// Show the actual patient's name; fall back to the booker's display name for older bookings
+// eslint-disable-next-line react-refresh/only-export-components -- shared pure helper, not a component
+export function getPatientDisplayName(booking: Pick<Booking, 'careRecipientName' | 'patientName'>): string {
+  return booking.careRecipientName || booking.patientName;
+}
+
 function serviceLocationLabel(loc: string): string {
   switch (loc) {
     case 'at_home': return 'ดูแลที่บ้านผู้ป่วย';
@@ -323,7 +329,7 @@ export const CaregiverBookings: React.FC = () => {
 
       const msg = (
         <>
-          ยอมรับคำขอของ <strong className="font-bold text-[#1A1A1A]">{booking.patientName}</strong> แล้ว{"\n"}
+          ยอมรับคำขอของ <strong className="font-bold text-[#1A1A1A]">{getPatientDisplayName(booking)}</strong> แล้ว{"\n"}
           รอผู้ป่วยชำระเงินเพื่อยืนยันการจอง
         </>
       );
@@ -427,8 +433,16 @@ export const CaregiverBookings: React.FC = () => {
     }
 
     if (activeTab === 'scheduled') {
-      // Chronological order: most overdue first in "due", soonest first in "upcoming"
-      return [...list].sort((a, b) => new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime());
+      // Chronological order: most overdue first in "due", soonest first in "upcoming";
+      // same day → earliest start time first
+      const startMinutes = (b: Booking) => {
+        const match = /^(\d{1,2}):(\d{2})/.exec(b.time ?? '');
+        return match ? Number(match[1]) * 60 + Number(match[2]) : Number.MAX_SAFE_INTEGER;
+      };
+      return [...list].sort((a, b) => {
+        const dateDiff = new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime();
+        return dateDiff !== 0 ? dateDiff : startMinutes(a) - startMinutes(b);
+      });
     }
 
     if (activeTab === 'history') {
@@ -439,9 +453,9 @@ export const CaregiverBookings: React.FC = () => {
       });
     }
 
-    return [...list].sort((a, b) => {
-      return new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime();
-    });
+    // Action required: newest requests first
+    const createdTime = (b: Booking) => new Date(b.createdAt).getTime() || 0;
+    return [...list].sort((a, b) => createdTime(b) - createdTime(a));
   };
 
   const filteredBookings = getFilteredBookings();
@@ -944,7 +958,7 @@ export const CaregiverBookings: React.FC = () => {
             if (targetBooking) {
               const msg = (
                 <>
-                  ปฏิเสธคำขอจองของ <strong className="font-bold">{targetBooking.patientName}</strong> แล้ว
+                  ปฏิเสธคำขอจองของ <strong className="font-bold">{getPatientDisplayName(targetBooking)}</strong> แล้ว
                 </>
               );
               showSuccess(msg, 4000, 'decline-toast');
@@ -983,7 +997,7 @@ export const CaregiverBookings: React.FC = () => {
             if (targetBooking) {
               const msg = (
                 <>
-                  ยกเลิกการตอบรับงานของ <strong className="font-bold">{targetBooking.patientName}</strong> แล้ว
+                  ยกเลิกการตอบรับงานของ <strong className="font-bold">{getPatientDisplayName(targetBooking)}</strong> แล้ว
                 </>
               );
               showSuccess(msg, 4000, 'decline-toast');

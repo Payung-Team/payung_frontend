@@ -3,6 +3,8 @@
  * strings live in one place here rather than being scattered as inline literals.
  */
 
+import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
+
 /** e.g. "12 ส.ค. 2569" (Buddhist year). */
 export function formatDate(iso: string | Date | null | undefined): string {
   if (!iso) return '';
@@ -302,19 +304,7 @@ const S: Strings = {
   apptEmptyPendingBody: 'การจองที่รอผู้ดูแลจับคู่หรือยืนยันจะแสดงที่นี่',
   apptEmptyHistoryTitle: 'ยังไม่มีประวัติการจอง',
   apptEmptyHistoryBody: 'งานที่เสร็จสิ้นหรือยกเลิกแล้วจะย้ายมาเก็บที่นี่',
-  serviceTypeLabel: (t) =>
-    ({
-      general_care: 'ดูแลทั่วไป',
-      elderly_care: 'ดูแลผู้สูงอายุ',
-      bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
-      physiotherapy: 'กายภาพบำบัด',
-      medication: 'ช่วยจัดการยา',
-      companion: 'เป็นเพื่อน/พูดคุย',
-      nursing: 'พยาบาลวิชาชีพ',
-      basic_care: 'ดูแลเบื้องต้น',
-      home_health: 'สุขภาพที่บ้าน',
-      patient_transport: 'รับส่งผู้ป่วย',
-    })[t] ?? t,
+  serviceTypeLabel: (t) => serviceTypeLabel(t),
   serviceFormatLabel: (locs) => {
     const home = locs.includes('at_home');
     const out = locs.includes('accompany_outside');

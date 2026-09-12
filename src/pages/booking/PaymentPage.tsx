@@ -5,6 +5,7 @@ import type { ConfirmedBooking, BookingRequest } from '../../context/BookingCont
 import { GET_MY_BOOKING, CREATE_PAYMENT, GET_PAYMENT_BY_BOOKING } from '../../graphql/queries';
 import { mapGqlStatus } from '../../utils/bookingStatus';
 import { loadOmiseJs } from '../../lib/omise-loader';
+import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -16,20 +17,6 @@ function formatThaiDate(dateStr: string): string {
     });
   } catch { return dateStr; }
 }
-
-const SERVICE_TYPE_LABELS: Record<string, string> = {
-  general_care: 'ดูแลทั่วไป',
-  bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
-  physiotherapy: 'กายภาพบำบัด',
-  medication: 'ช่วยจัดการยา',
-  companion: 'เป็นเพื่อน/พูดคุย',
-  nursing: 'พยาบาลวิชาชีพ',
-  basic_care: 'ดูแลเบื้องต้น',
-  elderly_care: 'ดูแลผู้สูงอายุ',
-  home_health: 'สุขภาพที่บ้าน',
-  patient_transport: 'รับส่งผู้ป่วย',
-  post_surgery: 'หลังผ่าตัด',
-};
 
 const SERVICE_LOCATION_LABELS: Record<string, string> = {
   at_home: 'ที่บ้านและนอกสถานที่',
@@ -338,7 +325,7 @@ export default function PaymentPage() {
   const dt = booking.draft.dateTime;
   const est = booking.draft.estimatedCost;
   const svcTypes = booking.draft.serviceTypes ?? [];
-  const svcTypeLabel = svcTypes.map((t) => SERVICE_TYPE_LABELS[t] ?? t).join(', ') || '—';
+  const svcTypeLabel = svcTypes.map((t) => serviceTypeLabel(t)).join(', ') || '—';
   const dateStr = dt?.date ? formatThaiDate(dt.date) : '—';
   const timeStr = dt?.startTime && dt?.endTime ? `${dt.startTime}–${dt.endTime} น.` : (dt?.slot ?? '—');
   const durationStr = dt?.duration ? `${dt.duration} ชั่วโมง` : '—';

@@ -18,6 +18,7 @@ import type { PaymentInfo } from '../../components/payment/PaymentInfoSection';
 import { Divider, SectionTitle, InfoRow } from '../../components/booking/BookingDetailFields';
 import { BookingTrackingView } from '../../components/booking/BookingTrackingView';
 import { hasAnyProfileData, type PatientProfile } from '../../lib/patientProfile';
+import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -43,20 +44,6 @@ function NoteBlock({ label, text }: Readonly<{ label: string; text: string }>) {
     </div>
   );
 }
-
-const SERVICE_TYPE_LABELS: Record<string, string> = {
-  general_care: 'ดูแลทั่วไป',
-  bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
-  physiotherapy: 'กายภาพบำบัด',
-  medication: 'ช่วยจัดการยา',
-  companion: 'เป็นเพื่อน/พูดคุย',
-  nursing: 'พยาบาลวิชาชีพ',
-  basic_care: 'ดูแลเบื้องต้น',
-  elderly_care: 'ดูแลผู้สูงอายุ',
-  home_health: 'สุขภาพที่บ้าน',
-  patient_transport: 'รับส่งผู้ป่วย',
-  post_surgery: 'หลังผ่าตัด',
-};
 
 // Statuses in which the patient may still write their review.
 const REVIEWABLE_STATUSES = new Set<ConfirmedBooking['status']>([
@@ -269,7 +256,7 @@ export default function BookingDetailPage() {
   const dt = booking.draft.dateTime;
   const est = booking.draft.estimatedCost;
   const svcTypes = booking.draft.serviceTypes ?? [];
-  const svcTypeLabel = svcTypes.map((t) => SERVICE_TYPE_LABELS[t] ?? t).join(', ') || '—';
+  const svcTypeLabel = svcTypes.map((t) => serviceTypeLabel(t)).join(', ') || '—';
   const dateStr = dt?.date ? formatThaiDate(dt.date) : '—';
   const timeStr = dt?.startTime && dt?.endTime ? `${dt.startTime}–${dt.endTime} น.` : (dt?.slot ?? '—');
   const durationStr = dt?.duration ? `${dt.duration} ชั่วโมง` : '—';

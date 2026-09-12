@@ -8,6 +8,7 @@ import { useJobQr } from '../../hooks/useJobQr';
 import { shouldShowJobQr } from '../../lib/jobQr';
 import { copyTextToClipboard, QR_TEST_TOOLS_ENABLED } from '../../lib/qrTestTools';
 import { JobQrCard } from './JobQrCard';
+import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 
 // ── Tracking Service view (PYG-361) ─────────────────────────────────────────────
 // Shown to patients once a confirmed booking's service date has arrived. Three
@@ -18,20 +19,6 @@ import { JobQrCard } from './JobQrCard';
 // adds those fields.
 
 export type TrackingState = 'awaiting_checkin' | 'checked_in' | 'working' | 'checked_out';
-
-const SERVICE_TYPE_LABELS: Record<string, string> = {
-  general_care: 'ดูแลทั่วไป',
-  bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
-  physiotherapy: 'กายภาพบำบัด',
-  medication: 'ช่วยจัดการยา',
-  companion: 'เป็นเพื่อน/พูดคุย',
-  nursing: 'พยาบาลวิชาชีพ',
-  basic_care: 'ดูแลเบื้องต้น',
-  elderly_care: 'ดูแลผู้สูงอายุ',
-  home_health: 'สุขภาพที่บ้าน',
-  patient_transport: 'รับส่งผู้ป่วย',
-  post_surgery: 'หลังผ่าตัด',
-};
 
 function formatThaiDate(dateStr: string): string {
   if (!dateStr) return '—';
@@ -941,7 +928,7 @@ export function BookingTrackingView({
   const dt = booking.draft.dateTime;
   const est = booking.draft.estimatedCost;
   const svcTypes = booking.draft.serviceTypes ?? [];
-  const svcTypeLabel = svcTypes.map((t) => SERVICE_TYPE_LABELS[t] ?? t).join(', ') || '—';
+  const svcTypeLabel = svcTypes.map((t) => serviceTypeLabel(t)).join(', ') || '—';
   const dateStr = dt?.date ? formatThaiDate(dt.date) : '—';
   const timeStr = dt?.startTime && dt?.endTime ? `${dt.startTime}–${dt.endTime} น.` : (dt?.slot ?? '—');
   const durationStr = dt?.duration ? `${dt.duration} ชม.` : '—';

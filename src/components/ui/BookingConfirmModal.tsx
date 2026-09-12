@@ -1,5 +1,6 @@
 import React from 'react';
 import type { BookingRequest } from '../../context/BookingContext';
+import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -42,14 +43,6 @@ const SKILL_TRANSLATIONS: Record<string, string> = {
   dementia_care: 'ดูแลสมองเสื่อม',
   general_care: 'ดูแลทั่วไป',
   bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
-  companion: 'เป็นเพื่อน/พูดคุย',
-};
-
-const SERVICE_TYPE_LABELS: Record<string, string> = {
-  general_care: 'ดูแลทั่วไป',
-  physiotherapy: 'กายภาพบำบัด',
-  bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
-  medication: 'ช่วยจัดการยา',
   companion: 'เป็นเพื่อน/พูดคุย',
 };
 
@@ -117,7 +110,7 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
 
   // Booking details
   const serviceTypes = (bookingDraft?.serviceTypes ?? [])
-    .map((s) => SERVICE_TYPE_LABELS[s] || s)
+    .map((s) => serviceTypeLabel(s))
     .join(', ');
   const dateTime = bookingDraft?.dateTime;
   const duration = dateTime?.duration ?? 0;
