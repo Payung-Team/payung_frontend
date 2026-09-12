@@ -61,7 +61,6 @@ const MOCK = {
     { id: 't2', name: 'กายภาพบำบัดเบื้องต้น', done: false },
     { id: 't3', name: 'พยุงเดิน', done: false },
   ],
-  checkInLocation: 'ห้วยขวาง',
   // Fallbacks so the detail panel renders fully while test bookings still lack
   // patientDetails. Real values from booking.draft always win.
   health: {
@@ -83,16 +82,13 @@ const MOCK = {
     { id: 'l3', minutesAfterCheckIn: 20, category: 'vitals', text: 'วัดความดัน 128/80 ชีพจร 74 ปกติดีค่ะ', hasPhoto: false },
     { id: 'l4', minutesAfterCheckIn: 8, category: 'medication', text: 'ให้ยาลดความดันมื้อเช้าเรียบร้อยค่ะ', hasPhoto: false },
   ],
-  // Flip to true to exercise the "booking has no coordinates" case — the map
-  // card must disappear entirely, with no error and no empty box.
-  jobCoordsMissing: false,
 };
 
-const CARE_LOG_CATEGORY: Record<string, { icon: string; label: string }> = {
-  food: { icon: 'restaurant', label: 'อาหาร' },
-  activity: { icon: 'directions_walk', label: 'กิจกรรม' },
-  vitals: { icon: 'monitor_heart', label: 'สุขภาพร่างกาย' },
-  medication: { icon: 'medication', label: 'ยา' },
+const CARE_LOG_CATEGORY: Record<string, { icon: string; label: string; bg: string; color: string }> = {
+  food: { icon: 'restaurant', label: 'อาหาร', bg: '#FFF7ED', color: '#C2410C' },
+  activity: { icon: 'directions_walk', label: 'กิจกรรม', bg: '#F0FAF4', color: '#047857' },
+  vitals: { icon: 'favorite', label: 'สุขภาพร่างกาย', bg: '#F0FAF4', color: '#047857' },
+  medication: { icon: 'medication', label: 'ยา', bg: '#F0FAF4', color: '#047857' },
 };
 
 const LOG_PREVIEW_COUNT = 3;
@@ -535,7 +531,11 @@ function AwaitingCheckInView({
  *   สถานะอื่น (ยังไม่ถึงเวลา / หมดเวลา / โหลดไม่ได้) ส่งต่อให้ JobQrCard พูดแทน
  *   เพื่อไม่ต้องเขียนข้อความชุดนั้นซ้ำสองที่ — query เดียวกันจึงได้จาก cache ของ Apollo
  */
-function InlineCheckInQr({ bookingId, bookingStatus }: Readonly<{ bookingId: string; bookingStatus: ConfirmedBooking['status'] }>) {
+function InlineCheckInQr({
+  bookingId,
+  bookingStatus,
+  purpose = 'checkin',
+}: Readonly<{ bookingId: string; bookingStatus: ConfirmedBooking['status']; purpose?: 'checkin' | 'checkout' }>) {
   const eligible = shouldShowJobQr(bookingStatus);
   const { qr, loading, rotate, rotating, rotateErrorMessage } = useJobQr(bookingId, { skip: !eligible });
   const [showTestTools, setShowTestTools] = useState(false);
@@ -559,7 +559,7 @@ function InlineCheckInQr({ bookingId, bookingStatus }: Readonly<{ bookingId: str
   return (
     <div style={{ boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 28px 32px' }}>
       <h2 style={{ fontFamily: FONT_TH, fontSize: 22, fontWeight: 700, color: '#064E3B', margin: 0, lineHeight: '32px', textAlign: 'center' }}>
-        ให้ผู้ดูแลสแกน QR นี้
+        {purpose === 'checkout' ? 'ให้ผู้ดูแลสแกน QR นี้เพื่อจบการดูแล' : 'ให้ผู้ดูแลสแกน QR นี้'}
       </h2>
 
       <div style={{ marginTop: 20, boxSizing: 'border-box', width: 324, maxWidth: '100%', padding: 16, background: '#FFFFFF', border: '1.6px solid rgba(0,146,101,0.25)', borderRadius: 16, lineHeight: 0 }}>
@@ -571,7 +571,7 @@ function InlineCheckInQr({ bookingId, bookingStatus }: Readonly<{ bookingId: str
           marginSize={0}
           bgColor="#FFFFFF"
           fgColor="#10302A"
-          title="QR สำหรับให้ผู้ดูแลสแกนเพื่อเช็คอิน"
+          title={purpose === 'checkout' ? 'QR สำหรับให้ผู้ดูแลสแกนเพื่อจบการดูแล' : 'QR สำหรับให้ผู้ดูแลสแกนเพื่อเช็คอิน'}
           style={{ width: '100%', height: 'auto' }}
         />
       </div>
@@ -642,36 +642,34 @@ interface CareLogEntry {
 function CareLogItem({ entry, isLast }: Readonly<{ entry: CareLogEntry; isLast: boolean }>) {
   const meta = CARE_LOG_CATEGORY[entry.category];
   return (
-    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: 14 }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 10, flexShrink: 0 }}>
-        <span style={{ width: 10, height: 10, borderRadius: 5, background: '#52B69A', marginTop: 6, flexShrink: 0 }} />
-        {!isLast && <span style={{ width: 1, flex: 1, background: '#E5E7EB' }} />}
+        <span style={{ width: 10, height: 10, borderRadius: 5, background: '#52B69A', boxShadow: '0px 0px 0px 4px #ECFDF5', marginTop: 6, flexShrink: 0 }} />
+        {!isLast && <span style={{ width: 1, flex: 1, marginTop: 6, background: '#F3F4F6' }} />}
       </div>
       <div style={{ flex: 1, minWidth: 0, paddingBottom: isLast ? 0 : 20 }}>
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 600, color: '#8A8C8E', lineHeight: '16px' }}>
+          <span style={{ fontFamily: FONT_TH, fontSize: 12, color: '#8A8C8E', lineHeight: '18px' }}>
             {entry.time}
           </span>
           {meta && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', background: '#E6F5ED', borderRadius: 9999 }}>
-              <span className="material-icons" style={{ fontSize: 11, color: '#3A9A7E' }}>{meta.icon}</span>
-              <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, fontWeight: 700, color: '#3A9A7E', lineHeight: '16px' }}>{meta.label}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0 8px', height: 22, background: meta.bg, borderRadius: 9999 }}>
+              <span className="material-icons" style={{ fontSize: 13, color: meta.color }}>{meta.icon}</span>
+              <span style={{ fontFamily: FONT_TH, fontSize: 11, fontWeight: 600, color: meta.color, lineHeight: '16px' }}>{meta.label}</span>
             </span>
           )}
         </div>
         <div style={{ marginTop: 6, boxSizing: 'border-box', background: '#FFFFFF', border: '0.8px solid #E5E7EB', borderRadius: 12, padding: '12px 16px' }}>
-          <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#1A1A1A', margin: 0, lineHeight: '21px' }}>
+          <p style={{ fontFamily: FONT_TH, fontSize: 14, color: '#1A1A1A', margin: 0, lineHeight: '24px' }}>
             {entry.text}
           </p>
           {entry.hasPhoto && (
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '0.8px solid #F0F1F3' }}>
-              {/* Photo placeholder — real uploads land here once the care-log API exists. */}
-              <div style={{ position: 'relative', width: 64, height: 64, border: '0.8px solid #E5E7EB', borderRadius: 10, background: 'linear-gradient(135deg, #F0F1F3 0%, #E5E7EB 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span className="material-icons" style={{ fontSize: 22, color: '#B0B3B8' }}>image</span>
-                <span style={{ position: 'absolute', right: 2, bottom: 2, width: 20, height: 20, borderRadius: 8, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-icons" style={{ fontSize: 13, color: '#FFFFFF' }}>zoom_in</span>
-                </span>
-              </div>
+            // Photo placeholder — real uploads land here once the care-log API exists.
+            <div style={{ position: 'relative', marginTop: 12, width: 92, height: 92, boxSizing: 'border-box', border: '0.8px solid rgba(0,0,0,0.05)', borderRadius: 12, background: '#FDE8D5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span className="material-icons" style={{ fontSize: 36, color: '#E8956B' }}>image</span>
+              <span style={{ position: 'absolute', right: 6, bottom: 6, width: 24, height: 24, borderRadius: 12, background: 'rgba(255,255,255,0.9)', boxShadow: '0px 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-icons" style={{ fontSize: 14, color: '#1A1A1A' }}>search</span>
+              </span>
             </div>
           )}
         </div>
@@ -680,79 +678,347 @@ function CareLogItem({ entry, isLast }: Readonly<{ entry: CareLogEntry; isLast: 
   );
 }
 
-// Mock street grid — absolute insets lifted straight from the design spec.
-// Purely decorative; the real screen will render Google Maps here.
-const MAP_ROADS: Array<{ inset: string; bg: string }> = [
-  { inset: '0 27.62% 0 27.62%', bg: '#EEF7F3' },        // map panel
-  { inset: '46.15% 27.62% 43.85% 27.62%', bg: '#D8ECE4' }, // main road, horizontal
-  { inset: '0 48.66% 0 48.66%', bg: '#D8ECE4' },        // main road, vertical
-  { inset: '15.38% 27.62% 80.38% 27.62%', bg: '#E2F0EA' },
-  { inset: '81.54% 27.62% 14.23% 27.62%', bg: '#E2F0EA' },
-  { inset: '0 63.77% 0 35%', bg: '#E2F0EA' },
-  { inset: '0 35.34% 0 63.43%', bg: '#E2F0EA' },
-];
+// ── In-progress layout ───────────────────────────────────────────────────────
+// ผู้ดูแลเช็คอินแล้วและยังไม่ปิดงาน — ไม่มีแผนที่/ไทม์ไลน์ด้านข้าง
+// สิ่งที่ผู้ใช้ต้องทำมีแค่ "จบการดูแล" (เปิด QR ให้ผู้ดูแลสแกนปิดงาน) กับ "โทรฉุกเฉิน"
+// จึงอยู่ในแถบล่างที่ติดจอตลอด ส่วน QR ซ่อนไว้ในป๊อปอัปจนกว่าจะกดจบการดูแล
 
-const MAP_BLOCKS: string[] = [
-  '22.31% 52.69% 56.15% 37.91%',
-  '22.31% 37.91% 56.15% 53.36%',
-  '60% 52.69% 20.77% 37.91%',
-  '60% 37.91% 20.77% 53.36%',
-];
+/** สายด่วนการแพทย์ฉุกเฉิน (สพฉ.) */
+const EMERGENCY_PHONE = '1669';
 
-const MAP_PIN_RINGS: Array<{ inset: string; bg: string; opacity: number }> = [
-  { inset: '41.15% 47.09% 38.85% 47.09%', bg: '#52B69A', opacity: 0.05 },
-  { inset: '45.38% 48.32% 43.08% 48.32%', bg: '#52B69A', opacity: 0.22 },
-  { inset: '48.08% 49.1% 45.77% 49.1%', bg: '#52B69A', opacity: 1 },
-  { inset: '49.92% 49.64% 47.62% 49.64%', bg: '#FFFFFF', opacity: 1 },
-];
+interface InProgressStep {
+  key: string;
+  icon: string;
+  label: string;
+  detail: string;
+  state: 'done' | 'active' | 'pending';
+}
 
-function CheckInMapCard({ checkInTime, location }: Readonly<{ checkInTime: string; location: string }>) {
-  const chipBase = {
-    position: 'absolute' as const,
-    background: 'rgba(255,255,255,0.95)',
-    boxShadow: '0px 1px 4px rgba(0,0,0,0.03)',
-  };
+const IN_PROGRESS_STEP_STYLE: Record<InProgressStep['state'], { bg: string; color: string }> = {
+  done: { bg: '#009265', color: '#FFFFFF' },
+  active: { bg: '#EFF6FF', color: '#1D4ED8' },
+  pending: { bg: '#F3F4F6', color: '#9CA3AF' },
+};
+
+function InProgressStepper({ steps }: Readonly<{ steps: InProgressStep[] }>) {
+  // เส้นเชื่อมวิ่งจากกลางวงแรกถึงกลางวงสุดท้าย (แต่ละขั้นกว้าง 1/n) ส่วนสีเขียวเติมถึงขั้นที่กำลังทำ
+  const n = steps.length;
+  const edge = `${50 / n}%`;
+  const activeIdx = steps.findIndex((s) => s.state !== 'done');
+  const reached = activeIdx === -1 ? n - 1 : activeIdx;
+  const fillPct = n > 1 ? (reached / (n - 1)) * 100 : 0;
+
   return (
-    <div style={{ marginTop: 20, background: '#FFFFFF', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 18 }}>
-      <div style={{ position: 'relative', height: 280, border: '0.8px solid #E5E7EB', borderRadius: 16, overflow: 'hidden', boxSizing: 'border-box' }}>
-        {MAP_ROADS.map((road) => (
-          <div key={road.inset} aria-hidden style={{ position: 'absolute', inset: road.inset, background: road.bg }} />
-        ))}
-        {MAP_BLOCKS.map((inset) => (
-          <div key={inset} aria-hidden style={{ position: 'absolute', inset, background: '#DCEFE6', opacity: 0.85 }} />
-        ))}
-        {MAP_PIN_RINGS.map((ring) => (
-          <div key={ring.inset} aria-hidden style={{ position: 'absolute', inset: ring.inset, background: ring.bg, opacity: ring.opacity, borderRadius: '50%' }} />
-        ))}
+    <div style={{ position: 'relative' }}>
+      <div aria-hidden style={{ position: 'absolute', left: edge, right: edge, top: 19, height: 3, background: '#F3F4F6', borderRadius: 9999 }}>
+        <div style={{ width: `${fillPct}%`, height: '100%', background: '#009265', borderRadius: 9999 }} />
+      </div>
+      <ol style={{ position: 'relative', display: 'flex', margin: 0, padding: 0, listStyle: 'none' }}>
+        {steps.map((step) => {
+          const s = IN_PROGRESS_STEP_STYLE[step.state];
+          return (
+            <li key={step.key} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+              <span style={{ width: 40, height: 40, borderRadius: 9999, background: s.bg, boxShadow: '0px 0px 0px 5px #FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-icons" style={{ fontSize: 19, color: s.color }}>{step.icon}</span>
+              </span>
+              <p style={{ fontFamily: FONT_TH, fontSize: 13, fontWeight: 700, color: '#1A1A1A', margin: '8px 0 0', lineHeight: '20px' }}>{step.label}</p>
+              <p style={{ fontFamily: FONT_TH, fontSize: 12, color: '#8A8C8E', margin: 0, lineHeight: '18px' }}>{step.detail}</p>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
 
-        {/* Live pill */}
-        <div style={{ ...chipBase, left: 10.8, top: 10.8, display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 9999 }}>
-          <span style={{ position: 'relative', width: 8, height: 8, flexShrink: 0 }}>
-            <span aria-hidden style={{ position: 'absolute', left: -3.9, top: -3.9, width: 15.8, height: 15.8, borderRadius: '50%', background: '#10B981', opacity: 0.2 }} />
-            <span aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#10B981' }} />
+/** ป๊อปอัป QR ตอนกด "จบการดูแล" — พอผู้ดูแลสแกนปิดงานสำเร็จ proof อัปเดต หน้าจะสลับเป็นสถานะเสร็จสิ้นเอง */
+function CheckoutQrModal({
+  bookingId,
+  bookingStatus,
+  onClose,
+}: Readonly<{ bookingId: string; bookingStatus: ConfirmedBooking['status']; onClose: () => void }>) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="QR สำหรับจบการดูแล"
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(17,24,39,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxSizing: 'border-box', overflowY: 'auto' }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ position: 'relative', width: '100%', maxWidth: 480, maxHeight: '100%', overflowY: 'auto', background: '#FFFFFF', borderRadius: 16, boxShadow: '0px 20px 48px rgba(0,0,0,0.2)' }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="ปิด"
+          style={{ position: 'absolute', top: 12, right: 12, zIndex: 1, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F3F4F6', border: 'none', borderRadius: 9999, cursor: 'pointer' }}
+        >
+          <span className="material-icons" style={{ fontSize: 20, color: '#575859' }}>close</span>
+        </button>
+        <InlineCheckInQr bookingId={bookingId} bookingStatus={bookingStatus} purpose="checkout" />
+      </div>
+    </div>
+  );
+}
+
+const IN_PROGRESS_CARD: CSSProperties = {
+  boxSizing: 'border-box',
+  background: '#FFFFFF',
+  border: '0.8px solid #F3F4F6',
+  boxShadow: '0px 1px 2px rgba(0,0,0,0.05)',
+};
+
+function InProgressView({
+  booking,
+  steps,
+  detailsPanel,
+  showDetails,
+  onToggleDetails,
+  careNote,
+  planTasks,
+  lastTaskUpdate,
+  careLogs,
+  onBack,
+  onReportProblem,
+}: Readonly<{
+  booking: ConfirmedBooking;
+  steps: InProgressStep[];
+  detailsPanel: ReactNode;
+  showDetails: boolean;
+  onToggleDetails: () => void;
+  careNote: string | null;
+  planTasks: Array<{ id: string; name: string; done: boolean }>;
+  lastTaskUpdate: string | null;
+  careLogs: CareLogEntry[];
+  onBack: () => void;
+  onReportProblem: () => void;
+}>) {
+  const [showQr, setShowQr] = useState(false);
+  const [showAllLogs, setShowAllLogs] = useState(false);
+  const doneCount = planTasks.filter((t) => t.done).length;
+  const visibleLogs = showAllLogs ? careLogs : careLogs.slice(0, LOG_PREVIEW_COUNT);
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#F6FAF9', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 1200, padding: '24px 24px 128px', boxSizing: 'border-box' }}>
+
+        {/* Back link */}
+        <button
+          type="button"
+          onClick={onBack}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: '0 0 12px', cursor: 'pointer' }}
+        >
+          <span className="material-icons" style={{ fontSize: 18, color: '#8A8C8E' }}>arrow_back</span>
+          <span style={{ fontFamily: FONT_TH, fontSize: 13, fontWeight: 500, color: '#8A8C8E', lineHeight: '20px' }}>
+            กลับไปนัดหมายของฉัน
           </span>
-          <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, fontWeight: 700, color: '#047857', lineHeight: '16px' }}>
-            กำลังปฏิบัติงาน
-          </span>
+        </button>
+
+        {/* Header */}
+        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ fontFamily: FONT_TH, fontSize: 28, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '42px', letterSpacing: -0.7 }}>
+              {booking.ref}
+            </h1>
+            <p style={{ fontFamily: FONT_TH, fontSize: 14, color: '#8A8C8E', margin: '2px 0 0', lineHeight: '21px' }}>
+              ติดตามการทำงานของผู้ดูแล
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onReportProblem}
+            style={{ boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 16px', height: 40, background: '#FFFFFF', border: '0.8px solid #E5E7EB', borderRadius: 8, cursor: 'pointer', flexShrink: 0 }}
+          >
+            <span className="material-icons" style={{ fontSize: 17, color: '#DC2626' }}>flag</span>
+            <span style={{ fontFamily: FONT_TH, fontSize: 13, fontWeight: 600, color: '#DC2626', lineHeight: '20px' }}>แจ้งปัญหา</span>
+          </button>
         </div>
 
-        {/* Check-in time */}
-        <div style={{ ...chipBase, left: 10.8, bottom: 10.8, padding: '6px 10px', borderRadius: 10 }}>
-          <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E', lineHeight: '16px' }}>
-            เช็คอิน <strong style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: '#1A1A1A' }}>{checkInTime}</strong>
-          </span>
+        {/* Stepper + caregiver */}
+        <div style={{ ...IN_PROGRESS_CARD, marginTop: 20, borderRadius: 16 }}>
+          <div style={{ padding: '24px 40px 20px', borderBottom: '0.8px solid #F3F4F6' }}>
+            <InProgressStepper steps={steps} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 24px', flexWrap: 'wrap' }}>
+            <CaregiverAvatar
+              name={booking.caregiverName}
+              avatarUrl={booking.caregiverAvatarUrl}
+              size={46}
+              online
+              fallbackBg="#F59E0B"
+              shadow="0px 4px 16px rgba(245,158,11,0.25)"
+            />
+            <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+              <p style={{ fontFamily: FONT_TH, fontSize: 11, fontWeight: 600, color: '#8A8C8E', margin: 0, lineHeight: '16px', letterSpacing: 0.4 }}>ผู้ดูแล</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 2 }}>
+                <span style={{ fontFamily: FONT_TH, fontSize: 17, fontWeight: 700, color: '#1A1A1A', lineHeight: '26px' }}>{booking.caregiverName}</span>
+                <span className="material-icons" style={{ fontSize: 18, color: '#009265' }}>verified</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 2, flexWrap: 'wrap' }}>
+                <CaregiverStats booking={booking} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+              <CallCaregiverButton phone={booking.caregiverPhone} />
+              <button
+                type="button"
+                onClick={onToggleDetails}
+                aria-expanded={showDetails}
+                style={{ boxSizing: 'border-box', height: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0 24px', background: '#009265', border: 'none', borderRadius: 12, cursor: 'pointer' }}
+              >
+                <span style={{ fontFamily: FONT_TH, fontSize: 14, fontWeight: 700, color: '#FFFFFF', lineHeight: '21px' }}>รายละเอียดการจอง</span>
+                <span
+                  className="material-icons"
+                  style={{ fontSize: 18, color: '#FFFFFF', transition: 'transform 0.15s ease', transform: showDetails ? 'rotate(180deg)' : 'none' }}
+                >
+                  expand_more
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Mock disclaimer */}
-        <div style={{ position: 'absolute', right: 10.8, bottom: 10.8, background: 'rgba(255,255,255,0.9)', boxShadow: '0px 1px 2px rgba(0,0,0,0.05)', padding: '2px 8px', borderRadius: 10 }}>
-          <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 10, fontWeight: 700, color: '#52B69A', lineHeight: '15px' }}>
-            แผนที่จำลอง · จริงใช้ Google Maps
-          </span>
+        {showDetails && detailsPanel}
+
+        {/* แผนงานที่ผู้ดูแลทำ */}
+        <div style={{ ...IN_PROGRESS_CARD, marginTop: 16, borderRadius: 12, padding: 24 }}>
+          <h3 style={{ fontFamily: FONT_TH, fontSize: 17, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '26px' }}>
+            แผนงานที่ผู้ดูแลทำ
+          </h3>
+
+          {careNote && (
+            <div style={{ marginTop: 16, boxSizing: 'border-box', background: '#FFFBEB', border: '0.8px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '12px 16px' }}>
+              <p style={{ fontFamily: FONT_TH, fontSize: 13, fontWeight: 700, color: '#B45309', margin: 0, lineHeight: '20px' }}>
+                ข้อควรระวัง / หมายเหตุที่คุณแจ้งไว้
+              </p>
+              <p style={{ fontFamily: FONT_TH, fontSize: 14, color: '#1A1A1A', margin: '4px 0 0', lineHeight: '21px' }}>
+                {careNote}
+              </p>
+            </div>
+          )}
+
+          <p style={{ fontFamily: FONT_TH, fontSize: 14, color: '#8A8C8E', margin: '20px 0 0', lineHeight: '21px' }}>
+            ทำแล้ว <strong style={{ fontWeight: 700, color: '#1A1A1A' }}>{doneCount}</strong> จาก {planTasks.length} รายการ
+          </p>
+
+          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {planTasks.map((task) => (
+              <div
+                key={task.id}
+                style={{
+                  boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 12,
+                  background: task.done ? '#F0FBF5' : '#FFFFFF',
+                  border: task.done ? '0.8px solid rgba(82,182,154,0.35)' : '0.8px solid #E5E7EB',
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    boxSizing: 'border-box', width: 24, height: 24, borderRadius: 9999, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: task.done ? '#009265' : '#FFFFFF',
+                    border: task.done ? 'none' : '1.6px solid #E5E7EB',
+                  }}
+                >
+                  {task.done && <span className="material-icons" style={{ fontSize: 14, color: '#FFFFFF' }}>check</span>}
+                </span>
+                <span
+                  style={{
+                    fontFamily: FONT_TH, fontSize: 14, lineHeight: '21px',
+                    fontWeight: task.done ? 700 : 400,
+                    color: task.done ? '#047857' : '#1A1A1A',
+                    textDecoration: task.done ? 'line-through' : 'none',
+                  }}
+                >
+                  {task.name}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {lastTaskUpdate && (
+            <p style={{ margin: '20px 0 0', paddingTop: 16, borderTop: '0.8px solid #F3F4F6', fontFamily: FONT_TH, fontSize: 12, color: '#8A8C8E', textAlign: 'right', lineHeight: '18px' }}>
+              บันทึกเมื่อ {lastTaskUpdate}
+            </p>
+          )}
+        </div>
+
+        {/* บันทึกจากผู้ดูแล */}
+        <div style={{ ...IN_PROGRESS_CARD, marginTop: 16, borderRadius: 12, padding: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <h3 style={{ fontFamily: FONT_TH, fontSize: 17, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '26px' }}>
+              บันทึกจากผู้ดูแล
+            </h3>
+            <span style={{ fontFamily: FONT_TH, fontSize: 13, color: '#8A8C8E', lineHeight: '20px' }}>
+              {careLogs.length} รายการ
+            </span>
+          </div>
+
+          {careLogs.length > 0 ? (
+            <>
+              <div style={{ marginTop: 20 }}>
+                {visibleLogs.map((entry, idx) => (
+                  <CareLogItem key={entry.id} entry={entry} isLast={idx === visibleLogs.length - 1} />
+                ))}
+              </div>
+              {careLogs.length > LOG_PREVIEW_COUNT && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllLogs((v) => !v)}
+                  style={{ marginTop: 20, boxSizing: 'border-box', width: '100%', height: 44, display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: 6, background: '#FFFFFF', border: '0.8px solid #E5E7EB', borderRadius: 12, cursor: 'pointer' }}
+                >
+                  <span style={{ fontFamily: FONT_TH, fontSize: 14, fontWeight: 600, color: '#009265', lineHeight: '21px' }}>
+                    {showAllLogs ? 'ย่อบันทึก' : `ดูบันทึกทั้งหมด (${careLogs.length})`}
+                  </span>
+                  <span
+                    className="material-icons"
+                    style={{ fontSize: 18, color: '#009265', transition: 'transform 0.15s ease', transform: showAllLogs ? 'rotate(180deg)' : 'none' }}
+                  >
+                    expand_more
+                  </span>
+                </button>
+              )}
+            </>
+          ) : (
+            <p style={{ fontFamily: FONT_TH, fontSize: 13, color: '#8A8C8E', margin: '16px 0 0', lineHeight: '20px', textAlign: 'center' }}>
+              ยังไม่มีบันทึก — บันทึกที่ผู้ดูแลส่งจะแสดงให้คุณเห็นทันที
+            </p>
+          )}
         </div>
       </div>
-      <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E', margin: 0, padding: '10px 16px', lineHeight: '16px', textAlign: 'center' }}>
-        ตำแหน่งที่ผู้ดูแลเช็คอิน · {location}
-      </p>
+
+      {/* Fixed action bar */}
+      <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, background: '#FFFFFF', borderTop: '0.8px solid #F3F4F6', boxShadow: '0px -4px 16px rgba(0,0,0,0.04)' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '12px 24px', boxSizing: 'border-box', display: 'flex', gap: 16 }}>
+          <button
+            type="button"
+            onClick={() => setShowQr(true)}
+            style={{ flex: '1 1 0', minWidth: 0, height: 56, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#DC2626', border: 'none', borderRadius: 12, boxShadow: '0px 6px 18px rgba(220,38,38,0.25)', cursor: 'pointer' }}
+          >
+            <span style={{ fontFamily: FONT_TH, fontSize: 16, fontWeight: 700, color: '#FFFFFF', lineHeight: '24px' }}>จบการดูแล</span>
+          </button>
+          <a
+            href={toTelHref(EMERGENCY_PHONE)}
+            title={`โทรสายด่วนฉุกเฉิน ${EMERGENCY_PHONE}`}
+            style={{ flex: '0 1 264px', minWidth: 0, height: 56, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#FFFFFF', border: '0.8px solid rgba(220,38,38,0.4)', borderRadius: 12, textDecoration: 'none' }}
+          >
+            <span className="material-icons" style={{ fontSize: 20, color: '#DC2626' }}>call</span>
+            <span style={{ fontFamily: FONT_TH, fontSize: 16, fontWeight: 700, color: '#DC2626', lineHeight: '24px', whiteSpace: 'nowrap' }}>โทรฉุกเฉิน</span>
+          </a>
+        </div>
+      </div>
+
+      {showQr && (
+        <CheckoutQrModal bookingId={booking.id} bookingStatus={booking.status} onClose={() => setShowQr(false)} />
+      )}
     </div>
   );
 }
@@ -921,10 +1187,6 @@ export function BookingTrackingView({
   const canSaveCaregiver = Boolean(booking.caregiverId);
   const isSaved = canSaveCaregiver && isCaregiverSaved(booking.caregiverId);
 
-  // Hide the map when the booking has no coordinates — that is a gap in our data,
-  // not the caregiver's fault, and an empty map would just look broken.
-  const hideMap = proof ? proof.jobCoordsMissing : MOCK.jobCoordsMissing;
-
   const dt = booking.draft.dateTime;
   const est = booking.draft.estimatedCost;
   const svcTypes = booking.draft.serviceTypes ?? [];
@@ -939,9 +1201,6 @@ export function BookingTrackingView({
 
   const loc = booking.draft.locationDetails;
   const areaStr = [loc?.district, loc?.province].filter(Boolean).join(', ') || locationStr;
-  // The map is still a mock drawing, so we caption it with the booking's district
-  // rather than reverse-geocoding proof.checkIn.lat/lng.
-  const checkInAreaStr = loc?.district || MOCK.checkInLocation;
   const serviceModeStr = booking.draft.serviceLocation?.includes('accompany_outside')
     ? 'พาไปโรงพยาบาล'
     : 'ดูแลที่บ้านผู้ป่วย';
@@ -1040,10 +1299,11 @@ export function BookingTrackingView({
 
       <div style={{ marginTop: 20, paddingTop: 16, borderTop: '0.8px solid #F0F1F3' }}>
         <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 15, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '22px' }}>
-          ข้อมูลสุขภาพของฉัน (กรอกตอนจอง)
+          ข้อมูลผู้รับบริการ
         </p>
 
         <div style={{ ...FIELD_GRID, marginTop: 12 }}>
+          <DetailField label="ชื่อผู้รับบริการ" value={pd?.name ?? ''} />
           <DetailField label="อายุ" value={ageStr} />
           <DetailField label="เพศ" value={genderStr} />
           <DetailField label="กรุ๊ปเลือด" value={bloodStr} />
@@ -1096,6 +1356,37 @@ export function BookingTrackingView({
     );
   }
 
+  if (!hasCheckedOut) {
+    // เวลาจบที่คาดไว้: ใช้เวลาจบจากการจองก่อน ถ้าไม่มีค่อยคำนวณจากเวลาเช็คอิน + ระยะเวลาที่จอง
+    let expectedEndStr = '—';
+    if (dt?.endTime) {
+      expectedEndStr = `${dt.endTime} น. (คาดว่า)`;
+    } else if (effectiveCheckedInAt && dt?.duration) {
+      expectedEndStr = `${formatThaiTime(new Date(effectiveCheckedInAt.getTime() + Number(dt.duration) * 3_600_000))} (คาดว่า)`;
+    }
+    const inProgressSteps: InProgressStep[] = [
+      { key: 'checkin', icon: 'check', label: 'เช็คอิน', detail: checkInTimeStr, state: 'done' },
+      { key: 'caring', icon: 'volunteer_activism', label: 'กำลังดูแล', detail: elapsedStr === '—' ? '—' : `ผ่านไป ${elapsedStr}`, state: 'active' },
+      { key: 'done', icon: 'logout', label: 'การดูแลเสร็จสิ้น', detail: expectedEndStr, state: 'pending' },
+    ];
+
+    return (
+      <InProgressView
+        booking={booking}
+        steps={inProgressSteps}
+        detailsPanel={detailsPanel}
+        showDetails={showDetails}
+        onToggleDetails={() => setShowDetails((v) => !v)}
+        careNote={noteToCaregiver || MOCK.careNote}
+        planTasks={planTasks}
+        lastTaskUpdate={lastTaskUpdate}
+        careLogs={careLogs}
+        onBack={onBack}
+        onReportProblem={onReportProblem}
+      />
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#F6FAF9', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div style={{ width: '100%', maxWidth: 1000, padding: '24px 20px 100px', boxSizing: 'border-box' }}>
@@ -1141,22 +1432,6 @@ export function BookingTrackingView({
 
         {/* Collapsible booking details panel */}
         {showDetails && detailsPanel}
-
-        {/* QR ให้ผู้ดูแลสแกน (PYG-437) — วางไว้บนสุดของเนื้อหาเพราะเป็น "สิ่งที่ผู้ใช้
-            ต้องลงมือทำ" บนหน้านี้ ส่วนการ์ดอื่นเป็นข้อมูลให้อ่าน
-            ซ่อนทั้งใบเมื่อเช็คเอาท์แล้ว — การ์ด "การดูแลเสร็จสิ้น" ด้านล่างพูดแทนแล้ว
-            (ตัวการ์ดเองก็กันอีกชั้น ถ้า job_session เป็น CHECKED_OUT จะไม่วาด QR อยู่ดี) */}
-        {!hasCheckedOut && (
-          <div style={{ marginTop: 20 }}>
-            <JobQrCard bookingId={booking.id} bookingStatus={booking.status} />
-          </div>
-        )}
-
-        {/* Checked in → live location map (mocked). Hidden entirely when the
-            booking has no coordinates. */}
-        {isCheckedIn && !hideMap && !hasCheckedOut && (
-          <CheckInMapCard checkInTime={checkInTimeStr} location={checkInAreaStr} />
-        )}
 
         {/* Job finished → the only two things left to do are review or dispute,
             both time-boxed by the payout window. */}
