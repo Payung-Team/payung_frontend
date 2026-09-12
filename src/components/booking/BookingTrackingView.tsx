@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import { useLocation } from 'react-router-dom';
 import type { ConfirmedBooking } from '../../context/BookingContext';
 import { useJobEvents } from '../../hooks/useJobEvents';
+import { useCareProgress } from '../../hooks/useCareProgress';
 import { ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
 import { QRCodeSVG } from 'qrcode.react';
 import { useJobQr } from '../../hooks/useJobQr';
@@ -45,19 +46,12 @@ function formatElapsed(ms: number): string {
 }
 
 // ── Still mocked ─────────────────────────────────────────────────────────────
-// Check-in/check-out now comes from proofOfWork, but these have no backend yet:
-//   • careLogs   — no care_logs table exists. Needs its own card.
-//   • tasks.done — booking_tasks has no done/completed_at column. Needs its own card.
+// Check-in/check-out comes from proofOfWork, task ticks and care logs from
+// useCareProgress. Only this is left:
 //   • health.*   — real values from booking.draft win; these are only fallbacks.
 // The 24h auto-release countdown is deliberately absent: there is no release_at
 // column and no release cron yet (PYG-366 / PYG-367), so any number would be a guess.
 const MOCK = {
-  careNote: 'ต้องวัดน้ำตาลก่อนเริ่มกายภาพทุกครั้ง',
-  tasks: [
-    { id: 't1', name: 'วัดระดับน้ำตาล', done: false },
-    { id: 't2', name: 'กายภาพบำบัดเบื้องต้น', done: false },
-    { id: 't3', name: 'พยุงเดิน', done: false },
-  ],
   // Fallbacks so the detail panel renders fully while test bookings still lack
   // patientDetails. Real values from booking.draft always win.
   health: {
@@ -71,14 +65,6 @@ const MOCK = {
     allergies: 'แพ้ยาเพนิซิลลิน',
     careInstructions: 'เพิ่งผ่าตัดเปลี่ยนสะโพกใหม่ 2 สัปดาห์ ยังช่วยพยุงเดินค่อนข้างช้า จำเป็นต้องพลิกตัวสม่ำเสมอ',
   },
-  // Care-log entries, newest first. minutesAfterCheckIn keeps every timestamp
-  // consistent with the mocked check-in time.
-  careLogs: [
-    { id: 'l1', minutesAfterCheckIn: 40, category: 'food', text: 'กินข้าวต้ม', hasPhoto: true },
-    { id: 'l2', minutesAfterCheckIn: 34, category: 'activity', text: 'พาเดินฝึกกายภาพในห้อง 10 นาที คุณสมศรีให้ความร่วมมือดีมากค่ะ', hasPhoto: false },
-    { id: 'l3', minutesAfterCheckIn: 20, category: 'vitals', text: 'วัดความดัน 128/80 ชีพจร 74 ปกติดีค่ะ', hasPhoto: false },
-    { id: 'l4', minutesAfterCheckIn: 8, category: 'medication', text: 'ให้ยาลดความดันมื้อเช้าเรียบร้อยค่ะ', hasPhoto: false },
-  ],
 };
 
 const CARE_LOG_CATEGORY: Record<string, { icon: string; label: string; bg: string; color: string }> = {
@@ -86,6 +72,7 @@ const CARE_LOG_CATEGORY: Record<string, { icon: string; label: string; bg: strin
   activity: { icon: 'directions_walk', label: 'กิจกรรม', bg: '#F0FAF4', color: '#047857' },
   vitals: { icon: 'favorite', label: 'สุขภาพร่างกาย', bg: '#F0FAF4', color: '#047857' },
   medication: { icon: 'medication', label: 'ยา', bg: '#F0FAF4', color: '#047857' },
+  other: { icon: 'notes', label: 'อื่นๆ', bg: '#F3F4F6', color: '#575859' },
 };
 
 const LOG_PREVIEW_COUNT = 3;
@@ -592,7 +579,8 @@ interface CareLogEntry {
   time: string;
   category: string;
   text: string;
-  hasPhoto: boolean;
+  /** Signed URL from the backend (short-lived) — null when the caregiver attached no photo. */
+  photoUrl: string | null;
 }
 
 function CareLogItem({ entry, isLast }: Readonly<{ entry: CareLogEntry; isLast: boolean }>) {
@@ -616,17 +604,23 @@ function CareLogItem({ entry, isLast }: Readonly<{ entry: CareLogEntry; isLast: 
           )}
         </div>
         <div style={{ marginTop: 6, boxSizing: 'border-box', background: '#FFFFFF', border: '0.8px solid #E5E7EB', borderRadius: 12, padding: '12px 16px' }}>
-          <p style={{ fontFamily: FONT_TH, fontSize: 14, color: '#1A1A1A', margin: 0, lineHeight: '24px' }}>
+          <p style={{ fontFamily: FONT_TH, fontSize: 14, color: '#1A1A1A', margin: 0, lineHeight: '24px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
             {entry.text}
           </p>
-          {entry.hasPhoto && (
-            // Photo placeholder — real uploads land here once the care-log API exists.
-            <div style={{ position: 'relative', marginTop: 12, width: 92, height: 92, boxSizing: 'border-box', border: '0.8px solid rgba(0,0,0,0.05)', borderRadius: 12, background: '#FDE8D5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="material-icons" style={{ fontSize: 36, color: '#E8956B' }}>image</span>
+          {entry.photoUrl && (
+            // เปิดรูปเต็มในแท็บใหม่ — URL เป็น signed URL อายุสั้นจาก backend
+            <a
+              href={entry.photoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="ดูรูปขนาดเต็ม"
+              style={{ position: 'relative', display: 'block', marginTop: 12, width: 92, height: 92, boxSizing: 'border-box', border: '0.8px solid rgba(0,0,0,0.05)', borderRadius: 12, background: '#FDE8D5', overflow: 'hidden' }}
+            >
+              <img src={entry.photoUrl} alt="รูปประกอบบันทึก" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               <span style={{ position: 'absolute', right: 6, bottom: 6, width: 24, height: 24, borderRadius: 12, background: 'rgba(255,255,255,0.9)', boxShadow: '0px 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span className="material-icons" style={{ fontSize: 14, color: '#1A1A1A' }}>search</span>
               </span>
-            </div>
+            </a>
           )}
         </div>
       </div>
@@ -933,7 +927,11 @@ function InProgressView({
           )}
 
           <p style={{ fontFamily: FONT_TH, fontSize: 14, color: '#8A8C8E', margin: '20px 0 0', lineHeight: '21px' }}>
-            ทำแล้ว <strong style={{ fontWeight: 700, color: '#1A1A1A' }}>{doneCount}</strong> จาก {planTasks.length} รายการ
+            {planTasks.length > 0 ? (
+              <>ทำแล้ว <strong style={{ fontWeight: 700, color: '#1A1A1A' }}>{doneCount}</strong> จาก {planTasks.length} รายการ</>
+            ) : (
+              'การจองนี้ไม่ได้ระบุรายการงาน'
+            )}
           </p>
 
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1087,8 +1085,8 @@ export function BookingTrackingView({
   const [showDetails, setShowDetails] = useState(false);
 
   // ── Live data ───────────────────────────────────────────────────────────────
-  // proofOfWork is the source of truth for check-in/check-out. The care log and
-  // task-progress parts of this screen are still mocked (see MOCK below).
+  // proofOfWork is the source of truth for check-in/check-out; task progress and
+  // care logs come from useCareProgress below.
   const { proof } = useJobEvents(booking.id);
 
   // `?mock=` stays as a dev override so the states that have no real data yet can
@@ -1121,16 +1119,19 @@ export function BookingTrackingView({
   if (hasCheckedOut) {
     state = 'checked_out';
   } else if (hasStarted) {
-    // 'working' vs 'checked_in' only decides whether the (still mocked) care log
-    // renders, so the override keeps its say here.
     state = mockState === 'checked_in' ? 'checked_in' : 'working';
   } else {
     state = mockState ?? 'awaiting_checkin';
   }
-  // The care log and task progress are history once the job ends, so they must
-  // keep rendering after check-out — not fall back to the empty state.
-  const isWorking = state === 'working' || state === 'checked_out';
   const isCheckedIn = state !== 'awaiting_checkin';
+
+  // Task ticks + care logs posted by the caregiver. Only fetched once the job has
+  // started (nothing to show before), and only polled while it's still running —
+  // after check-out they're history.
+  const { tasks: liveTasks, logs: liveLogs } = useCareProgress(
+    isCheckedIn ? booking.id : undefined,
+    { live: isCheckedIn && !hasCheckedOut },
+  );
 
   // Mock clock, used only when `?mock=` is driving a state that has no real
   // check-in row behind it.
@@ -1196,20 +1197,34 @@ export function BookingTrackingView({
   const tasks = booking.draft.jobDetails?.tasks ?? [];
   const tasksText = tasks.length > 0 ? tasks.map((t) => t.name).join(', ') : null;
 
-  // Mock progress: in the working state the caregiver has ticked off all but
-  // the last task.
-  // After check-out every task is done.
-  const planTasks = MOCK.tasks.map((t, i) => ({ ...t, done: hasCheckedOut || (isWorking && i < MOCK.tasks.length - 1) }));
+  // Real task progress — the caregiver ticks these via setTaskDone. Before the
+  // first fetch lands, fall back to the task names from the booking (all undone)
+  // so the card doesn't flash "0 จาก 0".
+  const planTasks = liveTasks
+    ? [...liveTasks]
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((t) => ({
+          id: t.id,
+          name: t.timeNote ? `${t.description} (${t.timeNote})` : t.description,
+          done: Boolean(t.doneAt),
+        }))
+    : tasks.map((t) => ({ id: t.id, name: t.name, done: false }));
 
-  // Still mocked — there is no care_logs table yet. Timestamps are derived from
-  // the real check-in time so they at least stay coherent with the rest.
-  const careLogs: CareLogEntry[] = isWorking && effectiveCheckedInAt
-    ? MOCK.careLogs.map((l) => ({
-        ...l,
-        time: formatThaiTime(new Date(effectiveCheckedInAt.getTime() + l.minutesAfterCheckIn * 60_000)),
-      }))
-    : [];
-  const lastTaskUpdate = careLogs.length > 1 ? careLogs[1].time : null;
+  // "บันทึกเมื่อ" = the most recent tick, not the most recent care log.
+  const lastDoneAt = (liveTasks ?? [])
+    .map((t) => (t.doneAt ? new Date(t.doneAt).getTime() : NaN))
+    .filter((ms) => !Number.isNaN(ms))
+    .reduce<number | null>((max, ms) => (max === null || ms > max ? ms : max), null);
+  const lastTaskUpdate = lastDoneAt !== null ? formatThaiTime(new Date(lastDoneAt)) : null;
+
+  // Real care logs (addCareLog), newest first as the backend returns them.
+  const careLogs: CareLogEntry[] = (liveLogs ?? []).map((l) => ({
+    id: l.id,
+    time: formatThaiTime(new Date(l.serverTs)),
+    category: l.category,
+    text: l.body,
+    photoUrl: l.photoUrl ?? null,
+  }));
 
   // Shared by both layouts (awaiting check-in and the live/finished one).
   const detailsPanel = (
@@ -1318,7 +1333,7 @@ export function BookingTrackingView({
       detailsPanel={detailsPanel}
       showDetails={showDetails}
       onToggleDetails={() => setShowDetails((v) => !v)}
-      careNote={noteToCaregiver || MOCK.careNote}
+      careNote={noteToCaregiver || null}
       planTasks={planTasks}
       lastTaskUpdate={lastTaskUpdate}
       careLogs={careLogs}

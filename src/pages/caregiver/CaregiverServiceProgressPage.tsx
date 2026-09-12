@@ -122,7 +122,7 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
           <div className="overflow-hidden rounded-2xl bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)]">{workSection}</div>
         )}
 
-        <ChecklistCard tasks={booking.tasks ?? []} notes={booking.notes} />
+        <ChecklistCard tasks={booking.bookingTasks ?? []} notes={booking.notes} />
       </div>
 
       <div className="order-1 flex flex-col gap-5 lg:order-2">
@@ -150,7 +150,7 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
           </ExpandableSection>
         </div>
 
-        <CareLogCard />
+        <CareLogCard bookingId={booking.id} />
       </div>
     </div>
   );

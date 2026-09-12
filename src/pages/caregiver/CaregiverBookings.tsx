@@ -18,6 +18,15 @@ import {
   CANCEL_ACCEPTANCE,
 } from '../../graphql/queries';
 
+export interface BookingTask {
+  id: string;
+  description: string;
+  timeNote?: string | null;
+  sortOrder: number;
+  doneAt?: string | null;
+  doneBy?: string | null;
+}
+
 export interface Booking {
   id: string;
   bookingDate: string;
@@ -43,6 +52,7 @@ export interface Booking {
   serviceFormat?: string;
   durationText?: string;
   tasks?: string[];
+  bookingTasks?: BookingTask[];
   receivedTimeText?: string;
   careRecipientName?: string;
   dayOfContactName?: string;
@@ -134,6 +144,7 @@ export function mapToBooking(summary: any): Booking {
     serviceFormat: summary.serviceLocations?.[0] ? serviceLocationLabel(summary.serviceLocations[0]) : undefined,
     durationText: `${durationHours} ชม.`,
     tasks: summary.tasks && summary.tasks.length > 0 ? summary.tasks : undefined,
+    bookingTasks: Array.isArray(summary.bookingTasks) ? summary.bookingTasks : undefined,
     receivedTimeText,
     notes: summary.notes ?? undefined,
     careRecipientName: summary.patientName || summary.careRecipientName || undefined,

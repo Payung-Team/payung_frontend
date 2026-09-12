@@ -326,7 +326,24 @@ export default function BookingDetailPage() {
     }
   };
 
-  const handleReview = () => {
+  // The tracking view shows "ให้คะแนนรีวิว" as soon as the live proofOfWork has a
+  // check-out, which can land before this page's booking.status leaves in_progress.
+  // Refetch first in that case — otherwise the form's status gate below silently
+  // swallows the click.
+  const handleReview = async () => {
+    if (!REVIEWABLE_STATUSES.has(booking.status)) {
+      try {
+        const result = await refetch();
+        const fresh = (result.data as { myBooking?: Record<string, unknown> } | undefined)?.myBooking;
+        if (!fresh || !REVIEWABLE_STATUSES.has(mapGqlBooking(fresh).status)) {
+          showError('ยังรีวิวไม่ได้ในตอนนี้ กรุณาลองใหม่อีกครั้งในอีกสักครู่');
+          return;
+        }
+      } catch {
+        showError('โหลดข้อมูลการจองไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+        return;
+      }
+    }
     setShowReviewForm(true);
   };
 

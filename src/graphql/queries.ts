@@ -966,9 +966,75 @@ export const GET_CAREGIVER_BOOKING = gql`
   query GetCaregiverBooking($id: ID!) {
     caregiverBooking(id: $id) {
       ${CAREGIVER_BOOKING_SUMMARY_FIELDS}
+      bookingTasks {
+        id
+        description
+        timeNote
+        sortOrder
+        doneAt
+        doneBy
+      }
       dayOfContactName
       dayOfContactPhone
       dayOfContactRelationship
+    }
+  }
+`;
+
+export const SET_TASK_DONE = gql`
+  mutation SetTaskDone($input: SetTaskDoneInput!) {
+    setTaskDone(input: $input) {
+      id
+      description
+      timeNote
+      sortOrder
+      doneAt
+      doneBy
+    }
+  }
+`;
+
+export const GET_CARE_LOGS = gql`
+  query CareLogs($bookingId: ID!, $limit: Int, $offset: Int) {
+    careLogs(bookingId: $bookingId, limit: $limit, offset: $offset) {
+      id
+      bookingId
+      category
+      body
+      photoUrl
+      serverTs
+      deviceTs
+    }
+  }
+`;
+
+// ฝั่งผู้จอง: ดึงเฉพาะความคืบหน้าของงานย่อย (ติ๊กโดยผู้ดูแลผ่าน setTaskDone)
+// แยกจาก GET_MY_BOOKING เพื่อ poll ถี่ ๆ ได้โดยไม่ต้องโหลดข้อมูลการจองทั้งก้อนซ้ำ
+export const GET_MY_BOOKING_TASKS = gql`
+  query GetMyBookingTasks($id: ID!) {
+    myBooking(id: $id) {
+      id
+      bookingTasks {
+        id
+        description
+        timeNote
+        sortOrder
+        doneAt
+      }
+    }
+  }
+`;
+
+export const ADD_CARE_LOG = gql`
+  mutation AddCareLog($input: AddCareLogInput!) {
+    addCareLog(input: $input) {
+      id
+      bookingId
+      category
+      body
+      photoUrl
+      serverTs
+      deviceTs
     }
   }
 `;
