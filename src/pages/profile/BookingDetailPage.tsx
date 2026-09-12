@@ -17,7 +17,7 @@ import { PaymentInfoSection } from '../../components/payment/PaymentInfoSection'
 import type { PaymentInfo } from '../../components/payment/PaymentInfoSection';
 import { Divider, SectionTitle, InfoRow } from '../../components/booking/BookingDetailFields';
 import { BookingTrackingView } from '../../components/booking/BookingTrackingView';
-import { JobQrCard } from '../../components/booking/JobQrCard';
+import { hasAnyProfileData, type PatientProfile } from '../../lib/patientProfile';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +30,18 @@ function formatThaiDate(dateStr: string): string {
   } catch {
     return dateStr;
   }
+}
+
+/** ข้อความยาวที่ผู้ใช้พิมพ์เอง (ยา / คำแนะนำการดูแล) — InfoRow ชิดขวาอ่านยากเมื่อยาวหลายบรรทัด */
+function NoteBlock({ label, text }: Readonly<{ label: string; text: string }>) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E', margin: '0 0 4px', lineHeight: '20px' }}>{label}</p>
+      <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#1A1A1A', margin: 0, lineHeight: '20px', background: '#F9FAFB', borderRadius: 10, padding: '10px 14px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+        {text}
+      </p>
+    </div>
+  );
 }
 
 const SERVICE_TYPE_LABELS: Record<string, string> = {
@@ -104,6 +116,7 @@ function mapGqlBooking(api: any): ConfirmedBooking {
   const tasks: { id: string; name: string }[] = (api.tasks ?? []).map((name: string) => ({ id: name, name }));
 
   const resolvedPatientName: string | undefined = api.patientName || api.careRecipientName || undefined;
+  const profile: PatientProfile = api.patientProfile ?? {};
 
   const draft: BookingRequest = {
     serviceTypes: api.serviceType ? [api.serviceType] : [],
@@ -116,8 +129,25 @@ function mapGqlBooking(api: any): ConfirmedBooking {
       const fee = Math.round(base * 0.1);
       return { hourlyRate: api.caregiver?.hourlyRate ?? 0, hours: durationHours, platformFee: fee, total: base + fee };
     })(),
-    recipient: resolvedPatientName
-      ? { type: 'member', patientDetails: { name: resolvedPatientName, age: 0 } }
+    // null จาก GraphQL → undefined เพื่อให้ "ไม่ได้กรอก" แยกจากค่าจริง (เช่น อายุ 0)
+    recipient: resolvedPatientName || hasAnyProfileData(api.patientProfile)
+      ? {
+        type: 'member',
+        patientDetails: {
+          name: resolvedPatientName ?? '',
+          age: profile.age ?? undefined,
+          gender: profile.gender ?? undefined,
+          weight: profile.weight ?? undefined,
+          height: profile.height ?? undefined,
+          supportLevel: profile.supportLevel ?? undefined,
+          bloodGroup: profile.bloodGroup ?? undefined,
+          conditions: profile.conditions ?? undefined,
+          medicines: profile.medicines ?? undefined,
+          allergies: profile.allergies ?? undefined,
+          careInstructions: profile.careInstructions ?? undefined,
+          regularHospital: profile.regularHospital ?? undefined,
+        },
+      }
       : { type: 'self' },
     contactPerson: (api.dayOfContactName || api.dayOfContactPhone || api.dayOfContactRelationship)
       ? {
@@ -241,7 +271,13 @@ export default function BookingDetailPage() {
   const locationStr = booking.draft.locationDetails?.at_home?.address
     || booking.draft.locationDetails?.accompany_outside?.hospitalName
     || '—';
-  const recipientName = booking.draft.recipient?.patientDetails?.name ?? 'ตัวเอง';
+  const patient = booking.draft.recipient?.patientDetails;
+  const recipientName = patient?.name || 'ตัวเอง';
+  // อายุ 0 = "ไม่ได้กรอก" — ขาส่ง (toPatientProfilePayload) ตัด 0 ทิ้งอยู่แล้ว จึงไม่มีทางเป็นค่าจริง
+  // และ mapper ของ BookingsPage ที่ส่งมาทาง location.state ใส่ age: 0 เป็นค่าตั้งต้น
+  const patientAgeStr = patient?.age ? `${patient.age} ปี` : '';
+  const patientWeightStr = patient?.weight != null ? `${patient.weight} กก.` : '';
+  const patientHeightStr = patient?.height != null ? `${patient.height} ซม.` : '';
   const contactPerson = booking.draft.contactPerson;
   const total = est?.total ?? 0;
   const tasks = booking.draft.jobDetails?.tasks ?? [];
@@ -588,16 +624,9 @@ export default function BookingDetailPage() {
             </p>
           </div>
 
-          {/* QR ให้ผู้ดูแลสแกน (PYG-437)
-              หน้านี้คือมุมมอง "ยังไม่ถึงวันนัด" — พอถึงวันจะสลับไปหน้า BookingTrackingView
-              ซึ่งมีการ์ดใบเดียวกันนี้อยู่แล้ว ที่นี่จึงมักแสดงสถานะ "ยังไม่ถึงเวลาใช้ QR"
-              ★ เช็ค isPatient ด้วย เพราะเส้นทาง /bookings/:id ผู้ดูแลก็เปิดได้
-                และ query jobQr เปิดให้เฉพาะเจ้าของ booking (ผู้ดูแลเรียกแล้วโดน 403) */}
-          {isPatient && (
-            <div style={{ marginBottom: 18 }}>
-              <JobQrCard bookingId={booking.id} bookingStatus={booking.status} />
-            </div>
-          )}
+          {/* ไม่แสดงการ์ด QR ที่นี่ (PYG-437) — หน้านี้คือมุมมอง "ยังไม่ถึงวันนัด"
+              ของผู้รับบริการ พอถึงวันนัด (isTrackingDue) จะสลับไป BookingTrackingView
+              ซึ่งมี JobQrCard อยู่แล้ว การโชว์ล่วงหน้าได้แค่สถานะ "ยังไม่ถึงเวลาใช้ QR" */}
 
           {/* Main card */}
           <div style={{ background: '#FFFFFF', border: '0.8px solid #E0E2E5', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 20, padding: 24 }}>
@@ -674,9 +703,34 @@ export default function BookingDetailPage() {
 
             {/* ── Section 3: ข้อมูลคนไข้ ── */}
             <SectionTitle>ข้อมูลคนไข้</SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
+            {/* ประวัติแพ้ยาขึ้นก่อนและเด่นที่สุด — ข้อมูลที่ผิดแล้วอันตรายถึงชีวิต
+                (ลำดับเดียวกับ PatientProfileDetails ฝั่งผู้ดูแล) */}
+            {patient?.allergies && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, background: '#FEF2F2', border: '0.8px solid #FCA5A5', borderRadius: 10, marginBottom: 12 }}>
+                <span className="material-icons" style={{ fontSize: 18, color: '#DC2626', flexShrink: 0 }}>warning</span>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, fontWeight: 700, color: '#DC2626', margin: 0, lineHeight: '18px' }}>
+                    ประวัติแพ้ยา / แพ้อาหาร
+                  </p>
+                  <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#991B1B', margin: '2px 0 0', lineHeight: '20px', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                    {patient.allergies}
+                  </p>
+                </div>
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 24px' }}>
               <InfoRow label="ชื่อผู้รับบริการ" value={recipientName} valueFont="thai" />
+              <InfoRow label="อายุ" value={patientAgeStr} valueFont="thai" />
+              <InfoRow label="เพศ" value={patient?.gender ?? ''} valueFont="thai" />
+              <InfoRow label="กรุ๊ปเลือด" value={patient?.bloodGroup ?? ''} />
+              <InfoRow label="น้ำหนัก" value={patientWeightStr} valueFont="thai" />
+              <InfoRow label="ส่วนสูง" value={patientHeightStr} valueFont="thai" />
             </div>
+            <InfoRow label="ระดับการช่วยเหลือตนเอง" value={patient?.supportLevel ?? ''} valueFont="thai" />
+            <InfoRow label="โรคประจำตัว" value={patient?.conditions?.join(', ') ?? ''} valueFont="thai" />
+            <InfoRow label="โรงพยาบาลประจำ" value={patient?.regularHospital ?? ''} valueFont="thai" />
+            {patient?.medicines && <NoteBlock label="ยาที่ใช้ประจำ" text={patient.medicines} />}
+            {patient?.careInstructions && <NoteBlock label="คำแนะนำการดูแล" text={patient.careInstructions} />}
 
             {contactPerson?.name && (
               <>

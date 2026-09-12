@@ -774,6 +774,24 @@ export const GET_MY_BOOKING = gql`
       notes
       estimatedCost
       careRecipientName
+      # ข้อมูลผู้รับบริการที่กรอกตอนจอง — แสดงครบในหน้ารายละเอียดฝั่งผู้จอง
+      patientName
+      dayOfContactName
+      dayOfContactPhone
+      dayOfContactRelationship
+      patientProfile {
+        age
+        gender
+        weight
+        height
+        supportLevel
+        bloodGroup
+        conditions
+        medicines
+        allergies
+        careInstructions
+        regularHospital
+      }
       confirmedAt
       createdAt
       caregiver {
