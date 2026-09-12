@@ -109,7 +109,8 @@ const REL_OPTIONS = ['บุตร', 'คู่สมรส', 'ญาติ', '�
  * Step 4 "ผู้รับบริการ". For a user in a family group it opens a chooser:
  *   จองให้ตัวเอง  → the standard patient form (SelfPatientForm)
  *   จองให้สมาชิกในกลุ่ม → pick a member whose profile is shared, booking on their behalf
- * A user in no group only ever sees SelfPatientForm, unchanged.
+ * The chooser only appears when the booking was started from the family group page;
+ * any other booking (or a user in no group) only ever sees SelfPatientForm.
  */
 export default function BookingStepPatient() {
   const { bookingDraft } = useBooking();
@@ -119,7 +120,10 @@ export default function BookingStepPatient() {
     fetchPolicy: 'cache-and-network',
   });
   const groups = data?.myFamilyGroups ?? [];
-  const inAnyGroup = groups.length > 0;
+  // The chooser only belongs to the family-group entry ("จองแทนสมาชิก"); a normal booking
+  // goes straight to the self form even when the user happens to be in a group.
+  const fromGroup = !!(gc || bookingDraft?.onBehalf);
+  const showChooser = fromGroup && groups.length > 0;
 
   // Entered from "จองแทนสมาชิก" → default to member mode; otherwise self.
   const [mode, setMode] = useState<'self' | 'member'>(
@@ -130,7 +134,7 @@ export default function BookingStepPatient() {
 
   return (
     <div className="space-y-4">
-      {inAnyGroup && (
+      {showChooser && (
         <section className="bg-white p-6 rounded-2xl border border-gray-100">
           <h2 className="text-lg font-bold text-[#1A1A1A]">จองให้ใคร</h2>
           <p className="text-sm text-[#8A8C8E] mt-1">เลือกผู้รับบริการสำหรับการจองครั้งนี้</p>
@@ -177,7 +181,7 @@ export default function BookingStepPatient() {
         </section>
       )}
 
-      {inAnyGroup && mode === 'member' ? (
+      {showChooser && mode === 'member' ? (
         <MemberBookingSection groups={groups} gc={gc} />
       ) : (
         <SelfPatientForm />
