@@ -4,6 +4,13 @@ import { useBooking } from '../../../context/BookingContext';
 import { GET_USER, GET_LATEST_BOOKING_ADDRESS } from '../../../graphql/queries';
 import ThaiAddressSelector from '../../../components/ui/ThaiAddressSelector';
 import MapPicker from '../MapPicker';
+import {
+  loadGoogleMaps,
+  getPlacePredictions,
+  geocodeAddress,
+  reverseGeocode,
+  type PlacePrediction,
+} from '../../../lib/googleMaps';
 
 // ที่อยู่ที่เติมให้อัตโนมัติได้ — มาจากการจองครั้งล่าสุด ถ้ายังไม่เคยจองก็ใช้ที่อยู่ในโปรไฟล์
 // (ที่กรอกไว้ตอน onboard) และถ้าไม่มีทั้งสองอย่างจะไม่แสดงปุ่มนี้เลย
@@ -80,6 +87,48 @@ export default function BookingStepLocation() {
   );
 
   const [error, setError] = useState<Record<string, string>>({});
+
+  // Address autocomplete suggestions
+  const [suggestions, setSuggestions] = useState<PlacePrediction[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    loadGoogleMaps().catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (!address.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    const requestId = ++suggestionRequestIdRef.current;
+    const timer = setTimeout(async () => {
+      const results = await getPlacePredictions(address);
+      if (suggestionRequestIdRef.current === requestId) {
+        setSuggestions(results);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [address]);
+
+  const handleSelectSuggestion = async (prediction: PlacePrediction) => {
+    setShowSuggestions(false);
+    setSuggestions([]);
+    const coords = await geocodeAddress(prediction.description);
+    if (!coords) {
+      setAddress(prediction.description);
+      return;
+    }
+    setLatA(coords.lat);
+    setLngA(coords.lng);
+    const geo = await reverseGeocode(coords.lat, coords.lng);
+    setAddress(geo.address || prediction.description);
+    if (geo.province) setProvince(geo.province);
+    if (geo.district) setDistrict(geo.district);
+    if (geo.subDistrict) setSubDistrict(geo.subDistrict);
+    if (geo.postalCode) setPostalCode(geo.postalCode);
+  };
 
   // Auto-save
   useEffect(() => {
@@ -247,13 +296,15 @@ export default function BookingStepLocation() {
           />
 
           {/* Address textarea */}
-          <div>
+          <div className="relative">
             <label className="block text-sm font-bold text-[#575859] mb-2">
               บ้านเลขที่ / ซอย / ถนน
             </label>
             <textarea
               value={address}
               onChange={(e) => setAddress(e.target.value)}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
               rows={3}
               placeholder="เช่น 123/45 ซอย 5 ถนนสุขุมวิท"
               className={`w-full p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 resize-none ${
@@ -265,6 +316,28 @@ export default function BookingStepLocation() {
             {error.address && (
               <p className="mt-1 text-xs font-semibold text-red-600">{error.address}</p>
             )}
+
+            {showSuggestions && suggestions.length > 0 && (
+              <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-[#E0E2E5] rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+                {suggestions.map((s) => (
+                  <li key={s.placeId}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSelectSuggestion(s);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm text-[#1A1A1A] hover:bg-[#F0FAF4] cursor-pointer"
+                    >
+                      <span className="material-icons text-[#AAB2BA] text-base shrink-0">
+                        location_on
+                      </span>
+                      <span className="truncate">{s.description}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {/* Map */}
@@ -275,9 +348,14 @@ export default function BookingStepLocation() {
             <MapPicker
               latA={latA}
               lngA={lngA}
-              onChangeA={(newLat, newLng) => {
+              onChangeA={(newLat, newLng, newAddress, newProvince, newDistrict, newSubDistrict, newPostalCode) => {
                 setLatA(newLat);
                 setLngA(newLng);
+                if (newAddress) setAddress(newAddress);
+                if (newProvince) setProvince(newProvince);
+                if (newDistrict) setDistrict(newDistrict);
+                if (newSubDistrict) setSubDistrict(newSubDistrict);
+                if (newPostalCode) setPostalCode(newPostalCode);
               }}
               latB={latB}
               lngB={lngB}
