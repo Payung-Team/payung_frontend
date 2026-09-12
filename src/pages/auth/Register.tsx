@@ -86,6 +86,10 @@ function PasswordStrengthMeter({ password, pwStrength }: { password: string, pwS
 
 type Role = 'patient' | 'caregiver';
 
+// role string → เลข ที่ backend เก็บ (1=patient, 2=caregiver) — ใช้ทั้งฟอร์ม email/password
+// และตอนพก role ข้าม redirect ไป Google (ดู handleGoogleSignIn)
+const ROLE_MAP: Record<Role, number> = { patient: 1, caregiver: 2 };
+
 interface RoleCardProps {
   role: Role;
   selectedRole: Role;
@@ -214,12 +218,10 @@ export default function Register() {
 
     if (Object.keys(errs).length === 0) {
       setIsSubmitting(true);
-      // Convert role string to number: 'patient' → 1, 'caregiver' → 2
-      const roleMap: Record<Role, number> = { patient: 1, caregiver: 2 };
       const result = await registerUser({
         email,
         password,
-        role: roleMap[selectedRole]
+        role: ROLE_MAP[selectedRole]
       });
 
       if (result.error) {
@@ -243,6 +245,9 @@ export default function Register() {
     // เซ็ต flag ก่อน redirect ไป Google เพื่อให้ AuthCallback รู้ว่าเป็น "สมัคร" ไม่ใช่ "เข้าสู่ระบบ"
     // flag จะอยู่ใน localStorage ข้าม redirect ไป Google แล้วกลับมาได้
     localStorage.setItem('is_registering', 'true');
+    // เก็บ role ที่เลือกไว้ด้วย — signInWithOAuth ไม่มีช่องส่ง role ไปกับ Google redirect
+    // AuthCallback จะอ่านค่านี้แล้วเรียก confirmOAuthRole mutation เพื่อแก้ role ให้ตรง
+    localStorage.setItem('oauth_role', String(ROLE_MAP[selectedRole]));
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -250,6 +255,7 @@ export default function Register() {
     });
     if (error) {
       localStorage.removeItem('is_registering');
+      localStorage.removeItem('oauth_role');
       setFormError('สมัครด้วย Google ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
       setErrorCount(prev => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
