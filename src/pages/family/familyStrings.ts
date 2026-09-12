@@ -15,6 +15,32 @@ export function formatDate(iso: string | Date | null | undefined): string {
   }).format(d);
 }
 
+/** e.g. "14:05" — the time-of-day shown on an activity row. */
+export function formatTime(iso: string | Date | null | undefined): string {
+  if (!iso) return '';
+  const d = typeof iso === 'string' ? new Date(iso) : iso;
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('th-TH', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d);
+}
+
+/**
+ * Day separator for the activity feed: "วันนี้" / "เมื่อวาน" / a full date. Compared on the
+ * local calendar day, not on elapsed hours, so 23:50 → 00:10 reads as yesterday → today.
+ */
+export function formatDayHeading(iso: string | Date | null | undefined): string {
+  if (!iso) return '';
+  const d = typeof iso === 'string' ? new Date(iso) : iso;
+  if (Number.isNaN(d.getTime())) return '';
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOfDay(new Date()) - startOfDay(d)) / 86_400_000);
+  if (days === 0) return S.today;
+  if (days === 1) return S.yesterday;
+  return formatDate(d);
+}
+
 /** Grapheme-aware first character for avatars (handles Thai + emoji). */
 export function initial(name: string | null | undefined, fallback = '?'): string {
   const trimmed = (name ?? '').trim();
@@ -237,6 +263,26 @@ export interface Strings {
   errFullTitle: string;
   errInvalidTitle: string;
   errAskOwner: string;
+  // activity feed (PYG-422) — the per-action sentences live in activityCopy.ts
+  today: string;
+  yesterday: string;
+  activityTitle: string;
+  activitySubtitle: string;
+  activityRefresh: string;
+  activityEmptyTitle: string;
+  activityEmptyBody: string;
+  activityLoadMore: string;
+  activityLoadingMore: string;
+  activityEnd: string;
+  activityErrorTitle: string;
+  activityErrorBody: string;
+  activityRetry: string;
+  activityUnavailableTitle: string;
+  activityUnavailableBody: string;
+  activityMemberOnlyTitle: string;
+  activityMemberOnlyBody: string;
+  activityActorUnknown: string;
+  activityActorYou: string;
 }
 
 const S: Strings = {
@@ -486,4 +532,25 @@ const S: Strings = {
   errFullTitle: 'กลุ่มนี้มีสมาชิกครบแล้ว',
   errInvalidTitle: 'ลิงก์คำเชิญไม่ถูกต้อง',
   errAskOwner: 'กรุณาขอลิงก์ใหม่จากเจ้าของกลุ่ม',
+  today: 'วันนี้',
+  yesterday: 'เมื่อวาน',
+  activityTitle: 'ความเคลื่อนไหวของกลุ่ม',
+  activitySubtitle: 'สิ่งที่เกิดขึ้นในกลุ่ม เรียงจากใหม่ไปเก่า',
+  activityRefresh: 'รีเฟรช',
+  activityEmptyTitle: 'ยังไม่มีความเคลื่อนไหว',
+  activityEmptyBody:
+    'เมื่อมีคนเข้าร่วมกลุ่ม แชร์โปรไฟล์ผู้รับการดูแล หรือจองผู้ดูแลแทนกัน รายการจะแสดงที่นี่',
+  activityLoadMore: 'ดูรายการเก่ากว่านี้',
+  activityLoadingMore: 'กำลังโหลด…',
+  activityEnd: 'แสดงครบทุกรายการแล้ว',
+  activityErrorTitle: 'โหลดความเคลื่อนไหวไม่สำเร็จ',
+  activityErrorBody: 'กรุณาลองใหม่อีกครั้ง',
+  activityRetry: 'ลองใหม่',
+  activityUnavailableTitle: 'ยังดูความเคลื่อนไหวไม่ได้ในตอนนี้',
+  activityUnavailableBody:
+    'ระบบบันทึกความเคลื่อนไหวของกลุ่มยังไม่เปิดใช้งานบนเซิร์ฟเวอร์ ส่วนอื่นของหน้านี้ใช้งานได้ตามปกติ',
+  activityMemberOnlyTitle: 'เฉพาะสมาชิกในกลุ่ม',
+  activityMemberOnlyBody: 'เฉพาะสมาชิกของกลุ่มนี้เท่านั้นที่ดูความเคลื่อนไหวได้',
+  activityActorUnknown: 'สมาชิกที่ออกจากกลุ่มแล้ว',
+  activityActorYou: 'คุณ',
 };
