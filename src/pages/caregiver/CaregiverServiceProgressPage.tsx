@@ -12,7 +12,6 @@ import { Icon } from '../../components/ui/Icon';
 import Skeleton from '../../components/ui/Skeleton';
 import type { ProofOfWorkSummary } from '../../lib/monitoring';
 import CaregiverQrScanPanel from './CaregiverQrScanPanel';
-import { QR_TEST_TOOLS_ENABLED } from '../../lib/qrTestTools';
 
 export interface CaregiverServiceProgressPageProps {
   booking: Booking & { locationLat?: number | null; locationLng?: number | null };
@@ -67,6 +66,25 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
   }
   const jobCoords = useJobCoordinates(booking.locationLat, booking.locationLng, booking.locationName);
 
+  const workSection =
+    loading || !proof ? (
+      <div className="p-4">
+        <Skeleton height={140} />
+      </div>
+    ) : (
+      <ServiceProgressWorkCard
+        bookingId={booking.id}
+        bookingRef={bookingRefOf(booking.id)}
+        proof={proof}
+        jobLat={jobCoords.lat}
+        jobLng={jobCoords.lng}
+        checkInServerTs={checkInServerTs}
+        checkOutServerTs={checkOutServerTs}
+        bookedDurationText={booking.durationText}
+        onCheckedOut={handleCheckedOut}
+      />
+    );
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[621fr_414fr]">
       <div className="order-2 flex flex-col gap-5 lg:order-1">
@@ -85,8 +103,9 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
         </div>
 
         {/* ปิดงานก็ต้องสแกน QR ใบเดิมอีกครั้งเหมือนตอนเช็คอิน (backend บังคับเท่ากัน)
-            ซ่อนเมื่อปิดงานไปแล้ว — สแกนซ้ำหลังจบงานจะได้ ALREADY_COMPLETED เปล่า ๆ */}
-        {QR_TEST_TOOLS_ENABLED && checkOutServerTs === null && (
+            แสดงทุก environment เพราะเป็นทางเดียวที่เช็คอิน/ปิดงานได้ (การ์ดเช็คอิน GPS ถูกเอาออกแล้ว)
+            เวลาเช็คอิน/เช็คเอาท์ + ปุ่มจบงาน อยู่ท้ายการ์ดนี้ แทนการ์ดแผนที่เดิม */}
+        {checkOutServerTs === null ? (
           <CaregiverQrScanPanel
             bookingId={booking.id}
             onScanned={(result) => {
@@ -95,24 +114,12 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
               if (result.action === 'CHECK_OUT') void handleCheckedOut();
               else void refetch();
             }}
-          />
-        )}
-
-        {loading || !proof ? (
-          <Skeleton height={260} />
+          >
+            {workSection}
+          </CaregiverQrScanPanel>
         ) : (
-          <ServiceProgressWorkCard
-            bookingId={booking.id}
-            bookingRef={bookingRefOf(booking.id)}
-            proof={proof}
-            jobLat={jobCoords.lat}
-            jobLng={jobCoords.lng}
-            checkInServerTs={checkInServerTs}
-            checkOutServerTs={checkOutServerTs}
-            bookedDurationText={booking.durationText}
-            approximateLocation={jobCoords.source === 'geocoded'}
-            onCheckedOut={handleCheckedOut}
-          />
+          // ปิดงานแล้ว — ซ่อนส่วนสแกน (สแกนซ้ำจะได้ ALREADY_COMPLETED เปล่า ๆ) แต่ยังโชว์เวลาไว้
+          <div className="overflow-hidden rounded-2xl bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)]">{workSection}</div>
         )}
 
         <ChecklistCard tasks={booking.tasks ?? []} notes={booking.notes} />

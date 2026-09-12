@@ -14,12 +14,8 @@ import { CancelAcceptanceModal } from '../../components/ui/CancelAcceptanceModal
 import { AcceptBookingModal } from '../../components/ui/AcceptBookingModal';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
-import { useJobCoordinates } from '../../hooks/useJobCoordinates';
 import Skeleton from '../../components/ui/Skeleton';
-import CheckInMap from './CheckInMap';
-import CaregiverCheckInPanel from './CaregiverCheckInPanel';
 import CaregiverQrScanPanel from './CaregiverQrScanPanel';
-import { QR_TEST_TOOLS_ENABLED } from '../../lib/qrTestTools';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import CaregiverServiceProgressPage from './CaregiverServiceProgressPage';
 import CheckOutSuccess from '../../components/caregiver/CheckOutSuccess';
@@ -106,7 +102,6 @@ export default function CaregiverBookingDetailPage() {
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
-  const [previewPosition, setPreviewPosition] = useState<{ lat: number; lng: number } | null>(null);
   /** มีค่าเมื่อเพิ่งปิดงานสำเร็จในรอบนี้ — ใช้สลับไปหน้าสรุปผลแทนหน้าความคืบหน้า */
   const [checkedOutProof, setCheckedOutProof] = useState<ProofOfWorkSummary | null>(null);
   /** เช็คอินสำเร็จ = backend เปลี่ยน status เป็น in_progress ไปแล้วแน่นอน จึงสลับหน้าได้เลย
@@ -131,9 +126,6 @@ export default function CaregiverBookingDetailPage() {
   });
   const fetchedBooking = fetchedData?.caregiverBooking ? mapToBooking(fetchedData.caregiverBooking) : undefined;
   const booking = fetchedBooking ?? stateBooking;
-  // Called unconditionally (rules of hooks) even though booking may still be undefined here —
-  // the hook itself tolerates undefined lat/lng/address.
-  const jobCoords = useJobCoordinates(booking?.locationLat, booking?.locationLng, booking?.locationName);
 
   const showToast = (message: string, isError = false) => {
     if (isError) showError(message, 3000);
@@ -145,7 +137,7 @@ export default function CaregiverBookingDetailPage() {
     if (fetchingBooking) {
       return (
         <div style={{ minHeight: '100vh', background: '#F6FAF9' }}>
-          <div className="mx-auto max-w-180 px-6 py-7">
+          <div className="mx-auto max-w-300 px-6 py-7">
             <Skeleton height={24} width={180} className="mb-4" />
             <Skeleton height={140} className="mb-4" />
             <Skeleton height={220} />
@@ -181,7 +173,7 @@ export default function CaregiverBookingDetailPage() {
   if (justCheckedIn || IN_PROGRESS_STATUSES.includes(booking.status)) {
     return (
       <div style={{ minHeight: '100vh', background: '#F6FAF9' }}>
-        <div className="mx-auto max-w-275 px-5 py-6 pb-25">
+        <div className="mx-auto max-w-300 px-6 py-6 pb-25">
           <button
             type="button"
             onClick={() => navigate('/caregiver/bookings')}
@@ -289,7 +281,7 @@ export default function CaregiverBookingDetailPage() {
 
       {/* Page */}
       <div style={{ minHeight: '100vh', background: '#F6FAF9' }}>
-        <div style={{ maxWidth: 720, margin: '0 auto', padding: '28px 24px 100px' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 24px 100px', boxSizing: 'border-box' }}>
 
           {/* Back */}
           <button type="button" onClick={() => navigate('/caregiver/bookings')}
@@ -458,13 +450,6 @@ export default function CaregiverBookingDetailPage() {
               {canCheckInToday ? (
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-[621fr_414fr]">
                   <div className="order-2 flex flex-col gap-5 lg:order-1">
-                    <CheckInMap
-                      jobLat={jobCoords.lat}
-                      jobLng={jobCoords.lng}
-                      caregiverLat={previewPosition?.lat ?? null}
-                      caregiverLng={previewPosition?.lng ?? null}
-                      approximate={jobCoords.source === 'geocoded'}
-                    />
                     <PatientSummaryCard
                       patientName={booking.patientName}
                       careRecipientName={booking.careRecipientName}
@@ -486,31 +471,16 @@ export default function CaregiverBookingDetailPage() {
                     />
                   </div>
                   <div className="order-1 flex flex-col gap-5 lg:order-2">
-                    {/* สแกน QR = ทางเดียวที่เริ่มงานได้ สำหรับงานที่มี QR (backend บังคับ)
-                        ตอนนี้ยังเป็นแบบอัปโหลดรูป รอ scanner กล้องจาก PYG-438 มาแทน
-                        วางไว้ "เหนือ" ปุ่มเช็คอินเดิม เพราะเป็นขั้นตอนที่ต้องทำก่อน */}
-                    {QR_TEST_TOOLS_ENABLED && (
-                      <CaregiverQrScanPanel
-                        bookingId={booking.id}
-                        onScanned={() => {
-                          // การสแกนที่สำเร็จ = backend เช็คอินให้เรียบร้อยแล้ว
-                          // สลับหน้าเหมือนตอนกดปุ่มเช็คอินเดิมทุกประการ
-                          setJustCheckedIn(true);
-                          void refetchBooking();
-                        }}
-                      />
-                    )}
-                    <CaregiverCheckInPanel
+                    {/* สแกน QR = ทางเดียวที่เริ่มงานได้ (การ์ดเช็คอินแบบ GPS เดิมถูกเอาออกแล้ว)
+                        จึงต้องแสดงทุก environment ไม่ผูกกับ QR_TEST_TOOLS_ENABLED
+                        ตอนนี้ยังเป็นแบบวางโทเค็น/อัปโหลดรูป รอ scanner กล้องจาก PYG-438 มาแทน */}
+                    <CaregiverQrScanPanel
                       bookingId={booking.id}
-                      jobLat={jobCoords.lat}
-                      jobLng={jobCoords.lng}
-                      bookingDate={booking.bookingDate}
-                      startTime={booking.time ? booking.time.split(' - ')[0] : null}
-                      onCheckedIn={() => {
+                      onScanned={() => {
+                        // การสแกนที่สำเร็จ = backend เช็คอินให้เรียบร้อยแล้ว → สลับไปหน้าความคืบหน้า
                         setJustCheckedIn(true);
                         void refetchBooking();
                       }}
-                      onPreviewPositionChange={setPreviewPosition}
                     />
                   </div>
                 </div>

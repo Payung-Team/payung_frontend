@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { SCAN_JOB_QR } from '../../graphql/queries';
 import { Icon } from '../../components/ui/Icon';
@@ -69,11 +69,14 @@ interface PanelState {
 export default function CaregiverQrScanPanel({
   bookingId,
   onScanned,
+  children,
 }: Readonly<{
   /** งานที่กำลังเปิดอยู่ — ใช้เทียบว่าโทเค็นที่ได้มาเป็นของงานใบนี้จริงไหม */
   bookingId: string;
   /** เรียกเมื่อการสแกนทำให้งานขยับจริง (ok = true) เพื่อให้หน้าแม่ refetch/สลับหน้า */
   onScanned: (result: JobScanResult) => void;
+  /** เนื้อหาเพิ่มท้ายการ์ด คั่นด้วยเส้น — เช่น เวลาเช็คอิน/เช็คเอาท์ในหน้าความคืบหน้า */
+  children?: ReactNode;
 }>) {
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -281,6 +284,9 @@ export default function CaregiverQrScanPanel({
       <p className="mt-2.5 text-[11px] text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
         หน้านี้ไม่ส่งพิกัดตำแหน่งไปกับการสแกน — งานที่เช็คอินผ่านหน้านี้จะไม่มีข้อมูลระยะทาง
       </p>
+
+      {/* -mx-5 -mb-5 ให้ส่วนล่างชิดขอบการ์ดเต็มความกว้าง เหมือนตอนเป็นการ์ดแยก */}
+      {children && <div className="-mx-5 -mb-5 mt-5 border-t border-[#F0F1F3]">{children}</div>}
     </div>
   );
 }

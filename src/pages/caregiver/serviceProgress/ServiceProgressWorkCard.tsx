@@ -1,4 +1,3 @@
-import ServiceProgressMap from './ServiceProgressMap';
 import TimeCards from './TimeCards';
 import CheckoutButton from './CheckoutButton';
 import { Icon } from '../../../components/ui/Icon';
@@ -13,17 +12,11 @@ export interface ServiceProgressWorkCardProps {
   checkInServerTs: string | null;
   checkOutServerTs: string | null;
   bookedDurationText?: string;
-  /** True when jobLat/jobLng were geocoded from the saved address rather than a dropped pin. */
-  approximateLocation?: boolean;
   onCheckedOut: (jobEvent: JobEvent) => void;
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-}
-
-/** One merged card — map, check-in/out times, and the checkout action all live together, matching
- * the Figma spec (a single Container with two internal dividers rather than three stacked cards). */
+/** Shell-less check-in/out times + checkout action — meant to be nested inside a parent card
+ * (the QR scan card on CaregiverServiceProgressPage), so it has no background/border of its own. */
 export default function ServiceProgressWorkCard({
   bookingId,
   bookingRef,
@@ -33,23 +26,11 @@ export default function ServiceProgressWorkCard({
   checkInServerTs,
   checkOutServerTs,
   bookedDurationText,
-  approximateLocation,
   onCheckedOut,
 }: Readonly<ServiceProgressWorkCardProps>) {
   return (
-    <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
-      <div className="p-3">
-        <ServiceProgressMap
-          jobLat={jobLat}
-          jobLng={jobLng}
-          checkInTimeText={checkInServerTs ? `เช็คอิน ${formatTime(checkInServerTs)} น.` : null}
-          approximate={approximateLocation}
-        />
-      </div>
-
-      <div className="border-t border-[#F0F1F3]">
-        <TimeCards checkInServerTs={checkInServerTs} checkOutServerTs={checkOutServerTs} bookedDurationText={bookedDurationText} />
-      </div>
+    <div>
+      <TimeCards checkInServerTs={checkInServerTs} checkOutServerTs={checkOutServerTs} bookedDurationText={bookedDurationText} />
 
       <div className="border-t border-[#F0F1F3] p-4">
         {checkOutServerTs ? (
