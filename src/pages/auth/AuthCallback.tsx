@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApolloClient } from '@apollo/client/react';
 import { supabase } from '../../lib/supabase';
-import { GET_USER } from '../../graphql/queries';
+import { GET_USER, CONFIRM_OAUTH_ROLE } from '../../graphql/queries';
 import { useAuth } from '../../context/AuthContext';
 import { getPostLoginRedirect } from '../../utils/getRedirectPath';
 import { takePendingJoinPath } from '../family/joinRedirect';
@@ -38,6 +38,33 @@ export default function AuthCallback() {
         return;
       }
 
+      // อ่าน flag ที่ Register.tsx เซ็ตไว้ก่อน redirect ไป Google แล้วลบทิ้งทันที
+      // (ไม่งั้นถ้า login ครั้งถัดไปจะเข้าใจผิดว่าเป็นการสมัครใหม่)
+      const isRegistering = localStorage.getItem('is_registering') === 'true';
+      const pendingOAuthRole = localStorage.getItem('oauth_role');
+      localStorage.removeItem('is_registering');
+      localStorage.removeItem('oauth_role');
+
+      // ต้องแก้ role ให้ตรงกับที่เลือกไว้ "ก่อน" ไปเรียก GET_USER รอบแรก ไม่งั้นจะได้ role
+      // เก่า (default = patient) ติดไปแสดงผล/ตัดสินใจ redirect ผิด
+      //
+      // Retry เหมือน GET_USER ด้านล่าง — public.users row อาจยังไม่ถูกสร้างตอนที่เรามาถึงหน้านี้
+      if (isRegistering && (pendingOAuthRole === '1' || pendingOAuthRole === '2')) {
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            await apolloClient.mutate({
+              mutation: CONFIRM_OAUTH_ROLE,
+              variables: { role: Number(pendingOAuthRole) },
+            });
+            break;
+          } catch (err) {
+            logGraphQLError(`ConfirmOAuthRole (attempt ${attempt})`, err);
+            // ไม่ throw ต่อหลัง attempt สุดท้าย — ผู้ใช้ยังเข้าระบบได้ (แค่ role อาจไม่ตรงที่เลือก)
+            if (attempt < 3) await sleep(1000);
+          }
+        }
+      }
+
       // Retry up to 3x with 1s delay — Supabase trigger may not have created
       // the public.users row by the time we land here
       let userData: MeResult['me'] | null = null;
@@ -70,12 +97,8 @@ export default function AuthCallback() {
       setUserRole(role);
       setMustChangePassword(false); // Google OAuth users never have temp passwords
 
-      // เช็ค flag is_registering ที่เซ็ตไว้ตอนกด "สมัครด้วย Google" ในหน้า Register
-      // ถ้ามี → user ใหม่ (เพิ่งสมัคร) → ส่งไป onboarding/kyc
+      // isRegistering (อ่านไว้ด้านบนแล้ว): ถ้ามี → user ใหม่ (เพิ่งสมัคร) → ส่งไป onboarding/kyc
       // ถ้าไม่มี → user เดิม (ล็อกอิน) → ส่งไป dashboard ปกติ
-      const isRegistering = localStorage.getItem('is_registering') === 'true';
-      localStorage.removeItem('is_registering');
-
       let targetPath: string;
       if (isRegistering) {
         // New user: onboarding/kyc will consume any pending invite-link join afterwards.

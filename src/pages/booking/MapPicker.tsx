@@ -1,13 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { loadGoogleMaps, reverseGeocode } from '../../lib/googleMaps';
 
+export type PinChangeHandler = (
+  lat: number,
+  lng: number,
+  address?: string,
+  province?: string,
+  district?: string,
+  subDistrict?: string,
+  postalCode?: string,
+) => void;
+
 export interface MapPickerProps {
   latA: number;
   lngA: number;
-  onChangeA: (lat: number, lng: number, address?: string, province?: string, district?: string) => void;
+  onChangeA: PinChangeHandler;
   latB?: number;
   lngB?: number;
-  onChangeB?: (lat: number, lng: number, address?: string, province?: string, district?: string) => void;
+  onChangeB?: PinChangeHandler;
   showPinB?: boolean;
 }
 
@@ -117,8 +127,8 @@ const MapPicker: React.FC<MapPickerProps> = ({
     });
     markerBRef.current.addListener('dragend', async () => {
       const pos = markerBRef.current.getPosition();
-      const { address, province, district } = await reverseGeocode(pos.lat(), pos.lng());
-      onChangeBRef.current?.(pos.lat(), pos.lng(), address, province, district);
+      const { address, province, district, subDistrict, postalCode } = await reverseGeocode(pos.lat(), pos.lng());
+      onChangeBRef.current?.(pos.lat(), pos.lng(), address, province, district, subDistrict, postalCode);
     });
   }
 
@@ -148,20 +158,20 @@ const MapPicker: React.FC<MapPickerProps> = ({
 
       markerARef.current.addListener('dragend', async () => {
         const pos = markerARef.current.getPosition();
-        const { address, province, district } = await reverseGeocode(pos.lat(), pos.lng());
-        onChangeARef.current(pos.lat(), pos.lng(), address, province, district);
+        const { address, province, district, subDistrict, postalCode } = await reverseGeocode(pos.lat(), pos.lng());
+        onChangeARef.current(pos.lat(), pos.lng(), address, province, district, subDistrict, postalCode);
       });
 
       mapRef.current.addListener('click', async (e: any) => {
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
-        const { address, province, district } = await reverseGeocode(lat, lng);
+        const { address, province, district, subDistrict, postalCode } = await reverseGeocode(lat, lng);
         if (activePinRef.current === 'A') {
           markerARef.current.setPosition({ lat, lng });
-          onChangeARef.current(lat, lng, address, province, district);
+          onChangeARef.current(lat, lng, address, province, district, subDistrict, postalCode);
         } else if (activePinRef.current === 'B' && markerBRef.current) {
           markerBRef.current.setPosition({ lat, lng });
-          onChangeBRef.current?.(lat, lng, address, province, district);
+          onChangeBRef.current?.(lat, lng, address, province, district, subDistrict, postalCode);
         }
       });
 
@@ -169,6 +179,7 @@ const MapPicker: React.FC<MapPickerProps> = ({
     }
 
     syncMarkerPosition(markerARef, latA, lngA);
+    mapRef.current.panTo({ lat: latA, lng: lngA });
 
     if (showPinB && onChangeB) {
       ensureMarkerB(g);

@@ -53,6 +53,16 @@ export const LOGOUT_USER = gql`
   }
 `;
 
+// แก้ role ให้ตรงกับที่เลือกไว้ก่อนกด "สมัครด้วย Google" — ดูคอมเมนต์ที่ AuthCallback.tsx
+export const CONFIRM_OAUTH_ROLE = gql`
+  mutation ConfirmOAuthRole($role: Int!) {
+    confirmOAuthRole(role: $role) {
+      id
+      role
+    }
+  }
+`;
+
 export const GET_USER = gql`
   query GetUser {
     me {
