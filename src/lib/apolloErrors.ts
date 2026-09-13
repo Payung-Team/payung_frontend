@@ -1,4 +1,4 @@
-import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { CombinedGraphQLErrors, ServerError } from '@apollo/client/errors';
 
 /**
  * Apollo Client 4 throws GraphQL execution errors as a CombinedGraphQLErrors instance
@@ -25,4 +25,18 @@ export function extractGraphQLErrorCode(err: unknown): string | undefined {
     return typeof code === 'string' ? code : undefined;
   }
   return undefined;
+}
+
+/**
+ * Raw response body of a non-2xx HTTP response, when there is one.
+ *
+ * Our API answers a *validation* error (asking for a field the schema doesn't have) with
+ * HTTP 400 and `content-type: application/json`. Apollo Client 4 only unwraps GraphQL errors
+ * from a 4xx when the content type is `application/graphql-response+json`; otherwise it throws
+ * a `ServerError` and the `errors` array survives only inside the raw body. So a caller that
+ * needs to tell "this field isn't deployed yet" from "the request failed" has to read the body
+ * — `extractGraphQLErrorCode` returns undefined for these.
+ */
+export function extractServerErrorBody(err: unknown): string | undefined {
+  return ServerError.is(err) ? err.bodyText : undefined;
 }
