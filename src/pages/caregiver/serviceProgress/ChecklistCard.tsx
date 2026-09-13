@@ -102,7 +102,7 @@ export default function ChecklistCard({ tasks, notes }: Readonly<ChecklistCardPr
                   aria-label={`${done ? 'ยกเลิกการทำ' : 'ทำเครื่องหมายว่าเสร็จ'} ${task.description}`}
                   disabled={pending}
                   onClick={() => void toggleTask(task)}
-                  className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition focus:outline-none focus:ring-2 focus:ring-[#52B69A] focus:ring-offset-1 disabled:cursor-wait disabled:opacity-60 ${
+                  className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition focus:outline-none focus:ring-2 focus:ring-[#52B69A] focus:ring-offset-1 disabled:cursor-wait disabled:opacity-60 ${
                     done ? 'border-[#B7E4D7] bg-[#F1FAF7]' : 'border-[#F0F1F3] bg-white hover:border-[#B7E4D7]'
                   }`}
                 >

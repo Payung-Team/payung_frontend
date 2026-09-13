@@ -32,7 +32,7 @@ export default function CheckoutButton({
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#52B69A] text-sm font-bold text-white shadow-[0_4px_12px_rgba(82,182,154,0.2)] transition hover:bg-[#489e86] focus:outline-none focus:ring-2 focus:ring-[#52B69A] focus:ring-offset-2"
+        className="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#52B69A] text-sm font-bold text-white shadow-[0_4px_12px_rgba(82,182,154,0.2)] transition hover:bg-[#489e86] focus:outline-none focus:ring-2 focus:ring-[#52B69A] focus:ring-offset-2"
         style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
       >
         <Icon name="logout" color="#FFFFFF" size="small" />

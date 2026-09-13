@@ -218,7 +218,7 @@ export default function CaregiverQrScanPanel({
           type="button"
           onClick={handleSubmitToken}
           disabled={!canSubmitToken}
-          className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#52B69A] px-6 text-sm font-bold text-white shadow-[0_4px_12px_rgba(82,182,154,0.2)] transition hover:bg-[#489e86] disabled:cursor-not-allowed disabled:bg-[#E5E7EB] disabled:text-[#9CA3AF] disabled:shadow-none"
+          className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#52B69A] px-6 text-sm font-bold text-white shadow-[0_4px_12px_rgba(82,182,154,0.2)] transition hover:bg-[#489e86] disabled:cursor-not-allowed disabled:bg-[#E5E7EB] disabled:text-[#9CA3AF] disabled:shadow-none"
           style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
         >
           <Icon name={busy ? 'hourglass_top' : 'login'} color={canSubmitToken ? '#FFFFFF' : '#9CA3AF'} size="small" />

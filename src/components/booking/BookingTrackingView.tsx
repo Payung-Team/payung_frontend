@@ -45,27 +45,10 @@ function formatElapsed(ms: number): string {
   return `${hours} ชม. ${minutes} นาที`;
 }
 
-// ── Still mocked ─────────────────────────────────────────────────────────────
 // Check-in/check-out comes from proofOfWork, task ticks and care logs from
-// useCareProgress. Only this is left:
-//   • health.*   — real values from booking.draft win; these are only fallbacks.
-// The 24h auto-release countdown is deliberately absent: there is no release_at
-// column and no release cron yet (PYG-366 / PYG-367), so any number would be a guess.
-const MOCK = {
-  // Fallbacks so the detail panel renders fully while test bookings still lack
-  // patientDetails. Real values from booking.draft always win.
-  health: {
-    age: 65,
-    gender: 'หญิง',
-    bloodGroup: 'กรุ๊ป B',
-    weight: 58,
-    height: 155,
-    regularHospital: 'รพ.รามาธิบดี',
-    medicines: 'ยาลดความดัน, ยาเบาหวาน',
-    allergies: 'แพ้ยาเพนิซิลลิน',
-    careInstructions: 'เพิ่งผ่าตัดเปลี่ยนสะโพกใหม่ 2 สัปดาห์ ยังช่วยพยุงเดินค่อนข้างช้า จำเป็นต้องพลิกตัวสม่ำเสมอ',
-  },
-};
+// useCareProgress. The 24h auto-release countdown is deliberately absent: there
+// is no release_at column and no release cron yet (PYG-366 / PYG-367), so any
+// number would be a guess.
 
 const CARE_LOG_CATEGORY: Record<string, { icon: string; label: string; bg: string; color: string }> = {
   food: { icon: 'restaurant', label: 'อาหาร', bg: '#FFF7ED', color: '#C2410C' },
@@ -1183,17 +1166,19 @@ export function BookingTrackingView({
     : 'ดูแลที่บ้านผู้ป่วย';
   const noteToCaregiver = booking.draft.jobDetails?.notes;
 
+  // Real values only — a field the patient left blank renders as "—".
+  // age 0 = "not filled in": toPatientProfilePayload strips 0 on submit, and the
+  // BookingsPage mapper (location.state) seeds age: 0 as a placeholder.
   const pd = booking.draft.recipient?.patientDetails;
-  const h = MOCK.health;
-  const ageStr = `${pd?.age ?? h.age} ปี`;
-  const genderStr = pd?.gender || h.gender;
-  const bloodStr = pd?.bloodGroup ?? h.bloodGroup;
-  const weightStr = `${pd?.weight ?? h.weight} กก.`;
-  const heightStr = `${pd?.height ?? h.height} ซม.`;
-  const hospitalStr = pd?.regularHospital ?? h.regularHospital;
-  const medicinesStr = pd?.medicines ?? h.medicines;
-  const allergiesStr = pd?.allergies ?? h.allergies;
-  const careInstructionsStr = pd?.careInstructions ?? h.careInstructions;
+  const ageStr = pd?.age ? `${pd.age} ปี` : '';
+  const genderStr = pd?.gender ?? '';
+  const bloodStr = pd?.bloodGroup ?? '';
+  const weightStr = pd?.weight != null ? `${pd.weight} กก.` : '';
+  const heightStr = pd?.height != null ? `${pd.height} ซม.` : '';
+  const hospitalStr = pd?.regularHospital ?? '';
+  const medicinesStr = pd?.medicines ?? '';
+  const allergiesStr = pd?.allergies ?? '';
+  const careInstructionsStr = pd?.careInstructions ?? '';
   const tasks = booking.draft.jobDetails?.tasks ?? [];
   const tasksText = tasks.length > 0 ? tasks.map((t) => t.name).join(', ') : null;
 

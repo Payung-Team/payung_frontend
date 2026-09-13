@@ -29,7 +29,7 @@ export default function EmergencyContactCard({ name, phone, relationship }: Read
       </div>
       <a
         href={`tel:${phone}`}
-        className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#DC2626] px-3.5 py-2 text-sm font-bold text-white transition hover:bg-[#B91C1C] focus:outline-none focus:ring-2 focus:ring-[#DC2626] focus:ring-offset-2"
+        className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-[#DC2626] px-3.5 py-2 text-sm font-bold text-white transition hover:bg-[#B91C1C] focus:outline-none focus:ring-2 focus:ring-[#DC2626] focus:ring-offset-2"
         style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
       >
         <Icon name="call" size="small" color="#FFFFFF" />
