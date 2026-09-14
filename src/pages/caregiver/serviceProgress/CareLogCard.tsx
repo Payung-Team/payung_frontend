@@ -1,9 +1,12 @@
-import { useState } from 'react';
-import { useMutation, useQuery } from '@apollo/client/react';
+import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
+import { useQuery } from '@apollo/client/react';
 import { useToast } from '../../../hooks/useToast';
 import { ToastContainer } from '../../../components/ui/Toast';
-import { ADD_CARE_LOG, GET_CARE_LOGS } from '../../../graphql/queries';
-import { extractGraphQLErrorMessage } from '../../../lib/apolloErrors';
+import ImageModal from '../../../components/ui/ImageModal';
+import { GET_CARE_LOGS } from '../../../graphql/queries';
+import { createCareLog } from '../../../lib/careLogApi';
+import { ACCEPTED_EVIDENCE_TYPES, resizeToJpeg, validateEvidenceFile } from '../../../lib/jobEvidence';
 
 const CATEGORIES = [
   { value: 'medication', label: 'ยา' },
@@ -23,6 +26,7 @@ interface CareLog {
   bookingId: string;
   category: string;
   body: string;
+  photoUrl?: string | null;
   serverTs: string;
   deviceTs?: string | null;
 }
@@ -35,19 +39,6 @@ interface CareLogsVariables {
   bookingId: string;
   limit: number;
   offset: number;
-}
-
-interface AddCareLogData {
-  addCareLog: CareLog;
-}
-
-interface AddCareLogVariables {
-  input: {
-    bookingId: string;
-    category: CareLogCategory;
-    body: string;
-    deviceTs: string;
-  };
 }
 
 function categoryLabel(value: string): string {
@@ -79,8 +70,12 @@ export default function CareLogCard({ bookingId }: Readonly<CareLogCardProps>) {
   const [note, setNote] = useState('');
   // เริ่มจากไม่เลือก — backend บังคับ category (String! + @IsIn + DB CHECK) จึงต้องให้ผู้ดูแลเลือกเองทุกครั้ง
   const [category, setCategory] = useState<CareLogCategory | null>(null);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
-  const [addCareLog, { loading: saving }] = useMutation<AddCareLogData, AddCareLogVariables>(ADD_CARE_LOG);
   const { data, loading, error: loadError, refetch } = useQuery<CareLogsData, CareLogsVariables>(GET_CARE_LOGS, {
     variables: { bookingId, limit: 20, offset: 0 },
     fetchPolicy: 'cache-and-network',
@@ -88,28 +83,54 @@ export default function CareLogCard({ bookingId }: Readonly<CareLogCardProps>) {
   const busy = saving;
   const canSubmit = Boolean(note.trim()) && category !== null && !busy;
 
+  // ปล่อย object URL ของรูปตัวอย่างเมื่อเปลี่ยนรูป/ออกจากหน้า ไม่งั้น blob ค้างใน memory
+  useEffect(() => {
+    if (!photo) {
+      setPhotoPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(photo);
+    setPhotoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photo]);
+
+  function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // ล้างค่า input เสมอ — เลือกรูปเดิมซ้ำหลังลบออกจะได้ยิง onChange อีกครั้ง
+    event.target.value = '';
+    if (!file) return;
+    const typeError = validateEvidenceFile(file);
+    if (typeError) {
+      showError(typeError, 4000);
+      return;
+    }
+    setPhoto(file);
+  }
+
   async function handleSubmit() {
     const body = note.trim();
     if (!body || category === null || busy) return;
 
+    setSaving(true);
     try {
-      await addCareLog({
-        variables: {
-          input: {
-            bookingId,
-            category,
-            body,
-            deviceTs: new Date().toISOString(),
-          },
-        },
+      // ย่อเป็น JPEG ก่อนเสมอ — รูปกล้องมือถือ 4–8 MB ส่วน backend รับไม่เกิน 5 MB และรับเฉพาะ JPEG
+      const resized = photo ? await resizeToJpeg(photo) : null;
+      await createCareLog(bookingId, {
+        category,
+        body,
+        deviceTs: new Date().toISOString(),
+        photo: resized,
       });
     } catch (error) {
-      showError(extractGraphQLErrorMessage(error) ?? 'บันทึกการดูแลไม่สำเร็จ กรุณาลองใหม่', 4000);
+      showError(error instanceof Error && error.message ? error.message : 'บันทึกการดูแลไม่สำเร็จ กรุณาลองใหม่', 4000);
       return;
+    } finally {
+      setSaving(false);
     }
 
     setNote('');
     setCategory(null);
+    setPhoto(null);
     showSuccess('บันทึกการดูแลแล้ว', 3000);
     try {
       await refetch();
@@ -123,6 +144,12 @@ export default function CareLogCard({ bookingId }: Readonly<CareLogCardProps>) {
   return (
     <div className="rounded-[18px] bg-white p-5 shadow-[0_1px_4px_rgba(0,0,0,0.03)]" style={FONT}>
       <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />
+      <ImageModal
+        isOpen={viewingPhoto !== null}
+        onClose={() => setViewingPhoto(null)}
+        imageUrl={viewingPhoto ?? ''}
+        title="รูปประกอบบันทึก"
+      />
 
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-[17px] font-bold text-[#1A1A1A]">บันทึกการดูแล</p>
@@ -173,9 +200,39 @@ export default function CareLogCard({ bookingId }: Readonly<CareLogCardProps>) {
           <p className="text-right text-[11px] text-[#B0B3B8]">
             {note.length}/{MAX_NOTE}
           </p>
+          {photoPreview && (
+            <div className="relative mt-2 h-16 w-16 overflow-hidden rounded-lg border border-[#E5E7EB]">
+              <img src={photoPreview} alt="รูปที่แนบ" className="h-full w-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setPhoto(null)}
+                disabled={busy}
+                aria-label="ลบรูปที่แนบ"
+                className="absolute right-0.5 top-0.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-black/60 disabled:cursor-not-allowed"
+              >
+                <MaterialIcon name="close" size={14} color="#FFFFFF" />
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center justify-end border-t border-[#F0F1F3] px-3 py-2.5">
+        <div className="flex items-center justify-between border-t border-[#F0F1F3] px-3 py-2.5">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_EVIDENCE_TYPES.join(',')}
+            onChange={handlePhotoChange}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={busy}
+            aria-label={photo ? 'เปลี่ยนรูปที่แนบ' : 'แนบรูป'}
+            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl transition hover:bg-[#F0F1F3] focus:outline-none focus:ring-2 focus:ring-[#52B69A] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <MaterialIcon name="add_a_photo" size={22} color="#575859" />
+          </button>
           <button
             type="button"
             onClick={() => void handleSubmit()}
@@ -224,6 +281,21 @@ export default function CareLogCard({ bookingId }: Readonly<CareLogCardProps>) {
 
                   <article className="mt-2 rounded-xl border border-[#E5E7EB] px-4 py-3">
                     <p className="whitespace-pre-wrap break-words text-sm text-[#343536]">{log.body}</p>
+                    {log.photoUrl && (
+                      <div className="mt-3 border-t border-[#F0F1F3] pt-3">
+                        <button
+                          type="button"
+                          onClick={() => setViewingPhoto(log.photoUrl ?? null)}
+                          aria-label="ดูรูปขนาดเต็ม"
+                          className="relative block h-16 w-16 cursor-pointer overflow-hidden rounded-lg"
+                        >
+                          <img src={log.photoUrl} alt="รูปประกอบบันทึก" loading="lazy" className="h-full w-full object-cover" />
+                          <span className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-md bg-black/50">
+                            <MaterialIcon name="zoom_in" size={14} color="#FFFFFF" />
+                          </span>
+                        </button>
+                      </div>
+                    )}
                   </article>
                 </li>
               );

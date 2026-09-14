@@ -9,6 +9,7 @@ import { useJobQr } from '../../hooks/useJobQr';
 import { shouldShowJobQr } from '../../lib/jobQr';
 import { copyTextToClipboard, QR_TEST_TOOLS_ENABLED } from '../../lib/qrTestTools';
 import { JobQrCard } from './JobQrCard';
+import ImageModal from '../ui/ImageModal';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 
 // ── Tracking Service view (PYG-361) ─────────────────────────────────────────────
@@ -568,6 +569,7 @@ interface CareLogEntry {
 
 function CareLogItem({ entry, isLast }: Readonly<{ entry: CareLogEntry; isLast: boolean }>) {
   const meta = CARE_LOG_CATEGORY[entry.category];
+  const [viewingPhoto, setViewingPhoto] = useState(false);
   return (
     <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: 14 }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 10, flexShrink: 0 }}>
@@ -591,19 +593,26 @@ function CareLogItem({ entry, isLast }: Readonly<{ entry: CareLogEntry; isLast: 
             {entry.text}
           </p>
           {entry.photoUrl && (
-            // เปิดรูปเต็มในแท็บใหม่ — URL เป็น signed URL อายุสั้นจาก backend
-            <a
-              href={entry.photoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            // เปิดรูปเต็มเป็น pop up (ImageModal ตัวเดียวกับฝั่งผู้ดูแล) — URL เป็น signed URL อายุสั้นจาก backend
+            <button
+              type="button"
+              onClick={() => setViewingPhoto(true)}
               aria-label="ดูรูปขนาดเต็ม"
-              style={{ position: 'relative', display: 'block', marginTop: 12, width: 92, height: 92, boxSizing: 'border-box', border: '0.8px solid rgba(0,0,0,0.05)', borderRadius: 12, background: '#FDE8D5', overflow: 'hidden' }}
+              style={{ position: 'relative', display: 'block', marginTop: 12, width: 92, height: 92, padding: 0, cursor: 'pointer', boxSizing: 'border-box', border: '0.8px solid rgba(0,0,0,0.05)', borderRadius: 12, background: '#FDE8D5', overflow: 'hidden' }}
             >
               <img src={entry.photoUrl} alt="รูปประกอบบันทึก" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              <span style={{ position: 'absolute', right: 6, bottom: 6, width: 24, height: 24, borderRadius: 12, background: 'rgba(255,255,255,0.9)', boxShadow: '0px 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span className="material-icons" style={{ fontSize: 14, color: '#1A1A1A' }}>search</span>
+              <span style={{ position: 'absolute', right: 4, bottom: 4, width: 20, height: 20, borderRadius: 6, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-icons" aria-hidden="true" style={{ fontSize: 14, color: '#FFFFFF', lineHeight: 1 }}>zoom_in</span>
               </span>
-            </a>
+            </button>
+          )}
+          {entry.photoUrl && (
+            <ImageModal
+              isOpen={viewingPhoto}
+              onClose={() => setViewingPhoto(false)}
+              imageUrl={entry.photoUrl}
+              title="รูปประกอบบันทึก"
+            />
           )}
         </div>
       </div>
