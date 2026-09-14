@@ -41,8 +41,8 @@ const DAYS = [
 
 const SLOTS: Array<{ key: SlotType; label: string; time: string }> = [
   { key: 'morning', label: 'เช้า', time: '06:00–12:00' },
-  { key: 'afternoon', label: 'บ่าย', time: '12:00–18:00' },
-  { key: 'evening', label: 'เย็น', time: '18:00–22:00' }
+  { key: 'afternoon', label: 'บ่าย', time: '12:00–17:00' },
+  { key: 'evening', label: 'เย็น', time: '17:00–22:00' }
 ];
 
 const SERVICE_LOCATIONS = [

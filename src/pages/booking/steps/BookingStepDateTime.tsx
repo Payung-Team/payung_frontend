@@ -3,24 +3,26 @@ import { useBooking } from '../../../context/BookingContext';
 
 const BUSY_SLOTS: string[] = [];
 
+// ช่วงเวลาต่อกันครบ 24 ชม. ไม่มีช่องว่าง (ตรงกับ JobReceptionTab ฝั่งผู้ดูแล: 06–12, 12–17, 17–22)
+// from/to เป็นชั่วโมง — ขอบเขตรวมทั้งสองฝั่ง เวลาตรงรอยต่อ (เช่น 17:00) จึงเลือกได้ทั้งสองช่วงที่ติดกัน
+// start = เวลาที่เติมให้อัตโนมัติเมื่อแตะเลือกช่วง
 const SLOTS = [
-  { id: 'morning', label: 'ช่วงเช้า', range: '08:00 - 12:00', start: '08:00' },
-  { id: 'afternoon', label: 'ช่วงบ่าย', range: '13:00 - 17:00', start: '13:00' },
-  { id: 'evening', label: 'ช่วงเย็น', range: '18:00 - 22:00', start: '18:00' },
-  { id: 'night', label: 'ช่วงดึก', range: '22:00 - 06:00', start: '22:00' },
+  { id: 'morning', label: 'ช่วงเช้า', range: '06:00 - 12:00', start: '08:00', from: 6, to: 12 },
+  { id: 'afternoon', label: 'ช่วงบ่าย', range: '12:00 - 17:00', start: '13:00', from: 12, to: 17 },
+  { id: 'evening', label: 'ช่วงเย็น', range: '17:00 - 22:00', start: '17:00', from: 17, to: 22 },
+  { id: 'night', label: 'ช่วงดึก', range: '22:00 - 06:00', start: '22:00', from: 22, to: 6 },
 ];
 
 const HOURLY_RATE = 250;
 
 function isTimeInSlot(time: string, slotName: string) {
   if (!time || !slotName) return true;
+  const s = SLOTS.find((x) => x.id === slotName);
+  if (!s) return true;
   const [h, m] = time.split(':').map(Number);
   const val = h + m / 60;
-  if (slotName === 'morning') return val >= 8 && val <= 12;
-  if (slotName === 'afternoon') return val >= 13 && val <= 17;
-  if (slotName === 'evening') return val >= 18 && val <= 22;
-  if (slotName === 'night') return val >= 22 || val <= 6;
-  return true;
+  // ช่วงข้ามเที่ยงคืน (from > to) เช่น ช่วงดึก 22:00 - 06:00
+  return s.from <= s.to ? val >= s.from && val <= s.to : val >= s.from || val <= s.to;
 }
 
 function computeEndTime(start: string, duration: number) {
