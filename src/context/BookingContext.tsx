@@ -13,8 +13,9 @@ export interface BookingRequest {
     postalCode?: string;
     at_home?: {
       address: string;
-      lat: number;
-      lng: number;
+      // undefined = ยังไม่ได้ปักหมุดบนแผนที่ (เช่น ปฏิเสธสิทธิ์ตำแหน่ง แล้วยังไม่คลิกเลือกเอง)
+      lat?: number;
+      lng?: number;
     };
     accompany_outside?: {
       hospitalName: string;
