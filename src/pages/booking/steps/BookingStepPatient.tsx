@@ -106,11 +106,10 @@ const BLOOD_GROUPS = ['A', 'B', 'AB', 'O', 'A+', 'B+', 'AB+', 'O+'];
 const REL_OPTIONS = ['บุตร', 'คู่สมรส', 'ญาติ', 'ตัวคนไข้เอง'];
 
 /**
- * Step 4 "ผู้รับบริการ". For a user in a family group it opens a chooser:
- *   จองให้ตัวเอง  → the standard patient form (SelfPatientForm)
- *   จองให้สมาชิกในกลุ่ม → pick a member whose profile is shared, booking on their behalf
- * The chooser only appears when the booking was started from the family group page;
- * any other booking (or a user in no group) only ever sees SelfPatientForm.
+ * Step 4 "ผู้รับบริการ".
+ *   Started from the family group page ("จองแทนสมาชิก") → pick any other ACTIVE member,
+ *   booking on their behalf (MemberBookingSection).
+ *   Any other booking (or a user in no group) → the standard patient form (SelfPatientForm).
  */
 export default function BookingStepPatient() {
   const { bookingDraft } = useBooking();
@@ -123,65 +122,12 @@ export default function BookingStepPatient() {
   // The chooser only belongs to the family-group entry ("จองแทนสมาชิก"); a normal booking
   // goes straight to the self form even when the user happens to be in a group.
   const fromGroup = !!(gc || bookingDraft?.onBehalf);
-  const showChooser = fromGroup && groups.length > 0;
-
-  // Entered from "จองแทนสมาชิก" → default to member mode; otherwise self.
-  const [mode, setMode] = useState<'self' | 'member'>(
-    gc || bookingDraft?.onBehalf ? 'member' : 'self',
-  );
-
-  const primaryGroup = groups.find((g) => g.id === gc?.groupId) ?? groups[0] ?? null;
+  // The "จองแทนสมาชิก" flow goes straight to member selection — no self/member chooser.
+  const memberFlow = fromGroup && groups.length > 0;
 
   return (
     <div className="space-y-4">
-      {showChooser && (
-        <section className="bg-white p-6 rounded-2xl border border-gray-100">
-          <h2 className="text-lg font-bold text-[#1A1A1A]">จองให้ใคร</h2>
-          <p className="text-sm text-[#8A8C8E] mt-1">เลือกผู้รับบริการสำหรับการจองครั้งนี้</p>
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setMode('self')}
-              className={`flex items-center gap-3 p-4 rounded-xl border-2 text-left transition cursor-pointer ${
-                mode === 'self'
-                  ? 'border-[#52B69A] bg-[#F0FAF4]'
-                  : 'border-[#E0E2E5] bg-white hover:border-gray-300'
-              }`}
-            >
-              <span className="material-icons text-[#52B69A]" style={{ fontSize: 24 }}>
-                person
-              </span>
-              <span>
-                <span className="block text-sm font-bold text-[#1A1A1A]">จองให้ตัวเอง</span>
-                <span className="block text-xs text-[#8A8C8E] mt-0.5">ใช้ข้อมูลของคุณ</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('member')}
-              className={`flex items-center gap-3 p-4 rounded-xl border-2 text-left transition cursor-pointer ${
-                mode === 'member'
-                  ? 'border-[#52B69A] bg-[#F0FAF4]'
-                  : 'border-[#E0E2E5] bg-white hover:border-gray-300'
-              }`}
-            >
-              <span className="material-icons text-[#009265]" style={{ fontSize: 24 }}>
-                groups
-              </span>
-              <span>
-                <span className="block text-sm font-bold text-[#1A1A1A]">จองให้สมาชิกในกลุ่ม</span>
-                <span className="block text-xs text-[#8A8C8E] mt-0.5">
-                  {primaryGroup
-                    ? `${primaryGroup.name} · ${primaryGroup.memberCount} คน`
-                    : 'จองแทนสมาชิกในครอบครัว'}
-                </span>
-              </span>
-            </button>
-          </div>
-        </section>
-      )}
-
-      {showChooser && mode === 'member' ? (
+      {memberFlow ? (
         <MemberBookingSection groups={groups} gc={gc} />
       ) : (
         <SelfPatientForm />
@@ -191,9 +137,9 @@ export default function BookingStepPatient() {
 }
 
 // ── Book on behalf of a group member ─────────────────────────────────────────
-// The person cared for is a member whose own profile is shared into the group; a member with
-// no shared profile can't be booked for yet. Health fields aren't returned by the API yet
-// (PYG-426) so the profile card shows the name + a note; per-booking notes go to memberDetails.
+// PYG-500: every other ACTIVE member is bookable. The backend resolves their care-recipient
+// profile by memberUserId: reuse the group profile, copy their personal profile, or create one
+// from the member name and per-booking details when neither exists.
 
 function MemberBookingSection({
   groups,
@@ -215,7 +161,8 @@ function MemberBookingSection({
   );
   const recipients = useMemo(() => data?.groupCareRecipients ?? [], [data?.groupCareRecipients]);
 
-  // A member is bookable when they've shared a profile — map member → their care recipient.
+  // A shared group profile is optional. It is used only to enrich the chooser immediately;
+  // the backend can provision one from memberUserId when it is absent (PYG-500).
   const options = useMemo(() => {
     const byUser = new Map<string, GroupCareRecipient>();
     for (const r of recipients) if (r.ownerUserId) byUser.set(r.ownerUserId, r);
@@ -225,7 +172,10 @@ function MemberBookingSection({
   }, [group?.members, recipients]);
 
   const [selectedUserId, setSelectedUserId] = useState<string>(gc?.memberUserId ?? '');
-  const selected = options.find((o) => o.member.userId === selectedUserId && o.recipient);
+  const selected = options.find((o) => o.member.userId === selectedUserId);
+  const selectedName = selected
+    ? selected.recipient?.name || selected.member.displayName || selected.member.email
+    : '';
 
   const [memberNote, setMemberNote] = useState(
     bookingDraft?.recipient?.patientDetails?.careInstructions ?? '',
@@ -237,19 +187,19 @@ function MemberBookingSection({
 
   // Persist the on-behalf context whenever the selection / notes / contact change.
   useEffect(() => {
-    if (!group || !selected?.recipient) return;
+    if (!group || !selected) return;
     setBookingDraft((prev) => ({
       ...(prev || { serviceLocation: [], serviceTypes: [] }),
       onBehalf: {
         familyGroupId: group.id,
-        careRecipientId: selected.recipient!.id,
-        recipientName: selected.recipient!.name,
+        memberUserId: selected.member.userId,
+        recipientName: selectedName,
       },
       recipient: {
         type: 'member',
-        selectedMemberId: selected.recipient!.id,
+        selectedMemberId: selected.member.userId,
         patientDetails: {
-          name: selected.recipient!.name,
+          name: selectedName,
           // ไม่ใส่ 0 — BE รับ 0 เป็นอายุที่ถูกต้อง (ทารก) ดู PYG-460 ใน BookingContext
           age: undefined,
           careInstructions: memberNote,
@@ -258,7 +208,7 @@ function MemberBookingSection({
       contactPerson: { name: contactName, phone: contactPhone, relationship: contactRel },
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [group?.id, selected?.recipient?.id, memberNote, contactName, contactPhone, contactRel]);
+  }, [group?.id, selected?.member.userId, selectedName, memberNote, contactName, contactPhone, contactRel]);
 
   const handleSubmit = () => {
     const errs: Record<string, string> = {};
@@ -324,24 +274,20 @@ function MemberBookingSection({
         ) : (
           <div className="mt-4 space-y-2">
             {options.map(({ member, recipient }) => {
-              const bookable = !!recipient;
-              const active = bookable && selectedUserId === member.userId;
+              const active = selectedUserId === member.userId;
               return (
                 <label
                   key={member.userId}
                   className={`flex items-center gap-3 rounded-xl border p-3 transition ${
-                    !bookable
-                      ? 'border-gray-200 opacity-60 cursor-not-allowed'
-                      : active
-                        ? 'border-2 border-[#009265] bg-[#F0FAF4] cursor-pointer'
-                        : 'border-gray-200 hover:bg-gray-50 cursor-pointer'
+                    active
+                      ? 'border-2 border-[#009265] bg-[#F0FAF4] cursor-pointer'
+                      : 'border-gray-200 hover:bg-gray-50 cursor-pointer'
                   }`}
                 >
                   <input
                     type="radio"
                     name="book-member"
                     className="h-4 w-4 accent-[#009265]"
-                    disabled={!bookable}
                     checked={active}
                     onChange={() => setSelectedUserId(member.userId)}
                   />
@@ -350,12 +296,10 @@ function MemberBookingSection({
                     <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
                       {member.displayName || member.email}
                     </p>
-                    <p
-                      className={`truncate text-[12px] ${bookable ? 'text-[#8A8C8E]' : 'text-[#B45309]'}`}
-                    >
-                      {bookable
+                    <p className="truncate text-[12px] text-[#8A8C8E]">
+                      {recipient
                         ? 'มีข้อมูลผู้รับบริการแล้ว'
-                        : 'ยังไม่ได้กรอกข้อมูลผู้รับบริการ — จองแทนไม่ได้'}
+                        : 'ยังไม่มีข้อมูลผู้รับบริการ — ระบบจะสร้างให้อัตโนมัติเมื่อจอง'}
                     </p>
                   </div>
                 </label>
@@ -365,7 +309,7 @@ function MemberBookingSection({
         )}
       </section>
 
-      {selected?.recipient && (
+      {selected && (
         <section className="bg-white p-6 rounded-2xl border border-gray-100">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -373,8 +317,8 @@ function MemberBookingSection({
                 ข้อมูลผู้รับบริการ
               </p>
               <h3 className="text-[16px] font-bold text-[#064E3B] mt-0.5">
-                {selected.recipient.name}
-                {selected.recipient.nickname && (
+                {selectedName}
+                {selected.recipient?.nickname && (
                   <span className="ml-1.5 text-[13px] font-normal text-[#8A8C8E]">
                     ({selected.recipient.nickname})
                   </span>
@@ -394,8 +338,9 @@ function MemberBookingSection({
               info
             </span>
             <p className="text-[12px] leading-5 text-[#8A8C8E]">
-              ข้อมูลสุขภาพของผู้รับบริการมาจากโปรไฟล์ที่เจ้าตัวกรอกเอง คุณแก้ไม่ได้ —
-              หากไม่ถูกต้อง ให้แจ้งเจ้าตัวอัปเดตในโปรไฟล์
+              {selected.recipient
+                ? 'ระบบจะใช้ข้อมูลผู้รับบริการที่มีอยู่ในกลุ่มสำหรับการจองครั้งนี้'
+                : 'ระบบจะค้นหาโปรไฟล์ส่วนตัวของสมาชิก หรือสร้างข้อมูลผู้รับบริการให้อัตโนมัติเมื่อยืนยันการจอง'}
             </p>
           </div>
 

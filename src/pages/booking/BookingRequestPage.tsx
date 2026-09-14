@@ -198,6 +198,12 @@ export default function BookingRequestPage() {
 
   const patientName = bookingDraft?.recipient?.patientDetails?.name || '';
 
+  // เข้ามาจากปุ่ม "จองแทนสมาชิก" ของกลุ่ม — อ่านจาก location.state ด้วยเพื่อไม่ให้หัวข้อกระพริบในเฟรมแรก
+  const isGroupBooking = Boolean(
+    bookingDraft?.groupContext?.groupId ||
+      (location.state as { groupBooking?: { groupId?: string } } | null)?.groupBooking?.groupId,
+  );
+
   const handleStartSearch = async () => {
     if (!bookingDraft) return;
     setIsSearching(true);
@@ -216,7 +222,9 @@ export default function BookingRequestPage() {
           <div className="flex items-center gap-2 flex-1">
             <span className="material-icons text-[#52B69A] text-[26px]">health_and_safety</span>
             <div>
-              <div className="text-base font-bold text-[#1A1A1A] leading-tight">จองผู้ดูแล</div>
+              <div className="text-base font-bold text-[#1A1A1A] leading-tight">
+                {isGroupBooking ? 'จองผู้ดูแลแทนสมาชิกกลุ่ม' : 'จองผู้ดูแล'}
+              </div>
               <div className="text-xs text-[#8A8C8E]">{STEP_CAPTIONS[step - 1]}</div>
             </div>
           </div>
