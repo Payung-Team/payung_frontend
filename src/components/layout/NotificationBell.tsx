@@ -31,11 +31,17 @@ interface UnreadCountData {
 interface NotificationBellProps {
   readonly currentUserId?: string;
   readonly externalUnreadCount?: number;
+  /** "ดูทั้งหมด" target (and where mobile taps go). Defaults to the caregiver settings page. */
+  readonly viewAllPath?: string;
+  /** Where clicking an item navigates. Defaults to resolveDeepLink, whose targets are patient/caregiver pages. */
+  readonly resolveLink?: (item: NotificationItem) => string;
 }
 
 export default function NotificationBell({
   currentUserId,
   externalUnreadCount,
+  viewAllPath = '/caregiver/settings/notifications',
+  resolveLink = resolveDeepLink,
 }: NotificationBellProps) {
   const navigate = useNavigate();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -146,7 +152,7 @@ export default function NotificationBell({
 
   const handleClickBell = () => {
     if (isMobile) {
-      navigate('/caregiver/settings/notifications');
+      navigate(viewAllPath);
     } else {
       setOpen((prev) => {
         if (prev) setBellTab('all'); // reset tab เมื่อปิด dropdown
@@ -172,7 +178,7 @@ export default function NotificationBell({
     setOpen(false);
     await refetchUnreadCount();
     await refetchNotifications();
-    navigate(resolveDeepLink(item));
+    navigate(resolveLink(item));
   };
 
   return (
@@ -291,7 +297,7 @@ export default function NotificationBell({
 
           <div className="flex h-[33px] items-start justify-center bg-[#F7F9F8] px-0 py-[10px]">
             <Link
-              to="/caregiver/settings/notifications"
+              to={viewAllPath}
               onClick={() => setOpen(false)}
               className="text-[11px] font-semibold leading-[13px] text-[#14554F] hover:underline"
             >
