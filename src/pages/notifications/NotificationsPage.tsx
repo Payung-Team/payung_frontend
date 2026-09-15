@@ -41,7 +41,17 @@ interface UnreadQueryResult {
 
 const PAGE_SIZE = 20;
 
-export default function NotificationsPage() {
+interface NotificationsPageProps {
+  /** Where clicking an item navigates. Defaults to resolveDeepLink, whose targets are patient/caregiver pages. */
+  readonly resolveLink?: (item: NotificationItem) => string;
+  /** The email toggle only covers KYC emails, which admins never receive. */
+  readonly showEmailPreference?: boolean;
+}
+
+export default function NotificationsPage({
+  resolveLink = resolveDeepLink,
+  showEmailPreference = true,
+}: NotificationsPageProps = {}) {
   const navigate = useNavigate();
   const client = useApolloClient();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -63,12 +73,18 @@ export default function NotificationsPage() {
   const unreadCount = unreadData?.unreadCount ?? items.filter((item) => !item.isRead).length;
   const emailEnabled = Boolean(userData?.me?.emailPreferences ?? true);
 
+  // Guard with a ref, not the loadingPage state: depending on that state gave
+  // loadPage a new identity on every load, which re-ran the initial-load effect
+  // (and re-subscribed the realtime channel) in an endless fetch loop.
+  const loadingRef = useRef(false);
+
   const loadPage = useCallback(
     async (offset: number) => {
-      if (loadingPage) {
+      if (loadingRef.current) {
         return;
       }
 
+      loadingRef.current = true;
       setLoadingPage(true);
       try {
         const result = await client.query<NotificationsQueryResult>({
@@ -90,11 +106,16 @@ export default function NotificationsPage() {
         });
 
         setHasMore(next.length === PAGE_SIZE);
+      } catch (err) {
+        // Stop paging so the load-more observer doesn't retry a failing query forever.
+        console.error('Failed to load notifications', err);
+        setHasMore(false);
       } finally {
+        loadingRef.current = false;
         setLoadingPage(false);
       }
     },
-    [client, loadingPage],
+    [client],
   );
 
   useEffect(() => {
@@ -162,7 +183,7 @@ export default function NotificationsPage() {
     await refetchUnread();
     setItems((prev) => prev.map((entry) => (entry.id === item.id ? { ...entry, isRead: true } : entry)));
 
-    navigate(resolveDeepLink(item));
+    navigate(resolveLink(item));
   };
 
   const handleToggleEmailPreference = async () => {
@@ -198,6 +219,7 @@ export default function NotificationsPage() {
         </button>
       </div>
 
+      {showEmailPreference && (
       <div className="mb-5 rounded-xl border border-[#E5E7E9] bg-white p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -222,6 +244,7 @@ export default function NotificationsPage() {
           </button>
         </div>
       </div>
+      )}
 
       <div className="mb-4 flex gap-2 overflow-x-auto">
         {FILTER_TABS.map((tab) => {
