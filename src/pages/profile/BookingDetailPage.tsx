@@ -70,7 +70,8 @@ const STATUS_BANNER: Record<ConfirmedBooking['status'], { icon: string; iconColo
   completed: { icon: 'task_alt', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: () => `การนัดหมายเสร็จสิ้นเรียบร้อยแล้ว` },
 };
 
-const CANCELLABLE_STATUSES = new Set<ConfirmedBooking['status']>(['pending', 'accepted', 'confirmed']);
+// Must match BookingService.cancelBooking: paid/confirmed jobs are no longer cancellable.
+const CANCELLABLE_STATUSES = new Set<ConfirmedBooking['status']>(['pending', 'accepted']);
 
 // ── GQL → ConfirmedBooking mapper (mirrors BookingsPage.mapGqlBooking) ─────────
 

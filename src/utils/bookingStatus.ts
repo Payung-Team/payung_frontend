@@ -29,6 +29,11 @@ const ALIASES: Record<string, BookingStatus> = {
   unmatched: 'pending',          // created, no caregiver assigned yet
   declined: 'rejected',
   awaiting_payment: 'accepted',  // legacy frontend-only name
+  // Legacy backend rows can still contain these values even though new jobs now
+  // close directly as completed. Keep them out of the UI state model, but render
+  // the old closed jobs as completed instead of falling through to pending.
+  awaiting_release: 'completed',
+  needs_review: 'completed',
 };
 
 /**
