@@ -10,6 +10,11 @@ import KycDocumentsPreview from '../../components/ui/KycDocumentsPreview';
 import KycHistoryCard from '../../components/ui/KycHistoryCard';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 
+/** daysUntil clamps to 0, so it can't tell "today" from "months overdue". */
+function isPastDate(dateStr: string): boolean {
+  return new Date(dateStr).getTime() <= Date.now();
+}
+
 function daysUntil(dateStr: string): number {
   return Math.max(0, Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000));
 }
@@ -571,7 +576,9 @@ export default function AdminCaregiverDetailPage() {
                         title={`กำหนดลบ: ${new Date(scheduledDeleteAt!).toLocaleDateString('th-TH')}`}
                       >
                         <span className="material-icons" style={{ fontSize: 11 }}>schedule</span>
-                        {daysUntilDelete > 0 ? `ลบใน ${daysUntilDelete} วัน` : 'ลบวันนี้'}
+                        {isPastDate(scheduledDeleteAt!)
+                          ? 'เลยกำหนดลบ'
+                          : daysUntilDelete > 0 ? `ลบใน ${daysUntilDelete} วัน` : 'ลบวันนี้'}
                       </span>
                     )}
                   </div>

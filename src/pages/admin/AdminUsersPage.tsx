@@ -74,6 +74,11 @@ const KYC_STATUS_META: Record<string, { label: string; badgeClass: string; dotCl
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
+/** daysUntil clamps to 0, so it can't tell "today" from "months overdue". */
+function isPastDate(dateStr: string): boolean {
+  return new Date(dateStr).getTime() <= Date.now();
+}
+
 function daysUntil(dateStr?: string | null): number {
   if (!dateStr) return 0;
   const diff = new Date(dateStr).getTime() - Date.now();
@@ -868,13 +873,14 @@ function AccountStatusCell({ item }: Readonly<{ item: UserSummary }>) {
       </span>
       {item.scheduledDeleteAt && (() => {
         const days = daysUntil(item.scheduledDeleteAt);
+        const overdue = isPastDate(item.scheduledDeleteAt);
         return (
           <span
             className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200"
             title={`กำหนดลบ: ${formatDate(item.scheduledDeleteAt)}`}
           >
             <span className="material-icons" style={{ fontSize: 11 }}>schedule</span>
-            {days > 0 ? `ลบใน ${days} วัน` : 'ลบวันนี้'}
+            {overdue ? 'เลยกำหนดลบ' : days > 0 ? `ลบใน ${days} วัน` : 'ลบวันนี้'}
           </span>
         );
       })()}
