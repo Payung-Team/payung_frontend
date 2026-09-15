@@ -4,9 +4,11 @@ import { useQuery } from '@apollo/client/react';
 import { useAuth } from '../../context/AuthContext';
 import { GET_USER, ADMIN_PENDING_COUNT, ADMIN_DISPUTE_PENDING_COUNT } from '../../graphql/queries';
 import AdminSidebar from './AdminSidebar';
+import NotificationBell from './NotificationBell';
+import { ADMIN_NOTIFICATIONS_PATH, adminNotificationLink } from './adminNotifications';
 
 interface UserData {
-  me: { displayName?: string };
+  me: { id?: string; displayName?: string; role?: number };
 }
 
 interface PendingCountData {
@@ -35,6 +37,7 @@ function getPageInfo(pathname: string): { title: string; breadcrumb: string } {
   if (pathname === '/admin/payments') return { title: 'Payments', breadcrumb: 'หน้าหลัก / Payments' };
   if (pathname === '/admin/disputes') return { title: 'จัดการคำร้อง', breadcrumb: 'หน้าหลัก / จัดการคำร้อง' };
   if (pathname.startsWith('/admin/disputes/')) return { title: 'ตรวจสอบคำร้อง', breadcrumb: 'หน้าหลัก / จัดการคำร้อง / รายละเอียด' };
+  if (pathname === '/admin/notifications') return { title: 'การแจ้งเตือน', breadcrumb: 'หน้าหลัก / การแจ้งเตือน' };
   return { title: 'Admin', breadcrumb: 'หน้าหลัก / Admin' };
 }
 
@@ -72,7 +75,7 @@ export default function AdminLayout() {
     });
   };
 
-  const { logout } = useAuth();
+  const { logout, userRole } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -116,6 +119,7 @@ export default function AdminLayout() {
           pendingKyc={pendingKyc}
           pendingDisputes={pendingDisputes}
           displayName={displayName}
+          role={userData?.me?.role ?? userRole}
           onLogout={handleLogout}
           collapsed={collapsed}
         />
@@ -162,21 +166,11 @@ export default function AdminLayout() {
               {today}
             </span>
 
-            {/* Bell */}
-            <div style={{ position: 'relative' }}>
-              <div style={{
-                width: 36, height: 36,
-                background: '#F3F4F6', borderRadius: 8,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <span className="material-icons" style={{ fontSize: 16, color: '#9CA3AF' }}>notifications</span>
-              </div>
-              <div style={{
-                position: 'absolute', top: -2, right: -2,
-                width: 8, height: 8, borderRadius: '50%',
-                background: '#EF4444',
-              }} />
-            </div>
+            <NotificationBell
+              currentUserId={userData?.me?.id}
+              viewAllPath={ADMIN_NOTIFICATIONS_PATH}
+              resolveLink={adminNotificationLink}
+            />
 
             {/* Avatar + profile dropdown */}
             <div ref={profileRef} style={{ position: 'relative' }}>

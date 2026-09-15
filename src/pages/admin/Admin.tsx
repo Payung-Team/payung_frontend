@@ -107,10 +107,10 @@ function abbreviateName(name: string): string {
 
 // ─── Alert banner styles ──────────────────────────────────────────────────────
 
-const ALERT_STYLE: Record<AlertVariant, { bg: string; border: string; iconBg: string; titleColor: string; subtitleColor: string; ctaBg: string; xColor: string }> = {
-  error:   { bg: '#FEF2F2', border: '#FEE2E2', iconBg: '#EF4444', titleColor: '#991B1B', subtitleColor: '#DC2626', ctaBg: '#DC2626', xColor: '#DC2626' },
-  warning: { bg: '#FFFBEB', border: '#FEF3C7', iconBg: '#F59E0B', titleColor: '#92400E', subtitleColor: '#D97706', ctaBg: '#D97706', xColor: '#D97706' },
-  info:    { bg: '#EFF6FF', border: '#DBEAFE', iconBg: '#3B82F6', titleColor: '#1E40AF', subtitleColor: '#3B82F6', ctaBg: '#3B82F6', xColor: '#3B82F6' },
+const ALERT_STYLE: Record<AlertVariant, { icon: string; bg: string; border: string; iconColor: string; titleColor: string; subtitleColor: string; ctaColor: string }> = {
+  error:   { icon: 'dangerous',     bg: '#FEF2F2', border: '#EF4444', iconColor: '#EF4444', titleColor: '#991B1B', subtitleColor: '#DC2626', ctaColor: '#DC2626' },
+  warning: { icon: 'warning_amber', bg: '#FFFBEB', border: '#F59E0B', iconColor: '#F59E0B', titleColor: '#92400E', subtitleColor: '#D97706', ctaColor: '#D97706' },
+  info:    { icon: 'info',          bg: '#EFF6FF', border: '#3B82F6', iconColor: '#3B82F6', titleColor: '#1E40AF', subtitleColor: '#3B82F6', ctaColor: '#3B82F6' },
 };
 
 // ─── Dual-Line Chart ─────────────────────────────────────────────────────────
@@ -361,17 +361,18 @@ export default function Admin() {
       list.push({
         id: 'kyc-backlog',
         variant: 'error',
-        title: `⚠️ KYC Backlog สูง! — มี ${summary.pendingKyc} รายการรอตรวจสอบ`,
-        subtitle: 'กรุณาตรวจสอบให้เสร็จโดยเร็ว',
-        cta: { label: 'ตรวจสอบเลย', to: '/admin/kyc' },
+        title: `คำขอยืนยันตัวตน (KYC) ค้างตรวจสอบ ${summary.pendingKyc} รายการ`,
+        subtitle: 'จำนวนคำขอเกินเกณฑ์ที่กำหนด โปรดดำเนินการเพื่อไม่ให้ผู้ดูแลต้องรอนาน',
+        cta: { label: 'ตรวจสอบคำขอ', to: '/admin/kyc' },
       });
     }
     if (summary.rejectedKyc > 0) {
       list.push({
         id: 'rejected-pending',
         variant: 'warning',
-        title: `มี ${summary.rejectedKyc} รายการถูกปฏิเสธ รอ Caregiver ส่งเอกสารใหม่`,
-        cta: { label: 'ดูรายการ →', to: '/admin/kyc?status=rejected' },
+        title: `เอกสาร KYC ถูกปฏิเสธ ${summary.rejectedKyc} รายการ`,
+        subtitle: 'อยู่ระหว่างรอผู้ดูแลส่งเอกสารฉบับแก้ไขกลับมา',
+        cta: { label: 'ดูรายการ', to: '/admin/kyc?status=rejected' },
       });
     }
     return list.filter(a => !dismissedAlerts.has(a.id));
@@ -388,42 +389,44 @@ export default function Admin() {
             return (
               <div
                 key={alert.id}
+                role={alert.variant === 'error' ? 'alert' : 'status'}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 16px',
+                  display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+                  padding: '10px 10px 10px 14px',
                   background: s.bg,
                   border: `1px solid ${s.border}`,
                   borderRadius: 10,
                 }}
               >
-                <div style={{ width: 22, height: 22, borderRadius: '50%', background: s.iconBg, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: s.titleColor, fontSize: 13, fontWeight: 600 }}>{alert.title}</div>
+                <Icon name={s.icon} variant="outlined" color={s.iconColor} style={{ fontSize: 20, flexShrink: 0 }} />
+                <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+                  <div style={{ color: s.titleColor, fontSize: 13, fontWeight: 600, lineHeight: '19px' }}>{alert.title}</div>
                   {alert.subtitle && (
-                    <div style={{ color: s.subtitleColor, fontSize: 11, marginTop: 2 }}>{alert.subtitle}</div>
+                    <div style={{ color: s.subtitleColor, fontSize: 12, lineHeight: '17px', marginTop: 1 }}>{alert.subtitle}</div>
                   )}
                 </div>
-                {alert.cta && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 'auto' }}>
+                  {alert.cta && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(alert.cta!.to)}
+                      className="inline-flex h-8 cursor-pointer items-center gap-0.5 rounded-lg border-0 pl-3 pr-2 text-xs font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-px hover:shadow-md hover:brightness-110 active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                      style={{ background: s.ctaColor, ['--tw-ring-color' as string]: s.ctaColor }}
+                    >
+                      {alert.cta.label}
+                      <Icon name="chevron_right" color="white" style={{ fontSize: 16 }} />
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => navigate(alert.cta!.to)}
-                    style={{
-                      background: s.ctaBg, color: 'white',
-                      border: 'none', borderRadius: 8,
-                      padding: '5px 14px', fontSize: 12, fontWeight: 600,
-                      cursor: 'pointer', flexShrink: 0,
-                    }}
+                    onClick={() => dismiss(alert.id)}
+                    aria-label="ปิดการแจ้งเตือน"
+                    title="ปิดการแจ้งเตือน"
+                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent p-0 transition-colors duration-200 hover:bg-black/5"
                   >
-                    {alert.cta.label}
+                    <Icon name="close" color="#9CA3AF" style={{ fontSize: 18 }} />
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => dismiss(alert.id)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: s.xColor, fontSize: 14, flexShrink: 0, padding: 0, lineHeight: 1 }}
-                >
-                  ✕
-                </button>
+                </div>
               </div>
             );
           })}

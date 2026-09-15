@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+// logo_5.png cropped to its visible bounds — white/orange mark made for dark backgrounds.
+import logoImg from '../../assets/logo_admin.png';
 
 interface NavLeaf {
   to: string;
@@ -37,10 +39,17 @@ const NAV_MENU: NavEntry[] = [
   },
 ];
 
+// 3 = admin, 4 = super_admin — the only roles AdminLayout's RoleRoute lets in.
+const ROLE_LABELS: Record<number, string> = {
+  3: 'Admin',
+  4: 'Super Admin',
+};
+
 interface AdminSidebarProps {
   pendingKyc: number;
   pendingDisputes?: number;
   displayName: string;
+  role?: number | null;
   onLogout: () => void;
   onClose?: () => void;
   collapsed?: boolean;
@@ -50,12 +59,14 @@ export default function AdminSidebar({
   pendingKyc,
   pendingDisputes = 0,
   displayName,
+  role,
   onLogout,
   onClose,
   collapsed = false,
 }: Readonly<AdminSidebarProps>) {
   const { pathname } = useLocation();
   const initial = displayName.charAt(0).toUpperCase() || 'A';
+  const roleLabel = role != null ? ROLE_LABELS[role] : undefined;
 
   const badgeFor = (key?: NavLeaf['badgeKey']): number | null => {
     if (key === 'kyc') return pendingKyc > 0 ? pendingKyc : null;
@@ -81,27 +92,45 @@ export default function AdminSidebar({
       }}
     >
       {/* Logo */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: collapsed ? 0 : 10,
-        height: 44,
-        marginBottom: 4,
-        justifyContent: collapsed ? 'center' : 'flex-start',
-      }}>
-        <div style={{
-          width: 34, height: 34,
-          background: '#10B981',
-          borderRadius: 8,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
-        }}>
-          <span style={{ color: 'white', fontWeight: 700, fontSize: 15, fontFamily: 'Inter,sans-serif' }}>P</span>
-        </div>
-        {!collapsed && (
+      <div
+        title={collapsed ? 'Payung Admin Portal' : undefined}
+        style={{
+          display: 'flex',
+          flexDirection: collapsed ? 'column' : 'row',
+          alignItems: 'center',
+          gap: collapsed ? 4 : 10,
+          height: 44,
+          marginBottom: 4,
+          justifyContent: collapsed ? 'center' : 'flex-start',
+        }}
+      >
+        <img
+          src={logoImg}
+          alt="Payung"
+          style={{ height: collapsed ? 20 : 30, width: 'auto', objectFit: 'contain', flexShrink: 0, display: 'block' }}
+        />
+        {collapsed ? (
+          <span style={{
+            color: '#FDBA74', background: 'rgba(251,146,60,0.18)', border: '1px solid rgba(251,146,60,0.4)',
+            borderRadius: 4, padding: '0 4px', fontSize: 8, fontWeight: 700, letterSpacing: 0.6, lineHeight: '12px',
+            fontFamily: 'Inter,sans-serif',
+          }}>
+            ADMIN
+          </span>
+        ) : (
           <>
-            <span style={{ color: 'white', fontWeight: 700, fontSize: 15, fontFamily: 'Inter,sans-serif', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              Payung Admin
+            <span style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.2)', flexShrink: 0 }} aria-hidden="true" />
+            <span style={{
+              flex: 1, minWidth: 0,
+              display: 'inline-flex', alignItems: 'center',
+            }}>
+              <span style={{
+                color: '#FDBA74', background: 'rgba(251,146,60,0.18)', border: '1px solid rgba(251,146,60,0.4)',
+                borderRadius: 6, padding: '2px 8px', fontSize: 10, fontWeight: 700, letterSpacing: 1, lineHeight: '14px',
+                fontFamily: 'Inter,sans-serif', whiteSpace: 'nowrap',
+              }}>
+                ADMIN PORTAL
+              </span>
             </span>
             {onClose && (
               <button
@@ -171,7 +200,9 @@ export default function AdminSidebar({
             <div style={{ color: 'white', fontSize: 12, fontWeight: 500, fontFamily: 'Inter,sans-serif', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {displayName || 'Admin'}
             </div>
-            <div style={{ color: 'white', opacity: 0.5, fontSize: 10, fontFamily: 'Inter,sans-serif' }}>Admin</div>
+            {roleLabel && (
+              <div style={{ color: 'white', opacity: 0.5, fontSize: 10, fontFamily: 'Inter,sans-serif' }}>{roleLabel}</div>
+            )}
           </div>
         </div>
       )}
@@ -181,22 +212,18 @@ export default function AdminSidebar({
         type="button"
         onClick={onLogout}
         title={collapsed ? 'ออกจากระบบ' : undefined}
+        aria-label="ออกจากระบบ"
+        className="flex w-full cursor-pointer items-center rounded-lg border border-[rgba(248,113,113,0.35)] bg-[rgba(239,68,68,0.12)] text-[#FCA5A5] transition-colors duration-200 hover:border-[rgba(248,113,113,0.6)] hover:bg-[rgba(239,68,68,0.25)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FCA5A5]"
         style={{
-          display: 'flex',
-          alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'flex-start',
-          gap: collapsed ? 0 : 8,
-          padding: collapsed ? '8px 0' : '8px 12px',
-          borderRadius: 8,
-          background: 'rgba(255,255,255,0.06)',
-          border: 'none',
-          cursor: 'pointer',
-          width: '100%',
+          gap: collapsed ? 0 : 10,
+          padding: collapsed ? '9px 0' : '9px 12px',
+          marginTop: 4,
         }}
       >
-        <div style={{ width: 14, height: 14, borderRadius: 3, background: 'rgba(239,68,68,0.6)', flexShrink: 0 }} />
+        <span className="material-icons" style={{ fontSize: 18, flexShrink: 0 }} aria-hidden="true">logout</span>
         {!collapsed && (
-          <span style={{ color: 'white', opacity: 0.6, fontSize: 12, fontWeight: 500, fontFamily: 'Inter,sans-serif' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'Inter,sans-serif' }}>
             ออกจากระบบ
           </span>
         )}
