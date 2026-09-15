@@ -41,18 +41,23 @@ interface MockActivity {
   id: string;
   action: string;
   targetType: string | null;
-  metadata: Record<string, string> | null;
+  targetId: string | null;
+  metadata: Record<string, unknown>;
   createdAt: string;
-  actorUserId: string;
+  /** null = the account was deleted since; the API then returns `actor: null`. */
+  actorUserId: string | null;
 }
 
-/** Names for activity actors — including people who have since left the group. */
-const PEOPLE: Record<string, { displayName: string; email: string }> = {
-  [ME]: { displayName: 'ณัฐพล วงศ์ดี', email: 'nattapon@example.com' },
-  'u-parichat': { displayName: 'ปาริชาต วงศ์ดี', email: 'parichat@example.com' },
-  'u-somchai': { displayName: 'สมชาย วงศ์ดี', email: 'somchai@example.com' },
-  'u-aunt': { displayName: 'สมใจ ใจดี', email: 'somjai@example.com' },
-  'u-wilai': { displayName: 'วิไล วงศ์ดี', email: 'wilai@example.com' },
+/**
+ * Display names as the API's users table has them — including people who have since left.
+ * สมชาย has no display name on purpose: the feed must fall back to the member list for him.
+ */
+const PEOPLE: Record<string, { displayName: string | null }> = {
+  [ME]: { displayName: 'ณัฐพล วงศ์ดี' },
+  'u-parichat': { displayName: 'ปาริชาต วงศ์ดี' },
+  'u-somchai': { displayName: null },
+  'u-aunt': { displayName: 'สมใจ ใจดี' },
+  'u-wilai': { displayName: 'วิไล วงศ์ดี' },
 };
 
 // ── Seed ─────────────────────────────────────────────────────────────────────
@@ -242,61 +247,82 @@ const store: {
   seq: 100,
 };
 
-/** Seeded history, oldest last. 16 rows on g1 so the feed pages twice at PAGE_SIZE=15. */
+/** Target type per action, as the API's writeActivity calls set it. */
+function targetOf(action: string): string {
+  if (action.startsWith('JOIN_LINK_')) return 'JOIN_LINK';
+  if (action.startsWith('GROUP_')) return 'GROUP';
+  if (action.startsWith('RECIPIENT_')) return 'RECIPIENT';
+  if (action.startsWith('BOOKING_')) return 'BOOKING';
+  if (action === 'MEMBER_INVITED' || action === 'INVITE_REVOKED') return 'INVITE';
+  return 'MEMBER';
+}
+
+/**
+ * Seeded history, newest first. 17 rows on g1 so the feed pages twice at PAGE_SIZE=15.
+ *
+ * Only actions the API really writes today are seeded, with the metadata keys it really uses.
+ * The first version of this mock invented both, which is how the FE query drifted from the
+ * schema while the demo kept looking fine. RECIPIENT_* are phrased in activityCopy.ts but not
+ * seeded: the API declares them (PYG-424) and nothing writes them yet.
+ */
 function seedActivity(
   groupId: string,
-  rows: [action: string, actorUserId: string, hours: number, metadata?: Record<string, string>][],
+  rows: [action: string, actorUserId: string | null, hours: number, metadata?: Record<string, unknown>][],
 ) {
   store.activity[groupId] = rows.map(([action, actorUserId, hours, metadata], i) => ({
-    id: `${groupId}-a${i + 1}`,
+    id: `${groupId}-a${String(i + 1).padStart(2, '0')}`,
     action,
-    targetType: null,
-    metadata: metadata ?? null,
+    targetType: targetOf(action),
+    targetId: null,
+    metadata: metadata ?? {},
     createdAt: hoursAgo(hours),
     actorUserId,
   }));
 }
 
 seedActivity('g1', [
-  ['MEMBER_JOINED', 'u-somchai', 2],
-  ['JOIN_LINK_ROTATED', ME, 5],
-  ['BOOKING_CREATED_ON_BEHALF', 'u-parichat', 26, { recipientName: 'สมศรี วงศ์ดี' }],
-  ['RECIPIENT_SHARED', 'u-parichat', 30, { recipientName: 'ประยูร วงศ์ดี' }],
+  ['MEMBER_JOINED', 'u-somchai', 2, { joinedViaLinkId: 'l1' }],
+  ['JOIN_LINK_ROTATED', ME, 5, { replacedLinkId: 'l0', maxUses: 10, expiresAt: iso(7) }],
+  ['BOOKING_ON_BEHALF', 'u-parichat', 26, { recipientName: 'สมศรี วงศ์ดี' }],
   ['GROUP_RENAMED', ME, 50, { oldName: 'ครอบครัวของฉัน', newName: 'ครอบครัววงศ์ดี' }],
-  ['MEMBER_REMOVED', ME, 74, { memberName: 'วิไล วงศ์ดี' }],
-  ['JOIN_LINK_REVOKED', ME, 76],
-  ['BOOKING_CANCELLED', ME, 100, { recipientName: 'สมศรี วงศ์ดี' }],
-  ['MEMBER_REJOINED', 'u-wilai', 120],
-  ['RECIPIENT_SHARED', ME, 140, { recipientName: 'สมศรี วงศ์ดี' }],
-  ['BOOKING_CREATED_ON_BEHALF', ME, 160, { recipientName: 'สมศรี วงศ์ดี' }],
-  ['MEMBER_LEFT', 'u-wilai', 300],
-  ['MEMBER_JOINED', 'u-wilai', 400],
-  ['MEMBER_JOINED', 'u-parichat', 600],
-  // Deliberately dirty metadata: a BE that puts the raw token/URL on a join-link row must not
-  // leak it into the feed. readActivityMeta() drops both — TC-BS-07 can check this row.
-  ['JOIN_LINK_CREATED', ME, 640, { token: 'demo9f2a4c71b8e35d0197', url: 'https://payung.app/join?token=demo9f2a4c71b8' }],
-  ['GROUP_CREATED', ME, 648, { groupName: 'ครอบครัววงศ์ดี' }],
+  ['MEMBER_REMOVED', ME, 74, {}],
+  ['JOIN_LINK_REVOKED', ME, 76, { usedCount: 3 }],
+  // Account deleted since → actor: null → "ผู้ใช้ที่ถูกลบ".
+  ['MEMBER_LEFT', null, 90, {}],
+  ['OWNERSHIP_TRANSFERRED', 'u-parichat', 110, { fromUserId: 'u-parichat', toUserId: ME }],
+  ['OWNERSHIP_TRANSFERRED', ME, 130, { fromUserId: ME, toUserId: 'u-parichat' }],
+  ['BOOKING_ON_BEHALF', ME, 160, { recipientName: 'ประยูร วงศ์ดี' }],
+  ['MEMBER_LEFT', 'u-wilai', 300, {}],
+  ['MEMBER_JOINED', 'u-wilai', 400, { joinedViaLinkId: 'l0' }],
+  ['MEMBER_JOINED', 'u-parichat', 600, { joinedViaLinkId: 'l0' }],
+  // Legacy email-invite rows (SCR-FG2-001) — the invitee's email must never reach the feed.
+  ['INVITE_REVOKED', ME, 610, { email: 'old-invite@example.com' }],
+  ['MEMBER_INVITED', ME, 620, { email: 'parichat@example.com' }],
+  // Deliberately dirty metadata: a join-link row carrying the raw token/URL must not leak into
+  // the feed. readActivityMeta() drops both — TC-BS-07 can check this row.
+  ['JOIN_LINK_CREATED', ME, 640, { maxUses: 10, expiresAt: iso(7), token: 'demo9f2a4c71b8e35d0197', url: 'https://payung.app/join?token=demo9f2a4c71b8' }],
+  ['GROUP_CREATED', ME, 648, { name: 'ครอบครัววงศ์ดี' }],
 ]);
 
 seedActivity('g2', [
-  ['MEMBER_JOINED', ME, 960],
-  ['RECIPIENT_SHARED', 'u-aunt', 1400, { recipientName: 'สมจิตร ใจดี' }],
-  ['JOIN_LINK_CREATED', 'u-aunt', 1430],
-  ['GROUP_CREATED', 'u-aunt', 1440, { groupName: 'บ้านคุณยายสมจิตร' }],
+  ['MEMBER_JOINED', ME, 960, { joinedViaLinkId: 'l-g2' }],
+  ['JOIN_LINK_CREATED', 'u-aunt', 1430, { maxUses: 10, expiresAt: iso(7) }],
+  ['GROUP_CREATED', 'u-aunt', 1440, { name: 'บ้านคุณยายสมจิตร' }],
 ]);
 
-/** Append a row for something the demo user just did, so the feed reacts like the real one. */
+/** Append a row for something the demo user just did, with the metadata the API writes for it. */
 function logActivity(
   groupId: string,
   action: string,
-  metadata: Record<string, string> | null = null,
+  metadata: Record<string, unknown> = {},
   actorUserId: string = ME,
 ) {
   if (!store.activity[groupId]) store.activity[groupId] = [];
   store.activity[groupId].unshift({
     id: `a${++store.seq}`,
     action,
-    targetType: null,
+    targetType: targetOf(action),
+    targetId: null,
     metadata,
     createdAt: new Date().toISOString(),
     actorUserId,
@@ -350,28 +376,48 @@ function linkOut(groupId: string, l: MockLink) {
   };
 }
 
-/** `metadata` goes out as a JSON *string* — the schema has no JSON scalar (see PYG-421 note). */
+/**
+ * One row in the API's FamilyGroupActivityItem shape: `metadata` is a JSON *string* ("{}" when
+ * empty), the actor has no email, and a deleted account comes back as `actor: null`.
+ */
 function activityOut(a: MockActivity) {
-  const person = PEOPLE[a.actorUserId];
+  const person = a.actorUserId ? PEOPLE[a.actorUserId] : undefined;
   return {
     __typename: 'FamilyGroupActivityItem',
     id: a.id,
     action: a.action,
     targetType: a.targetType,
-    metadata: a.metadata ? JSON.stringify(a.metadata) : null,
+    targetId: a.targetId,
+    metadata: JSON.stringify(a.metadata),
     createdAt: a.createdAt,
-    actor: {
-      __typename: 'FamilyGroupActivityActor',
-      userId: a.actorUserId,
-      displayName: person?.displayName ?? null,
-      email: person?.email ?? null,
-      avatarUrl: null,
-    },
+    cursor: cursorOf(a),
+    actor: a.actorUserId
+      ? {
+          __typename: 'FamilyGroupActivityActor',
+          userId: a.actorUserId,
+          displayName: person?.displayName ?? null,
+          avatarUrl: null,
+        }
+      : null,
   };
 }
 
 /** Opaque keyset cursor — the real one encodes (created_at, id) the same way. */
 const cursorOf = (a: MockActivity) => `${a.createdAt}|${a.id}`;
+
+/** Newest first on (createdAt, id), matching the API's ORDER BY created_at DESC, id DESC. */
+const newestFirst = (a: MockActivity, b: MockActivity) =>
+  a.createdAt === b.createdAt ? (a.id < b.id ? 1 : -1) : a.createdAt < b.createdAt ? 1 : -1;
+
+const connectionOut = (page: MockActivity[], hasNextPage: boolean) => ({
+  __typename: 'FamilyGroupActivityConnection',
+  nodes: page.map(activityOut),
+  pageInfo: {
+    __typename: 'FamilyGroupActivityPageInfo',
+    hasNextPage,
+    endCursor: page.length ? cursorOf(page[page.length - 1]) : null,
+  },
+});
 
 const gqlError = (message: string, code: string) => ({ message, extensions: { code } });
 
@@ -449,49 +495,32 @@ function resolve(opName: string, vars: Vars): { data?: unknown; errors?: unknown
       return { data: { groupJoinLink: linkOut(vars.groupId as string, l) } };
     }
 
-    // Keyset pagination: newest first, `after` is the previous page's last cursor. Rows added
-    // while paging shift nothing, which is the whole point of keyset over OFFSET.
+    // Keyset pagination: newest first, `after` is the previous page's pageInfo.endCursor. Rows
+    // added while paging shift nothing, which is the whole point of keyset over OFFSET.
     case 'FamilyGroupActivity': {
       const groupId = vars.groupId as string;
       if (!findGroup(groupId)) {
         return { errors: [gqlError('คุณไม่ได้เป็นสมาชิกของกลุ่มนี้', 'NOT_A_MEMBER')] };
       }
-      const first = Math.min(Math.max(Number(vars.first ?? 15) || 15, 1), 50);
+      // Same page-size rules as the API: 20 when omitted, clamped to 1..50.
+      const first = Math.min(Math.max(Number(vars.first ?? 20) || 20, 1), 50);
       const after = (vars.after as string | undefined) ?? null;
-      const all = [...(store.activity[groupId] ?? [])].sort(
-        (a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
-      );
+      let rows = [...(store.activity[groupId] ?? [])].sort(newestFirst);
 
-      let start = 0;
       if (after) {
-        const at = all.findIndex((a) => cursorOf(a) === after);
-        if (at === -1) {
-          // Cursor points at a row that no longer exists — end the feed rather than restart it.
-          return {
-            data: {
-              familyGroupActivity: {
-                __typename: 'FamilyGroupActivityConnection',
-                nodes: [],
-                hasNextPage: false,
-                endCursor: null,
-              },
-            },
-          };
+        // Like the API: a cursor that doesn't decode is an error; one that decodes simply
+        // continues after that (createdAt, id), whether or not the row still exists.
+        const [createdAt, id] = after.split('|');
+        if (!createdAt || !id) {
+          return { errors: [gqlError('cursor ไม่ถูกต้อง', 'ACTIVITY_CURSOR_INVALID')] };
         }
-        start = at + 1;
+        rows = rows.filter(
+          (a) => a.createdAt < createdAt || (a.createdAt === createdAt && a.id < id),
+        );
       }
 
-      const page = all.slice(start, start + first);
-      const last = page[page.length - 1];
       return {
-        data: {
-          familyGroupActivity: {
-            __typename: 'FamilyGroupActivityConnection',
-            nodes: page.map(activityOut),
-            hasNextPage: start + page.length < all.length,
-            endCursor: last ? cursorOf(last) : null,
-          },
-        },
+        data: { familyGroupActivity: connectionOut(rows.slice(0, first), rows.length > first) },
       };
     }
 
@@ -508,7 +537,7 @@ function resolve(opName: string, vars: Vars): { data?: unknown; errors?: unknown
         ],
       });
       store.recipients[id] = [];
-      logActivity(id, 'GROUP_CREATED', { groupName: input.name });
+      logActivity(id, 'GROUP_CREATED', { name: input.name });
       return { data: { createFamilyGroup: groupOut(findGroup(id)!) } };
     }
 
@@ -541,33 +570,31 @@ function resolve(opName: string, vars: Vars): { data?: unknown; errors?: unknown
     case 'RemoveMember': {
       const input = vars.input as { groupId: string; userId: string };
       const g = findGroup(input.groupId);
-      const removed = g?.members.find((m) => m.userId === input.userId);
       if (g) g.members = g.members.filter((m) => m.userId !== input.userId);
-      logActivity(input.groupId, 'MEMBER_REMOVED', {
-        memberName: removed?.displayName || removed?.email || '',
-      });
+      logActivity(input.groupId, 'MEMBER_REMOVED');
       return { data: { removeMember: groupOut(g!) } };
     }
 
     case 'TransferOwnership': {
       const input = vars.input as { groupId: string; newOwnerUserId: string };
       const g = findGroup(input.groupId);
-      let newOwnerName = '';
       if (g) {
         g.members.forEach((m) => {
-          if (m.userId === input.newOwnerUserId) {
-            m.role = 'OWNER';
-            newOwnerName = m.displayName || m.email;
-          } else if (m.role === 'OWNER') m.role = 'MEMBER';
+          if (m.userId === input.newOwnerUserId) m.role = 'OWNER';
+          else if (m.role === 'OWNER') m.role = 'MEMBER';
         });
       }
-      logActivity(input.groupId, 'OWNERSHIP_TRANSFERRED', { newOwnerName });
+      logActivity(input.groupId, 'OWNERSHIP_TRANSFERRED', {
+        fromUserId: ME,
+        toUserId: input.newOwnerUserId,
+      });
       return { data: { transferOwnership: groupOut(g!) } };
     }
 
     case 'CreateJoinLink':
     case 'RotateJoinLink': {
       const input = vars.input as { groupId: string };
+      const replaced = store.links[input.groupId];
       store.links[input.groupId] = {
         id: `l${++store.seq}`,
         url: `https://payung.app/join?token=demo${Math.random().toString(36).slice(2, 12)}`,
@@ -577,15 +604,22 @@ function resolve(opName: string, vars: Vars): { data?: unknown; errors?: unknown
         memberLimit: 10,
       };
       const rotated = opName === 'RotateJoinLink';
-      logActivity(input.groupId, rotated ? 'JOIN_LINK_ROTATED' : 'JOIN_LINK_CREATED');
+      const link = store.links[input.groupId]!;
+      // The API never puts the token or URL in metadata — every member can read the feed.
+      logActivity(input.groupId, rotated ? 'JOIN_LINK_ROTATED' : 'JOIN_LINK_CREATED', {
+        ...(rotated ? { replacedLinkId: replaced?.id ?? null } : {}),
+        maxUses: link.maxUses,
+        expiresAt: link.expiresAt,
+      });
       const key = rotated ? 'rotateJoinLink' : 'createJoinLink';
       return { data: { [key]: linkOut(input.groupId, store.links[input.groupId]!) } };
     }
 
     case 'RevokeJoinLink': {
       const groupId = vars.groupId as string;
+      const revoked = store.links[groupId];
       delete store.links[groupId];
-      logActivity(groupId, 'JOIN_LINK_REVOKED');
+      logActivity(groupId, 'JOIN_LINK_REVOKED', { usedCount: revoked?.usedCount ?? 0 });
       return { data: { revokeJoinLink: true } };
     }
 

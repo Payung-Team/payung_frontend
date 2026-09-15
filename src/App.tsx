@@ -24,6 +24,7 @@ import AdminPaymentsPage from './pages/admin/AdminPaymentsPage';
 import AdminDisputesPage from './pages/admin/AdminDisputesPage';
 import AdminDisputeDetailPage from './pages/admin/AdminDisputeDetailPage';
 import AdminLayout from './components/layout/AdminLayout';
+import { ADMIN_NOTIFICATIONS_PATH, adminNotificationLink } from './components/layout/adminNotifications';
 import NotFound from './pages/error/NotFound';
 import PayungHome from './pages/home/HomePage';
 import CaregiverHome from './pages/caregiver/CaregiverHome';
@@ -367,6 +368,10 @@ function App() {
           <Route path="/admin/payments" element={<AdminPaymentsPage />} />
           <Route path="/admin/disputes" element={<AdminDisputesPage />} />
           <Route path="/admin/disputes/:id" element={<AdminDisputeDetailPage />} />
+          <Route
+            path={ADMIN_NOTIFICATIONS_PATH}
+            element={<NotificationsPage resolveLink={adminNotificationLink} showEmailPreference={false} />}
+          />
         </Route>
 
         {/* 404 - Not Found (must be last) */}

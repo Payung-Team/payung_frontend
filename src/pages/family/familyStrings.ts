@@ -283,7 +283,8 @@ export interface Strings {
   activityUnavailableBody: string;
   activityMemberOnlyTitle: string;
   activityMemberOnlyBody: string;
-  activityActorUnknown: string;
+  activityActorDeleted: string;
+  activityActorUnnamed: string;
   activityActorYou: string;
 }
 
@@ -539,6 +540,7 @@ const S: Strings = {
     'ระบบบันทึกความเคลื่อนไหวของกลุ่มยังไม่เปิดใช้งานบนเซิร์ฟเวอร์ ส่วนอื่นของหน้านี้ใช้งานได้ตามปกติ',
   activityMemberOnlyTitle: 'เฉพาะสมาชิกในกลุ่ม',
   activityMemberOnlyBody: 'เฉพาะสมาชิกของกลุ่มนี้เท่านั้นที่ดูความเคลื่อนไหวได้',
-  activityActorUnknown: 'สมาชิกที่ออกจากกลุ่มแล้ว',
+  activityActorDeleted: 'ผู้ใช้ที่ถูกลบ',
+  activityActorUnnamed: 'ผู้ใช้ที่ไม่ได้ตั้งชื่อ',
   activityActorYou: 'คุณ',
 };
