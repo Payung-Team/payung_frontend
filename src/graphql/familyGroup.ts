@@ -130,18 +130,16 @@ export const JOIN_LINK_PREVIEW = gql`
 `;
 
 /**
- * Group activity feed — newest first, keyset paginated on createdAt DESC (PYG-422).
+ * Group activity feed — newest first, keyset paginated (PYG-422 · BE PYG-421).
  *
- * ⚠ Backend contract is PYG-421 and NOT deployed yet — the running schema has no
- *   `familyGroupActivity` field, so this query fails validation until it ships and the
- *   ActivityPanel renders its "unavailable" state instead of breaking the dashboard.
+ * Mirrors `familyGroupActivity` in the API's schema.gql (FamilyGroupActivityConnection /
+ * FamilyGroupActivityItem / FamilyGroupActivityPageInfo). Paging info sits under `pageInfo`, not
+ * beside `nodes`, and the actor carries no email. There is deliberately no totalCount: the API
+ * avoids COUNT(*) on an append-only table, and infinite scroll never shows a total anyway.
  *
- *   The shape below is the one PYG-421 describes (actor · action · targetType · metadata ·
- *   createdAt) expressed in this schema's house style: a flat `nodes` list plus paging info,
- *   like PaymentConnection / DisputeSummaryConnection, rather than Relay `edges`/`node`.
- *   `id` is requested on top of the card's field list because a connection node without one
- *   cannot be normalised by InMemoryCache. If BE lands a different shape, this file and
- *   `activityCopy.ts` are the only two places that need to change.
+ * `first` defaults to 20 server-side and is clamped to 50. `after` is the previous page's
+ * `pageInfo.endCursor` — opaque, never parse it; one the API cannot decode comes back as
+ * ACTIVITY_CURSOR_INVALID.
  */
 export const FAMILY_GROUP_ACTIVITY = gql`
   query FamilyGroupActivity($groupId: ID!, $first: Int, $after: String) {
@@ -155,12 +153,13 @@ export const FAMILY_GROUP_ACTIVITY = gql`
         actor {
           userId
           displayName
-          email
           avatarUrl
         }
       }
-      hasNextPage
-      endCursor
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
     }
   }
 `;
@@ -414,54 +413,64 @@ export interface JoinLinkPreview {
 }
 
 /**
- * Actions the activity feed knows how to phrase. Kept as a union of literals plus an escape
- * hatch: the server owns this list and may add to it, so an unknown code must still render
- * (as a generic line) rather than crash the feed.
+ * Every action the API can write to the feed — mirror of ACTIVITY_ACTION in the backend's
+ * family-group.constants.ts. The escape hatch stays: the server owns this list, so a code the FE
+ * has never seen must still render (as a generic line) rather than crash the feed.
  *
- * `MEMBER_INVITED` is deliberately absent — SCR-FG2-001 replaced per-email invites with a
- * group join link, so that action no longer exists (see PYG-408 / PYG-422 comments).
+ * MEMBER_INVITED / INVITE_REVOKED are deprecated by SCR-FG2-001 (email invites became a group
+ * join link) but the API still accepts them and old rows carry them, so they are listed and
+ * phrased rather than dropped.
  */
 export type FamilyGroupActivityAction =
   | 'GROUP_CREATED'
   | 'GROUP_RENAMED'
+  | 'MEMBER_INVITED'
+  | 'INVITE_REVOKED'
+  | 'JOIN_LINK_CREATED'
+  | 'JOIN_LINK_ROTATED'
+  | 'JOIN_LINK_REVOKED'
   | 'MEMBER_JOINED'
   | 'MEMBER_REJOINED'
   | 'MEMBER_LEFT'
   | 'MEMBER_REMOVED'
   | 'OWNERSHIP_TRANSFERRED'
-  | 'JOIN_LINK_CREATED'
-  | 'JOIN_LINK_ROTATED'
-  | 'JOIN_LINK_REVOKED'
-  | 'RECIPIENT_SHARED'
-  | 'RECIPIENT_UNSHARED'
-  | 'BOOKING_CREATED_ON_BEHALF'
-  | 'BOOKING_CANCELLED'
+  | 'RECIPIENT_ADDED'
+  | 'RECIPIENT_UPDATED'
+  | 'RECIPIENT_REMOVED'
+  | 'BOOKING_ON_BEHALF'
   | (string & {});
 
-/** Who did it. Nullable throughout: a removed user's row still has to render. */
+/** Who did it — mirrors FamilyGroupActivityActor. `displayName` is null until the user sets one. */
 export interface FamilyGroupActivityActor {
-  userId?: string | null;
+  userId: string;
   displayName?: string | null;
-  email?: string | null;
   avatarUrl?: string | null;
 }
 
+/** One feed row — mirrors FamilyGroupActivityItem. */
 export interface FamilyGroupActivity {
   id: string;
   action: FamilyGroupActivityAction;
+  /** 'GROUP' | 'MEMBER' | 'JOIN_LINK' | 'RECIPIENT' | 'BOOKING' (legacy rows: 'INVITE'). */
   targetType?: string | null;
   /**
-   * Per-action detail. The schema has no JSON scalar today, so this arrives as a JSON
-   * *string*; typed loosely because BE may later add one. Never render it raw — read it
-   * through `readActivityMeta()`, which allow-lists fields and drops tokens/URLs.
+   * Per-action detail as a JSON *string* — the schema has no JSON scalar — and "{}" when there
+   * is none. Never render it raw: read it through `readActivityMeta()`, which allow-lists fields
+   * and drops tokens/URLs.
    */
-  metadata?: string | Record<string, unknown> | null;
+  metadata: string;
   createdAt: string;
+  /** null when the account has since been deleted — the row still renders. */
   actor?: FamilyGroupActivityActor | null;
+}
+
+export interface FamilyGroupActivityPageInfo {
+  hasNextPage: boolean;
+  /** Cursor of the last row on this page; null when the page is empty. */
+  endCursor?: string | null;
 }
 
 export interface FamilyGroupActivityConnection {
   nodes: FamilyGroupActivity[];
-  hasNextPage: boolean;
-  endCursor?: string | null;
+  pageInfo: FamilyGroupActivityPageInfo;
 }
