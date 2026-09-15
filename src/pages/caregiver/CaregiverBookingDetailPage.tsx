@@ -23,7 +23,7 @@ import type { ProofOfWorkSummary } from '../../lib/monitoring';
 import PatientSummaryCard from './checkin/PatientSummaryCard';
 import BookingDetailCard from './checkin/BookingDetailCard';
 
-const IN_PROGRESS_STATUSES: ReadonlyArray<Booking['status']> = ['in_progress', 'awaiting_release', 'needs_review'];
+const IN_PROGRESS_STATUSES: ReadonlyArray<Booking['status']> = ['in_progress'];
 
 function isBookingToday(bookingDate: string): boolean {
   const today = new Date();
@@ -41,8 +41,6 @@ const STATUS_BADGE: Record<string, { label: string; dot: string; bg: string; tex
   completed: { label: 'เสร็จสิ้น',          dot: '#52B69A', bg: '#E6F5ED', text: '#3A9A7E' },
   cancelled: { label: 'ยกเลิกแล้ว',         dot: '#6B7280', bg: '#F3F4F6', text: '#374151' },
   in_progress:      { label: 'กำลังปฏิบัติงาน',   dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
-  awaiting_release: { label: 'รอปิดงาน',          dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
-  needs_review:     { label: 'รอแอดมินตรวจสอบ',   dot: '#DC2626', bg: '#FEF2F2', text: '#B91C1C' },
 };
 
 const STATUS_BANNER: Record<string, { icon: string; iconColor: string; bg: string; border: string; textColor: string; message: (name: string) => string }> = {
@@ -53,8 +51,6 @@ const STATUS_BANNER: Record<string, { icon: string; iconColor: string; bg: strin
   completed: { icon: 'task_alt',            iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: () => `งานนี้เสร็จสิ้นเรียบร้อยแล้ว` },
   cancelled: { icon: 'do_not_disturb_on',  iconColor: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', textColor: '#374151', message: () => `การจองนี้ถูกยกเลิกแล้ว` },
   in_progress:      { icon: 'directions_run', iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: (n) => `คุณกำลังปฏิบัติงานให้ ${n}` },
-  awaiting_release: { icon: 'hourglass_top',  iconColor: '#B45309', bg: '#FFFBEB', border: '#FDE68A', textColor: '#92400E', message: () => `เช็คเอาท์แล้ว กำลังรอปิดงาน` },
-  needs_review:     { icon: 'flag',           iconColor: '#DC2626', bg: '#FEF2F2', border: '#FECACA', textColor: '#991B1B', message: () => `งานนี้ถูกส่งให้แอดมินตรวจสอบ` },
 };
 
 function Divider() {

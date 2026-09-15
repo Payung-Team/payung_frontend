@@ -62,8 +62,6 @@ const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: str
   accepted:         { label: 'รอชำระเงิน',   dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
   confirmed:        { label: 'ยืนยันแล้ว',   dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
   in_progress:      { label: 'กำลังให้บริการ', dot: '#1D4ED8', bg: '#EFF6FF', text: '#1D4ED8' },
-  awaiting_release: { label: 'รอโอนเงิน',    dot: '#8B5CF6', bg: '#F5F3FF', text: '#6D28D9' },
-  needs_review:     { label: 'กำลังตรวจสอบ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
   rejected:         { label: 'ปฏิเสธแล้ว',   dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
   cancelled:        { label: 'ยกเลิกแล้ว',   dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280' },
   completed:        { label: 'เสร็จสิ้น',    dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
@@ -933,7 +931,7 @@ const BookingsPage: React.FC = () => {
   const [historyDateTo, setHistoryDateTo] = useState('');
 
   const grouped: Record<TabKey, ConfirmedBooking[]> = {
-    // Jobs that have started (in_progress / awaiting_release / needs_review) stay here
+    // Jobs that have started stay here
     // rather than in history: they are not finished, and the patient must keep seeing
     // them to raise a problem before the money is released.
     upcoming: allBookings

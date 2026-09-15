@@ -4,8 +4,8 @@
 // which meant the word 'accepted' meant two different things depending on which
 // file you were in. Don't reintroduce a translation layer.
 //
-// Flow (PYG-357):
-//   confirmed → in_progress → awaiting_release | needs_review → completed
+// Flow:
+//   confirmed → in_progress → completed
 //
 // Note 'accepted' means "caregiver said yes, patient has not paid yet" and
 // 'confirmed' means "paid, waiting for the service date".
@@ -15,15 +15,13 @@ export type BookingStatus =
   | 'accepted'          // caregiver accepted — payment still due
   | 'confirmed'         // paid — waiting for the service date
   | 'in_progress'       // caregiver checked in
-  | 'awaiting_release'  // caregiver checked out, money not yet released
-  | 'needs_review'      // check-out flagged — admin is reviewing
   | 'rejected'
   | 'cancelled'
   | 'completed';
 
 const KNOWN_STATUSES = new Set<string>([
   'pending', 'accepted', 'confirmed', 'in_progress',
-  'awaiting_release', 'needs_review', 'rejected', 'cancelled', 'completed',
+  'rejected', 'cancelled', 'completed',
 ]);
 
 /** Backend values that have no UI state of their own and fold into another one. */
@@ -55,5 +53,5 @@ export function mapGqlStatus(raw: string | null | undefined): BookingStatus {
 
 /** Statuses where the job has started and can no longer be treated as upcoming. */
 export const ACTIVE_JOB_STATUSES: ReadonlySet<BookingStatus> = new Set<BookingStatus>([
-  'in_progress', 'awaiting_release', 'needs_review',
+  'in_progress',
 ]);

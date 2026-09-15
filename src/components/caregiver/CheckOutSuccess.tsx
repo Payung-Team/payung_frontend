@@ -5,7 +5,7 @@
  *   ตั้งแต่ 2026-07-27 การกดเช็คเอาท์ของผู้ดูแล = งานจบแล้วจริง ๆ
  *   ถ้ายังเขียนว่ารอยืนยัน ผู้ดูแลจะเข้าใจว่ายังมีอะไรค้างอยู่
  */
-import { formatDurationTh, reviewReasonTh, type ProofOfWorkSummary } from '../../lib/monitoring';
+import { formatDurationTh, type ProofOfWorkSummary } from '../../lib/monitoring';
 import ProofOfWorkPanel from './ProofOfWorkPanel';
 
 interface CheckOutSuccessProps {
@@ -24,8 +24,6 @@ export default function CheckOutSuccess({
   proof,
   onBack,
 }: Readonly<CheckOutSuccessProps>) {
-  const needsReview = proof.verdict === 'needs_review';
-
   const focusRing =
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#52B69A] focus-visible:ring-offset-2';
 
@@ -35,40 +33,19 @@ export default function CheckOutSuccess({
         {/* ── หัวเรื่อง ── */}
         <div className="rounded-2xl border border-[#E0E2E5] bg-white px-5 py-8 text-center shadow-[0_1px_4px_rgba(0,0,0,0.03)] sm:px-8">
           <div
-            className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${
-              needsReview ? 'bg-[#FFFBEB]' : 'bg-[#E6F5ED]'
-            }`}
+            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#E6F5ED]"
           >
-            <span
-              className={`material-icons text-[34px] ${needsReview ? 'text-[#D97706]' : 'text-[#3AA981]'}`}
-            >
-              {needsReview ? 'fact_check' : 'check_circle'}
+            <span className="material-icons text-[34px] text-[#3AA981]">
+              check_circle
             </span>
           </div>
 
           <h1 className="mt-4 text-[22px] font-bold leading-8 text-[#1A1A1A]">
-            {needsReview ? 'ปิดงานแล้ว' : 'ปิดงานเรียบร้อย'}
+            ปิดงานเรียบร้อย
           </h1>
           <p className="mx-auto mt-2 max-w-[440px] text-[14px] leading-6 text-[#6B7280]">
-            {needsReview
-              ? 'แอดมินจะตรวจสอบก่อนโอนเงินให้คุณ'
-              : 'ระบบจะโอนเงินให้คุณภายใน 24 ชั่วโมง โดยไม่ต้องรอใครกดยืนยันอีก'}
+            การจองนี้เสร็จสิ้นแล้ว ระบบจะดำเนินการโอนเงินตามกำหนด
           </p>
-
-          {/* เหตุผลที่ต้องให้แอดมินดู — ต้องแปลไทยครบทุกค่า */}
-          {needsReview && proof.reviewReasons.length > 0 && (
-            <ul className="mt-4 flex flex-wrap justify-center gap-2">
-              {proof.reviewReasons.map((reason) => (
-                <li
-                  key={reason}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[#FFFBEB] px-3 py-1.5 text-[12px] font-semibold text-[#B45309]"
-                >
-                  <span className="material-icons text-[14px]">info</span>
-                  {reviewReasonTh(reason)}
-                </li>
-              ))}
-            </ul>
-          )}
 
           <div className="mt-6 border-t border-[#F0F1F3] pt-5 text-left">
             <p
@@ -114,15 +91,11 @@ export default function CheckOutSuccess({
 
         {/* ── แถบสถานะ ── */}
         <div
-          className={`mt-4 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-center ${
-            needsReview ? 'bg-[#FFFBEB] text-[#92400E]' : 'bg-[#EAF9F1] text-[#2E7D5B]'
-          }`}
+          className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-[#EAF9F1] px-4 py-3 text-center text-[#2E7D5B]"
         >
-          <span className="material-icons text-[18px]">{needsReview ? 'pending_actions' : 'send'}</span>
+          <span className="material-icons text-[18px]">send</span>
           <p className="text-[13px] font-semibold leading-5">
-            {needsReview
-              ? 'รอแอดมินตรวจสอบ · จะแจ้งผลให้ทราบทางการแจ้งเตือน'
-              : 'รอระบบตรวจสอบ · โอนเงินอัตโนมัติภายใน 24 ชั่วโมง'}
+            งานเสร็จสิ้นแล้ว · ระบบจะดำเนินการโอนเงินอัตโนมัติตามกำหนด
           </p>
         </div>
 

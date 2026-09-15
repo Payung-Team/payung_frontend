@@ -48,8 +48,6 @@ function NoteBlock({ label, text }: Readonly<{ label: string; text: string }>) {
 // Statuses in which the patient may still write their review.
 const REVIEWABLE_STATUSES = new Set<ConfirmedBooking['status']>([
   'completed',
-  'awaiting_release',
-  'needs_review',
 ]);
 
 const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: string; bg: string; text: string }> = {
@@ -57,8 +55,6 @@ const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: str
   accepted: { label: 'รอชำระเงิน', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
   confirmed: { label: 'ยืนยันแล้ว', dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
   in_progress: { label: 'กำลังให้บริการ', dot: '#1D4ED8', bg: '#EFF6FF', text: '#1D4ED8' },
-  awaiting_release: { label: 'รอโอนเงิน', dot: '#8B5CF6', bg: '#F5F3FF', text: '#6D28D9' },
-  needs_review: { label: 'กำลังตรวจสอบ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
   rejected: { label: 'ปฏิเสธแล้ว', dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
   cancelled: { label: 'ยกเลิกแล้ว', dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280' },
   completed: { label: 'เสร็จสิ้น', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
@@ -69,9 +65,6 @@ const STATUS_BANNER: Record<ConfirmedBooking['status'], { icon: string; iconColo
   accepted: { icon: 'credit_card', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1D4ED8', message: (n: string) => `${n} ได้ตอบรับคำขอของคุณแล้ว – กรุณาชำระเงินเพื่อยืนยันการจอง` },
   confirmed: { icon: 'check_circle', iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: (n: string) => `${n} ยืนยันการจองของคุณแล้ว พบกันในวันนัดหมาย` },
   in_progress: { icon: 'schedule', iconColor: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1D4ED8', message: (n: string) => `${n} กำลังให้บริการอยู่ในขณะนี้` },
-  // No countdown yet — release_at does not exist on the backend (PYG-366/367).
-  awaiting_release: { icon: 'account_balance_wallet', iconColor: '#6D28D9', bg: '#F5F3FF', border: '#DDD6FE', textColor: '#6D28D9', message: () => 'งานเสร็จแล้ว ระบบจะโอนเงินให้ผู้ดูแลตามกำหนด หากมีปัญหาโปรดแจ้งก่อนเงินถูกโอน' },
-  needs_review: { icon: 'gpp_maybe', iconColor: '#B45309', bg: '#FFFBEB', border: '#FDE68A', textColor: '#B45309', message: () => 'แอดมินกำลังตรวจสอบงานนี้ เงินจะยังไม่ถูกโอนจนกว่าการตรวจสอบจะเสร็จสิ้น' },
   rejected: { icon: 'cancel', iconColor: '#DC2626', bg: '#FEF2F2', border: '#FECACA', textColor: '#991B1B', message: (n) => `${n} ไม่สามารถรับงานนี้ได้ คุณสามารถค้นหาผู้ดูแลท่านอื่น` },
   cancelled: { icon: 'do_not_disturb_on', iconColor: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', textColor: '#374151', message: () => `การจองนี้ถูกยกเลิกแล้ว` },
   completed: { icon: 'task_alt', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: () => `การนัดหมายเสร็จสิ้นเรียบร้อยแล้ว` },
@@ -305,8 +298,7 @@ export default function BookingDetailPage() {
   const canComplete = booking.status === 'confirmed' && hasHeldPayment && isServiceDatePassed && (isPatient || isCaregiver);
 
   // Patients see the Tracking Service view instead of the static summary (PYG-361).
-  // Once the job has actually started the date no longer matters — in_progress /
-  // awaiting_release / needs_review mean the caregiver checked in, by definition.
+  // Once the job has actually started the date no longer matters.
   const isTrackingDue = isPatient && (
     ACTIVE_JOB_STATUSES.has(booking.status) ||
     (booking.status === 'confirmed' && isServiceDatePassed)
@@ -372,9 +364,7 @@ export default function BookingDetailPage() {
     }
   };
 
-  // Reviewing opens as soon as the caregiver checks out — the tracking view's
-  // "การดูแลเสร็จสิ้น" card invites it during awaiting_release / needs_review,
-  // i.e. before the payout lands and the booking flips to completed.
+  // Reviewing opens after the booking is completed.
   const showReviewSection = REVIEWABLE_STATUSES.has(booking.status) && isPatient;
   const canShowReviewPrompt = showReviewSection && !existingReview && !showReviewForm;
   const canShowSubmittedReview = showReviewSection && !!existingReview && !showReviewForm;

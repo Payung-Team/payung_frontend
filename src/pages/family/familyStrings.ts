@@ -323,8 +323,6 @@ const S: Strings = {
       accepted: 'ยืนยันแล้ว',
       confirmed: 'ยืนยันแล้ว',
       in_progress: 'กำลังดูแล',
-      awaiting_release: 'รอปิดงาน',
-      needs_review: 'รอตรวจสอบ',
       completed: 'เสร็จสิ้น',
       cancelled: 'ยกเลิกแล้ว',
       rejected: 'ถูกปฏิเสธ',

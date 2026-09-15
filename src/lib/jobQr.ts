@@ -61,7 +61,6 @@ export interface JobQr {
  *
  * ที่ไม่อยู่ในลิสต์และเหตุผล:
  *   pending / accepted              → ยังไม่จ่ายเงิน ยังไม่ควรมี QR ให้สแกน
- *   awaiting_release / needs_review → เช็คเอาท์ไปแล้ว (การ์ด "การดูแลเสร็จสิ้น" พูดแทน)
  *   completed / cancelled / rejected → จบเรื่องแล้ว
  */
 const QR_RELEVANT_STATUSES: ReadonlySet<BookingStatus> = new Set<BookingStatus>([

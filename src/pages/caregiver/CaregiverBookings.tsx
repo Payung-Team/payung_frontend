@@ -42,9 +42,7 @@ export interface Booking {
     | 'declined'
     | 'completed'
     | 'cancelled'
-    | 'in_progress'
-    | 'awaiting_release'
-    | 'needs_review';
+    | 'in_progress';
   declineReason?: string;
   createdAt: string;
   relation?: string;
@@ -237,21 +235,13 @@ export const CaregiverBookings: React.FC = () => {
     variables: { input: { status: 'CONFIRMED', limit: 50 } },
   });
 
-  // A checked-in job (and everything through checkout/admin-review) has no tab of its own — it's
-  // folded into "scheduled" alongside confirmed bookings, since without these three queries a
+  // A checked-in job has no tab of its own — it is folded into "scheduled" alongside confirmed
+  // bookings, since without this query a
   // caregiver who just checked in has no way to find their own in-progress job again (BookingStatus
   // didn't cover these statuses until now — see the backend BookingStatusEnum comment).
   const { data: inProgressData, loading: inProgressLoading, error: inProgressError } =
     useQuery<CaregiverBookingsData>(GET_CAREGIVER_BOOKINGS, {
       variables: { input: { status: 'IN_PROGRESS', limit: 50 } },
-    });
-  const { data: awaitingReleaseData, loading: awaitingReleaseLoading, error: awaitingReleaseError } =
-    useQuery<CaregiverBookingsData>(GET_CAREGIVER_BOOKINGS, {
-      variables: { input: { status: 'AWAITING_RELEASE', limit: 50 } },
-    });
-  const { data: needsReviewData, loading: needsReviewLoading, error: needsReviewError } =
-    useQuery<CaregiverBookingsData>(GET_CAREGIVER_BOOKINGS, {
-      variables: { input: { status: 'NEEDS_REVIEW', limit: 50 } },
     });
 
   // History tab variables
@@ -296,9 +286,7 @@ export const CaregiverBookings: React.FC = () => {
   const acceptedList = acceptedData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
   const confirmedList = confirmedData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
   const inProgressList = inProgressData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
-  const awaitingReleaseList = awaitingReleaseData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
-  const needsReviewList = needsReviewData?.caregiverBookings?.data?.map(mapToBooking) ?? [];
-  const activeWorkList: Booking[] = [...confirmedList, ...inProgressList, ...awaitingReleaseList, ...needsReviewList];
+  const activeWorkList: Booking[] = [...confirmedList, ...inProgressList];
   const historyList = historyData?.caregiverBookingHistory?.data?.map(mapToBooking) ?? [];
 
   const findBookingById = (id: string): Booking | null => {
@@ -473,9 +461,7 @@ export const CaregiverBookings: React.FC = () => {
 
   const scheduledCount =
     (confirmedData?.caregiverBookings?.pagination?.total ?? confirmedList.length) +
-    (inProgressData?.caregiverBookings?.pagination?.total ?? inProgressList.length) +
-    (awaitingReleaseData?.caregiverBookings?.pagination?.total ?? awaitingReleaseList.length) +
-    (needsReviewData?.caregiverBookings?.pagination?.total ?? needsReviewList.length);
+    (inProgressData?.caregiverBookings?.pagination?.total ?? inProgressList.length);
   const newRequestsCount = pendingData?.caregiverBookings?.pagination?.total ?? pendingList.length;
   const waitingConfirmCount = acceptedData?.caregiverBookings?.pagination?.total ?? acceptedList.length;
   const pendingCount = newRequestsCount + waitingConfirmCount;
@@ -486,11 +472,11 @@ export const CaregiverBookings: React.FC = () => {
 
   const isLoading =
     pendingLoading || acceptedLoading || confirmedLoading ||
-    inProgressLoading || awaitingReleaseLoading || needsReviewLoading ||
+    inProgressLoading ||
     (activeTab === 'history' && historyLoading);
   const isError = !!(
     pendingError || acceptedError || confirmedError ||
-    inProgressError || awaitingReleaseError || needsReviewError ||
+    inProgressError ||
     (activeTab === 'history' && historyError)
   );
 
@@ -538,20 +524,6 @@ export const CaregiverBookings: React.FC = () => {
           dot: 'bg-[#10B981]',
           text: 'text-[#047857]',
           label: 'กำลังปฏิบัติงาน'
-        };
-      case 'awaiting_release':
-        return {
-          bg: 'bg-[#FFFBEB]',
-          dot: 'bg-[#F59E0B]',
-          text: 'text-[#B45309]',
-          label: 'รอปิดงาน'
-        };
-      case 'needs_review':
-        return {
-          bg: 'bg-[#FEF2F2]',
-          dot: 'bg-[#DC2626]',
-          text: 'text-[#B91C1C]',
-          label: 'รอแอดมินตรวจสอบ'
         };
       case 'cancelled':
       default:

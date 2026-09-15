@@ -588,7 +588,7 @@ function GroupSwitcher({
 type ApptTab = 'confirmed' | 'pending' | 'history';
 
 const PENDING_STATUSES = ['unmatched', 'pending'];
-const CONFIRMED_STATUSES = ['accepted', 'confirmed', 'in_progress', 'awaiting_release', 'needs_review'];
+const CONFIRMED_STATUSES = ['accepted', 'confirmed', 'in_progress'];
 
 function bucketOf(status: string): ApptTab {
   if (PENDING_STATUSES.includes(status)) return 'pending';
@@ -607,7 +607,7 @@ function statusTone(status: string): string {
     case 'unmatched':
     case 'pending':
       return 'bg-[#FEF6E7] text-[#B45309]';
-    default: // accepted / confirmed / awaiting_release / …
+    default: // accepted / confirmed / in_progress / …
       return 'bg-[#ECFDF5] text-[#047857]';
   }
 }

@@ -134,7 +134,7 @@ export interface ConfirmedBooking {
   caregiverReviewCount?: number | null;
   caregiverCompletedJobs?: number | null;
   caregiverExperienceYears?: number | null;
-  /** BE ส่งให้เฉพาะหลังชำระเงิน (confirmed → needs_review) */
+  /** BE ส่งให้เฉพาะหลังชำระเงิน (confirmed → completed) */
   caregiverPhone?: string | null;
   draft: BookingRequest;
   confirmedAt: string;
