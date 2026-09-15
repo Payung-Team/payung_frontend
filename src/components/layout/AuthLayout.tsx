@@ -29,7 +29,7 @@ export default function AuthLayout({ children, tagline, subtitle, showBackToHome
 
         {/* Tagline */}
         {tagline && (
-          <div className="relative z-10 px-12 -mt-20">
+          <div className="relative z-10 px-12 my-auto -translate-y-20">
             <h1
               className="text-[56px] leading-[70px] font-bold text-white max-w-[529px]"
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
