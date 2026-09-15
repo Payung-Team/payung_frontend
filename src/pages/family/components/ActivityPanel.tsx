@@ -19,15 +19,16 @@ import {
  * Group activity history (PYG-422 · AC-BS-07).
  *
  * Newest first, keyset paginated — each page asks for the `first` N rows `after` the previous
- * page's `endCursor`, so a row written while the reader is scrolling can never shift the
+ * page's `pageInfo.endCursor`, so a row written while the reader is scrolling can never shift the
  * window and duplicate or skip an entry the way an OFFSET page would.
  *
  * **Member-only entry point.** The panel is only ever mounted from the group dashboard, which
  * renders groups returned by `myFamilyGroups` — i.e. groups the caller is an ACTIVE member of.
- * The server re-checks membership on every call (is_group_member); the NOT_A_MEMBER branch
+ * The server re-checks membership on every call (@GroupRole(MEMBER)); the NOT_A_MEMBER branch
  * below exists for the race where the reader is removed while the page is open.
  */
 
+/** The API defaults to 20 when `first` is omitted and silently clamps anything above 50. */
 const PAGE_SIZE = 15;
 
 interface QueryData {
@@ -35,14 +36,18 @@ interface QueryData {
 }
 
 /**
- * The BE query (PYG-421) is not deployed yet, so the server rejects the whole operation at
- * validation time. That is a "not built yet" state, not a failure the reader can retry away —
- * it gets its own calm card instead of a red error with a Retry button.
+ * An API older than PYG-421 has no `familyGroupActivity` field, so the server rejects the whole
+ * operation at validation time. That is a "not available on this server" state, not a failure the
+ * reader can retry away — it gets its own calm card instead of a red error with a Retry button.
  *
  * Our API answers that with HTTP 400 + `application/json`, which Apollo Client 4 surfaces as a
  * `ServerError` rather than `CombinedGraphQLErrors` — so the code/message live in the raw body
  * and `getFgErrorCode` comes back empty. Both shapes are checked; the GraphQL one is what a
  * spec-compliant `application/graphql-response+json` server would send instead.
+ *
+ * ⚠ This card also hides a *query that no longer matches the schema* — which is exactly how the
+ *   first version of this panel shipped broken without anyone seeing an error. When changing
+ *   FAMILY_GROUP_ACTIVITY, validate it against the API's schema.gql rather than trusting the demo.
  */
 function isSchemaMissing(err: unknown): boolean {
   if (getFgErrorCode(err) === 'GRAPHQL_VALIDATION_FAILED') return true;
@@ -67,8 +72,8 @@ export default function ActivityPanel({ group }: { group: FamilyGroup }) {
 
   const connection = data?.familyGroupActivity;
   const items = useMemo(() => connection?.nodes ?? [], [connection]);
-  const hasNextPage = connection?.hasNextPage ?? false;
-  const endCursor = connection?.endCursor ?? null;
+  const hasNextPage = connection?.pageInfo?.hasNextPage ?? false;
+  const endCursor = connection?.pageInfo?.endCursor ?? null;
 
   // A page can only be asked for when the server gave us somewhere to continue from; a
   // `hasNextPage: true` with no cursor is treated as the end rather than a dead button.
@@ -106,12 +111,15 @@ export default function ActivityPanel({ group }: { group: FamilyGroup }) {
         },
       });
     } catch (e) {
-      setPageError(e);
+      // A cursor the API cannot decode (e.g. its format changed across a deploy) will never
+      // work on retry — start over from the newest page instead of leaving a dead button.
+      if (getFgErrorCode(e) === FG_ERROR.ACTIVITY_CURSOR_INVALID) void refetch();
+      else setPageError(e);
     } finally {
       inFlight.current = false;
       setLoadingMore(false);
     }
-  }, [canLoadMore, endCursor, fetchMore, group.id]);
+  }, [canLoadMore, endCursor, fetchMore, refetch, group.id]);
 
   // Infinite scroll: a sentinel below the last row pulls the next page into view before the
   // reader hits the bottom. The button underneath stays — it is the keyboard path, and the
@@ -130,8 +138,18 @@ export default function ActivityPanel({ group }: { group: FamilyGroup }) {
     return () => observer.disconnect();
   }, [canLoadMore, loadingMore, pageError, loadMore]);
 
-  // Which userId is the reader — so their own rows read "คุณ …" rather than their own name.
-  const myUserId = group.members.find((m) => m.isMe)?.userId;
+  // userId → how this reader should see that person: "คุณ" for themselves, otherwise the
+  // member's name, or their email when they never set one. The API's actor carries no email,
+  // so the member list is the only fallback for an unnamed member. People no longer in the
+  // group resolve to undefined and fall back to what the row itself says.
+  const nameOf = useMemo(() => {
+    const byUserId = new Map(group.members.map((m) => [m.userId, m]));
+    return (userId: string): string | undefined => {
+      const member = byUserId.get(userId);
+      if (!member) return undefined;
+      return member.isMe ? s.activityActorYou : member.displayName?.trim() || member.email;
+    };
+  }, [group.members, s.activityActorYou]);
 
   const firstLoad = loading && items.length === 0;
   const showError = !!error && items.length === 0;
@@ -166,7 +184,7 @@ export default function ActivityPanel({ group }: { group: FamilyGroup }) {
           <EmptyState title={s.activityEmptyTitle} body={s.activityEmptyBody} icon="history" />
         ) : (
           <>
-            <Feed items={items} myUserId={myUserId} />
+            <Feed items={items} nameOf={nameOf} />
 
             {canLoadMore ? (
               <>
@@ -206,10 +224,10 @@ export default function ActivityPanel({ group }: { group: FamilyGroup }) {
 /** Rows are already newest-first from the server; this only inserts the day separators. */
 function Feed({
   items,
-  myUserId,
+  nameOf,
 }: {
   items: FamilyGroupActivity[];
-  myUserId?: string;
+  nameOf: (userId: string) => string | undefined;
 }) {
   const s = useStrings();
 
@@ -229,13 +247,13 @@ function Feed({
   return (
     <ol className="relative">
       {rows.map(({ item, heading, showHeading }, i) => {
-        const isMe = !!myUserId && item.actor?.userId === myUserId;
-        const actorName = isMe
-          ? s.activityActorYou
-          : item.actor?.displayName?.trim() ||
-            item.actor?.email?.trim() ||
-            s.activityActorUnknown;
-        const { icon, tone, text, code } = describeActivity(item, actorName);
+        // actor null = the account was deleted (the API keeps the row as evidence). An actor
+        // with no name is resolved through the member list first, then what the row carries.
+        const actorName = !item.actor
+          ? s.activityActorDeleted
+          : (nameOf(item.actor.userId) ?? item.actor.displayName?.trim()) ||
+            s.activityActorUnnamed;
+        const { icon, tone, text, code } = describeActivity(item, actorName, { nameOf });
 
         return (
           <li key={item.id}>
@@ -305,8 +323,8 @@ function EmptyState({
 function ErrorState({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const s = useStrings();
 
-  // "Not deployed yet" and "you are no longer a member" are both expected outcomes with
-  // nothing to retry — only a genuine failure gets the Retry button.
+  // "Not available on this server" and "you are no longer a member" are both expected outcomes
+  // with nothing to retry — only a genuine failure gets the Retry button.
   if (isSchemaMissing(error)) {
     return (
       <EmptyState
