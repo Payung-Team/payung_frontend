@@ -11,14 +11,23 @@ export type PinChangeHandler = (
   postalCode?: string,
 ) => void;
 
+// จุดกึ่งกลางเริ่มต้นของ "กล้อง" แผนที่เท่านั้น (ใช้ตอนยังไม่มีทั้งหมุด A และ B เลย
+// เช่น กำลังรอผล geolocation) — ไม่ใช่พิกัดที่ถือเป็นตำแหน่งจริงของหมุดใดๆ ทั้งสิ้น
+const INITIAL_CAMERA_CENTER = { lat: 13.7563, lng: 100.5018 };
+
 export interface MapPickerProps {
-  latA: number;
-  lngA: number;
+  // undefined = ยังไม่มีพิกัด (เช่น กำลังรอผลตำแหน่งปัจจุบัน หรือผู้ใช้ยังไม่ได้ปักหมุดเอง)
+  latA?: number;
+  lngA?: number;
   onChangeA: PinChangeHandler;
   latB?: number;
   lngB?: number;
   onChangeB?: PinChangeHandler;
   showPinB?: boolean;
+  // ชื่อหมุดที่โชว์บนปุ่มสลับ/ป้ายชื่อหมุดบนแผนที่ — ปรับได้ เพราะ MapPicker ถูกใช้ทั้งกับ
+  // "ที่อยู่บ้าน" และ "จุดนัดพบ" ซึ่งความหมายของหมุด A ไม่เหมือนกัน
+  labelA?: string;
+  labelB?: string;
 }
 
 // Haversine kept only as fallback when Directions API fails
@@ -45,10 +54,12 @@ const MapPicker: React.FC<MapPickerProps> = ({
   latA,
   lngA,
   onChangeA,
-  latB = 13.736717,
-  lngB = 100.560543,
+  latB,
+  lngB,
   onChangeB,
   showPinB = false,
+  labelA = 'บ้าน',
+  labelB = 'ปลายทาง',
 }) => {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -57,6 +68,7 @@ const MapPicker: React.FC<MapPickerProps> = ({
   const directionsServiceRef = useRef<any>(null);
   const directionsRendererRef = useRef<any>(null);
   const activePinRef = useRef<'A' | 'B'>('A');
+  const showPinBRef = useRef(showPinB);
 
   const [activePin, setActivePin] = useState<'A' | 'B'>('A');
   const [loaded, setLoaded] = useState(false);
@@ -69,6 +81,7 @@ const MapPicker: React.FC<MapPickerProps> = ({
   useEffect(() => { onChangeARef.current = onChangeA; }, [onChangeA]);
   useEffect(() => { onChangeBRef.current = onChangeB; }, [onChangeB]);
   useEffect(() => { activePinRef.current = activePin; }, [activePin]);
+  useEffect(() => { showPinBRef.current = showPinB; }, [showPinB]);
 
   useEffect(() => {
     loadGoogleMaps().then(() => setLoaded(true)).catch(console.error);
@@ -106,6 +119,11 @@ const MapPicker: React.FC<MapPickerProps> = ({
     );
   }
 
+  function clearPinA() {
+    markerARef.current?.setMap(null);
+    markerARef.current = null;
+  }
+
   function clearPinB() {
     markerBRef.current?.setMap(null);
     markerBRef.current = null;
@@ -116,13 +134,32 @@ const MapPicker: React.FC<MapPickerProps> = ({
     setRouteFallback(false);
   }
 
-  function ensureMarkerB(g: any) {
-    if (markerBRef.current) return;
-    markerBRef.current = new g.maps.Marker({
-      position: { lat: latB, lng: lngB },
+  // ทั้งสองฟังก์ชันต้องรับตำแหน่งเริ่มต้นมาจากผู้เรียกเสมอ — ไม่มีพิกัด default ในตัวฟังก์ชัน
+  // เพราะเรียกได้สองทาง: (1) lat/lng ที่มีค่าอยู่แล้ว (จาก draft เดิม หรือผลตำแหน่งปัจจุบัน)
+  // หรือ (2) ตำแหน่งที่ผู้ใช้เพิ่งคลิกบนแผนที่ (ยังไม่เคยมีหมุดนี้มาก่อน)
+  function ensureMarkerA(g: any, initLat: number, initLng: number) {
+    if (markerARef.current) return;
+    markerARef.current = new g.maps.Marker({
+      position: { lat: initLat, lng: initLng },
       map: mapRef.current,
       draggable: true,
-      title: 'จุดปลายทาง',
+      title: labelA,
+      icon: { url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' },
+    });
+    markerARef.current.addListener('dragend', async () => {
+      const pos = markerARef.current.getPosition();
+      const { address, province, district, subDistrict, postalCode } = await reverseGeocode(pos.lat(), pos.lng());
+      onChangeARef.current(pos.lat(), pos.lng(), address, province, district, subDistrict, postalCode);
+    });
+  }
+
+  function ensureMarkerB(g: any, initLat: number, initLng: number) {
+    if (markerBRef.current) return;
+    markerBRef.current = new g.maps.Marker({
+      position: { lat: initLat, lng: initLng },
+      map: mapRef.current,
+      draggable: true,
+      title: labelB,
       icon: { url: 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png' },
     });
     markerBRef.current.addListener('dragend', async () => {
@@ -140,7 +177,9 @@ const MapPicker: React.FC<MapPickerProps> = ({
 
     if (!mapRef.current) {
       mapRef.current = new g.maps.Map(mapDivRef.current, {
-        center: { lat: latA, lng: lngA },
+        // ศูนย์กลางเริ่มต้นของกล้องเท่านั้น ใช้ตอนยังไม่มีพิกัดหมุด A เลย (เช่น กำลังรอ
+        // ผล geolocation) — ไม่ได้แปลว่าหมุด A อยู่ตรงนี้ ดูตรรกะสร้างหมุดด้านล่าง
+        center: latA != null && lngA != null ? { lat: latA, lng: lngA } : INITIAL_CAMERA_CENTER,
         zoom: 15,
         mapTypeControl: false,
         streetViewControl: false,
@@ -148,29 +187,24 @@ const MapPicker: React.FC<MapPickerProps> = ({
         zoomControlOptions: { position: g.maps.ControlPosition.RIGHT_BOTTOM },
       });
 
-      markerARef.current = new g.maps.Marker({
-        position: { lat: latA, lng: lngA },
-        map: mapRef.current,
-        draggable: true,
-        title: 'ที่อยู่บ้าน',
-        icon: { url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' },
-      });
-
-      markerARef.current.addListener('dragend', async () => {
-        const pos = markerARef.current.getPosition();
-        const { address, province, district, subDistrict, postalCode } = await reverseGeocode(pos.lat(), pos.lng());
-        onChangeARef.current(pos.lat(), pos.lng(), address, province, district, subDistrict, postalCode);
-      });
-
       mapRef.current.addListener('click', async (e: any) => {
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
         const { address, province, district, subDistrict, postalCode } = await reverseGeocode(lat, lng);
+        // คลิกครั้งแรก (ยังไม่มีหมุด) → สร้างหมุดตรงจุดที่คลิกเลย ไม่มี default ให้ "sync" ไปหา
         if (activePinRef.current === 'A') {
-          markerARef.current.setPosition({ lat, lng });
+          if (markerARef.current) {
+            markerARef.current.setPosition({ lat, lng });
+          } else {
+            ensureMarkerA(g, lat, lng);
+          }
           onChangeARef.current(lat, lng, address, province, district, subDistrict, postalCode);
-        } else if (activePinRef.current === 'B' && markerBRef.current) {
-          markerBRef.current.setPosition({ lat, lng });
+        } else if (activePinRef.current === 'B' && showPinBRef.current) {
+          if (markerBRef.current) {
+            markerBRef.current.setPosition({ lat, lng });
+          } else {
+            ensureMarkerB(g, lat, lng);
+          }
           onChangeBRef.current?.(lat, lng, address, province, district, subDistrict, postalCode);
         }
       });
@@ -178,18 +212,28 @@ const MapPicker: React.FC<MapPickerProps> = ({
       directionsServiceRef.current = new g.maps.DirectionsService();
     }
 
-    syncMarkerPosition(markerARef, latA, lngA);
-    mapRef.current.panTo({ lat: latA, lng: lngA });
+    if (latA != null && lngA != null) {
+      ensureMarkerA(g, latA, lngA);
+      syncMarkerPosition(markerARef, latA, lngA);
+      mapRef.current.panTo({ lat: latA, lng: lngA });
+    } else {
+      clearPinA();
+    }
 
-    if (showPinB && onChangeB) {
-      ensureMarkerB(g);
+    if (showPinB && onChangeB && latB != null && lngB != null) {
+      ensureMarkerB(g, latB, lngB);
       syncMarkerPosition(markerBRef, latB, lngB);
-      fetchRoute(g, latA, lngA, latB, lngB);
 
-      const bounds = new g.maps.LatLngBounds();
-      bounds.extend({ lat: latA, lng: lngA });
-      bounds.extend({ lat: latB, lng: lngB });
-      mapRef.current.fitBounds(bounds, 60);
+      if (latA != null && lngA != null) {
+        fetchRoute(g, latA, lngA, latB, lngB);
+        const bounds = new g.maps.LatLngBounds();
+        bounds.extend({ lat: latA, lng: lngA });
+        bounds.extend({ lat: latB, lng: lngB });
+        mapRef.current.fitBounds(bounds, 60);
+      } else {
+        // ยังไม่มีหมุด A ให้คำนวณเส้นทางด้วย — แค่โฟกัสกล้องไปที่หมุด B ที่เพิ่งปักไปก่อน
+        mapRef.current.panTo({ lat: latB, lng: lngB });
+      }
     } else {
       clearPinB();
     }
@@ -217,7 +261,7 @@ const MapPicker: React.FC<MapPickerProps> = ({
           }`}
         >
           <span className="w-2.5 h-2.5 rounded-full bg-green-500 border border-white shrink-0" />
-          ปักหมุดบ้าน (A)
+          ปักหมุด{labelA} (A)
         </button>
 
         {showPinB && (
@@ -231,7 +275,7 @@ const MapPicker: React.FC<MapPickerProps> = ({
             }`}
           >
             <span className="w-2.5 h-2.5 rounded-full bg-orange-400 border border-white shrink-0" />
-            ปักหมุดปลายทาง (B)
+            ปักหมุด{labelB} (B)
           </button>
         )}
 

@@ -11,6 +11,7 @@ import {
   reverseGeocode,
   type PlacePrediction,
 } from '../../../lib/googleMaps';
+import { requestPosition } from '../../../lib/geolocation';
 
 // ที่อยู่ที่เติมให้อัตโนมัติได้ — มาจากการจองครั้งล่าสุด ถ้ายังไม่เคยจองก็ใช้ที่อยู่ในโปรไฟล์
 // (ที่กรอกไว้ตอน onboard) และถ้าไม่มีทั้งสองอย่างจะไม่แสดงปุ่มนี้เลย
@@ -46,6 +47,36 @@ interface LatestBookingResult {
   } | null;
 }
 
+// Debounce + คำขอค้นหาล่าสุดชนะ (requestId) — ใช้ร่วมกันทั้ง 3 ช่อง: ที่อยู่บ้าน,
+// สถานที่ปลายทาง, จุดนัดพบ กันไม่ให้เขียนโค้ด debounce ซ้ำ 3 รอบ
+function usePlaceSuggestions(query: string) {
+  const [suggestions, setSuggestions] = useState<PlacePrediction[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    const requestId = ++requestIdRef.current;
+    const timer = setTimeout(async () => {
+      const results = await getPlacePredictions(query);
+      if (requestIdRef.current === requestId) {
+        setSuggestions(results);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  return {
+    suggestions,
+    showSuggestions,
+    setShowSuggestions,
+    clearSuggestions: () => setSuggestions([]),
+  };
+}
+
 export default function BookingStepLocation() {
   const { bookingDraft, setBookingDraft, goToStep, setStepSubmit, setStepMissing } = useBooking();
 
@@ -65,11 +96,17 @@ export default function BookingStepLocation() {
   const [address, setAddress] = useState(
     bookingDraft?.locationDetails?.at_home?.address || '',
   );
-  const [latA, setLatA] = useState(
-    bookingDraft?.locationDetails?.at_home?.lat || 13.736717,
+  // ไม่มีค่า default — รอผลตำแหน่งปัจจุบันจาก geolocation effect ด้านล่าง ถ้าขอไม่ได้
+  // (ปฏิเสธสิทธิ์/ไม่รองรับ) ผู้ใช้ต้องคลิกปักหมุดเองบนแผนที่ (เหมือนหมุด B)
+  //
+  // ★ ต้อง gate ด้วย needHome — `at_home.lat` มีความหมายเฉพาะโหมด "ที่อยู่บ้าน" เท่านั้น
+  //   ถ้าอยู่โหมด "จุดนัดพบ" (!needHome) แล้วยังอ่านค่านี้ จะได้พิกัดเก่าที่ค้างจากการ
+  //   ทดสอบโหมดอื่นในเซสชันเดียวกันมาปักหมุด แทนที่จะเป็น undefined (ให้ geolocation ทำงาน)
+  const [latA, setLatA] = useState<number | undefined>(
+    needHome ? bookingDraft?.locationDetails?.at_home?.lat : undefined,
   );
-  const [lngA, setLngA] = useState(
-    bookingDraft?.locationDetails?.at_home?.lng || 100.560543,
+  const [lngA, setLngA] = useState<number | undefined>(
+    needHome ? bookingDraft?.locationDetails?.at_home?.lng : undefined,
   );
 
   // Accompany outside
@@ -79,42 +116,68 @@ export default function BookingStepLocation() {
   const [meetingPoint, setMeetingPoint] = useState(
     bookingDraft?.locationDetails?.accompany_outside?.meetingPoint || '',
   );
-  const [latB, setLatB] = useState(
-    bookingDraft?.locationDetails?.accompany_outside?.lat || 13.75633,
+  // ไม่มีค่า default — จุดปลายทางไม่เหมือนหมุดบ้านที่เดาจากตำแหน่งผู้ใช้ได้ ผู้ใช้ต้อง
+  // ปักเองบนแผนที่เท่านั้น (MapPicker จะไม่แสดงหมุด B จนกว่าจะมีค่าจริง)
+  const [latB, setLatB] = useState<number | undefined>(
+    bookingDraft?.locationDetails?.accompany_outside?.lat,
   );
-  const [lngB, setLngB] = useState(
-    bookingDraft?.locationDetails?.accompany_outside?.lng || 100.501765,
+  const [lngB, setLngB] = useState<number | undefined>(
+    bookingDraft?.locationDetails?.accompany_outside?.lng,
   );
 
   const [error, setError] = useState<Record<string, string>>({});
 
-  // Address autocomplete suggestions
-  const [suggestions, setSuggestions] = useState<PlacePrediction[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const suggestionRequestIdRef = useRef(0);
+  // Autocomplete suggestions — ที่อยู่บ้าน, สถานที่ปลายทาง, จุดนัดพบ
+  const addressSuggestions = usePlaceSuggestions(address);
+  const hospitalSuggestions = usePlaceSuggestions(hospitalName);
+  const meetingPointSuggestions = usePlaceSuggestions(meetingPoint);
 
   useEffect(() => {
     loadGoogleMaps().catch(console.error);
   }, []);
 
+  // หมุด A เริ่มที่ตำแหน่งปัจจุบันของผู้ใช้ — ไม่มี fallback เป็นพิกัด hardcode แล้ว
+  // ถ้าขอตำแหน่งไม่ได้ (ปฏิเสธสิทธิ์/ไม่รองรับ) latA/lngA จะยังเป็น undefined ต่อไป
+  // จนกว่าผู้ใช้จะคลิกปักหมุดเองบนแผนที่ (MapPicker จัดการกรณีนี้ให้แล้ว)
+  // ทำเฉพาะตอนยังไม่มีพิกัดที่บันทึกไว้ใน draft เดิม — ไม่งั้นจะไปทับตำแหน่งที่เลือกไว้แล้ว
+  // ★ เช็คเฉพาะตอน needHome เท่านั้น เพราะ `at_home.lat` มีความหมายเฉพาะโหมดนั้น (ดูเหตุผล
+  //   เดียวกับตอน init latA/lngA ด้านบน) — โหมด "จุดนัดพบ" ไม่มีพิกัดที่ persist ไว้เลย
+  //   จึงต้องขอตำแหน่งใหม่ทุกครั้งที่เข้ามาหน้านี้
+  //
+  // ได้พิกัดแล้ว reverse-geocode ต่อทันที เพื่อเติมช่องข้อความให้เอง — หมุด A มีสอง
+  // ความหมายตาม section ที่แสดง (เหมือน onChangeA): เลือกที่อยู่บ้าน (needHome) หรือ
+  // จุดนัดพบ (!needHome && needOutside) ก็เติมช่องนั้นให้ตรงกัน
   useEffect(() => {
-    if (!address.trim()) {
-      setSuggestions([]);
-      return;
-    }
-    const requestId = ++suggestionRequestIdRef.current;
-    const timer = setTimeout(async () => {
-      const results = await getPlacePredictions(address);
-      if (suggestionRequestIdRef.current === requestId) {
-        setSuggestions(results);
+    if (needHome && bookingDraft?.locationDetails?.at_home?.lat != null) return;
+    let cancelled = false;
+    requestPosition().then(async (result) => {
+      if (cancelled || !result.ok) return;
+      setLatA(result.fix.lat);
+      setLngA(result.fix.lng);
+
+      await loadGoogleMaps().catch(() => {});
+      if (cancelled) return;
+      const geo = await reverseGeocode(result.fix.lat, result.fix.lng);
+      if (cancelled) return;
+      if (needHome) {
+        if (geo.address) setAddress(geo.address);
+        if (geo.province) setProvince(geo.province);
+        if (geo.district) setDistrict(geo.district);
+        if (geo.subDistrict) setSubDistrict(geo.subDistrict);
+        if (geo.postalCode) setPostalCode(geo.postalCode);
+      } else if (needOutside && geo.address) {
+        setMeetingPoint(geo.address);
       }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [address]);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSelectSuggestion = async (prediction: PlacePrediction) => {
-    setShowSuggestions(false);
-    setSuggestions([]);
+    addressSuggestions.setShowSuggestions(false);
+    addressSuggestions.clearSuggestions();
     const coords = await geocodeAddress(prediction.description);
     if (!coords) {
       setAddress(prediction.description);
@@ -128,6 +191,30 @@ export default function BookingStepLocation() {
     if (geo.district) setDistrict(geo.district);
     if (geo.subDistrict) setSubDistrict(geo.subDistrict);
     if (geo.postalCode) setPostalCode(geo.postalCode);
+  };
+
+  // เลือกสถานที่ปลายทางจาก autocomplete → ตั้งชื่อสถานที่ + ย้ายหมุด B ไปที่นั่นด้วย
+  const handleSelectHospitalSuggestion = async (prediction: PlacePrediction) => {
+    hospitalSuggestions.setShowSuggestions(false);
+    hospitalSuggestions.clearSuggestions();
+    setHospitalName(prediction.description);
+    const coords = await geocodeAddress(prediction.description);
+    if (coords) {
+      setLatB(coords.lat);
+      setLngB(coords.lng);
+    }
+  };
+
+  // เลือกจุดนัดพบจาก autocomplete → ตั้งข้อความ + ย้ายหมุด A ไปที่นั่นด้วย
+  const handleSelectMeetingPointSuggestion = async (prediction: PlacePrediction) => {
+    meetingPointSuggestions.setShowSuggestions(false);
+    meetingPointSuggestions.clearSuggestions();
+    setMeetingPoint(prediction.description);
+    const coords = await geocodeAddress(prediction.description);
+    if (coords) {
+      setLatA(coords.lat);
+      setLngA(coords.lng);
+    }
   };
 
   // Auto-save
@@ -303,8 +390,8 @@ export default function BookingStepLocation() {
             <textarea
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              onFocus={() => setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              onFocus={() => addressSuggestions.setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => addressSuggestions.setShowSuggestions(false), 150)}
               rows={3}
               placeholder="เช่น 123/45 ซอย 5 ถนนสุขุมวิท"
               className={`w-full p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 resize-none ${
@@ -317,9 +404,9 @@ export default function BookingStepLocation() {
               <p className="mt-1 text-xs font-semibold text-red-600">{error.address}</p>
             )}
 
-            {showSuggestions && suggestions.length > 0 && (
+            {addressSuggestions.showSuggestions && addressSuggestions.suggestions.length > 0 && (
               <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-[#E0E2E5] rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
-                {suggestions.map((s) => (
+                {addressSuggestions.suggestions.map((s) => (
                   <li key={s.placeId}>
                     <button
                       type="button"
@@ -359,9 +446,10 @@ export default function BookingStepLocation() {
               }}
               latB={latB}
               lngB={lngB}
-              onChangeB={(newLat, newLng) => {
+              onChangeB={(newLat, newLng, newAddress) => {
                 setLatB(newLat);
                 setLngB(newLng);
+                if (newAddress) setHospitalName(newAddress);
               }}
               showPinB={needOutside}
             />
@@ -389,6 +477,8 @@ export default function BookingStepLocation() {
                 type="text"
                 value={hospitalName}
                 onChange={(e) => setHospitalName(e.target.value)}
+                onFocus={() => hospitalSuggestions.setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => hospitalSuggestions.setShowSuggestions(false), 150)}
                 placeholder="เช่น รพ.รามาธิบดี, คลินิกเวชกรรม"
                 className={`w-full p-3 pl-10 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
                   error.hospitalName
@@ -396,6 +486,28 @@ export default function BookingStepLocation() {
                     : 'border-[#E0E2E5] focus:ring-[#52B69A]'
                 }`}
               />
+
+              {hospitalSuggestions.showSuggestions && hospitalSuggestions.suggestions.length > 0 && (
+                <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-[#E0E2E5] rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+                  {hospitalSuggestions.suggestions.map((s) => (
+                    <li key={s.placeId}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectHospitalSuggestion(s);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm text-[#1A1A1A] hover:bg-[#F0FAF4] cursor-pointer"
+                      >
+                        <span className="material-icons text-[#AAB2BA] text-base shrink-0">
+                          location_on
+                        </span>
+                        <span className="truncate">{s.description}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             {error.hospitalName && (
               <p className="mt-1 text-xs font-semibold text-red-600">{error.hospitalName}</p>
@@ -406,17 +518,43 @@ export default function BookingStepLocation() {
             <label className="block text-sm font-bold text-[#575859] mb-2">
               จุดนัดพบ (ให้ผู้ดูแลหาคุณเจอ)
             </label>
-            <input
-              type="text"
-              value={meetingPoint}
-              onChange={(e) => setMeetingPoint(e.target.value)}
-              placeholder="เช่น ประตูหน้าอาคาร A ชั้น 1"
-              className={`w-full p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
-                error.meetingPoint
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-[#E0E2E5] focus:ring-[#52B69A]'
-              }`}
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={meetingPoint}
+                onChange={(e) => setMeetingPoint(e.target.value)}
+                onFocus={() => meetingPointSuggestions.setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => meetingPointSuggestions.setShowSuggestions(false), 150)}
+                placeholder="เช่น ประตูหน้าอาคาร A ชั้น 1"
+                className={`w-full p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
+                  error.meetingPoint
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-[#E0E2E5] focus:ring-[#52B69A]'
+                }`}
+              />
+
+              {meetingPointSuggestions.showSuggestions && meetingPointSuggestions.suggestions.length > 0 && (
+                <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-[#E0E2E5] rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+                  {meetingPointSuggestions.suggestions.map((s) => (
+                    <li key={s.placeId}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectMeetingPointSuggestion(s);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm text-[#1A1A1A] hover:bg-[#F0FAF4] cursor-pointer"
+                      >
+                        <span className="material-icons text-[#AAB2BA] text-base shrink-0">
+                          location_on
+                        </span>
+                        <span className="truncate">{s.description}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             {error.meetingPoint && (
               <p className="mt-1 text-xs font-semibold text-red-600">{error.meetingPoint}</p>
             )}
@@ -430,14 +568,21 @@ export default function BookingStepLocation() {
               <MapPicker
                 latA={latA}
                 lngA={lngA}
-                onChangeA={() => {}}
+                onChangeA={(newLat, newLng, newAddress) => {
+                  setLatA(newLat);
+                  setLngA(newLng);
+                  if (newAddress) setMeetingPoint(newAddress);
+                }}
                 latB={latB}
                 lngB={lngB}
-                onChangeB={(newLat, newLng) => {
+                onChangeB={(newLat, newLng, newAddress) => {
                   setLatB(newLat);
                   setLngB(newLng);
+                  if (newAddress) setHospitalName(newAddress);
                 }}
                 showPinB={true}
+                labelA="จุดนัดพบ"
+                labelB="สถานที่ปลายทาง"
               />
             </div>
           )}
