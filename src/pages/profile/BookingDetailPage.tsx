@@ -19,6 +19,7 @@ import { Divider, SectionTitle, InfoRow } from '../../components/booking/Booking
 import { BookingTrackingView } from '../../components/booking/BookingTrackingView';
 import { hasAnyProfileData, type PatientProfile } from '../../lib/patientProfile';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
+import { GROUP_BOOKING_DETAIL } from '../../graphql/familyGroup';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -165,17 +166,35 @@ export default function BookingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { userRole } = useAuth();
   const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
+  const familyGroupId = new URLSearchParams(location.search).get('group');
+  const isFamilyView = Boolean(familyGroupId);
 
   // Navigation state used as instant initial data while query loads
   const stateBooking = location.state?.booking as ConfirmedBooking | undefined;
 
-  const { data, loading, refetch } = useQuery(GET_MY_BOOKING, {
-    variables: { id },
-    skip: !id,
-    fetchPolicy: 'cache-and-network',
-  });
+  const { data, loading, refetch } = useQuery(
+    isFamilyView ? GROUP_BOOKING_DETAIL : GET_MY_BOOKING,
+    {
+      variables: isFamilyView ? { groupId: familyGroupId, bookingId: id } : { id },
+      skip: !id,
+      fetchPolicy: 'cache-and-network',
+    },
+  );
 
-  const gqlData = data as { myBooking?: Record<string, unknown> } | undefined;
+  const queryData = data as {
+    myBooking?: Record<string, unknown>;
+    groupBooking?: Record<string, unknown>;
+  } | undefined;
+  const apiBooking = isFamilyView ? queryData?.groupBooking : queryData?.myBooking;
+  const gqlData = useMemo(
+    () => apiBooking ? { myBooking: apiBooking } : undefined,
+    [apiBooking],
+  );
+  const canManageBooking = !isFamilyView
+    || (apiBooking?.bookedByMe as boolean | undefined) === true;
+  const backTarget = isFamilyView && familyGroupId
+    ? `/family-group?group=${encodeURIComponent(familyGroupId)}`
+    : '/bookings';
 
   const booking = useMemo<ConfirmedBooking | undefined>(() => {
     if (gqlData?.myBooking) return mapGqlBooking(gqlData.myBooking);
@@ -235,7 +254,7 @@ export default function BookingDetailPage() {
           <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 16, color: '#8A8C8E' }}>ไม่พบข้อมูลการจอง</p>
           <button
             type="button"
-            onClick={() => navigate('/bookings')}
+            onClick={() => navigate(backTarget)}
             style={{ marginTop: 16, padding: '8px 20px', background: '#52B69A', color: '#FFFFFF', border: 'none', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
           >
             กลับไปยังนัดหมาย
@@ -281,7 +300,7 @@ export default function BookingDetailPage() {
     setToastVisible(true);
     toastTimer.current = setTimeout(() => {
       setToastVisible(false);
-      if (navigateAway) setTimeout(() => navigate('/bookings'), 300);
+      if (navigateAway) setTimeout(() => navigate(backTarget), 300);
     }, 2500);
   };
 
@@ -296,11 +315,11 @@ export default function BookingDetailPage() {
     return serviceDate <= today;
   })();
 
-  const canComplete = booking.status === 'confirmed' && hasHeldPayment && isServiceDatePassed && (isPatient || isCaregiver);
+  const canComplete = canManageBooking && booking.status === 'confirmed' && hasHeldPayment && isServiceDatePassed && (isPatient || isCaregiver);
 
   // Patients see the Tracking Service view instead of the static summary (PYG-361).
   // Once the job has actually started the date no longer matters.
-  const isTrackingDue = isPatient && (
+  const isTrackingDue = canManageBooking && isPatient && (
     ACTIVE_JOB_STATUSES.has(booking.status) ||
     (booking.status === 'confirmed' && isServiceDatePassed)
   );
@@ -327,7 +346,11 @@ export default function BookingDetailPage() {
     if (!REVIEWABLE_STATUSES.has(booking.status)) {
       try {
         const result = await refetch();
-        const fresh = (result.data as { myBooking?: Record<string, unknown> } | undefined)?.myBooking;
+        const freshData = result.data as {
+          myBooking?: Record<string, unknown>;
+          groupBooking?: Record<string, unknown>;
+        } | undefined;
+        const fresh = isFamilyView ? freshData?.groupBooking : freshData?.myBooking;
         if (!fresh || !REVIEWABLE_STATUSES.has(mapGqlBooking(fresh).status)) {
           showError('ยังรีวิวไม่ได้ในตอนนี้ กรุณาลองใหม่อีกครั้งในอีกสักครู่');
           return;
@@ -366,7 +389,7 @@ export default function BookingDetailPage() {
   };
 
   // Reviewing opens after the booking is completed.
-  const showReviewSection = REVIEWABLE_STATUSES.has(booking.status) && isPatient;
+  const showReviewSection = canManageBooking && REVIEWABLE_STATUSES.has(booking.status) && isPatient;
   const canShowReviewPrompt = showReviewSection && !existingReview && !showReviewForm;
   const canShowSubmittedReview = showReviewSection && !!existingReview && !showReviewForm;
 
@@ -497,7 +520,7 @@ export default function BookingDetailPage() {
       <>
         <BookingTrackingView
           booking={booking}
-          onBack={() => navigate('/bookings')}
+          onBack={() => navigate(backTarget)}
           onReportProblem={() => setShowDisputeModal(true)}
           onWriteReview={handleReview}
           onRebook={() => {
@@ -589,12 +612,12 @@ export default function BookingDetailPage() {
           {/* Back link */}
           <button
             type="button"
-            onClick={() => navigate('/bookings')}
+            onClick={() => navigate(backTarget)}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginBottom: 18 }}
           >
             <span className="material-icons" style={{ fontSize: 16, color: '#52B69A' }}>arrow_back</span>
             <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#52B69A', lineHeight: '20px' }}>
-              กลับไปยังนัดหมายทั้งหมด
+              {isFamilyView ? 'กลับไปยังกลุ่มครอบครัว' : 'กลับไปยังนัดหมายทั้งหมด'}
             </span>
           </button>
 
@@ -623,6 +646,15 @@ export default function BookingDetailPage() {
               {banner.message(caregiverDisplayName)}
             </p>
           </div>
+
+          {isFamilyView && !canManageBooking && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 14, background: '#F0F9FF', border: '0.8px solid #BAE6FD', borderRadius: 12, marginBottom: 18 }}>
+              <span className="material-icons" style={{ fontSize: 18, color: '#0284C7', flexShrink: 0, marginTop: 1 }}>visibility</span>
+              <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#075985', margin: 0, lineHeight: '20px' }}>
+                คุณกำลังดูนัดหมายของสมาชิกในครอบครัว การชำระเงินและการจัดการคำจองทำได้โดยผู้จองเท่านั้น
+              </p>
+            </div>
+          )}
 
           {/* ไม่แสดงการ์ด QR ที่นี่ (PYG-437) — หน้านี้คือมุมมอง "ยังไม่ถึงวันนัด"
               ของผู้รับบริการ พอถึงวันนัด (isTrackingDue) จะสลับไป BookingTrackingView
@@ -704,7 +736,7 @@ export default function BookingDetailPage() {
             {/* ── Section 3: ข้อมูลคนไข้ ── */}
             <SectionTitle>ข้อมูลคนไข้</SectionTitle>
             {/* ประวัติแพ้ยาขึ้นก่อนและเด่นที่สุด — ข้อมูลที่ผิดแล้วอันตรายถึงชีวิต
-                (ลำดับเดียวกับ PatientProfileDetails ฝั่งผู้ดูแล) */}
+                (ลำดับเดียวกับ PatientFullProfile ฝั่งผู้ดูแล) */}
             {patient?.allergies && (
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, background: '#FEF2F2', border: '0.8px solid #FCA5A5', borderRadius: 10, marginBottom: 12 }}>
                 <span className="material-icons" style={{ fontSize: 18, color: '#DC2626', flexShrink: 0 }}>warning</span>
@@ -773,7 +805,9 @@ export default function BookingDetailPage() {
           {payment && (
             <PaymentInfoSection
               payment={payment}
-              onRetry={() => navigate(`/bookings/${booking.id}/payment`, { state: { booking } })}
+              onRetry={canManageBooking
+                ? () => navigate(`/bookings/${booking.id}/payment`, { state: { booking } })
+                : undefined}
             />
           )}
 
@@ -810,7 +844,7 @@ export default function BookingDetailPage() {
           )}
 
           {/* Pay button — backend 'accepted' = caregiver said yes, payment still due */}
-          {booking.status === 'accepted' && (
+          {canManageBooking && booking.status === 'accepted' && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 24 }}>
               <button
                 type="button"
@@ -839,7 +873,7 @@ export default function BookingDetailPage() {
           )}
 
           {/* Cancel button (pending / confirmed — the pay button owns the 'accepted' state) */}
-          {isCancellable && booking.status !== 'accepted' && (
+          {canManageBooking && isCancellable && booking.status !== 'accepted' && (
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
               <button
                 type="button"
@@ -853,7 +887,7 @@ export default function BookingDetailPage() {
           )}
 
           {/* Dispute button (completed bookings) */}
-          {booking.status === 'completed' && (
+          {canManageBooking && booking.status === 'completed' && (
             <div style={{ marginTop: 16 }}>
               {isDisputed ? (
                 disputeStatus === 'resolved' ? (

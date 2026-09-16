@@ -699,6 +699,9 @@ function MemberAppointments({ group }: { group: FamilyGroup }) {
   const list = buckets[tab];
   const shown = expanded ? list : list.slice(0, 5);
   const hasAny = bookings.length > 0;
+  const openBooking = (booking: GroupBookingSummary) => {
+    navigate(`/bookings/${booking.id}?group=${encodeURIComponent(group.id)}`);
+  };
 
   return (
     <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
@@ -763,9 +766,9 @@ function MemberAppointments({ group }: { group: FamilyGroup }) {
           <ul className="mt-4 space-y-2.5">
             {shown.map((b) =>
               b.status === 'in_progress' ? (
-                <RichAppointmentCard key={b.id} b={b} />
+                <RichAppointmentCard key={b.id} b={b} onOpen={() => openBooking(b)} />
               ) : (
-                <CompactAppointmentCard key={b.id} b={b} />
+                <CompactAppointmentCard key={b.id} b={b} onOpen={() => openBooking(b)} />
               ),
             )}
           </ul>
@@ -860,7 +863,7 @@ function ApptPrice({ b }: { b: GroupBookingSummary }) {
 }
 
 /** Expanded card for an in-progress job: live shift timeline + location details. */
-function RichAppointmentCard({ b }: { b: GroupBookingSummary }) {
+function RichAppointmentCard({ b, onOpen }: { b: GroupBookingSummary; onOpen: () => void }) {
   const s = useStrings();
   const end = plannedEnd(b.startTime, b.durationHours);
   const pct = `${(shiftProgress(b) * 100).toFixed(1)}%`;
@@ -871,7 +874,18 @@ function RichAppointmentCard({ b }: { b: GroupBookingSummary }) {
       : '';
 
   return (
-    <li className="rounded-xl border-2 border-[#F6D9A8] bg-[#FFFDF8] p-4">
+    <li
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      className="cursor-pointer rounded-xl border-2 border-[#F6D9A8] bg-[#FFFDF8] p-4 transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#52B69A] focus:ring-offset-2"
+    >
       <div className="flex items-start gap-3">
         <GroupAvatar name={b.careRecipientName} seed={b.id} size={44} />
         <div className="min-w-0 flex-1">
@@ -934,11 +948,22 @@ function ApptDetailRow({ icon, label, value }: { icon: string; label: string; va
 }
 
 /** Compact row for confirmed / pending / past bookings. */
-function CompactAppointmentCard({ b }: { b: GroupBookingSummary }) {
+function CompactAppointmentCard({ b, onOpen }: { b: GroupBookingSummary; onOpen: () => void }) {
   const s = useStrings();
   const { month, day } = monthDay(b.bookingDate);
   return (
-    <li className="flex items-center gap-3 rounded-xl border border-gray-100 bg-[#FBFDFC] p-3">
+    <li
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-100 bg-[#FBFDFC] p-3 transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#52B69A] focus:ring-offset-2"
+    >
       <div className="flex w-12 shrink-0 flex-col items-center rounded-lg bg-white py-1.5 text-center ring-1 ring-gray-100">
         <span className="text-[11px] font-medium text-[#8A8C8E]">{month}</span>
         <span className="text-[18px] font-bold leading-tight text-[#1A1A1A]">{day}</span>

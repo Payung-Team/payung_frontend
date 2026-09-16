@@ -104,6 +104,72 @@ export const GROUP_BOOKINGS = gql`
   }
 `;
 
+/** รายละเอียดคำจองสำหรับสมาชิกกลุ่ม ใช้หน้าเดียวกับรายละเอียดคำจองส่วนตัว. */
+export const GROUP_BOOKING_DETAIL = gql`
+  query GroupBookingDetail($groupId: ID!, $bookingId: ID!) {
+    groupBooking(groupId: $groupId, bookingId: $bookingId) {
+      id
+      bookedByMe
+      status
+      disputeStatus
+      disputeReason
+      serviceType
+      timeSlot
+      startTime
+      durationHours
+      tasks
+      serviceLocations
+      bookingDate
+      locationAddress
+      locationLat
+      locationLng
+      notes
+      estimatedCost
+      careRecipientName
+      patientName
+      dayOfContactName
+      dayOfContactPhone
+      dayOfContactRelationship
+      patientProfile {
+        age
+        gender
+        weight
+        height
+        supportLevel
+        bloodGroup
+        conditions
+        medicines
+        allergies
+        careInstructions
+        regularHospital
+      }
+      confirmedAt
+      createdAt
+      caregiver {
+        id
+        fullName
+        avatarUrl
+        hourlyRate
+        averageRating
+        reviewCount
+        completedJobs
+        experienceYears
+        phone
+      }
+      payment {
+        id
+        amount
+        currency
+        paymentMethod
+        paymentStatus
+        failureMessage
+        qrCodeUrl
+        updatedAt
+      }
+    }
+  }
+`;
+
 /** The current usable join link (OWNER only). Throws JOIN_LINK_NOT_FOUND when the group has none. */
 export const GROUP_JOIN_LINK = gql`
   query GroupJoinLink($groupId: ID!) {
