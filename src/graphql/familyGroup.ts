@@ -56,7 +56,19 @@ export const GROUP_CARE_RECIPIENTS = gql`
       name
       nickname
       ownerUserId
-      selfReported
+      details {
+        age
+        gender
+        weight
+        height
+        supportLevel
+        bloodGroup
+        conditions
+        medicines
+        allergies
+        careInstructions
+        regularHospital
+      }
     }
   }
 `;
@@ -357,8 +369,19 @@ export interface GroupCareRecipient {
   name: string;
   nickname?: string | null;
   ownerUserId: string;
-  /** PYG-500: true = ข้อมูลจากเจ้าตัว, false = คนอื่นในกลุ่มกรอกให้ */
-  selfReported: boolean;
+  details?: {
+    age?: number;
+    gender?: 'ชาย' | 'หญิง';
+    weight?: number;
+    height?: number;
+    supportLevel?: string;
+    bloodGroup?: string;
+    conditions?: string[];
+    medicines?: string;
+    allergies?: string;
+    careInstructions?: string;
+    regularHospital?: string;
+  } | null;
 }
 
 export interface GroupBookingSummary {

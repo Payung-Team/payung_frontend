@@ -55,7 +55,13 @@ function isSchemaMissing(err: unknown): boolean {
   return /GRAPHQL_VALIDATION_FAILED|Cannot query field|Unknown (?:type|argument)/i.test(text);
 }
 
-export default function ActivityPanel({ group }: { group: FamilyGroup }) {
+export default function ActivityPanel({
+  group,
+  variant = 'card',
+}: {
+  group: FamilyGroup;
+  variant?: 'card' | 'drawer';
+}) {
   const s = useStrings();
 
   const { data, loading, error, fetchMore, refetch } = useQuery<QueryData>(
@@ -155,12 +161,24 @@ export default function ActivityPanel({ group }: { group: FamilyGroup }) {
   const showError = !!error && items.length === 0;
 
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
+    <section
+      className={
+        variant === 'card'
+          ? 'rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-6'
+          : 'bg-white'
+      }
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-[16px] font-bold text-[#064E3B]">{s.activityTitle}</h3>
-          <p className="mt-0.5 text-[13px] text-[#8A8C8E]">{s.activitySubtitle}</p>
-        </div>
+        {variant === 'card' ? (
+          <div>
+            <h3 className="text-[16px] font-bold text-[#064E3B]">{s.activityTitle}</h3>
+            <p className="mt-0.5 text-[13px] text-[#8A8C8E]">{s.activitySubtitle}</p>
+          </div>
+        ) : (
+          <p className="max-w-[270px] text-[13px] leading-5 text-[#8A8C8E]">
+            {s.activitySubtitle}
+          </p>
+        )}
         {!showError && (
           <button
             type="button"
@@ -216,6 +234,60 @@ export default function ActivityPanel({ group }: { group: FamilyGroup }) {
         )}
       </div>
     </section>
+  );
+}
+
+export function ActivityDrawer({
+  group,
+  onClose,
+}: {
+  group: FamilyGroup;
+  onClose: () => void;
+}) {
+  const s = useStrings();
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-labelledby="activity-drawer-title">
+      <button
+        type="button"
+        aria-label={s.close}
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-black/45"
+      />
+      <aside className="absolute inset-y-0 right-0 flex w-full max-w-[440px] flex-col bg-white shadow-[-12px_0_32px_rgba(0,0,0,0.16)]">
+        <div className="flex h-[72px] shrink-0 items-center gap-3 border-b border-gray-100 px-5 md:px-6">
+          <Icon name="history" color="#2DB99A" />
+          <h2 id="activity-drawer-title" className="text-[18px] font-bold text-[#064E3B]">
+            {s.activityRecentTitle}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            autoFocus
+            aria-label={s.close}
+            className="ml-auto flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          >
+            <Icon name="close" size="small" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 md:px-6">
+          <ActivityPanel group={group} variant="drawer" />
+        </div>
+      </aside>
+    </div>
   );
 }
 

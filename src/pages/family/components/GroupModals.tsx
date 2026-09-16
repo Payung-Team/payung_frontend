@@ -38,6 +38,7 @@ export function CreateGroupWizard({
   const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState('');
   const [touched, setTouched] = useState(false);
+  const [nameLimitExceeded, setNameLimitExceeded] = useState(false);
   const [group, setGroup] = useState<FamilyGroup | null>(null);
   const [link, setLink] = useState<FamilyGroupJoinLink | null>(null);
   const [copied, setCopied] = useState(false);
@@ -61,7 +62,7 @@ export function CreateGroupWizard({
 
   const goToInvite = async () => {
     setTouched(true);
-    if (localError) return;
+    if (localError || nameLimitExceeded) return;
     try {
       let g = group;
       if (!g) {
@@ -119,9 +120,11 @@ export function CreateGroupWizard({
           placeholder={s.groupNamePlaceholder}
           value={name}
           onChange={setName}
+          maxLength={NAME_MAX}
+          onLimitChange={setNameLimitExceeded}
           onEnter={goToInvite}
-          error={touched ? localError : ''}
-          count={s.charCount([...trimmed].length, NAME_MAX)}
+          error={nameLimitExceeded ? s.nameTooLong(NAME_MAX) : touched ? localError : ''}
+          count={s.charCount([...name].length, NAME_MAX)}
           autoFocus
         />
         <FormActions
@@ -129,7 +132,7 @@ export function CreateGroupWizard({
           confirmText={s.next}
           busyText={s.busyCreating}
           loading={busy}
-          disabled={touched && !!localError}
+          disabled={nameLimitExceeded || (touched && !!localError)}
           onClose={onClose}
           onConfirm={goToInvite}
         />
@@ -221,6 +224,7 @@ export function RenameGroupModal({
   const s = useStrings();
   const [name, setName] = useState(group.name);
   const [touched, setTouched] = useState(false);
+  const [nameLimitExceeded, setNameLimitExceeded] = useState(false);
   const [rename, { loading }] = useMutation(RENAME_FAMILY_GROUP);
 
   const trimmed = name.trim();
@@ -233,7 +237,7 @@ export function RenameGroupModal({
 
   const submit = async () => {
     setTouched(true);
-    if (localError || unchanged) {
+    if (localError || nameLimitExceeded || unchanged) {
       if (unchanged) onClose();
       return;
     }
@@ -257,9 +261,11 @@ export function RenameGroupModal({
         placeholder={s.groupNamePlaceholder}
         value={name}
         onChange={setName}
+        maxLength={NAME_MAX}
+        onLimitChange={setNameLimitExceeded}
         onEnter={submit}
-        error={touched ? localError : ''}
-        count={s.charCount([...trimmed].length, NAME_MAX)}
+        error={nameLimitExceeded ? s.nameTooLong(NAME_MAX) : touched ? localError : ''}
+        count={s.charCount([...name].length, NAME_MAX)}
         autoFocus
       />
       <FormActions
@@ -267,7 +273,7 @@ export function RenameGroupModal({
         confirmText={s.save}
         busyText={s.busySaving}
         loading={loading}
-        disabled={touched && !!localError}
+        disabled={nameLimitExceeded || (touched && !!localError)}
         onClose={onClose}
         onConfirm={submit}
       />
@@ -467,6 +473,8 @@ function NameField({
   placeholder,
   value,
   onChange,
+  maxLength,
+  onLimitChange,
   onEnter,
   error,
   count,
@@ -476,6 +484,8 @@ function NameField({
   placeholder: string;
   value: string;
   onChange: (v: string) => void;
+  maxLength: number;
+  onLimitChange: (exceeded: boolean) => void;
   onEnter: () => void;
   error: string;
   count: string;
@@ -488,14 +498,24 @@ function NameField({
         autoFocus={autoFocus}
         value={value}
         placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          const characters = [...e.target.value];
+          const exceeded = characters.length > maxLength;
+          onLimitChange(exceeded);
+          onChange(exceeded ? characters.slice(0, maxLength).join('') : e.target.value);
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
             onEnter();
           }
         }}
-        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58]"
+        aria-invalid={!!error}
+        className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 ${
+          error
+            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+            : 'border-gray-300 focus:border-[#2D6A58] focus:ring-[#2D6A58]'
+        }`}
       />
       <div className="mt-1 flex items-center justify-between">
         <span className="text-sm text-red-500">{error}</span>

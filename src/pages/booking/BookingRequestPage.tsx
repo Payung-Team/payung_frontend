@@ -149,7 +149,12 @@ export default function BookingRequestPage() {
 
   const handleBack = () => {
     if (step > 1) goToStep(step - 1);
-    else navigate('/patient-home');
+    else {
+      const groupId = (
+        location.state as { groupBooking?: { groupId?: string } } | null
+      )?.groupBooking?.groupId;
+      navigate(groupId ? `/family-group?group=${encodeURIComponent(groupId)}` : '/patient-home');
+    }
   };
   const handleNext = () => {
     if (stepSubmit) stepSubmit();

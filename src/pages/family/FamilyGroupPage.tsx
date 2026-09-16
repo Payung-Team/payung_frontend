@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useLazyQuery, useMutation } from '@apollo/client/react';
 import { Icon } from '../../components/ui/Icon';
 import { ToastContainer } from '../../components/ui/Toast';
@@ -16,7 +16,7 @@ import {
 import { formatDate, useStrings } from './familyStrings';
 import { FONT, GroupAvatar, RoleBadge, ConfirmDialog } from './components/familyUi';
 import InviteLinkModal from './components/InviteLinkModal';
-import ActivityPanel from './components/ActivityPanel';
+import { ActivityDrawer } from './components/ActivityPanel';
 import {
   CreateGroupWizard,
   RenameGroupModal,
@@ -34,11 +34,13 @@ type ModalKind =
   | 'delete'
   | 'leave'
   | 'lastOwner'
+  | 'activity'
   | null;
 
 export default function FamilyGroupPage() {
   const s = useStrings();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toasts, removeToast, success, error: toastError } = useToast();
   const toast = (message: string, kind: 'success' | 'error' = 'success') =>
     kind === 'success' ? success(message) : toastError(message);
@@ -49,8 +51,11 @@ export default function FamilyGroupPage() {
   );
   const groups = data?.myFamilyGroups ?? [];
 
-  // The user's explicit pick; may be null (initial) or stale (after leave/delete).
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Keep the explicit pick in the URL so it survives navigation to child pages and back.
+  const selectedId = searchParams.get('group');
+  const selectGroup = (id: string) =>
+    setSearchParams({ group: id }, { replace: true });
+  const clearSelectedGroup = () => setSearchParams({}, { replace: true });
   const [modal, setModal] = useState<ModalKind>(null);
 
   // Derive the effective group rather than syncing state in an effect: a stale/empty pick
@@ -61,7 +66,7 @@ export default function FamilyGroupPage() {
 
   return (
     <div
-      className="mx-auto w-full max-w-[1120px] px-4 pb-24 pt-6 md:px-6 md:pb-10"
+      className="mx-auto w-full max-w-[1120px] px-4 pb-24 pt-6 [&_button:not(:disabled)]:cursor-pointer [&_button:disabled]:cursor-not-allowed md:px-6 md:pb-10"
       style={{ fontFamily: FONT }}
     >
       <div className="flex flex-wrap items-start gap-3">
@@ -74,7 +79,7 @@ export default function FamilyGroupPage() {
             <GroupSwitcher
               groups={groups}
               selected={selected}
-              onSelect={(id) => setSelectedId(id)}
+              onSelect={selectGroup}
               onCreate={() => setModal('create')}
             />
           </div>
@@ -94,6 +99,7 @@ export default function FamilyGroupPage() {
               navigate(`/family-group/members?group=${selected.id}`)
             }
             onInvite={() => setModal('invite')}
+            onActivity={() => setModal('activity')}
             onRename={() => setModal('rename')}
             onTransfer={() => setModal('transfer')}
             onLeave={() =>
@@ -102,7 +108,6 @@ export default function FamilyGroupPage() {
             onDelete={() => setModal('delete')}
           />
           <MemberAppointments group={selected} />
-          <ActivityPanel group={selected} />
         </div>
       ) : null}
 
@@ -112,7 +117,7 @@ export default function FamilyGroupPage() {
           onClose={() => setModal(null)}
           onToast={toast}
           onCreated={(g) => {
-            setSelectedId(g.id);
+            selectGroup(g.id);
             setModal(null);
           }}
         />
@@ -123,6 +128,9 @@ export default function FamilyGroupPage() {
           onClose={() => setModal(null)}
           onToast={toast}
         />
+      )}
+      {modal === 'activity' && selected && (
+        <ActivityDrawer group={selected} onClose={() => setModal(null)} />
       )}
       {modal === 'rename' && selected && (
         <RenameGroupModal
@@ -153,7 +161,7 @@ export default function FamilyGroupPage() {
           onToast={toast}
           onDeleted={() => {
             setModal(null);
-            setSelectedId(null);
+            clearSelectedGroup();
             refetch();
           }}
         />
@@ -165,7 +173,7 @@ export default function FamilyGroupPage() {
           onToast={toast}
           onLeft={() => {
             setModal(null);
-            setSelectedId(null);
+            clearSelectedGroup();
             refetch();
           }}
         />
@@ -303,6 +311,7 @@ function GroupHeaderCard({
   group,
   onViewMembers,
   onInvite,
+  onActivity,
   onRename,
   onTransfer,
   onLeave,
@@ -311,6 +320,7 @@ function GroupHeaderCard({
   group: FamilyGroup;
   onViewMembers: () => void;
   onInvite: () => void;
+  onActivity: () => void;
   onRename: () => void;
   onTransfer: () => void;
   onLeave: () => void;
@@ -393,6 +403,7 @@ function GroupHeaderCard({
           )}
           <GroupMenu
             isOwner={isOwner}
+            onActivity={onActivity}
             onRename={onRename}
             onTransfer={onTransfer}
             onLeave={onLeave}
@@ -415,12 +426,14 @@ function GroupHeaderCard({
 
 function GroupMenu({
   isOwner,
+  onActivity,
   onRename,
   onTransfer,
   onLeave,
   onDelete,
 }: {
   isOwner: boolean;
+  onActivity: () => void;
   onRename: () => void;
   onTransfer: () => void;
   onLeave: () => void;
@@ -473,6 +486,8 @@ function GroupMenu({
           role="menu"
           className="absolute right-0 z-30 mt-2 w-[230px] rounded-xl border border-gray-100 bg-white p-1.5 shadow-lg"
         >
+          {item('history', s.activityRecentTitle, onActivity)}
+          <div className="my-1.5 h-px bg-gray-100" />
           {isOwner && item('edit', s.renameGroup, onRename)}
           {isOwner && item('swap_horiz', s.transferOwnership, onTransfer)}
           {item('logout', s.leaveGroup, onLeave)}

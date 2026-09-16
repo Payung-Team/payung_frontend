@@ -268,6 +268,7 @@ export interface Strings {
   // activity feed (PYG-422) — the per-action sentences live in activityCopy.ts
   today: string;
   yesterday: string;
+  activityRecentTitle: string;
   activityTitle: string;
   activitySubtitle: string;
   activityRefresh: string;
@@ -523,6 +524,7 @@ const S: Strings = {
   errAskOwner: 'กรุณาขอลิงก์ใหม่จากเจ้าของกลุ่ม',
   today: 'วันนี้',
   yesterday: 'เมื่อวาน',
+  activityRecentTitle: 'กิจกรรมล่าสุด',
   activityTitle: 'ความเคลื่อนไหวของกลุ่ม',
   activitySubtitle: 'สิ่งที่เกิดขึ้นในกลุ่ม เรียงจากใหม่ไปเก่า',
   activityRefresh: 'รีเฟรช',

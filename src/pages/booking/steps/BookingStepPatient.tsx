@@ -19,7 +19,7 @@ const API_BASE = ((import.meta.env.VITE_GRAPHQL_URL as string) || 'http://localh
 interface SavedRecipient {
   id: string;
   name: string;
-  nickname?: string;
+  nickname?: string | null;
   /**
    * ข้อมูลสุขภาพที่จะเติมให้อัตโนมัติเมื่อเลือกโปรไฟล์นี้
    *
@@ -27,7 +27,7 @@ interface SavedRecipient {
    * ⚠ age / weight / height เป็น number ตาม API — ไม่ใช่ string เหมือน input state
    *   จึงต้อง String() ก่อนใส่ลงช่องกรอก (ดู handleSelectRecipient)
    */
-  details?: PatientProfile;
+  details?: PatientProfile | null;
 }
 
 /** หนึ่งแถวในลิสต์ "ผู้รับบริการคือใคร" — วงกลมเลือก + ชื่อ + ปุ่มลบ */
@@ -40,7 +40,7 @@ function RecipientRow({
   selected: boolean;
   title: string;
   onSelect: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
 }) {
   return (
     <div
@@ -65,15 +65,17 @@ function RecipientRow({
         </span>
         <span className="flex-1 min-w-0 text-sm font-bold text-[#1A1A1A] truncate">{title}</span>
       </button>
-      <button
-        type="button"
-        onClick={onDelete}
-        aria-label={`ลบ ${title}`}
-        title="ลบรายชื่อนี้"
-        className="shrink-0 px-4 py-3.5 text-sm font-semibold text-red-600 hover:text-red-700 hover:underline transition cursor-pointer"
-      >
-        ลบ
-      </button>
+      {onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label={`ลบ ${title}`}
+          title="ลบรายชื่อนี้"
+          className="shrink-0 px-4 py-3.5 text-sm font-semibold text-red-600 hover:text-red-700 hover:underline transition cursor-pointer"
+        >
+          ลบ
+        </button>
+      )}
     </div>
   );
 }
@@ -148,7 +150,7 @@ function MemberBookingSection({
   groups: FamilyGroup[];
   gc?: { groupId: string; memberUserId?: string };
 }) {
-  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit, setStepMissing } = useBooking();
+  const { bookingDraft } = useBooking();
 
   const [groupId, setGroupId] = useState<string>(
     gc?.groupId ?? bookingDraft?.onBehalf?.familyGroupId ?? groups[0]?.id ?? '',
@@ -161,83 +163,17 @@ function MemberBookingSection({
   );
   const recipients = useMemo(() => data?.groupCareRecipients ?? [], [data?.groupCareRecipients]);
 
-  // A shared group profile is optional. It is used only to enrich the chooser immediately;
-  // the backend can provision one from memberUserId when it is absent (PYG-500).
   const options = useMemo(() => {
-    const byUser = new Map<string, GroupCareRecipient>();
-    for (const r of recipients) if (r.ownerUserId) byUser.set(r.ownerUserId, r);
     return (group?.members ?? [])
       .filter((m) => !m.isMe)
-      .map((m) => ({ member: m, recipient: byUser.get(m.userId) }));
+      .map((m) => ({
+        member: m,
+        profiles: recipients.filter((recipient) => recipient.ownerUserId === m.userId),
+      }));
   }, [group?.members, recipients]);
 
   const [selectedUserId, setSelectedUserId] = useState<string>(gc?.memberUserId ?? '');
   const selected = options.find((o) => o.member.userId === selectedUserId);
-  const selectedName = selected
-    ? selected.recipient?.name || selected.member.displayName || selected.member.email
-    : '';
-
-  const [memberNote, setMemberNote] = useState(
-    bookingDraft?.recipient?.patientDetails?.careInstructions ?? '',
-  );
-  const [contactName, setContactName] = useState(bookingDraft?.contactPerson?.name ?? '');
-  const [contactPhone, setContactPhone] = useState(bookingDraft?.contactPerson?.phone ?? '');
-  const [contactRel, setContactRel] = useState(bookingDraft?.contactPerson?.relationship ?? '');
-  const [error, setError] = useState<Record<string, string>>({});
-
-  // Persist the on-behalf context whenever the selection / notes / contact change.
-  useEffect(() => {
-    if (!group || !selected) return;
-    setBookingDraft((prev) => ({
-      ...(prev || { serviceLocation: [], serviceTypes: [] }),
-      onBehalf: {
-        familyGroupId: group.id,
-        memberUserId: selected.member.userId,
-        recipientName: selectedName,
-      },
-      recipient: {
-        type: 'member',
-        selectedMemberId: selected.member.userId,
-        patientDetails: {
-          name: selectedName,
-          // ไม่ใส่ 0 — BE รับ 0 เป็นอายุที่ถูกต้อง (ทารก) ดู PYG-460 ใน BookingContext
-          age: undefined,
-          careInstructions: memberNote,
-        },
-      },
-      contactPerson: { name: contactName, phone: contactPhone, relationship: contactRel },
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [group?.id, selected?.member.userId, selectedName, memberNote, contactName, contactPhone, contactRel]);
-
-  const handleSubmit = () => {
-    const errs: Record<string, string> = {};
-    if (!selected) errs.member = 'กรุณาเลือกสมาชิกที่จะจองให้';
-    if (!contactName.trim()) errs.contactName = 'กรุณากรอกชื่อผู้ติดต่อ';
-    if (!contactPhone.trim() || contactPhone.length !== 10)
-      errs.contactPhone = 'เบอร์โทรต้องมี 10 หลัก';
-    if (!contactRel) errs.contactRel = 'กรุณาเลือกความสัมพันธ์';
-    setError(errs);
-    if (Object.keys(errs).length === 0) goToStep(5);
-  };
-
-  // Report missing required fields so the sticky "Next" button can disable itself
-  useEffect(() => {
-    const missing: string[] = [];
-    if (!selected) missing.push('สมาชิกที่จะจองให้');
-    if (!contactName.trim()) missing.push('ชื่อผู้ติดต่อ');
-    if (!contactPhone.trim() || contactPhone.length !== 10) missing.push('เบอร์โทรผู้ติดต่อ');
-    if (!contactRel) missing.push('ความสัมพันธ์');
-    setStepMissing(missing);
-    return () => setStepMissing([]);
-  }, [selected, contactName, contactPhone, contactRel, setStepMissing]);
-
-  const submitRef = useRef<() => void>(() => {});
-  submitRef.current = handleSubmit;
-  useEffect(() => {
-    setStepSubmit(() => submitRef.current());
-    return () => setStepSubmit(null);
-  }, [setStepSubmit]);
 
   return (
     <>
@@ -273,7 +209,7 @@ function MemberBookingSection({
           </p>
         ) : (
           <div className="mt-4 space-y-2">
-            {options.map(({ member, recipient }) => {
+            {options.map(({ member, profiles }) => {
               const active = selectedUserId === member.userId;
               return (
                 <label
@@ -297,9 +233,9 @@ function MemberBookingSection({
                       {member.displayName || member.email}
                     </p>
                     <p className="truncate text-[12px] text-[#8A8C8E]">
-                      {recipient
-                        ? 'มีข้อมูลผู้รับบริการแล้ว'
-                        : 'ยังไม่มีข้อมูลผู้รับบริการ — ระบบจะสร้างให้อัตโนมัติเมื่อจอง'}
+                      {profiles.length > 0
+                        ? `มีโปรไฟล์ที่บันทึกไว้ ${profiles.length} รายการ`
+                        : 'ยังไม่มีโปรไฟล์ที่บันทึกไว้ — เลือกแล้วกรอกข้อมูลใหม่ได้'}
                     </p>
                   </div>
                 </label>
@@ -309,72 +245,17 @@ function MemberBookingSection({
         )}
       </section>
 
-      {selected && (
-        <section className="bg-white p-6 rounded-2xl border border-gray-100">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-bold tracking-[0.7px] uppercase text-[#8A8C8E]">
-                ข้อมูลผู้รับบริการ
-              </p>
-              <h3 className="text-[16px] font-bold text-[#064E3B] mt-0.5">
-                {selectedName}
-                {selected.recipient?.nickname && (
-                  <span className="ml-1.5 text-[13px] font-normal text-[#8A8C8E]">
-                    ({selected.recipient.nickname})
-                  </span>
-                )}
-              </h3>
-            </div>
-            <span className="inline-flex h-6 items-center gap-1.5 rounded-full px-3 text-xs font-semibold bg-[#EFF6FF] text-[#1D4ED8]">
-              <span className="material-icons" style={{ fontSize: 14 }}>
-                lock
-              </span>
-              ข้อมูลจากเจ้าตัว
-            </span>
-          </div>
-
-          <div className="mt-4 flex items-start gap-2.5 rounded-lg bg-[#F6FAF9] px-4 py-3">
-            <span className="material-icons text-[#8A8C8E]" style={{ fontSize: 18 }}>
-              info
-            </span>
-            <p className="text-[12px] leading-5 text-[#8A8C8E]">
-              {selected.recipient
-                ? 'ระบบจะใช้ข้อมูลผู้รับบริการที่มีอยู่ในกลุ่มสำหรับการจองครั้งนี้'
-                : 'ระบบจะค้นหาโปรไฟล์ส่วนตัวของสมาชิก หรือสร้างข้อมูลผู้รับบริการให้อัตโนมัติเมื่อยืนยันการจอง'}
-            </p>
-          </div>
-
-          <div className="mt-5 flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">
-              อาการ/สิ่งที่ต้องดูแลเป็นพิเศษครั้งนี้
-            </label>
-            <textarea
-              rows={3}
-              value={memberNote}
-              onChange={(e) => setMemberNote(e.target.value)}
-              placeholder="เช่น เพิ่งผ่าตัดเข่า ต้องช่วยพยุงเดินและพลิกตัวทุก 2 ชม."
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl outline-none text-sm focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58] resize-none"
-            />
-            <span className="text-xs text-[#8A8C8E]">
-              ใช้เฉพาะการจองครั้งนี้ ไม่บันทึกทับโปรไฟล์ของสมาชิก
-            </span>
-          </div>
-        </section>
+      {selected && group && (
+        <SelfPatientForm
+          key={`${group.id}:${selected.member.userId}`}
+          memberContext={{
+            groupId: group.id,
+            memberUserId: selected.member.userId,
+            memberName: selected.member.displayName || selected.member.email,
+            savedRecipients: selected.profiles,
+          }}
+        />
       )}
-
-      {error.member && !selected && (
-        <p className="text-[12px] text-red-500 font-semibold">{error.member}</p>
-      )}
-
-      <ContactPersonForm
-        name={contactName}
-        phone={contactPhone}
-        rel={contactRel}
-        error={error}
-        onName={setContactName}
-        onPhone={setContactPhone}
-        onRel={setContactRel}
-      />
     </>
   );
 }
@@ -476,42 +357,62 @@ function ContactPersonForm({
 
 // ── Self / personal patient form (the original step 4, unchanged behaviour) ───
 
-function SelfPatientForm() {
-  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit, setStepMissing } = useBooking();
+interface MemberPatientContext {
+  groupId: string;
+  memberUserId: string;
+  memberName: string;
+  savedRecipients: SavedRecipient[];
+}
 
-  const [name, setName] = useState(bookingDraft?.recipient?.patientDetails?.name || '');
+function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientContext } = {}) {
+  const { bookingDraft, setBookingDraft, goToStep, setStepSubmit, setStepMissing } = useBooking();
+  const memberGroupId = memberContext?.groupId;
+  const memberUserId = memberContext?.memberUserId;
+  const isMemberBooking = !!memberContext;
+  const previousPatient =
+    !memberUserId || bookingDraft?.recipient?.selectedMemberId === memberUserId
+      ? bookingDraft?.recipient?.patientDetails
+      : undefined;
+  const initialSavedRecipient = memberContext?.savedRecipients.find(
+    (recipient) => recipient.id === bookingDraft?.recipient?.selectedRecipientId,
+  ) ?? memberContext?.savedRecipients[0];
+  const initialPatient = previousPatient ?? initialSavedRecipient?.details;
+
+  const [name, setName] = useState(
+    previousPatient?.name || initialSavedRecipient?.name || memberContext?.memberName || '',
+  );
   const [age, setAge] = useState(
-    bookingDraft?.recipient?.patientDetails?.age?.toString() || '',
+    initialPatient?.age?.toString() || '',
   );
   const [gender, setGender] = useState<'ชาย' | 'หญิง' | ''>(
-    bookingDraft?.recipient?.patientDetails?.gender || '',
+    initialPatient?.gender || '',
   );
   const [weight, setWeight] = useState(
-    bookingDraft?.recipient?.patientDetails?.weight?.toString() || '',
+    initialPatient?.weight?.toString() || '',
   );
   const [height, setHeight] = useState(
-    bookingDraft?.recipient?.patientDetails?.height?.toString() || '',
+    initialPatient?.height?.toString() || '',
   );
   const [supportLevel, setSupportLevel] = useState(
-    bookingDraft?.recipient?.patientDetails?.supportLevel || '',
+    initialPatient?.supportLevel || '',
   );
   const [bloodGroup, setBloodGroup] = useState(
-    bookingDraft?.recipient?.patientDetails?.bloodGroup || '',
+    initialPatient?.bloodGroup || '',
   );
   const [conditions, setConditions] = useState<string[]>(
-    bookingDraft?.recipient?.patientDetails?.conditions || [],
+    initialPatient?.conditions || [],
   );
   const [medicines, setMedicines] = useState(
-    bookingDraft?.recipient?.patientDetails?.medicines || '',
+    initialPatient?.medicines || '',
   );
   const [allergies, setAllergies] = useState(
-    bookingDraft?.recipient?.patientDetails?.allergies || '',
+    initialPatient?.allergies || '',
   );
   const [careInstructions, setCareInstructions] = useState(
-    bookingDraft?.recipient?.patientDetails?.careInstructions || '',
+    initialPatient?.careInstructions || '',
   );
   const [regularHospital, setRegularHospital] = useState(
-    bookingDraft?.recipient?.patientDetails?.regularHospital || '',
+    initialPatient?.regularHospital || '',
   );
 
   // Contact person
@@ -524,16 +425,21 @@ function SelfPatientForm() {
   const [error, setError] = useState<Record<string, string>>({});
 
   // โปรไฟล์ผู้รับบริการที่เคยบันทึกไว้ + ใบไหนที่ถูกเลือกอยู่
-  const [selectedRecipientId, setSelectedRecipientId] = useState<string | null>(null);
+  const [selectedRecipientId, setSelectedRecipientId] = useState<string | null>(
+    initialSavedRecipient?.id ?? null,
+  );
   // กรอกเองโดยไม่ได้เลือกจากลิสต์ → ถามว่าจะบันทึกโปรไฟล์ไว้ใช้ครั้งหน้าไหม
-  const [saveAsProfile, setSaveAsProfile] = useState(false);
+  const [saveAsProfile, setSaveAsProfile] = useState(!!memberContext);
   // รายชื่อที่กด "ลบ" ไว้ รอยืนยันใน modal
   const [pendingDelete, setPendingDelete] = useState<SavedRecipient | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const [savedRecipients, setSavedRecipients] = useState<SavedRecipient[]>([]);
+  const [savedRecipients, setSavedRecipients] = useState<SavedRecipient[]>(
+    memberContext?.savedRecipients ?? [],
+  );
   useEffect(() => {
+    if (isMemberBooking) return;
     let cancelled = false;
     (async () => {
       const {
@@ -557,7 +463,7 @@ function SelfPatientForm() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isMemberBooking]);
 
   // Auto-save. Clears any on-behalf context so a self booking never submits as booking-on-behalf.
   //
@@ -568,9 +474,17 @@ function SelfPatientForm() {
   useEffect(() => {
     setBookingDraft((prev) => ({
       ...(prev || { serviceLocation: [], serviceTypes: [] }),
-      onBehalf: undefined,
+      onBehalf: memberGroupId && memberUserId
+        ? {
+            familyGroupId: memberGroupId,
+            memberUserId,
+            careRecipientId: selectedRecipientId ?? undefined,
+            recipientName: name,
+          }
+        : undefined,
       recipient: {
-        type: 'self',
+        type: isMemberBooking ? 'member' : 'self',
+        selectedMemberId: memberUserId,
         selectedRecipientId,
         saveAsProfile,
         patientDetails: {
@@ -611,12 +525,16 @@ function SelfPatientForm() {
     contactRel,
     selectedRecipientId,
     saveAsProfile,
+    memberGroupId,
+    memberUserId,
+    isMemberBooking,
   ]);
 
   // เลือกโปรไฟล์ที่บันทึกไว้ — เติมทุกช่องที่โปรไฟล์นั้นมี ที่เหลือล้างให้ว่าง
   // กดซ้ำที่ใบเดิม = ยกเลิกการเลือก แล้วกลับไปกรอกเอง
   const handleSelectRecipient = (recipient: SavedRecipient) => {
     if (selectedRecipientId === recipient.id) {
+      if (isMemberBooking) return;
       setSelectedRecipientId(null);
       return;
     }
@@ -743,7 +661,9 @@ function SelfPatientForm() {
       {/* เลือกจากโปรไฟล์ที่เคยบันทึกไว้ — ไม่เลือกก็กรอกเองได้ในการ์ดถัดไป */}
       {savedRecipients.length > 0 && (
         <section className="bg-white p-6 rounded-2xl border border-gray-100">
-          <h2 className="text-lg font-bold text-[#1A1A1A]">ผู้รับบริการคือใคร</h2>
+          <h2 className="text-lg font-bold text-[#1A1A1A]">
+            {isMemberBooking ? `โปรไฟล์ที่ ${memberContext?.memberName} เคยบันทึกไว้` : 'ผู้รับบริการคือใคร'}
+          </h2>
           <p className="text-sm text-[#8A8C8E] mt-1">
             เลือกจากรายชื่อที่บันทึกไว้ หรือกรอกข้อมูลใหม่ด้านล่าง
           </p>
@@ -754,10 +674,14 @@ function SelfPatientForm() {
                 selected={selectedRecipientId === r.id}
                 title={r.name}
                 onSelect={() => handleSelectRecipient(r)}
-                onDelete={() => {
-                  setDeleteError(null);
-                  setPendingDelete(r);
-                }}
+                onDelete={
+                  isMemberBooking
+                    ? undefined
+                    : () => {
+                        setDeleteError(null);
+                        setPendingDelete(r);
+                      }
+                }
               />
             ))}
           </div>
@@ -1006,7 +930,7 @@ function SelfPatientForm() {
         </div>
 
         {/* กรอกเองโดยไม่ได้เลือกจากลิสต์ → ถามว่าจะเก็บโปรไฟล์นี้ไว้ใช้ครั้งหน้าไหม */}
-        {isManualEntry && (
+        {isManualEntry && !isMemberBooking && (
           <label className="mt-5 flex items-start gap-3 p-4 bg-[#F6FAF9] border border-[#E0E2E5] rounded-xl cursor-pointer">
             <input
               type="checkbox"
@@ -1023,6 +947,21 @@ function SelfPatientForm() {
               </span>
             </span>
           </label>
+        )}
+        {isManualEntry && isMemberBooking && (
+          <div className="mt-5 flex items-start gap-3 rounded-xl border border-[#B7D9CD] bg-[#F0FAF4] p-4">
+            <span className="material-icons text-[#009265]" style={{ fontSize: 20 }}>
+              save
+            </span>
+            <span>
+              <span className="block text-sm font-bold text-[#1A1A1A]">
+                บันทึกเป็นโปรไฟล์ของสมาชิกเมื่อยืนยันการจอง
+              </span>
+              <span className="mt-0.5 block text-xs text-[#5B7A70]">
+                ครั้งถัดไปสมาชิกในกลุ่มสามารถเลือกโปรไฟล์นี้ได้ทันที
+              </span>
+            </span>
+          </div>
         )}
       </section>
 

@@ -685,10 +685,17 @@ function SearchPageContent() {
       if (bookingDraft.onBehalf) {
         const pd = bookingDraft.recipient?.patientDetails;
         const memberDetails = {
+          age: pd?.age,
+          gender: pd?.gender || undefined,
+          weight: pd?.weight,
+          height: pd?.height,
+          supportLevel: pd?.supportLevel || undefined,
+          bloodGroup: pd?.bloodGroup || undefined,
           conditions: pd?.conditions?.length ? pd.conditions : undefined,
           medicines: pd?.medicines || undefined,
           allergies: pd?.allergies || undefined,
           careInstructions: pd?.careInstructions || undefined,
+          regularHospital: pd?.regularHospital || undefined,
         };
         const hasDetails = Object.values(memberDetails).some((v) => v != null);
         try {

@@ -47,7 +47,8 @@ export default function MembersPage() {
   const [modal, setModal] = useState<ModalKind>(null);
   const [viewMember, setViewMember] = useState<FamilyGroupMember | null>(null);
   const closeModal = () => setModal(null);
-  const backToGroup = () => navigate('/family-group');
+  const backToGroup = () =>
+    navigate(`/family-group?group=${encodeURIComponent(groupParam ?? '')}`);
 
   if (loading && groups.length === 0) {
     return (
@@ -73,7 +74,7 @@ export default function MembersPage() {
 
   return (
     <div
-      className="mx-auto w-full max-w-[1120px] px-4 pb-24 pt-6 md:px-6 md:pb-10"
+      className="mx-auto w-full max-w-[1120px] px-4 pb-24 pt-6 [&_button:not(:disabled)]:cursor-pointer [&_button:disabled]:cursor-not-allowed md:px-6 md:pb-10"
       style={{ fontFamily: FONT }}
     >
       <button
