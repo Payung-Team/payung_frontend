@@ -6,13 +6,17 @@
  *   ถ้ายังเขียนว่ารอยืนยัน ผู้ดูแลจะเข้าใจว่ายังมีอะไรค้างอยู่
  */
 import { formatDurationTh, type ProofOfWorkSummary } from '../../lib/monitoring';
+import { caregiverEarnings, formatBaht } from '../../lib/caregiverEarnings';
 import ProofOfWorkPanel from './ProofOfWorkPanel';
 
 interface CheckOutSuccessProps {
   bookingRef: string;
   /** วันที่ให้บริการ แปลงเป็นไทยมาแล้ว เช่น "12 มิ.ย. 2569" */
   bookingDateText: string;
-  price: number;
+  /** ยอดค่าบริการก่อนหักค่าธรรมเนียม */
+  grossAmount: number;
+  /** ยอดโอนสุทธิจริงเมื่อ payout ถูกสร้างแล้ว */
+  payoutAmount?: number | null;
   proof: ProofOfWorkSummary;
   onBack: () => void;
 }
@@ -20,10 +24,12 @@ interface CheckOutSuccessProps {
 export default function CheckOutSuccess({
   bookingRef,
   bookingDateText,
-  price,
+  grossAmount,
+  payoutAmount,
   proof,
   onBack,
 }: Readonly<CheckOutSuccessProps>) {
+  const earnings = caregiverEarnings(grossAmount, payoutAmount);
   const focusRing =
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#52B69A] focus-visible:ring-offset-2';
 
@@ -79,12 +85,19 @@ export default function CheckOutSuccess({
             <span className="material-icons text-[20px] text-[#E0952B]">account_balance_wallet</span>
           </span>
           <div>
-            <p className="text-[13px] text-[#8A8C8E]">ยอดเงินที่คาดว่าจะได้รับ</p>
+            <p className="text-[13px] text-[#8A8C8E]">
+              {earnings.isActual ? 'ยอดเงินสุทธิที่ได้รับ' : 'ยอดเงินสุทธิที่คาดว่าจะได้รับ'}
+            </p>
             <p
               className="text-[22px] font-bold leading-8 text-[#3AA981]"
               style={{ fontFamily: "'Inter', sans-serif" }}
             >
-              ฿{price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatBaht(earnings.net)}
+            </p>
+            <p className="mt-0.5 text-[11px] text-[#8A8C8E]">
+              {earnings.isActual
+                ? 'ยอดโอนจริงหลังหักค่าบริการแล้ว'
+                : `ประมาณการหลังหักค่าธรรมเนียมแพลตฟอร์ม ${earnings.feePercent}%`}
             </p>
           </div>
         </div>
