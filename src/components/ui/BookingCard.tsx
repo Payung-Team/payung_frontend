@@ -2,6 +2,7 @@ import React from 'react';
 import Icon from './Icon';
 import { getPatientDisplayName, type Booking } from '../../pages/caregiver/CaregiverBookings';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
+import { getPayoutStatusMeta } from '../../lib/payoutStatus';
 
 interface BookingCardProps {
   booking: Booking;
@@ -38,6 +39,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
     ? { bg: 'bg-[#EFF6FF]', dot: 'bg-[#3B82F6]', text: 'text-[#1D4ED8]', label: 'ถึงกำหนดบริการแล้ว' }
     : getStatusBadgeStyle(booking.status);
   const displayPatientName = getPatientDisplayName(booking);
+  const payoutBadge = getPayoutStatusMeta(booking.payoutStatus);
 
   return (
     <div
@@ -123,6 +125,20 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                 </div>
 
               </div>
+              {booking.status === 'completed' && (
+                <div className="mt-2 flex flex-row items-center gap-2 text-xs">
+                  <span className="font-semibold text-[#575859]">สถานะเงิน:</span>
+                  <span className={`inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 font-semibold ${payoutBadge.bg} ${payoutBadge.text}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${payoutBadge.dot}`} />
+                    {payoutBadge.label}
+                  </span>
+                  {booking.payoutAmount != null && (
+                    <span className="font-semibold text-[#059669]">
+                      ยอดรับสุทธิ ฿{booking.payoutAmount.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

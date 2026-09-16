@@ -34,6 +34,8 @@ export interface Booking {
   serviceType: string;
   patientName: string;
   price: number;
+  payoutStatus?: 'scheduled' | 'processing' | 'paid' | 'failed' | 'cancelled' | null;
+  payoutAmount?: number | null;
   notes?: string;
   status:
     | 'pending'
@@ -134,6 +136,8 @@ export function mapToBooking(summary: any): Booking {
     serviceType: summary.serviceType,
     patientName: summary.patient?.displayName ?? 'ผู้ใช้บริการ',
     price: summary.estimatedCost ?? 0,
+    payoutStatus: summary.payoutStatus ?? null,
+    payoutAmount: summary.payoutAmount ?? null,
     status: status as any,
     declineReason: summary.rejectionReason ?? undefined,
     createdAt: summary.createdAt,

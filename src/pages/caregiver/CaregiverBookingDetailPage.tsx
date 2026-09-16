@@ -22,6 +22,7 @@ import CheckOutSuccess from '../../components/caregiver/CheckOutSuccess';
 import type { ProofOfWorkSummary } from '../../lib/monitoring';
 import PatientSummaryCard from './checkin/PatientSummaryCard';
 import BookingDetailCard from './checkin/BookingDetailCard';
+import { getPayoutStatusMeta } from '../../lib/payoutStatus';
 
 const IN_PROGRESS_STATUSES: ReadonlyArray<Booking['status']> = ['in_progress'];
 
@@ -153,6 +154,8 @@ export default function CaregiverBookingDetailPage() {
       </div>
     );
   }
+
+  const payoutBadge = getPayoutStatusMeta(booking.payoutStatus);
 
   if (checkedOutProof) {
     return (
@@ -407,6 +410,22 @@ export default function CaregiverBookingDetailPage() {
                 {booking.price > 0 ? `฿${booking.price.toLocaleString()}` : '—'}
               </p>
             </div>
+            {booking.status === 'completed' && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-2.5">
+                <div>
+                  <p className="m-0 font-['Bai_Jamjuree'] text-xs font-semibold text-[#575859]">สถานะการรับเงิน</p>
+                  {booking.payoutAmount != null && (
+                    <p className="m-0 mt-0.5 font-['Bai_Jamjuree'] text-xs text-[#8A8C8E]">
+                      ยอดรับสุทธิ ฿{booking.payoutAmount.toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <span className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-semibold ${payoutBadge.bg} ${payoutBadge.text}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${payoutBadge.dot}`} />
+                  {payoutBadge.label}
+                </span>
+              </div>
+            )}
           </div>
           )}
 
