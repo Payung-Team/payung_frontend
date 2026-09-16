@@ -733,6 +733,8 @@ const CAREGIVER_BOOKING_SUMMARY_FIELDS = `
   startTime
   durationHours
   estimatedCost
+  payoutStatus
+  payoutAmount
   locationAddress
   locationLat
   locationLng
@@ -939,6 +941,7 @@ export const SEARCH_CAREGIVERS = gql`
         skills
         province
         district
+        gender
       }
       pagination {
         page

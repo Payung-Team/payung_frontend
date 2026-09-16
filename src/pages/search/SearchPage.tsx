@@ -10,6 +10,12 @@ import Pagination from '../../components/ui/Pagination';
 import Skeleton from '../../components/ui/Skeleton';
 import Avatar from '../../components/ui/Avatar';
 import BookingConfirmModal from '../../components/ui/BookingConfirmModal';
+import {
+  BOOKING_SESSION_EXPIRED_MESSAGE,
+  BOOKING_UNCONFIRMED_MESSAGE,
+  BOOKING_UNKNOWN_ERROR_MESSAGE,
+  bookingHttpErrorMessage,
+} from '../../lib/bookingSubmitError';
 import ThailandAddressSimple from 'thailand-address-simple';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -28,7 +34,8 @@ interface CaregiverSummary {
   // All optional: the card renders each only when the backend supplies it.
   bio?: string | null;
   experience?: number | null;       // years
-  gender?: 'male' | 'female' | null;
+  // BE เก็บเป็น 'male' | 'female' | 'other' (null = caregiver ยังไม่ได้กรอกตอน KYC)
+  gender?: string | null;
   distance?: number | null;         // km
   verified?: boolean;
 }
@@ -58,14 +65,6 @@ interface FilterState {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const JOB_TYPES = [
-  { id: 'general_care', label: 'ดูแลทั่วไป' },
-  { id: 'physiotherapy', label: 'กายภาพบำบัด' },
-  { id: 'bedridden_care', label: 'ดูแลผู้ป่วยติดเตียง' },
-  { id: 'medication', label: 'ช่วยจัดการยา' },
-  { id: 'companion', label: 'เป็นเพื่อน/พูดคุย' },
-];
-
 const SERVICE_TYPE_MAP: Record<string, string> = {
   'ดูแลทั่วไป': 'general_care',
   'กายภาพบำบัด': 'physiotherapy',
@@ -87,6 +86,14 @@ const SKILL_TRANSLATIONS: Record<string, string> = {
   general_care: 'ดูแลทั่วไป',
   bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
   companion: 'เป็นเพื่อน/พูดคุย',
+};
+
+// ค่าที่ไม่รู้จัก (หรือยังไม่ได้กรอก) → ไม่แสดงทั้งไอคอนและบรรทัดเพศ ดีกว่าเดาเป็นชาย/หญิง
+// ไอคอนมี title/aria-label กำกับเสมอ — สีอย่างเดียวสื่อความหมายไม่ได้สำหรับคนตาบอดสี
+const GENDER_DISPLAY: Record<string, { label: string; icon: string; color: string }> = {
+  male:   { label: 'ชาย',    icon: 'male',        color: '#2563EB' },
+  female: { label: 'หญิง',   icon: 'female',      color: '#DB2777' },
+  other:  { label: 'อื่น ๆ', icon: 'transgender', color: '#7C3AED' },
 };
 
 const SORT_OPTIONS = [
@@ -131,7 +138,8 @@ function CaregiverCard({ cg, onSelect, onViewProfile }: { cg: CaregiverSummary; 
   const translatedSkills = cg.skills.map((skill) => SKILL_TRANSLATIONS[skill] || skill);
   const visibleSkills = translatedSkills.slice(0, 3);
   const extraSkills = translatedSkills.length - 3;
-  const hasMeta = cg.gender != null || cg.experience != null;
+  const gender = GENDER_DISPLAY[cg.gender ?? ''] ?? null;
+  const hasMeta = gender != null || cg.experience != null;
 
   return (
     <div
@@ -166,6 +174,17 @@ function CaregiverCard({ cg, onSelect, onViewProfile }: { cg: CaregiverSummary; 
 
           {/* Name + inline stars */}
           <div className="flex items-center gap-2.5 flex-wrap">
+            {gender && (
+              <span
+                className="material-icons shrink-0"
+                style={{ fontSize: 18, color: gender.color }}
+                title={`เพศ: ${gender.label}`}
+                aria-label={`เพศ: ${gender.label}`}
+                role="img"
+              >
+                {gender.icon}
+              </span>
+            )}
             <span className="text-[20px] font-bold text-[#1A1A1A] leading-tight"
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
               {fullName}
@@ -192,8 +211,8 @@ function CaregiverCard({ cg, onSelect, onViewProfile }: { cg: CaregiverSummary; 
           {/* Gender · experience */}
           {hasMeta && (
             <div className="flex items-center gap-2 flex-wrap text-[12px] text-[#8A8C8E] mt-0.5">
-              {cg.gender != null && <span>เพศ: {cg.gender === 'female' ? 'หญิง' : 'ชาย'}</span>}
-              {cg.gender != null && cg.experience != null && <span className="text-[#E0E2E5]">·</span>}
+              {gender && <span>เพศ: {gender.label}</span>}
+              {gender && cg.experience != null && <span className="text-[#E0E2E5]">·</span>}
               {cg.experience != null && <span>ประสบการณ์ {cg.experience} ปี</span>}
             </div>
           )}
@@ -336,13 +355,6 @@ function FilterSidebar({
   isMobileOpen,
   onMobileClose,
 }: FilterSidebarProps) {
-  const toggleJobType = (id: string) => {
-    const next = filters.jobTypes.includes(id)
-      ? filters.jobTypes.filter((j) => j !== id)
-      : [...filters.jobTypes, id];
-    onChange({ ...filters, jobTypes: next });
-  };
-
   const content = (
     <div className="flex flex-col gap-5">
       {/* Province */}
@@ -382,37 +394,6 @@ function FilterSidebar({
             {districts.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
           <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8A8C8E] text-xs">▾</span>
-        </div>
-      </div>
-
-      {/* Divider */}
-      <div className="border-t border-[#F0F1F3]" />
-
-      {/* Job types */}
-      <div>
-        <label className="text-[13px] font-bold text-[#1A1A1A] mb-2.5 block"
-          style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-          ประเภทงาน
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {JOB_TYPES.map((jt) => {
-            const active = filters.jobTypes.includes(jt.id);
-            return (
-              <button
-                key={jt.id}
-                type="button"
-                onClick={() => toggleJobType(jt.id)}
-                className={`px-3 py-1.5 text-[12px] font-semibold rounded-full border transition-all duration-150 cursor-pointer
-                  ${active
-                    ? 'bg-[#52B69A] text-white border-[#52B69A] shadow-sm'
-                    : 'bg-white text-[#575859] border-[#E0E2E5] hover:border-[#52B69A] hover:text-[#52B69A]'
-                  }`}
-                style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-              >
-                {jt.label}
-              </button>
-            );
-          })}
         </div>
       </div>
 
@@ -686,9 +667,14 @@ function SearchPageContent() {
   const handleConfirmBooking = useCallback(async () => {
     if (!bookingCaregiver || !bookingDraft) return;
     setIsSubmitting(true);
+    setBookingError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+      if (!token) {
+        setBookingError(BOOKING_SESSION_EXPIRED_MESSAGE);
+        return;
+      }
 
       // PYG-460 — payload สร้างที่ buildBookingPayload ที่เดียว ใช้ร่วมกับ
       // CaregiverProfilePage ซึ่งเคยมีโค้ดชุดเดียวกันคัดลอกไว้อีกชุด
@@ -736,6 +722,10 @@ function SearchPageContent() {
           });
           const created = (data as { createBookingOnBehalf?: { id: string } } | null)
             ?.createBookingOnBehalf;
+          if (!created?.id) {
+            setBookingError(BOOKING_UNCONFIRMED_MESSAGE);
+            return;
+          }
           setBookingError(null);
           setBookingCaregiver(null);
           navigate('/booking/success', {
@@ -762,27 +752,29 @@ function SearchPageContent() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({})) as { message?: string };
-        if (res.status === 409) {
-          setBookingError(errData.message ?? 'คุณมีนัดหมายในช่วงเวลาเดียวกันอยู่แล้ว กรุณาเลือกเวลาอื่น');
-          return;
-        }
-        throw new Error(errData.message ?? `HTTP ${res.status}`);
+        const errData = await res.json().catch(() => null);
+        setBookingError(bookingHttpErrorMessage(res.status, errData));
+        return;
       }
-      const resData = await res.json() as { id: string };
+      const resData = await res.json().catch(() => null) as { id?: string } | null;
+      if (!resData?.id) {
+        setBookingError(BOOKING_UNCONFIRMED_MESSAGE);
+        return;
+      }
       setBookingError(null);
       setBookingCaregiver(null);
       navigate('/booking/success', {
         state: { ref: resData.id, caregiverName: bookingCaregiver.fullName },
       });
-    } catch {
-      setBookingCaregiver(null);
-      navigate('/booking/success', { state: { caregiverName: bookingCaregiver.fullName } });
+    } catch (err) {
+      // ห้ามพาไปหน้าสำเร็จ — ไม่มีการยืนยันว่าจองได้จริง
+      console.error('Failed to create booking:', err);
+      setBookingError(BOOKING_UNKNOWN_ERROR_MESSAGE);
     } finally {
       setIsSubmitting(false);
     }
@@ -797,7 +789,6 @@ function SearchPageContent() {
     let count = 0;
     if (appliedFilters.province) count++;
     if (appliedFilters.district) count++;
-    if (appliedFilters.jobTypes.length > 0) count++;
     if (appliedFilters.minPrice > PRICE_MIN) count++;
     if (appliedFilters.maxPrice < PRICE_MAX) count++;
     if (appliedFilters.minRating != null) count++;
@@ -815,7 +806,9 @@ function SearchPageContent() {
             <span className="material-icons text-[18px] text-[#52B69A]">arrow_back</span>
             <button
               type="button"
-              onClick={() => window.history.back()}
+              // history.back() หลุดออกนอกแอปไปหน้าว่างได้ ถ้า /search เป็น entry แรกของ tab
+              // (เช่นเปิดลิงก์ตรง ๆ หรือ redirect มา) → สั่ง router ไปหน้าจองตรง ๆ แทน
+              onClick={() => navigate('/booking/new')}
               className="text-[13px] text-[#52B69A] font-semibold hover:text-[#469e85] transition-colors cursor-pointer"
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
             >

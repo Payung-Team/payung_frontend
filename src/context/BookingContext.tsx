@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import type { BookingStatus } from '../utils/bookingStatus';
@@ -211,6 +211,39 @@ function mapBackendToSaved(item: BackendSavedItem): SavedCaregiver {
 
 const ROLE_PATIENT = 1;
 
+// Booking draft ถูกเก็บใน sessionStorage เพื่อให้รีเฟรชหน้า /search แล้วไม่ต้องกรอกใหม่
+// ใช้ sessionStorage (ไม่ใช่ localStorage) เพราะมีข้อมูลสุขภาพผู้รับบริการ — หายเองเมื่อปิด tab
+// เก็บ ownerId ไว้ด้วย กัน draft ของบัญชีหนึ่งไปโผล่ในอีกบัญชี
+const DRAFT_STORAGE_KEY = 'payung:bookingDraft';
+
+interface StoredDraft {
+  ownerId: string;
+  draft: BookingRequest;
+}
+
+function readStoredDraft(): StoredDraft | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredDraft> | null;
+    if (!parsed || typeof parsed.ownerId !== 'string' || !parsed.draft || typeof parsed.draft !== 'object') {
+      return null;
+    }
+    return parsed as StoredDraft;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredDraft(value: StoredDraft | null) {
+  try {
+    if (value) sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(value));
+    else sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+  } catch {
+    // storage ถูกปิด/เต็ม — ใช้แค่ state ใน memory ต่อไป
+  }
+}
+
 async function getAuthToken(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession();
   return session?.access_token ?? null;
@@ -219,11 +252,32 @@ async function getAuthToken(): Promise<string | null> {
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { session, userRole } = useAuth();
+  const { session, userRole, loading: authLoading } = useAuth();
   const userId = session?.user?.id ?? null;
 
-  const [bookingDraft, setBookingDraft] = useState<BookingRequest | null>(null);
+  // โหลดแบบ synchronous เพื่อให้ SearchPage เห็น draft ตั้งแต่ render แรก
+  // (ไม่งั้นจะโดน redirect ไป /booking/new ก่อน) — เจ้าของจะถูกตรวจอีกทีเมื่อ auth โหลดเสร็จ
+  const [initialStored] = useState(readStoredDraft);
+  const draftOwnerRef = useRef<string | null>(initialStored?.ownerId ?? null);
+  const [bookingDraft, setBookingDraft] = useState<BookingRequest | null>(initialStored?.draft ?? null);
   const [step, setStep] = useState(1);
+
+  // sync draft → sessionStorage เมื่อ auth พร้อมแล้วเท่านั้น (ไม่งั้นจะเขียนทับ ownerId ด้วยค่าว่าง)
+  // logout หรือเปลี่ยนบัญชี → ทิ้ง draft
+  useEffect(() => {
+    if (authLoading) return;
+    const owner = draftOwnerRef.current;
+    draftOwnerRef.current = userId;
+    if (!userId || (owner && owner !== userId)) {
+      if (bookingDraft) {
+        setBookingDraft(null);
+        setStep(1);
+      }
+      writeStoredDraft(null);
+      return;
+    }
+    writeStoredDraft(bookingDraft ? { ownerId: userId, draft: bookingDraft } : null);
+  }, [bookingDraft, authLoading, userId]);
   const [confirmedBookings, setConfirmedBookings] = useState<ConfirmedBooking[]>([]);
   const [savedCaregivers, setSavedCaregivers] = useState<SavedCaregiver[]>([]);
   const [stepSubmit, setStepSubmitState] = useState<(() => void) | null>(null);

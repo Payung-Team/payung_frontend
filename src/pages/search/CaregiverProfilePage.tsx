@@ -7,6 +7,12 @@ import { CREATE_BOOKING_ON_BEHALF } from '../../graphql/familyGroup';
 import { RatingDistribution } from '../../components/ui/RatingDistribution';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 import BookingConfirmModal from '../../components/ui/BookingConfirmModal';
+import {
+  BOOKING_SESSION_EXPIRED_MESSAGE,
+  BOOKING_UNCONFIRMED_MESSAGE,
+  BOOKING_UNKNOWN_ERROR_MESSAGE,
+  bookingHttpErrorMessage,
+} from '../../lib/bookingSubmitError';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
 import { supabase } from '../../lib/supabase';
@@ -313,9 +319,14 @@ const CaregiverProfilePage: React.FC = () => {
   const handleConfirmBooking = async () => {
     if (!cg || !bookingDraft) return;
     setIsSubmitting(true);
+    setBookingError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+      if (!token) {
+        setBookingError(BOOKING_SESSION_EXPIRED_MESSAGE);
+        return;
+      }
 
       // PYG-460 — payload สร้างที่ buildBookingPayload ที่เดียว ใช้ร่วมกับ SearchPage
       // (เดิมโค้ดชุดนี้ถูกคัดลอกไว้สองที่ แก้ที่เดียวก็ยังผิดอีกที่)
@@ -363,6 +374,10 @@ const CaregiverProfilePage: React.FC = () => {
           });
           const created = (data as { createBookingOnBehalf?: { id: string } } | null)
             ?.createBookingOnBehalf;
+          if (!created?.id) {
+            setBookingError(BOOKING_UNCONFIRMED_MESSAGE);
+            return;
+          }
           setBookingError(null);
           setShowModal(false);
           navigate('/booking/success', {
@@ -389,28 +404,29 @@ const CaregiverProfilePage: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({})) as { message?: string };
-        if (res.status === 409) {
-          setBookingError(errData.message ?? 'คุณมีนัดหมายในช่วงเวลาเดียวกันอยู่แล้ว กรุณาเลือกเวลาอื่น');
-          return;
-        }
-        throw new Error(errData.message ?? `HTTP ${res.status}`);
+        const errData = await res.json().catch(() => null);
+        setBookingError(bookingHttpErrorMessage(res.status, errData));
+        return;
       }
 
-      const data = await res.json() as { id: string };
+      const data = await res.json().catch(() => null) as { id?: string } | null;
+      if (!data?.id) {
+        setBookingError(BOOKING_UNCONFIRMED_MESSAGE);
+        return;
+      }
       setBookingError(null);
       setShowModal(false);
       navigate('/booking/success', { state: { ref: data.id, caregiverName: cg.fullName } });
     } catch (err) {
+      // ห้ามพาไปหน้าสำเร็จ — ไม่มีการยืนยันว่าจองได้จริง
       console.error('Failed to create booking:', err);
-      setShowModal(false);
-      navigate('/booking/success', { state: { caregiverName: cg.fullName } });
+      setBookingError(BOOKING_UNKNOWN_ERROR_MESSAGE);
     } finally {
       setIsSubmitting(false);
     }

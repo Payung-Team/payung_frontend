@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
+import { useBooking } from '../../context/BookingContext';
 
 interface SuccessState {
   ref: string;
@@ -11,7 +12,16 @@ interface SuccessState {
 
 const COUNTDOWN_START = 5;
 
+// ไม่มี booking id = ไม่มีหลักฐานว่าจองได้จริง (เปิด URL ตรง ๆ หรือ flow เก่าที่กลืน error)
+// → ห้ามแสดงว่าสำเร็จ ส่งไปหน้ารายการจองแทน
 const BookingSuccessPage: React.FC = () => {
+  const location = useLocation();
+  const state = location.state as SuccessState | null;
+  if (!state?.ref) return <Navigate to="/bookings" replace />;
+  return <BookingSuccessContent />;
+};
+
+const BookingSuccessContent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as SuccessState | undefined;
@@ -26,10 +36,13 @@ const BookingSuccessPage: React.FC = () => {
   const [countdown, setCountdown] = useState(COUNTDOWN_START);
   const { toasts, removeToast, success: showSuccess } = useToast();
   const toastShown = useRef(false);
+  const { resetBooking } = useBooking();
 
   useEffect(() => {
     if (toastShown.current) return;
     toastShown.current = true;
+    // จองเสร็จแล้ว — ทิ้ง draft (รวมใน sessionStorage) ไม่ให้กลับไป /search แล้วจองซ้ำด้วยข้อมูลเดิม
+    resetBooking();
 
     if (paid) {
       showSuccess(
