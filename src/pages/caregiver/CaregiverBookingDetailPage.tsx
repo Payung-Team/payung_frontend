@@ -15,14 +15,13 @@ import { AcceptBookingModal } from '../../components/ui/AcceptBookingModal';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
 import Skeleton from '../../components/ui/Skeleton';
-import CaregiverQrScanPanel from './CaregiverQrScanPanel';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import CaregiverServiceProgressPage from './CaregiverServiceProgressPage';
 import CheckOutSuccess from '../../components/caregiver/CheckOutSuccess';
 import type { ProofOfWorkSummary } from '../../lib/monitoring';
-import PatientSummaryCard from './checkin/PatientSummaryCard';
-import BookingDetailCard from './checkin/BookingDetailCard';
+import CheckInView from './checkin/CheckInView';
 import { getPayoutStatusMeta } from '../../lib/payoutStatus';
+import { formatThaiDate } from '../../lib/thaiDate';
 
 const IN_PROGRESS_STATUSES: ReadonlyArray<Booking['status']> = ['in_progress'];
 
@@ -73,21 +72,6 @@ function InfoRow({ label, value, valueFont = 'inter' }: Readonly<{ label: string
       <span style={{ fontFamily: valueFont === 'inter' ? "'Inter', sans-serif" : "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#1A1A1A', lineHeight: '20px', textAlign: 'right' }}>{value || '—'}</span>
     </div>
   );
-}
-
-function formatThaiDate(dateStr: string): string {
-  if (!dateStr) return '—';
-  try {
-    const parts = dateStr.split('-');
-    if (parts.length !== 3) return dateStr;
-    const year = parseInt(parts[0]) + 543;
-    const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-    const month = monthNames[parseInt(parts[1]) - 1];
-    const day = parseInt(parts[2]);
-    return `${day} ${month} ${year}`;
-  } catch {
-    return dateStr;
-  }
 }
 
 export default function CaregiverBookingDetailPage() {
@@ -162,7 +146,8 @@ export default function CaregiverBookingDetailPage() {
       <CheckOutSuccess
         bookingRef={`REF-${booking.id.toUpperCase().replaceAll('-', '').slice(-6)}`}
         bookingDateText={booking.bookingDate ? formatThaiDate(booking.bookingDate) : '—'}
-        price={booking.price}
+        grossAmount={booking.price}
+        payoutAmount={booking.payoutAmount}
         proof={checkedOutProof}
         onBack={() => navigate('/caregiver/bookings')}
       />
@@ -317,10 +302,10 @@ export default function CaregiverBookingDetailPage() {
             </p>
           </div>
 
-          {/* Main card — superseded by PatientSummaryCard + BookingDetailCard once the check-in
-              cards render below (same info, restyled to the Figma check-in spec), so it's hidden
-              for that branch to avoid showing everything twice. Still used for every other status. */}
-          {!canCheckInToday && (
+          {/* Main card — สถานะ confirmed มี CheckInView ของตัวเองด้านล่าง (ข้อมูลชุดเดียวกัน
+              จัดใหม่เป็นการ์ดก่อนเริ่มงาน + ป๊อปอัป) จึงซ่อนการ์ดนี้ไม่ให้แสดงซ้ำ
+              สถานะอื่น (pending/accepted/declined/completed/cancelled) ยังใช้การ์ดนี้ */}
+          {booking.status !== 'confirmed' && (
           <div style={{ background: '#FFFFFF', border: '0.8px solid #E0E2E5', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 20, padding: 24 }}>
 
             {/* ── Section 1: ผู้จอง ── */}
@@ -461,50 +446,16 @@ export default function CaregiverBookingDetailPage() {
               module. Two competing primary actions for the same status didn't make sense, so this
               is the only "start the job" affordance now. */}
           {booking.status === 'confirmed' && (
-            <div className="mt-6">
-              {canCheckInToday ? (
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[621fr_414fr]">
-                  <div className="order-2 flex flex-col gap-5 lg:order-1">
-                    <PatientSummaryCard
-                      patientName={booking.patientName}
-                      careRecipientName={booking.careRecipientName}
-                      patientProfile={booking.patientProfile}
-                    />
-                    <BookingDetailCard
-                      serviceLabel={svcLabel}
-                      dateText={dateStr}
-                      timeText={booking.time ? `${booking.time} น.` : '—'}
-                      durationText={booking.durationText}
-                      locationName={booking.locationName}
-                      serviceFormat={booking.serviceFormat}
-                      price={booking.price}
-                      tasks={tasks}
-                      notes={booking.notes}
-                      dayOfContactName={booking.dayOfContactName}
-                      dayOfContactPhone={booking.dayOfContactPhone}
-                      dayOfContactRelationship={booking.dayOfContactRelationship}
-                    />
-                  </div>
-                  <div className="order-1 flex flex-col gap-5 lg:order-2">
-                    {/* สแกน QR = ทางเดียวที่เริ่มงานได้ (การ์ดเช็คอินแบบ GPS เดิมถูกเอาออกแล้ว)
-                        จึงต้องแสดงทุก environment ไม่ผูกกับ QR_TEST_TOOLS_ENABLED
-                        ตอนนี้ยังเป็นแบบวางโทเค็น/อัปโหลดรูป รอ scanner กล้องจาก PYG-438 มาแทน */}
-                    <CaregiverQrScanPanel
-                      bookingId={booking.id}
-                      onScanned={() => {
-                        // การสแกนที่สำเร็จ = backend เช็คอินให้เรียบร้อยแล้ว → สลับไปหน้าความคืบหน้า
-                        setJustCheckedIn(true);
-                        void refetchBooking();
-                      }}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <p className="text-center text-sm text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                  จะเช็คอินได้ในวันที่ {formatThaiDate(booking.bookingDate)}
-                </p>
-              )}
-            </div>
+            <CheckInView
+              booking={booking}
+              dateText={dateStr}
+              canCheckInToday={canCheckInToday}
+              onCheckedIn={() => {
+                // การสแกนที่สำเร็จ = backend เช็คอินให้เรียบร้อยแล้ว → สลับไปหน้าความคืบหน้า
+                setJustCheckedIn(true);
+                void refetchBooking();
+              }}
+            />
           )}
 
         </div>

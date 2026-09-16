@@ -5,13 +5,31 @@ import { useJobQrScan, type JobScanResult } from '../useJobQrScan';
 
 const FONT = { fontFamily: "'Bai Jamjuree', sans-serif" } as const;
 
-export interface CheckOutScanModalProps {
+/** เริ่มงานหรือปิดงาน — เปลี่ยนแค่ข้อความ ตัวสแกนและ mutation เหมือนกันทุกกรณี
+ *  (backend ดูจากสถานะ session เองว่าโทเค็นนี้ควรเป็น CHECK_IN หรือ CHECK_OUT) */
+export type ScanPurpose = 'check_in' | 'check_out';
+
+const PURPOSE_COPY: Record<ScanPurpose, { title: string; subtitle: string; aim: string }> = {
+  check_in: {
+    title: 'สแกนเริ่มงาน',
+    subtitle: 'สแกน QR ของผู้รับบริการเพื่อเช็คอิน',
+    aim: 'ให้ผู้รับบริการเปิดหน้า QR ของการจอง แล้วเล็งกล้องให้ QR อยู่ในกรอบเพื่อเริ่มงาน',
+  },
+  check_out: {
+    title: 'สแกนจบงาน',
+    subtitle: 'สแกน QR ของผู้รับบริการเพื่อปิดงาน',
+    aim: 'ให้ผู้รับบริการเปิดหน้า QR ของการจอง แล้วเล็งกล้องให้ QR อยู่ในกรอบเพื่อปิดงาน',
+  },
+};
+
+export interface JobScanModalProps {
   isOpen: boolean;
   onClose: () => void;
   /** งานที่กำลังเปิดอยู่ — ใช้เทียบว่าโทเค็นที่สแกนได้เป็นของงานใบนี้จริงไหม */
   bookingId: string;
   /** เรียกเมื่อการสแกนทำให้งานขยับจริง (ok = true) */
   onScanned: (result: JobScanResult) => void;
+  purpose: ScanPurpose;
 }
 
 type Mode = 'camera' | 'token';
@@ -27,13 +45,14 @@ function cameraErrorCopy(error: unknown): string {
 }
 
 /**
- * โมดัลสแกน QR เพื่อจบงาน — เปิดจากปุ่ม "สแกนจบงาน" บนแถบล่างที่ติดหน้าจอ
+ * โมดัลสแกน QR — ใช้ทั้งเริ่มงานและปิดงาน เปิดจากปุ่มบนแถบล่างที่ติดหน้าจอ
  *
  * โหมดหลักคือกล้อง (ของจริงตาม PYG-438) ส่วน "โหมดทดสอบ" ยังเก็บช่องป้อนโทเค็น/
  * อัปโหลดรูปไว้ เพราะกล้องใช้ได้เฉพาะบน https/localhost และยังต้องเทสบนเครื่องที่ไม่มีกล้อง
  * ทั้งสองโหมดยิง mutation scanJobQr ตัวเดียวกันผ่าน useJobQrScan
  */
-export default function CheckOutScanModal({ isOpen, onClose, bookingId, onScanned }: Readonly<CheckOutScanModalProps>) {
+export default function JobScanModal({ isOpen, onClose, bookingId, onScanned, purpose }: Readonly<JobScanModalProps>) {
+  const copy = PURPOSE_COPY[purpose];
   const [mode, setMode] = useState<Mode>('camera');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
@@ -165,7 +184,7 @@ export default function CheckOutScanModal({ isOpen, onClose, bookingId, onScanne
       className="fixed inset-0 z-[120] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center"
       role="dialog"
       aria-modal="true"
-      aria-label="สแกน QR เพื่อจบงาน"
+      aria-label={copy.subtitle}
       onClick={onClose}
     >
       <div
@@ -176,10 +195,10 @@ export default function CheckOutScanModal({ isOpen, onClose, bookingId, onScanne
         <div className="flex items-center justify-between gap-3 border-b border-[#F0F1F3] px-5 py-4">
           <div>
             <p className="text-[17px] font-bold text-[#1A1A1A]" style={FONT}>
-              สแกนจบงาน
+              {copy.title}
             </p>
             <p className="mt-0.5 text-xs text-[#8A8C8E]" style={FONT}>
-              สแกน QR ของผู้รับบริการเพื่อปิดงาน
+              {copy.subtitle}
             </p>
           </div>
           <button
@@ -244,7 +263,7 @@ export default function CheckOutScanModal({ isOpen, onClose, bookingId, onScanne
 
               {!scan.state && !cameraError && (
                 <p className="mt-3 text-center text-xs text-[#8A8C8E]" style={FONT}>
-                  ให้ผู้รับบริการเปิดหน้า QR ของการจอง แล้วเล็งกล้องให้ QR อยู่ในกรอบ
+                  {copy.aim}
                 </p>
               )}
             </>

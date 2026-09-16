@@ -5,11 +5,9 @@ import type { Booking } from './CaregiverBookings';
 import ShiftStatusCard from './serviceProgress/ShiftStatusCard';
 import ChecklistCard from './serviceProgress/ChecklistCard';
 import CareLogCard from './serviceProgress/CareLogCard';
-import CheckOutScanModal from './serviceProgress/CheckOutScanModal';
-import InfoModal from './serviceProgress/InfoModal';
-import PatientFullProfile from './serviceProgress/PatientFullProfile';
-import { hasAnyProfileData } from '../../lib/patientProfile';
-import { caregiverEarnings, formatBaht, type CaregiverEarnings } from '../../lib/caregiverEarnings';
+import JobScanModal from './serviceProgress/JobScanModal';
+import JobInfoModals, { type JobInfoPanel } from './serviceProgress/JobInfoModals';
+import { caregiverEarnings, formatBaht } from '../../lib/caregiverEarnings';
 import { Icon } from '../../components/ui/Icon';
 import Skeleton from '../../components/ui/Skeleton';
 import type { ProofOfWorkSummary } from '../../lib/monitoring';
@@ -26,77 +24,22 @@ interface ProofOfWorkData {
   proofOfWork: ProofOfWorkSummary;
 }
 
-function BookingDetailRow({ icon, label, value }: Readonly<{ icon: string; label: string; value: string }>) {
-  return (
-    <div className="flex items-start gap-2.5 py-2.5">
-      <Icon name={icon} size="small" color="#B0B3B8" style={{ marginTop: 2 }} />
-      <span className="w-20 shrink-0 text-xs text-[#8A8C8E]" style={FONT}>
-        {label}
-      </span>
-      <span className="min-w-0 flex-1 break-words text-right text-sm font-semibold text-[#1A1A1A]" style={FONT}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
-/** รายได้ของงานนี้แบบเห็นที่มาที่ไป — ยอดที่ลูกค้าจ่าย หักค่าธรรมเนียม เหลือสุทธิเท่าไร
- *  ตัวเลขสุทธิเป็นประมาณการจนกว่า payout จริงจะถูกบันทึก (ดู lib/caregiverEarnings) */
-function EarningsBreakdown({ earnings }: Readonly<{ earnings: CaregiverEarnings }>) {
-  return (
-    <div className="mt-4 rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] p-3.5">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs text-[#575859]" style={FONT}>
-          ค่าบริการที่ผู้รับบริการชำระ
-        </span>
-        <span className="text-sm font-semibold text-[#1A1A1A]" style={FONT}>
-          {formatBaht(earnings.gross)}
-        </span>
-      </div>
-      <div className="mt-1.5 flex items-center justify-between gap-3">
-        <span className="text-xs text-[#575859]" style={FONT}>
-          ค่าธรรมเนียมแพลตฟอร์ม ({earnings.feePercent}%)
-        </span>
-        <span className="text-sm font-semibold text-[#DC2626]" style={FONT}>
-          −{formatBaht(earnings.fee)}
-        </span>
-      </div>
-
-      <div className="mt-2.5 flex items-center justify-between gap-3 border-t border-dashed border-[#E0E2E5] pt-2.5">
-        <span className="text-sm font-bold text-[#1A1A1A]" style={FONT}>
-          รายได้สุทธิที่คุณได้รับ
-        </span>
-        <span className="text-lg font-bold text-[#009265]" style={FONT}>
-          {formatBaht(earnings.net)}
-        </span>
-      </div>
-
-      <p className="mt-2 text-[11px] leading-relaxed text-[#8A8C8E]" style={FONT}>
-        {earnings.isActual
-          ? 'ยอดนี้เป็นยอดโอนจริงที่ระบบบันทึกไว้แล้ว'
-          : 'เป็นยอดประมาณการ — ระบบจะโอนหลังปิดงานและพ้นระยะตรวจสอบ ยอดจริงยืนยันเมื่อโอนเงิน'}
-      </p>
-    </div>
-  );
-}
-
 /**
  * หน้าระหว่างปฏิบัติงานของผู้ดูแล — เรียงตามสิ่งที่ผู้ดูแลต้องใช้จริงระหว่างอยู่หน้างาน:
  *
  *   1. การ์ดสถานะกะงานบนสุด — ทำมานานแค่ไหน เลิกกี่โมง + ผู้รับบริการและทางเข้าดูข้อมูล
- *                             (โครงเดียวกับการ์ดติดตามงานฝั่งผู้รับบริการ)
+ *                             (โครงเดียวกับการ์ดก่อนเริ่มงานในหน้าเช็คอิน)
  *   2. เนื้อหน้า            — สิ่งที่ต้อง "ทำ": เช็คลิสต์แผนงาน และบันทึกการดูแล
  *   3. แถบล่างที่ติดหน้าจอ   — "สแกนจบงาน" (เปิดโมดัลสแกน) และ "โทรฉุกเฉิน"
  *
  * เดิมการ์ดสแกน QR อยู่กลางหน้าบนสุดและมีเวลาเช็คอินซ่อนอยู่ข้างใน ทำให้สิ่งที่ทำบ่อยที่สุด
  * (เช็คลิสต์/บันทึก) ถูกดันลงไปใต้เส้นพับ และสิ่งที่ทำครั้งเดียวตอนจบกลับเด่นที่สุด
  * ตอนนี้ตัวสแกนอยู่ในโมดัลที่เรียกจากแถบล่าง ส่วนข้อมูลอ้างอิง (โปรไฟล์/รายละเอียดงาน)
- * อยู่ในป๊อปอัป จึงเหลือพื้นที่ทั้งหน้าให้เช็คลิสต์และบันทึกการดูแล
+ * อยู่ในป๊อปอัปร่วมกับหน้าเช็คอิน จึงเหลือพื้นที่ทั้งหน้าให้เช็คลิสต์และบันทึกการดูแล
  */
 export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: Readonly<CaregiverServiceProgressPageProps>) {
   const [scanOpen, setScanOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [infoPanel, setInfoPanel] = useState<JobInfoPanel>(null);
 
   const { data, loading, refetch } = useQuery<ProofOfWorkData>(PROOF_OF_WORK, {
     variables: { bookingId: booking.id },
@@ -117,7 +60,6 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
     }
   }
 
-  const recipientName = booking.careRecipientName || booking.patientName;
   const earnings = caregiverEarnings(booking.price, booking.payoutAmount);
 
   return (
@@ -134,8 +76,8 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
           patientProfile={booking.patientProfile}
           netEarningsText={booking.price > 0 ? formatBaht(earnings.net) : undefined}
           netIsActual={earnings.isActual}
-          onViewProfile={() => setProfileOpen(true)}
-          onViewBookingDetails={() => setDetailsOpen(true)}
+          onViewProfile={() => setInfoPanel('profile')}
+          onViewBookingDetails={() => setInfoPanel('details')}
         />
       )}
 
@@ -179,73 +121,13 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
         </div>
       )}
 
-      {/* ── ป๊อปอัปโปรไฟล์ผู้รับบริการ — แสดงทุกอย่างที่ผู้จองกรอกไว้ ── */}
-      <InfoModal
-        isOpen={profileOpen}
-        onClose={() => setProfileOpen(false)}
-        title="โปรไฟล์ผู้รับบริการ"
-        subtitle={recipientName}
-        size="lg"
-      >
-        <div className="mb-4 flex items-start gap-2 rounded-xl border border-[#FFEAA7] bg-[#FFFBF0] p-3">
-          <Icon name="shield" size="small" color="#B45309" />
-          <p className="text-[11px] leading-relaxed text-[#8A6D1F]" style={FONT}>
-            {hasAnyProfileData(booking.patientProfile)
-              ? 'ข้อมูลนี้เป็นภาพ ณ วันที่จอง — ตรวจสอบประวัติแพ้ยาและระดับการช่วยเหลือทุกครั้งก่อนเริ่มดูแล'
-              : 'การจองนี้ไม่มีข้อมูลสุขภาพที่กรอกไว้ — สอบถามจากผู้ติดต่อในวันนัดหมายก่อนเริ่มดูแล'}
-          </p>
-        </div>
-        <PatientFullProfile
-          recipientName={recipientName}
-          bookedByName={booking.careRecipientName ? booking.patientName : null}
-          profile={booking.patientProfile}
-          dayOfContactName={booking.dayOfContactName}
-          dayOfContactPhone={booking.dayOfContactPhone}
-          dayOfContactRelationship={booking.dayOfContactRelationship}
-        />
-      </InfoModal>
+      <JobInfoModals booking={booking} open={infoPanel} onClose={() => setInfoPanel(null)} />
 
-      {/* ── ป๊อปอัปรายละเอียดงาน ── */}
-      <InfoModal isOpen={detailsOpen} onClose={() => setDetailsOpen(false)} title="รายละเอียดงาน" subtitle={recipientName}>
-        <div className="divide-y divide-[#F5F6F7]">
-          <BookingDetailRow icon="calendar_today" label="วันที่" value={booking.bookingDate || '—'} />
-          <BookingDetailRow icon="schedule" label="เวลา" value={booking.time || '—'} />
-          {booking.durationText && <BookingDetailRow icon="hourglass_bottom" label="ระยะเวลา" value={booking.durationText} />}
-          {booking.locationName && <BookingDetailRow icon="place" label="สถานที่" value={booking.locationName} />}
-          {booking.serviceFormat && <BookingDetailRow icon="directions" label="รูปแบบ" value={booking.serviceFormat} />}
-          {booking.dayOfContactName && (
-            <BookingDetailRow
-              icon="contact_phone"
-              label="ผู้ติดต่อ"
-              value={`${booking.dayOfContactName}${booking.dayOfContactRelationship ? ` (${booking.dayOfContactRelationship})` : ''}${
-                booking.dayOfContactPhone ? ` · ${booking.dayOfContactPhone}` : ''
-              }`}
-            />
-          )}
-        </div>
-
-        {/* รายได้ — เดิมโชว์ booking.price ห้วน ๆ ว่า "รายได้" ซึ่งเป็นยอดที่ผู้รับบริการจ่าย
-            ไม่ใช่ยอดที่ผู้ดูแลได้รับ จึงแยกให้เห็นว่าหักอะไรไปเท่าไรและเหลือเท่าไร */}
-        {booking.price > 0 && <EarningsBreakdown earnings={earnings} />}
-        {booking.notes && (
-          <div className="mt-3 flex items-start gap-2 rounded-xl border border-[#FFEAA7] bg-[#FFF8E7] p-3">
-            <Icon name="sticky_note_2" size="small" color="#B45309" />
-            <div className="min-w-0">
-              <p className="text-[11px] font-bold text-[#B45309]" style={FONT}>
-                ข้อความจากผู้รับบริการ
-              </p>
-              <p className="mt-0.5 break-words text-xs text-[#8A6D1F]" style={FONT}>
-                {booking.notes}
-              </p>
-            </div>
-          </div>
-        )}
-      </InfoModal>
-
-      <CheckOutScanModal
+      <JobScanModal
         isOpen={scanOpen}
         onClose={() => setScanOpen(false)}
         bookingId={booking.id}
+        purpose="check_out"
         onScanned={(result) => {
           // เช็ค action ก่อน: หน้านี้เด้งไปหน้าสรุปผลได้เฉพาะตอนที่ "ปิดงาน" จริง
           // ถ้าเป็น CHECK_IN (เข้าหน้านี้มาโดยที่ยังไม่เคยสแกน) แค่ดึงข้อมูลใหม่พอ
