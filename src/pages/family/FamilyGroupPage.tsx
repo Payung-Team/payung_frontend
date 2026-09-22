@@ -356,7 +356,7 @@ function GroupHeaderCard({
               className="rounded-full ring-2 ring-white"
               style={{ marginLeft: i === 0 ? 0 : -8 }}
             >
-              <GroupAvatar name={m.displayName || m.email} seed={m.userId} size={30} />
+              <GroupAvatar name={m.displayName || m.email} seed={m.userId} src={m.avatarUrl} size={30} />
             </span>
           ))}
           {extra > 0 && (

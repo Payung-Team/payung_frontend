@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '../../../components/ui/Icon';
 import { initial } from '../familyStrings';
 
@@ -31,15 +31,31 @@ function colorFor(seed: string): string {
 export function GroupAvatar({
   name,
   seed,
+  src,
   size = 44,
   className = '',
 }: {
   name?: string | null;
   seed: string;
+  /** Profile photo; falls back to the coloured initial when missing or it fails to load. */
+  src?: string | null;
   size?: number;
   className?: string;
 }) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const fontSize = Math.round(size * 0.4);
+  if (src && src !== failedSrc) {
+    return (
+      <img
+        src={src}
+        alt=""
+        aria-hidden="true"
+        onError={() => setFailedSrc(src)}
+        className={`inline-block shrink-0 rounded-full object-cover ${className}`}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
   return (
     <span
       className={`inline-flex shrink-0 items-center justify-center rounded-full font-bold text-white ${className}`}

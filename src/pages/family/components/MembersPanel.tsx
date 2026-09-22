@@ -63,7 +63,7 @@ export default function MembersPanel({
             key={m.id}
             className="flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
           >
-            <GroupAvatar name={m.displayName || m.email} seed={m.userId} size={44} />
+            <GroupAvatar name={m.displayName || m.email} seed={m.userId} src={m.avatarUrl} size={44} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
                 {m.displayName || m.email}

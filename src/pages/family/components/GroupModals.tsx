@@ -351,7 +351,7 @@ export function TransferOwnershipModal({
                   checked={active}
                   onChange={() => setSelected(m.userId)}
                 />
-                <GroupAvatar name={m.displayName || m.email} seed={m.userId} size={36} />
+                <GroupAvatar name={m.displayName || m.email} seed={m.userId} src={m.avatarUrl} size={36} />
                 <div className="min-w-0">
                   <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
                     {m.displayName || m.email}
