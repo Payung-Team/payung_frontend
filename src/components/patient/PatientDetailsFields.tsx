@@ -53,6 +53,14 @@ export interface PatientDetailsValues {
 
 export interface PatientDetailsFieldsProps {
   nameMode: 'single' | 'split';
+  /**
+   * PYG-519 — ล็อกช่องชื่อ (จองแทนสมาชิกในกลุ่ม)
+   *
+   * ★ ชื่อ-นามสกุลเป็น "ตัวตน" ของเจ้าของบัญชี คนจองแทนแก้ไม่ได้
+   *   BE ปฏิเสธ patientName อยู่แล้ว (PYG-516) — ตรงนี้คือการบอกผู้ใช้ก่อนเขาพิมพ์
+   *   ไม่ใช่ด่านความปลอดภัย (ด่านจริงอยู่ที่ BE)
+   */
+  nameReadOnly?: boolean;
   values: PatientDetailsValues;
   errors: PatientFieldErrors;
   disabled?: boolean;
@@ -67,6 +75,25 @@ const inputBase =
 const inputOk = 'border-[#E0E2E5] focus:ring-[#52B69A]';
 const inputErr = 'border-red-500 focus:ring-red-500';
 
+/** พื้นเทา + เคอร์เซอร์ห้าม — บอกด้วยสายตาว่าช่องนี้แก้ไม่ได้ */
+const inputLocked = 'bg-[#F6F7F8] text-[#575859] cursor-not-allowed';
+
+/**
+ * ★ readOnly ไม่ใช่ disabled โดยตั้งใจ — disabled ทำให้ screen reader ข้ามช่องไปเลย
+ *   ผู้ใช้ที่ใช้ตัวอ่านหน้าจอจะไม่รู้ว่ามีชื่ออะไรอยู่ · readOnly ยังโฟกัสและอ่านค่าได้
+ */
+function LockedHint({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <p className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-[#8A8C8E]">
+      <span className="material-icons" style={{ fontSize: 14 }}>
+        lock
+      </span>
+      ชื่อจากบัญชีของสมาชิก แก้ไขไม่ได้
+    </p>
+  );
+}
+
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="mt-1 text-[11px] text-red-500 font-semibold">{message}</p>;
@@ -74,6 +101,7 @@ function FieldError({ message }: { message?: string }) {
 
 export default function PatientDetailsFields({
   nameMode,
+  nameReadOnly = false,
   values,
   errors,
   disabled = false,
@@ -99,9 +127,13 @@ export default function PatientDetailsFields({
               value={values.name}
               onChange={(e) => onChange('name', e.target.value)}
               disabled={disabled}
+              readOnly={nameReadOnly}
               placeholder="ชื่อจริงตามบัตรประชาชน"
-              className={`${inputBase} ${errors.name ? inputErr : inputOk}`}
+              className={`${inputBase} ${errors.name ? inputErr : inputOk} ${
+                nameReadOnly ? inputLocked : ''
+              }`}
             />
+            <LockedHint show={nameReadOnly} />
             <FieldError message={errors.name} />
           </div>
         ) : (
@@ -115,8 +147,11 @@ export default function PatientDetailsFields({
                 value={values.firstName}
                 onChange={(e) => onChange('firstName', e.target.value)}
                 disabled={disabled}
+                readOnly={nameReadOnly}
                 placeholder="ชื่อจริงตามบัตรประชาชน"
-                className={`${inputBase} ${errors.firstName ? inputErr : inputOk}`}
+                className={`${inputBase} ${errors.firstName ? inputErr : inputOk} ${
+                  nameReadOnly ? inputLocked : ''
+                }`}
               />
               <FieldError message={errors.firstName} />
             </div>
@@ -129,11 +164,19 @@ export default function PatientDetailsFields({
                 value={values.lastName}
                 onChange={(e) => onChange('lastName', e.target.value)}
                 disabled={disabled}
+                readOnly={nameReadOnly}
                 placeholder="นามสกุลตามบัตรประชาชน"
-                className={`${inputBase} ${errors.lastName ? inputErr : inputOk}`}
+                className={`${inputBase} ${errors.lastName ? inputErr : inputOk} ${
+                  nameReadOnly ? inputLocked : ''
+                }`}
               />
               <FieldError message={errors.lastName} />
             </div>
+            {nameReadOnly && (
+              <div className="md:col-span-2 -mt-2">
+                <LockedHint show />
+              </div>
+            )}
           </>
         )}
 

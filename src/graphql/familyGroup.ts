@@ -49,6 +49,68 @@ export const MY_FAMILY_GROUPS = gql`
 `;
 
 /** Care recipients shared into a group — used on the dashboard. */
+
+/**
+ * PYG-517 — สมาชิก ACTIVE ทุกคนในกลุ่มพร้อมข้อมูลสำหรับ autofill ตอนจองแทน
+ *
+ * ต่างจาก GROUP_CARE_RECIPIENTS ตรงที่คืน "คน" ไม่ใช่ "โปรไฟล์" — สมาชิกทุกคนได้
+ * หนึ่งรายการเสมอ แม้ยังไม่มีโปรไฟล์ในกลุ่ม (hasProfile=false, details=null)
+ *
+ * ★ BE ตั้งใจไม่คืนข้อมูลจากโปรไฟล์ส่วนตัวของสมาชิก (ยังไม่ได้แชร์เข้ากลุ่ม — PDPA)
+ *   ดังนั้น details=null ไม่ได้แปลว่า "คนนี้ไม่มีข้อมูล" แต่แปลว่า "ยังไม่มีในกลุ่มนี้"
+ */
+export const GROUP_BOOKING_RECIPIENTS = gql`
+  query GroupBookingRecipients($groupId: ID!) {
+    groupBookingRecipients(groupId: $groupId) {
+      memberUserId
+      name
+      nameLocked
+      nickname
+      hasProfile
+      details {
+        age
+        gender
+        weight
+        height
+        supportLevel
+        bloodGroup
+        conditions
+        medicines
+        allergies
+        careInstructions
+        regularHospital
+        addressLine
+        province
+        district
+      }
+    }
+  }
+`;
+
+export interface GroupBookingRecipient {
+  memberUserId: string;
+  name: string;
+  nameLocked: boolean;
+  nickname?: string | null;
+  hasProfile: boolean;
+  details?: {
+    age?: number | null;
+    gender?: string | null;
+    weight?: number | null;
+    height?: number | null;
+    supportLevel?: string | null;
+    bloodGroup?: string | null;
+    conditions?: string[] | null;
+    medicines?: string | null;
+    allergies?: string | null;
+    careInstructions?: string | null;
+    regularHospital?: string | null;
+    addressLine?: string | null;
+    province?: string | null;
+    district?: string | null;
+  } | null;
+}
+
 export const GROUP_CARE_RECIPIENTS = gql`
   query GroupCareRecipients($groupId: ID!) {
     groupCareRecipients(groupId: $groupId) {

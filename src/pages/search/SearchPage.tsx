@@ -704,10 +704,11 @@ function SearchPageContent() {
               input: {
                 groupId: bookingDraft.onBehalf.familyGroupId,
                 // PYG-500: โมเดล "สมาชิก = patient" — ส่ง memberUserId (backend หา/สร้างโปรไฟล์ให้)
-                // patientName ใช้เฉพาะกรณีสมาชิกยังไม่มีข้อมูลแล้วคนจองกรอกให้
                 memberUserId: bookingDraft.onBehalf.memberUserId,
                 careRecipientId: bookingDraft.onBehalf.careRecipientId,
-                patientName: bookingDraft.onBehalf.recipientName,
+                // ★ PYG-519: ไม่ส่ง patientName อีกแล้ว — ชื่อ-นามสกุลมาจากบัญชีของสมาชิกเสมอ
+                //   BE ปฏิเสธด้วย 400 PATIENT_NAME_NOT_ALLOWED ถ้าส่งมา (PYG-516)
+                //   ฟีดแบ็กอาจารย์ Sprint 9 ข้อ 6: คนจองพิมพ์ชื่อใครก็ได้ลงใบจองไม่ได้อีก
                 caregiverId: payload.caregiverId,
                 tasks: payload.tasks,
                 serviceLocations: payload.serviceLocations,
