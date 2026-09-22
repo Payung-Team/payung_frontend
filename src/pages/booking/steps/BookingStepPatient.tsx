@@ -6,9 +6,9 @@ import type { PatientProfile } from '../../../lib/patientProfile';
 import ConfirmModal from '../../../components/ui/ConfirmModal';
 import {
   MY_FAMILY_GROUPS,
-  GROUP_CARE_RECIPIENTS,
+  GROUP_BOOKING_RECIPIENTS,
   type FamilyGroup,
-  type GroupCareRecipient,
+  type GroupBookingRecipient,
 } from '../../../graphql/familyGroup';
 import { GroupAvatar } from '../../family/components/familyUi';
 // PYG-500: ตัวเลือกย้ายไปอยู่ที่เดียวแล้ว — หน้า Onboarding ใช้ชุดเดียวกันนี้
@@ -130,6 +130,44 @@ export default function BookingStepPatient() {
   );
 }
 
+
+/**
+ * PYG-519 — GroupBookingRecipient → รูปทรง SavedRecipient ที่ฟอร์มใช้เติมค่าอยู่แล้ว
+ *
+ * ★ คืน array ว่างเมื่อยังไม่มีโปรไฟล์ในกลุ่ม — ไม่ใช่ใบเปล่า
+ *   ใบเปล่าจะทำให้ฟอร์มคิดว่า "เลือกโปรไฟล์แล้ว" แล้วส่ง careRecipientId ที่ไม่มีจริง
+ *
+ * ★ ที่อยู่ไม่ได้อยู่ใน SavedRecipient.details — ฟอร์มขั้นนี้ไม่มีช่องที่อยู่
+ *   (อยู่คนละขั้นของ flow จอง) จึงยังไม่ส่งต่อ
+ */
+function toSavedRecipients(member: GroupBookingRecipient): SavedRecipient[] {
+  if (!member.hasProfile || !member.details) return [];
+  const d = member.details;
+  return [
+    {
+      // ยังไม่มี id ของโปรไฟล์จาก query นี้ (BE ตั้งใจคืน "คน" ไม่ใช่ "โปรไฟล์")
+      // ใช้ memberUserId เป็น key ชั่วคราว — ฟอร์มใช้แค่เติมค่า ไม่ได้ส่ง id นี้ขึ้น BE
+      // เพราะเส้นทางจองแทนส่ง memberUserId ให้ BE หาโปรไฟล์เอง
+      id: member.memberUserId,
+      name: member.name,
+      nickname: member.nickname ?? undefined,
+      details: {
+        age: d.age ?? undefined,
+        gender: (d.gender as 'ชาย' | 'หญิง' | undefined) ?? undefined,
+        weight: d.weight ?? undefined,
+        height: d.height ?? undefined,
+        supportLevel: d.supportLevel ?? undefined,
+        bloodGroup: d.bloodGroup ?? undefined,
+        conditions: d.conditions ?? undefined,
+        medicines: d.medicines ?? undefined,
+        allergies: d.allergies ?? undefined,
+        careInstructions: d.careInstructions ?? undefined,
+        regularHospital: d.regularHospital ?? undefined,
+      },
+    },
+  ];
+}
+
 // ── Book on behalf of a group member ─────────────────────────────────────────
 // PYG-500: every other ACTIVE member is bookable. The backend resolves their care-recipient
 // profile by memberUserId: reuse the group profile, copy their personal profile, or create one
@@ -149,23 +187,46 @@ function MemberBookingSection({
   );
   const group = groups.find((g) => g.id === groupId) ?? groups[0] ?? null;
 
-  const { data, loading } = useQuery<{ groupCareRecipients: GroupCareRecipient[] }>(
-    GROUP_CARE_RECIPIENTS,
+  // PYG-519: ใช้ query ของ PYG-517 — คืน "คน" ไม่ใช่ "โปรไฟล์" สมาชิกทุกคนได้หนึ่งรายการ
+  //   แม้ยังไม่มีโปรไฟล์ในกลุ่ม จึงมีปุ่มให้กดครบทุกคน
+  const { data, loading } = useQuery<{ groupBookingRecipients: GroupBookingRecipient[] }>(
+    GROUP_BOOKING_RECIPIENTS,
     { variables: { groupId: group?.id ?? '' }, skip: !group, fetchPolicy: 'cache-and-network' },
   );
-  const recipients = useMemo(() => data?.groupCareRecipients ?? [], [data?.groupCareRecipients]);
+  const members = useMemo(
+    () => data?.groupBookingRecipients ?? [],
+    [data?.groupBookingRecipients],
+  );
 
-  const options = useMemo(() => {
-    return (group?.members ?? [])
-      .filter((m) => !m.isMe)
-      .map((m) => ({
-        member: m,
-        profiles: recipients.filter((recipient) => recipient.ownerUserId === m.userId),
-      }));
-  }, [group?.members, recipients]);
+  // จองแทน = จองให้ "คนอื่น" — ตัวเองออกจากลิสต์ (จองให้ตัวเองใช้ flow ปกติ)
+  const myUserId = (group?.members ?? []).find((m) => m.isMe)?.userId;
+  const options = useMemo(
+    () => members.filter((m) => m.memberUserId !== myUserId),
+    [members, myUserId],
+  );
 
   const [selectedUserId, setSelectedUserId] = useState<string>(gc?.memberUserId ?? '');
-  const selected = options.find((o) => o.member.userId === selectedUserId);
+  const selected = options.find((o) => o.memberUserId === selectedUserId);
+
+  /**
+   * PYG-519 — สลับไปสมาชิกคนอื่น: ถามยืนยันก่อนถ้ามีค่าที่แก้ไว้
+   *
+   * ★ ข้อมูลที่กรอกค้างเป็นของคนเดิม ถ้าพาไปต่อกับคนใหม่เงียบ ๆ จะกลายเป็นการส่ง
+   *   ข้อมูลสุขภาพของคนหนึ่งไปให้ผู้ดูแลในนามของอีกคน
+   *   ฟอร์มถูก remount ด้วย key อยู่แล้ว (ล้างค่าให้เอง) ที่นี่แค่กันการกดพลาด
+   */
+  const handlePickMember = (nextUserId: string) => {
+    if (nextUserId === selectedUserId) return;
+    const hasEdits =
+      selectedUserId !== '' && !!bookingDraft?.recipient?.patientDetails;
+    if (
+      hasEdits &&
+      !window.confirm('เปลี่ยนสมาชิกแล้วข้อมูลที่กรอกไว้จะถูกล้าง ต้องการเปลี่ยนหรือไม่?')
+    ) {
+      return;
+    }
+    setSelectedUserId(nextUserId);
+  };
 
   return (
     <>
@@ -190,7 +251,7 @@ function MemberBookingSection({
           )}
         </div>
 
-        {loading && recipients.length === 0 ? (
+        {loading && members.length === 0 ? (
           <div className="mt-4 space-y-2">
             <div className="h-16 w-full animate-pulse rounded-xl bg-gray-100" />
             <div className="h-16 w-full animate-pulse rounded-xl bg-gray-100" />
@@ -201,11 +262,11 @@ function MemberBookingSection({
           </p>
         ) : (
           <div className="mt-4 space-y-2">
-            {options.map(({ member, profiles }) => {
-              const active = selectedUserId === member.userId;
+            {options.map((member) => {
+              const active = selectedUserId === member.memberUserId;
               return (
                 <label
-                  key={member.userId}
+                  key={member.memberUserId}
                   className={`flex items-center gap-3 rounded-xl border p-3 transition ${
                     active
                       ? 'border-2 border-[#009265] bg-[#F0FAF4] cursor-pointer'
@@ -217,17 +278,17 @@ function MemberBookingSection({
                     name="book-member"
                     className="h-4 w-4 accent-[#009265]"
                     checked={active}
-                    onChange={() => setSelectedUserId(member.userId)}
+                    onChange={() => handlePickMember(member.memberUserId)}
                   />
-                  <GroupAvatar name={member.displayName || member.email} seed={member.userId} size={40} />
+                  <GroupAvatar name={member.name} seed={member.memberUserId} size={40} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
-                      {member.displayName || member.email}
+                      {member.name || 'สมาชิกที่ยังไม่ได้กรอกชื่อ'}
                     </p>
                     <p className="truncate text-[12px] text-[#8A8C8E]">
-                      {profiles.length > 0
-                        ? `มีโปรไฟล์ที่บันทึกไว้ ${profiles.length} รายการ`
-                        : 'ยังไม่มีโปรไฟล์ที่บันทึกไว้ — เลือกแล้วกรอกข้อมูลใหม่ได้'}
+                      {member.hasProfile
+                        ? 'มีข้อมูลผู้รับบริการแล้ว — เลือกแล้วเติมให้อัตโนมัติ'
+                        : 'ยังไม่มีข้อมูลในกลุ่ม — เลือกแล้วกรอกได้เลย'}
                     </p>
                   </div>
                 </label>
@@ -239,12 +300,14 @@ function MemberBookingSection({
 
       {selected && group && (
         <SelfPatientForm
-          key={`${group.id}:${selected.member.userId}`}
+          key={`${group.id}:${selected.memberUserId}`}
           memberContext={{
             groupId: group.id,
-            memberUserId: selected.member.userId,
-            memberName: selected.member.displayName || selected.member.email,
-            savedRecipients: selected.profiles,
+            memberUserId: selected.memberUserId,
+            memberName: selected.name,
+            // PYG-519: ชื่อมาจากบัญชีของสมาชิก แก้ไม่ได้ (BE ปฏิเสธ patientName — PYG-516)
+            nameLocked: selected.nameLocked,
+            savedRecipients: toSavedRecipients(selected),
           }}
         />
       )}
@@ -354,6 +417,8 @@ interface MemberPatientContext {
   memberUserId: string;
   memberName: string;
   savedRecipients: SavedRecipient[];
+  /** PYG-519: ชื่อ-นามสกุลมาจากบัญชีสมาชิก แก้ไม่ได้ */
+  nameLocked?: boolean;
 }
 
 function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientContext } = {}) {
@@ -711,6 +776,7 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
         {/* PYG-500: ฟอร์มชุดนี้ใช้ร่วมกับหน้า Onboarding — แก้ช่อง/ตัวเลือกที่ PatientDetailsFields */}
         <PatientDetailsFields
           nameMode="single"
+          nameReadOnly={memberContext?.nameLocked ?? false}
           values={{
             name,
             firstName: '',
