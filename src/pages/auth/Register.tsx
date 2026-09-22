@@ -10,7 +10,7 @@ import { Icon } from '../../components/ui/Icon';
 import { supabase } from '../../lib/supabase';
 import { useQuery } from '@apollo/client/react';
 // PYG-475: ข้อความความยินยอมมาจาก BE ที่เดียว (PYG-472) ห้ามเขียนเองฝั่งนี้
-import ConsentBox from '../../components/consent/ConsentBox';
+import ConsentModal from '../../components/consent/ConsentModal';
 import { CONSENT_POLICY, type ConsentPolicyData } from '../../graphql/consent';
 
 // Icons
@@ -200,8 +200,9 @@ export default function Register() {
    * ★ ถ้านโยบายยังโหลดไม่เสร็จ ถือว่ายังไม่ครบ — ปุ่มสมัครต้องไม่กดได้ก่อนที่ผู้ใช้จะได้เห็น
    *   ข้อความที่เขากำลังจะยินยอม
    */
-  const consentIncomplete =
-    !policy || policy.items.some((item) => item.required && !grantedConsents.has(item.type));
+  // PYG-541: pop-up ความยินยอมเปิดอยู่ไหม + error ที่แสดงในกล่อง
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [consentError, setConsentError] = useState('');
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
@@ -239,51 +240,68 @@ export default function Register() {
     }
   }, [validate, submitted]);
 
-  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+  /**
+   * กดสมัคร → ตรวจฟอร์มก่อน แล้วเปิด pop-up ความยินยอม (PYG-541)
+   *
+   * ★ ยังไม่สร้างบัญชีตรงนี้ — ความยินยอมต้องมาก่อนการเก็บข้อมูลเสมอ
+   *   บัญชีถูกสร้างใน doRegister() หลังผู้ใช้กดยินยอมใน pop-up เท่านั้น
+   */
+  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError('');
     const errs = validate();
     setErrors(errs);
     setSubmitted(true);
 
-    if (consentIncomplete) {
-      setFormError('กรุณาอ่านและให้ความยินยอมข้อที่บังคับก่อนสมัครสมาชิก');
+    if (Object.keys(errs).length > 0) {
       setErrorCount(prev => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    if (Object.keys(errs).length === 0) {
-      setIsSubmitting(true);
-      const result = await registerUser({
-        email,
-        password,
-        role: ROLE_MAP[selectedRole],
-        // ★ ส่งคำตอบของทุกข้อที่แสดง รวมข้อที่ไม่ติ๊ก (granted: false)
-        //   การปฏิเสธก็เป็นข้อเท็จจริงที่ต้องพิสูจน์ได้ว่าเราถามแล้วและเขาตอบว่าไม่
-        //   policyVersion มาจาก policy ที่โหลดมา ไม่ hardcode — BE ปฏิเสธถ้าไม่ตรง
-        consents: policy.items.map((item) => ({
-          type: item.type,
-          granted: grantedConsents.has(item.type),
-          policyVersion: policy.version,
-        })),
-      });
-
-      if (result.error) {
-        setIsSubmitting(false);
-        setFormError(result.error);
-        setErrorCount(prev => prev + 1);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } else {
-        // Success → redirect ทันที (ไม่ต้อง setIsSubmitting(false) เพราะออกจากหน้าแล้ว
-        // การเรียก setState ก่อน navigate จะ trigger re-render ที่ทำให้ GuestRoute
-        // ตัดสินใจ redirect ผิดหน้า เพราะ is_registering ถูกลบไปแล้วจาก render ก่อนหน้า)
-        navigate(selectedRole === 'caregiver' ? '/kyc' : '/onboarding');
-      }
-    } else {
+    // นโยบายยังโหลดไม่เสร็จ = ยังไม่มีข้อความให้ผู้ใช้อ่าน — เปิดกล่องเปล่าไม่ได้
+    if (!policy) {
+      setFormError('กำลังโหลดข้อความความยินยอม กรุณาลองอีกครั้ง');
       setErrorCount(prev => prev + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
     }
+
+    setConsentError('');
+    setConsentOpen(true);
+  };
+
+  /** ผู้ใช้กดยินยอมใน pop-up → สร้างบัญชีพร้อมส่งคำตอบความยินยอม */
+  const doRegister = async () => {
+    if (!policy) return;
+
+    setIsSubmitting(true);
+    setConsentError('');
+
+    const result = await registerUser({
+      email,
+      password,
+      role: ROLE_MAP[selectedRole],
+      // ★ ส่งคำตอบของทุกข้อที่แสดง รวมข้อที่ไม่ติ๊ก (granted: false)
+      //   การปฏิเสธก็เป็นข้อเท็จจริงที่ต้องพิสูจน์ได้ว่าเราถามแล้วและเขาตอบว่าไม่
+      //   policyVersion มาจาก policy ที่โหลดมา ไม่ hardcode — BE ปฏิเสธถ้าไม่ตรง
+      consents: policy.items.map((item) => ({
+        type: item.type,
+        granted: grantedConsents.has(item.type),
+        policyVersion: policy.version,
+      })),
+    });
+
+    if (result.error) {
+      setIsSubmitting(false);
+      // ★ แสดง error ในกล่อง ไม่ปิด pop-up — ปิดไปแล้วผู้ใช้ต้องติ๊กใหม่ทั้งหมด
+      setConsentError(result.error);
+      return;
+    }
+
+    // Success → redirect ทันที (ไม่ต้อง setIsSubmitting(false) เพราะออกจากหน้าแล้ว
+    // การเรียก setState ก่อน navigate จะ trigger re-render ที่ทำให้ GuestRoute
+    // ตัดสินใจ redirect ผิดหน้า เพราะ is_registering ถูกลบไปแล้วจาก render ก่อนหน้า)
+    navigate(selectedRole === 'caregiver' ? '/kyc' : '/onboarding');
   };
 
   const handleGoogleSignIn = async () => {
@@ -403,39 +421,11 @@ export default function Register() {
           wrapperClassName="mt-4"
         />
 
-        {/* PYG-475: ความยินยอม PDPA — ต้องอยู่เหนือปุ่มสมัคร ผู้ใช้ควรอ่านก่อนกด */}
-        {policy && (
-          <div className="mt-6 rounded-2xl border border-[#E0E2E5] bg-white p-4">
-            {policy.screen?.titleTh && (
-              <h2 className="text-base font-bold text-[#1A1A1A]">{policy.screen.titleTh}</h2>
-            )}
-            {policy.screen?.introTh && (
-              <p className="mt-1 text-sm leading-6 text-[#8A8C8E]">{policy.screen.introTh}</p>
-            )}
-
-            <div className="mt-3">
-              <ConsentBox
-                items={policy.items}
-                granted={grantedConsents}
-                onToggle={toggleConsent}
-                rightsNote={policy.rightsNoteTh}
-                privacyNotice={policy.privacyNoticeTh}
-                disabled={isSubmitting}
-                showErrors={submitted}
-              />
-            </div>
-
-            <p className="mt-3 text-xs text-[#B0B2B5]">
-              นโยบายเวอร์ชัน {policy.version} · เริ่มใช้ {policy.effectiveDate}
-            </p>
-          </div>
-        )}
-
         <button
           type="submit"
           id="register-submit"
-          disabled={isSubmitting || consentIncomplete}
-          className={`mt-5 h-[52px] w-full rounded-lg bg-[#52B69A] text-xl font-bold text-white shadow-[0_4px_12px_rgba(82,182,154,0.2)] transition-all duration-200 hover:bg-[#45a085] hover:shadow-[0_6px_20px_rgba(82,182,154,0.35)] active:scale-[0.98] ${isSubmitting || consentIncomplete ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+          disabled={isSubmitting}
+          className={`mt-5 h-[52px] w-full rounded-lg bg-[#52B69A] text-xl font-bold text-white shadow-[0_4px_12px_rgba(82,182,154,0.2)] transition-all duration-200 hover:bg-[#45a085] hover:shadow-[0_6px_20px_rgba(82,182,154,0.35)] active:scale-[0.98] ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
           style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
         >
           {isSubmitting ? 'กำลังสมัครสมาชิก...' : 'สมัครสมาชิก'}
@@ -463,6 +453,25 @@ export default function Register() {
           <span className="cursor-pointer underline hover:text-[#8A8C8E]">นโยบายความเป็นส่วนตัว</span>
         </p>
       </form>
+
+      {/* PYG-541: ความยินยอม PDPA เด้งหลังกดสมัคร — บัญชีถูกสร้างหลังกดยินยอมเท่านั้น */}
+      {policy && (
+        <ConsentModal
+          open={consentOpen}
+          items={policy.items}
+          granted={grantedConsents}
+          onToggle={toggleConsent}
+          screen={policy.screen}
+          rightsNote={policy.rightsNoteTh}
+          privacyNotice={policy.privacyNoticeTh}
+          policyVersion={policy.version}
+          effectiveDate={policy.effectiveDate}
+          submitting={isSubmitting}
+          error={consentError}
+          onCancel={() => setConsentOpen(false)}
+          onAccept={() => void doRegister()}
+        />
+      )}
     </AuthLayout>
   );
 }

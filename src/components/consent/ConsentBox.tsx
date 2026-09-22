@@ -12,8 +12,10 @@
  *   ③ ข้อที่ `sensitive` (ม.26) ต้องอยู่ในกรอบของตัวเอง แยกสายตาจากข้อตกลงทั่วไป
  *      และต้องเลื่อนอ่านจนสุดก่อนถึงจะติ๊กได้
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { ConsentItem } from '../../graphql/consent';
+// PYG-541: แยกออกมาเป็นไฟล์ของตัวเอง ให้ ConsentModal ใช้ร่วมกันได้
+import { useScrolledToEnd } from './useScrolledToEnd';
 
 export interface ConsentBoxProps {
   items: ConsentItem[];
@@ -27,48 +29,6 @@ export interface ConsentBoxProps {
   disabled?: boolean;
   /** แสดง error ใต้ข้อที่ยังไม่ติ๊ก (ตั้งหลังผู้ใช้กดบันทึกแล้ว) */
   showErrors?: boolean;
-}
-
-/**
- * เลื่อนถึงท้ายข้อความแล้วหรือยัง
- *
- * ★ เผื่อ 8px เพราะความสูงจริงของ element เป็นทศนิยม การเทียบเท่ากันเป๊ะจะไม่มีวันจริง
- *   ในบางเบราว์เซอร์/ระดับซูม แล้วปุ่มจะค้าง disabled ตลอดกาลโดยไม่มีอะไรบอกผู้ใช้
- *
- * ★ ถ้าเนื้อหาสั้นกว่ากล่อง (ไม่มีอะไรให้เลื่อน) ถือว่าอ่านจบแล้ว — ไม่งั้นผู้ใช้จะติดตาย
- */
-function useScrolledToEnd(): [boolean, (el: HTMLDivElement | null) => void] {
-  const [reachedEnd, setReachedEnd] = useState(false);
-  const elRef = useRef<HTMLDivElement | null>(null);
-
-  const check = useCallback((el: HTMLDivElement) => {
-    const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
-    if (atEnd) setReachedEnd(true);
-  }, []);
-
-  const attach = useCallback(
-    (el: HTMLDivElement | null) => {
-      elRef.current = el;
-      if (el) check(el);
-    },
-    [check],
-  );
-
-  useEffect(() => {
-    const el = elRef.current;
-    if (!el) return;
-    const onScroll = () => check(el);
-    el.addEventListener('scroll', onScroll, { passive: true });
-    // เนื้อหามาทีหลัง (โหลดจาก query) → ขนาดเปลี่ยน ต้องตรวจซ้ำ
-    const observer = new ResizeObserver(() => check(el));
-    observer.observe(el);
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-      observer.disconnect();
-    };
-  }, [check]);
-
-  return [reachedEnd, attach];
 }
 
 function SensitiveItem({
