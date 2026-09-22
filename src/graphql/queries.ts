@@ -30,11 +30,18 @@ export const COMPLETE_PASSWORD_CHANGE = gql`
 `;
 
 export const REGISTER_USER = gql`
-  mutation Register($email: String!, $password: String!, $role: Int!) {
+  mutation Register(
+    $email: String!
+    $password: String!
+    $role: Int!
+    # PYG-475: ความยินยอม PDPA — ไม่ส่ง = BE ตอบ CONSENT_REQUIRED และไม่สร้างบัญชี
+    $consents: [ConsentAnswerInput!]
+  ) {
     register(input: {
       email: $email
       password: $password
       role: $role
+      consents: $consents
     }) {
       accessToken
       refreshToken
