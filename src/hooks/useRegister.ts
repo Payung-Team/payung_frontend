@@ -3,11 +3,19 @@ import { REGISTER_USER } from '../graphql/queries';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { logGraphQLError } from '../lib/logGraphQLError';
+import { extractGraphQLErrorCode } from '../lib/apolloErrors';
+import { CONSENT_ERROR, type ConsentAnswer } from '../graphql/consent';
 
 export interface RegisterData {
   email: string;
   password: string;
   role: number; // 1 = patient, 2 = caregiver
+  /**
+   * PYG-475 — คำตอบความยินยอมของทุกข้อที่หน้าสมัครแสดง (จาก consentPolicy source: "register")
+   * ข้อที่ไม่ติ๊กก็ต้องส่ง granted: false มาด้วย ไม่ใช่ตัดออก
+   * policyVersion มาจาก consentPolicy.version ห้าม hardcode
+   */
+  consents: ConsentAnswer[];
 }
 
 export interface RegisterResponse {
@@ -61,6 +69,24 @@ export function useRegister() {
       const errorMessage = err.message || '';
       let displayError = 'เกิดข้อผิดพลาดในการลงทะเบียน';
       
+      // PYG-475: BE ส่ง code เรื่องความยินยอมมาใน extensions.code (ConsentError ของ PYG-474)
+      //   แปลเป็นสิ่งที่ผู้ใช้ต้องทำต่อ — ข้อความดิบไม่ได้บอกว่าต้องติ๊กอะไรหรือต้องรีเฟรช
+      const code = extractGraphQLErrorCode(err);
+      if (code === CONSENT_ERROR.VERSION_MISMATCH) {
+        return {
+          data: null,
+          error: 'นโยบายความเป็นส่วนตัวมีฉบับใหม่แล้ว กรุณารีเฟรชหน้าเว็บแล้วอ่านอีกครั้ง',
+          code,
+        };
+      }
+      if (code && code.startsWith('CONSENT_')) {
+        return {
+          data: null,
+          error: 'ต้องให้ความยินยอมข้อที่บังคับก่อนจึงจะสมัครได้',
+          code,
+        };
+      }
+
       if (errorMessage.includes('Email is already in use') || errorMessage.includes('Unique constraint failed') || errorMessage.toLowerCase().includes('already exists')) {
         displayError = 'อีเมลนี้ถูกใช้งานแล้ว';
       } else if (errorMessage) {

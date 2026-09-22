@@ -8,6 +8,10 @@ import GoogleAuthButton from '../../components/ui/GoogleAuthButton';
 import { useRegister } from '../../hooks/useRegister';
 import { Icon } from '../../components/ui/Icon';
 import { supabase } from '../../lib/supabase';
+import { useQuery } from '@apollo/client/react';
+// PYG-475: ข้อความความยินยอมมาจาก BE ที่เดียว (PYG-472) ห้ามเขียนเองฝั่งนี้
+import ConsentBox from '../../components/consent/ConsentBox';
+import { CONSENT_POLICY, type ConsentPolicyData } from '../../graphql/consent';
 
 // Icons
 const EmailIcon = <Icon name="email" size="small" color="currentColor" />;
@@ -173,6 +177,32 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   // Validation & Auth state
+  // PYG-475: ความยินยอม PDPA — ★ เริ่มจาก "ไม่ติ๊ก" เสมอ ห้ามติ๊กมาให้ล่วงหน้า
+  const [grantedConsents, setGrantedConsents] = useState<Set<string>>(new Set());
+
+  const { data: consentData } = useQuery<ConsentPolicyData>(CONSENT_POLICY, {
+    variables: { source: 'register' },
+    fetchPolicy: 'cache-and-network',
+  });
+  const policy = consentData?.consentPolicy;
+
+  const toggleConsent = (type: string, next: boolean) => {
+    setGrantedConsents((prev) => {
+      const updated = new Set(prev);
+      if (next) updated.add(type);
+      else updated.delete(type);
+      return updated;
+    });
+  };
+
+  /**
+   * ยังติ๊กข้อบังคับไม่ครบ
+   * ★ ถ้านโยบายยังโหลดไม่เสร็จ ถือว่ายังไม่ครบ — ปุ่มสมัครต้องไม่กดได้ก่อนที่ผู้ใช้จะได้เห็น
+   *   ข้อความที่เขากำลังจะยินยอม
+   */
+  const consentIncomplete =
+    !policy || policy.items.some((item) => item.required && !grantedConsents.has(item.type));
+
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -216,12 +246,27 @@ export default function Register() {
     setErrors(errs);
     setSubmitted(true);
 
+    if (consentIncomplete) {
+      setFormError('กรุณาอ่านและให้ความยินยอมข้อที่บังคับก่อนสมัครสมาชิก');
+      setErrorCount(prev => prev + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     if (Object.keys(errs).length === 0) {
       setIsSubmitting(true);
       const result = await registerUser({
         email,
         password,
-        role: ROLE_MAP[selectedRole]
+        role: ROLE_MAP[selectedRole],
+        // ★ ส่งคำตอบของทุกข้อที่แสดง รวมข้อที่ไม่ติ๊ก (granted: false)
+        //   การปฏิเสธก็เป็นข้อเท็จจริงที่ต้องพิสูจน์ได้ว่าเราถามแล้วและเขาตอบว่าไม่
+        //   policyVersion มาจาก policy ที่โหลดมา ไม่ hardcode — BE ปฏิเสธถ้าไม่ตรง
+        consents: policy.items.map((item) => ({
+          type: item.type,
+          granted: grantedConsents.has(item.type),
+          policyVersion: policy.version,
+        })),
       });
 
       if (result.error) {
@@ -358,11 +403,39 @@ export default function Register() {
           wrapperClassName="mt-4"
         />
 
+        {/* PYG-475: ความยินยอม PDPA — ต้องอยู่เหนือปุ่มสมัคร ผู้ใช้ควรอ่านก่อนกด */}
+        {policy && (
+          <div className="mt-6 rounded-2xl border border-[#E0E2E5] bg-white p-4">
+            {policy.screen?.titleTh && (
+              <h2 className="text-base font-bold text-[#1A1A1A]">{policy.screen.titleTh}</h2>
+            )}
+            {policy.screen?.introTh && (
+              <p className="mt-1 text-sm leading-6 text-[#8A8C8E]">{policy.screen.introTh}</p>
+            )}
+
+            <div className="mt-3">
+              <ConsentBox
+                items={policy.items}
+                granted={grantedConsents}
+                onToggle={toggleConsent}
+                rightsNote={policy.rightsNoteTh}
+                privacyNotice={policy.privacyNoticeTh}
+                disabled={isSubmitting}
+                showErrors={submitted}
+              />
+            </div>
+
+            <p className="mt-3 text-xs text-[#B0B2B5]">
+              นโยบายเวอร์ชัน {policy.version} · เริ่มใช้ {policy.effectiveDate}
+            </p>
+          </div>
+        )}
+
         <button
           type="submit"
           id="register-submit"
-          disabled={isSubmitting}
-          className={`mt-5 h-[52px] w-full rounded-lg bg-[#52B69A] text-xl font-bold text-white shadow-[0_4px_12px_rgba(82,182,154,0.2)] transition-all duration-200 hover:bg-[#45a085] hover:shadow-[0_6px_20px_rgba(82,182,154,0.35)] active:scale-[0.98] ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+          disabled={isSubmitting || consentIncomplete}
+          className={`mt-5 h-[52px] w-full rounded-lg bg-[#52B69A] text-xl font-bold text-white shadow-[0_4px_12px_rgba(82,182,154,0.2)] transition-all duration-200 hover:bg-[#45a085] hover:shadow-[0_6px_20px_rgba(82,182,154,0.35)] active:scale-[0.98] ${isSubmitting || consentIncomplete ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
           style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
         >
           {isSubmitting ? 'กำลังสมัครสมาชิก...' : 'สมัครสมาชิก'}
