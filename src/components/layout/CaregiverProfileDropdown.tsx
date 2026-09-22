@@ -42,6 +42,13 @@ export default function CaregiverProfileDropdown({
     navigate('/caregiver/settings');
   };
 
+  // PYG-540: หน้าความเป็นส่วนตัว — แสดงเสมอ ไม่ขึ้นกับสถานะ KYC
+  // (สิทธิ์ถอนความยินยอมต้องใช้ได้ตั้งแต่สมัคร ต่างจาก "ตั้งค่า" ที่ซ่อนไว้จนเริ่ม KYC)
+  const handlePrivacy = () => {
+    setIsOpen(false);
+    navigate('/settings/privacy');
+  };
+
   return (
     <div className="relative">
       <button
@@ -76,6 +83,19 @@ export default function CaregiverProfileDropdown({
           </div>
 
           <div className="py-2">
+            <button
+              onClick={handlePrivacy}
+              className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
+            >
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                <Icon name="privacy_tip" size="small" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-medium text-gray-900">ความเป็นส่วนตัว</p>
+                <p className="text-xs text-gray-500">ความยินยอมและสิทธิ์ของฉัน</p>
+              </div>
+            </button>
+
             {kycStatus !== 'none' && (
               <>
                 <button

@@ -83,7 +83,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
         '/caregiver/settings/notifications',
         '/caregiver/settings/language',
         '/caregiver/settings/billing',
-        '/caregiver/availability'
+        '/caregiver/availability',
+        // PYG-540: สิทธิ์ถอนความยินยอมต้องใช้ได้เสมอ แม้ KYC ยังไม่ผ่าน
+        '/settings/privacy'
       ];
       
       const isAllowedPath = allowedUnverifiedPaths.some(path => location.pathname.startsWith(path));
