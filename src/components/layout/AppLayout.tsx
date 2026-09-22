@@ -31,12 +31,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
     return '/patient-home';
   })();
   const { navItems, isLoading: menuLoading, error: menuError } = useFilteredMenu(menuName, userRole);
-  const { data: userData } = useQuery<{ me: { id: string; role: number; displayName?: string; phone?: string; address?: string; bio?: string; avatarUrl?: string | null } } | undefined>(GET_USER);
+  const { data: userData } = useQuery<{ me: { id: string; role: number; displayName?: string; firstName?: string; lastName?: string; phone?: string; address?: string; bio?: string; avatarUrl?: string | null } } | undefined>(GET_USER);
   
   const [isViewProfileOpen, setIsViewProfileOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
   const currentRole = userData?.me?.role ?? userRole;
+
+  // PYG-497 เก็บ firstName/lastName ตอน Onboarding — ผู้ใช้เก่าเกือบทั้งหมดยังไม่มี
+  // จึงต้อง fallback ไป displayName ไม่งั้นหัวมุมขวาจะว่าง
+  const fullName = [userData?.me?.firstName, userData?.me?.lastName]
+    .filter(Boolean)
+    .join(' ');
 
   const { data: caregiverData, loading: caregiverLoading, error: caregiverError } = useQuery<{ myCaregiverProfile?: { kycStatus: string; fullName?: string } } | undefined>(GET_CAREGIVER_PROFILE, {
     skip: currentRole !== 2,
@@ -134,7 +140,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <CaregiverProfileDropdown
                 avatarFallbackColor="#52B69A"
                 avatarUrl={userData?.me?.avatarUrl ?? undefined}
-                displayName={caregiverData?.myCaregiverProfile?.fullName || userData?.me?.displayName || ''}
+                displayName={caregiverData?.myCaregiverProfile?.fullName || fullName || userData?.me?.displayName || ''}
                 kycStatus={caregiverData?.myCaregiverProfile?.kycStatus}
               />
             ) : (
@@ -143,7 +149,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 onEditProfileClick={() => setIsEditProfileOpen(true)}
                 avatarFallbackColor="#52B69A"
                 avatarUrl={userData?.me?.avatarUrl ?? undefined}
-                displayName={userData?.me?.displayName || ''}
+                displayName={fullName || userData?.me?.displayName || ''}
               />
             )
           }

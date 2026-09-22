@@ -20,7 +20,10 @@ export default function ViewProfileModal({
   if (!isOpen) return null;
 
   const user = data?.me;
-  const userInitial = user?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || '?';
+  // PYG-497 เก็บ firstName/lastName ตอน Onboarding — ผู้ใช้เก่าเกือบทั้งหมดยังไม่มี
+  // จึง fallback ไป displayName ไม่งั้นช่องชื่อจะว่าง
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ');
+  const shownName = fullName || user?.displayName || user?.email?.split('@')[0] || 'ผู้ใช้';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 overflow-y-auto backdrop-blur-sm">
@@ -65,13 +68,14 @@ export default function ViewProfileModal({
             <div className="flex flex-col items-center mb-6 pb-6 border-b border-gray-200">
               <div className="relative">
                 <Avatar
-                  name={userInitial}
+                  src={user?.avatarUrl ?? undefined}
+                  name={shownName}
                   size={70}
                   fallbackColor="#52B69A"
                 />
               </div>
               <p className="text-sm font-semibold text-gray-900 mt-3">
-                {user?.displayName || user?.email?.split('@')[0] || 'ผู้ใช้'}
+                {shownName}
               </p>
               <p className="text-xs text-gray-500 mt-1">{user?.email}</p>
             </div>
@@ -84,7 +88,7 @@ export default function ViewProfileModal({
                   ชื่อ-นามสกุล
                 </label>
                 <div className="px-3 py-2 text-sm bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
-                  {user?.displayName || '—'}
+                  {fullName || user?.displayName || '—'}
                 </div>
               </div>
 

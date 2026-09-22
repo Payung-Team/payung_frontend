@@ -69,6 +69,8 @@ export const GET_USER = gql`
       id
       email
       displayName
+      firstName
+      lastName
       phone
       address
       subDistrict
