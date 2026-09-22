@@ -308,24 +308,26 @@ export default function OnboardingPage() {
       if (isElder) {
         await completeOnboarding({
           variables: {
-            firstName: firstName.trim(),
-            lastName: lastName.trim(),
-            details: {
-              age: Number(patient.age),
-              gender: patient.gender,
-              supportLevel: patient.supportLevel,
-              ...(patient.weight ? { weight: Number(patient.weight) } : {}),
-              ...(patient.height ? { height: Number(patient.height) } : {}),
-              ...(patient.bloodGroup ? { bloodGroup: patient.bloodGroup } : {}),
-              ...(patient.conditions.length ? { conditions: patient.conditions } : {}),
-              ...(patient.medicines.trim() ? { medicines: patient.medicines.trim() } : {}),
-              ...(patient.allergies.trim() ? { allergies: patient.allergies.trim() } : {}),
-              ...(patient.careInstructions.trim()
-                ? { careInstructions: patient.careInstructions.trim() }
-                : {}),
-              ...(patient.regularHospital.trim()
-                ? { regularHospital: patient.regularHospital.trim() }
-                : {}),
+            input: {
+              firstName: firstName.trim(),
+              lastName: lastName.trim(),
+              details: {
+                age: Number(patient.age),
+                gender: patient.gender,
+                supportLevel: patient.supportLevel,
+                ...(patient.weight ? { weight: Number(patient.weight) } : {}),
+                ...(patient.height ? { height: Number(patient.height) } : {}),
+                ...(patient.bloodGroup ? { bloodGroup: patient.bloodGroup } : {}),
+                ...(patient.conditions.length ? { conditions: patient.conditions } : {}),
+                ...(patient.medicines.trim() ? { medicines: patient.medicines.trim() } : {}),
+                ...(patient.allergies.trim() ? { allergies: patient.allergies.trim() } : {}),
+                ...(patient.careInstructions.trim()
+                  ? { careInstructions: patient.careInstructions.trim() }
+                  : {}),
+                ...(patient.regularHospital.trim()
+                  ? { regularHospital: patient.regularHospital.trim() }
+                  : {}),
+              },
             },
           },
         });
