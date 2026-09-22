@@ -9,6 +9,7 @@
  *   ทั้งคำขอ → ทุกหน้าที่เรียก GET_USER พังพร้อมกัน ทั้งที่ยังไม่เกี่ยวกับ Onboarding เลย
  */
 import { gql } from '@apollo/client';
+import type { ConsentAnswer } from './consent';
 
 /**
  * บันทึกข้อมูลผู้รับบริการของตัวเองตอน Onboarding
@@ -33,6 +34,12 @@ export interface CompleteOnboardingVars {
     firstName: string;
     lastName: string;
     nickname?: string;
+    /**
+     * PYG-538/539 — ความยินยอมที่ผู้ใช้กดบนหน้า Onboarding
+     * ต้องมี sensitive_health_data ที่ granted = true ไม่งั้น BE ปฏิเสธทั้งคำขอ
+     * policyVersion ต้องมาจาก consentPolicy.version ห้าม hardcode
+     */
+    consents: ConsentAnswer[];
     details: {
       age: number;
       gender: string;

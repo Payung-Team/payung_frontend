@@ -23,6 +23,13 @@ import {
   type CompleteOnboardingData,
   type CompleteOnboardingVars,
 } from '../../graphql/onboarding';
+// PYG-539: ข้อความความยินยอมมาจาก BE ที่เดียว (PYG-472) ห้ามเขียนเองฝั่งนี้
+import ConsentBox from '../../components/consent/ConsentBox';
+import {
+  CONSENT_ERROR,
+  CONSENT_POLICY,
+  type ConsentPolicyData,
+} from '../../graphql/consent';
 
 const PhoneIcon = <Icon name="phone" size="small" color="currentColor" />;
 const LocationIcon = <Icon name="location_on" size="small" color="currentColor" />;
@@ -162,6 +169,27 @@ export default function OnboardingPage() {
     setPatient((prev) => ({ ...prev, [field]: value }));
   };
 
+  // PYG-539: ความยินยอม — ★ เริ่มจาก "ไม่ติ๊ก" เสมอ ห้ามติ๊กมาให้ล่วงหน้า
+  //   กฎหมายต้องการการกระทำโดยชัดแจ้ง ไม่ใช่การที่ผู้ใช้ไม่ยกเลิกค่าที่เราตั้งไว้
+  const [grantedConsents, setGrantedConsents] = useState<Set<string>>(new Set());
+  const [consentError, setConsentError] = useState('');
+
+  const { data: consentData } = useQuery<ConsentPolicyData>(CONSENT_POLICY, {
+    variables: { source: 'onboarding' },
+    skip: !isElder,
+    fetchPolicy: 'cache-and-network',
+  });
+  const policy = consentData?.consentPolicy;
+
+  const toggleConsent = (type: string, next: boolean) => {
+    setGrantedConsents((prev) => {
+      const updated = new Set(prev);
+      if (next) updated.add(type);
+      else updated.delete(type);
+      return updated;
+    });
+  };
+
   const [errors, setErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -276,7 +304,22 @@ export default function OnboardingPage() {
     setPatientErrors(patientErrs);
     setSubmitted(true);
 
-    if (Object.keys(errs).length > 0 || Object.keys(patientErrs).length > 0) {
+    // PYG-539: ข้อบังคับต้องติ๊กครบก่อน ไม่งั้นไม่ต้องยิงไปให้ BE ปฏิเสธ
+    //   (BE ตรวจซ้ำอีกชั้นอยู่แล้ว — ที่นี่แค่ไม่ให้ผู้ใช้เสียเที่ยว)
+    const missingConsent = isElder
+      ? (policy?.items ?? []).some(
+          (item) => item.required && !grantedConsents.has(item.type),
+        )
+      : false;
+    setConsentError(
+      missingConsent ? 'ต้องให้ความยินยอมข้อที่บังคับก่อนจึงจะบันทึกได้' : '',
+    );
+
+    if (
+      Object.keys(errs).length > 0 ||
+      Object.keys(patientErrs).length > 0 ||
+      missingConsent
+    ) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -311,6 +354,13 @@ export default function OnboardingPage() {
             input: {
               firstName: firstName.trim(),
               lastName: lastName.trim(),
+              // ★ policyVersion มาจาก consentPolicy ห้าม hardcode — BE ปฏิเสธถ้าไม่ตรง
+              //   เพราะแปลว่าผู้ใช้อ่านข้อความคนละฉบับกับที่บังคับใช้อยู่
+              consents: (policy?.items ?? []).map((item) => ({
+                type: item.type,
+                granted: grantedConsents.has(item.type),
+                policyVersion: policy!.version,
+              })),
               details: {
                 age: Number(patient.age),
                 gender: patient.gender,
@@ -335,6 +385,23 @@ export default function OnboardingPage() {
 
       goToHome();
     } catch (err) {
+      // PYG-539: BE ตอบ code เฉพาะเรื่อง consent มา — แปลเป็นข้อความที่บอกว่าต้องทำอะไรต่อ
+      //   ถ้าโชว์ message ดิบของ GraphQL ผู้ใช้จะไม่รู้ว่าต้องรีเฟรชหรือต้องติ๊กอะไร
+      const code = consentErrorCodeOf(err);
+      if (code === CONSENT_ERROR.VERSION_MISMATCH) {
+        setFormError(
+          'นโยบายความเป็นส่วนตัวมีฉบับใหม่แล้ว กรุณารีเฟรชหน้าเว็บแล้วอ่านอีกครั้ง',
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      if (code === CONSENT_ERROR.REQUIRED) {
+        setConsentError('ต้องให้ความยินยอมข้อที่บังคับก่อนจึงจะบันทึกได้');
+        setFormError('');
+        setIsSubmitting(false);
+        return;
+      }
+
       const message = err instanceof Error ? err.message : 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
       setFormError(message);
       setIsSubmitting(false);
@@ -453,6 +520,44 @@ export default function OnboardingPage() {
           </section>
         )}
 
+        {/* PYG-539: ความยินยอม ม.26 — ต้องอยู่ "ใต้" ฟอร์มและ "เหนือ" ปุ่มบันทึก
+            ผู้ใช้ควรเห็นว่าจะให้ข้อมูลอะไรก่อน แล้วค่อยตัดสินใจว่ายินยอมไหม */}
+        {isElder && policy && (
+          <section className="mt-6 rounded-2xl border border-[#E0E2E5] bg-white p-5">
+            <h2
+              className="text-xl font-bold text-[#1A1A1A]"
+              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+            >
+              {policy.screen?.titleTh ?? 'ความยินยอม'}
+            </h2>
+            {policy.screen?.introTh && (
+              <p className="mt-1.5 text-sm leading-6 text-[#8A8C8E]">
+                {policy.screen.introTh}
+              </p>
+            )}
+
+            <div className="mt-4">
+              <ConsentBox
+                items={policy.items}
+                granted={grantedConsents}
+                onToggle={toggleConsent}
+                rightsNote={policy.rightsNoteTh}
+                privacyNotice={policy.privacyNoticeTh}
+                disabled={isSubmitting}
+                showErrors={submitted}
+              />
+            </div>
+
+            {consentError && (
+              <p className="mt-3 text-sm font-semibold text-red-500">{consentError}</p>
+            )}
+
+            <p className="mt-4 text-xs text-[#B0B2B5]">
+              นโยบายเวอร์ชัน {policy.version} · เริ่มใช้ {policy.effectiveDate}
+            </p>
+          </section>
+        )}
+
         <button
           type="submit"
           id="onboarding-submit"
@@ -478,4 +583,32 @@ export default function OnboardingPage() {
       </form>
     </AuthLayout>
   );
+}
+
+/**
+ * ดึงรหัส error เรื่อง consent ออกจาก error ของ Apollo — PYG-539
+ *
+ * BE โยน BadRequest/Forbidden ที่มี body เป็น object { code, message, ... }
+ * ซึ่ง Apollo ห่อไว้ใน graphQLErrors[].extensions โดยรูปทรงต่างกันได้ตามชั้นที่โยน
+ * จึงค้นแบบยอมพลาด: หาไม่เจอคืน null แล้วไปใช้ข้อความทั่วไปแทน
+ */
+function consentErrorCodeOf(err: unknown): string | null {
+  const graphQLErrors = (err as { graphQLErrors?: unknown[] })?.graphQLErrors;
+  if (!Array.isArray(graphQLErrors)) return null;
+
+  for (const gqlError of graphQLErrors) {
+    const extensions = (gqlError as { extensions?: Record<string, unknown> })?.extensions;
+    if (!extensions) continue;
+
+    const direct = extensions.code;
+    if (typeof direct === 'string' && direct.startsWith('CONSENT_')) return direct;
+
+    // Nest ห่อ body ของ HttpException ไว้ใน extensions.originalError.response
+    const original = extensions.originalError as
+      | { response?: { code?: unknown } }
+      | undefined;
+    const nested = original?.response?.code;
+    if (typeof nested === 'string' && nested.startsWith('CONSENT_')) return nested;
+  }
+  return null;
 }
