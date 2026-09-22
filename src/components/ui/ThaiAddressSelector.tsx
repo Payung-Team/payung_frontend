@@ -10,6 +10,8 @@ interface ThaiAddressSelectorProps {
   amphoeValue?: string;
   districtValue?: string;
   error?: { province?: string; amphoe?: string; district?: string };
+  /** แสดง * ท้าย label ทั้งสามช่อง — ตัวคอมโพเนนต์ไม่ได้ validate เอง หน้าที่เรียกเป็นคนตรวจ */
+  required?: boolean;
 }
 
 const db = new ThailandAddressSimple();
@@ -23,6 +25,7 @@ function SelectField({
   placeholder,
   onChange,
   error,
+  required,
 }: {
   id: string;
   label: string;
@@ -32,6 +35,7 @@ function SelectField({
   placeholder: string;
   onChange: (v: string) => void;
   error?: string;
+  required?: boolean;
 }) {
   const selectRef = useRef<HTMLSelectElement>(null);
 
@@ -39,6 +43,7 @@ function SelectField({
     <div>
       <label htmlFor={id} className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">
         {label}
+        {required && <span className="text-red-500"> *</span>}
       </label>
       <div className="relative">
         <select
@@ -76,6 +81,7 @@ export default function ThaiAddressSelector({
   amphoeValue = '',
   districtValue = '',
   error,
+  required,
 }: ThaiAddressSelectorProps) {
   const [ready, setReady] = useState(false);
 
@@ -134,7 +140,10 @@ export default function ThaiAddressSelector({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {['จังหวัด', 'เขต/อำเภอ', 'ตำบล'].map((label) => (
           <div key={label}>
-            <p className="text-[14px] font-semibold text-[#0A0A0A] mb-2">{label}</p>
+            <p className="text-[14px] font-semibold text-[#0A0A0A] mb-2">
+              {label}
+              {required && <span className="text-red-500"> *</span>}
+            </p>
             <div className="h-[38px] rounded-lg bg-gray-100 animate-pulse" />
           </div>
         ))}
@@ -152,6 +161,7 @@ export default function ThaiAddressSelector({
         placeholder="— เลือกจังหวัด —"
         onChange={handleProvinceChange}
         error={error?.province}
+        required={required}
       />
       <SelectField
         id="amphoe"
@@ -162,6 +172,7 @@ export default function ThaiAddressSelector({
         placeholder="— เลือกอำเภอ —"
         onChange={handleAmphoeChange}
         error={error?.amphoe}
+        required={required}
       />
       <SelectField
         id="district"
@@ -172,6 +183,7 @@ export default function ThaiAddressSelector({
         placeholder="— เลือกตำบล —"
         onChange={handleDistrictChange}
         error={error?.district}
+        required={required}
       />
     </div>
   );

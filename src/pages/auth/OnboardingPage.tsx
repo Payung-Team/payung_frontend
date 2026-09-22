@@ -127,7 +127,7 @@ function formatPhone(value: string): string {
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
-  const { user, userRole, mustChangePassword } = useAuth();
+  const { user, userRole, mustChangePassword, logout } = useAuth();
 
   // ลบ flag is_registering ที่ GuestRoute เซ็ตไว้ (ทำใน effect เพื่อความปลอดภัยกับ StrictMode)
   useEffect(() => {
@@ -285,15 +285,30 @@ export default function OnboardingPage() {
     return errs;
   };
 
+  // ปุ่มบันทึกกดได้เมื่อช่องบังคับครบ และติ๊กความยินยอมข้อบังคับครบแล้วเท่านั้น
+  //   ★ ผู้สูงอายุ: ถ้านโยบายยังโหลดไม่เสร็จ ถือว่ายังไม่ครบ — ต้องเห็นข้อความก่อนจึงจะยินยอมได้
+  const formIncomplete =
+    Object.keys(validate()).length > 0 || Object.keys(validatePatient()).length > 0;
+  const consentIncomplete =
+    isElder &&
+    (!policy || policy.items.some((item) => item.required && !grantedConsents.has(item.type)));
+  const submitDisabled = isSubmitting || formIncomplete || consentIncomplete;
+
   const handleAvatarSelect = (file: File) => {
     setAvatarError('');
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
   };
 
-  const handleSkip = () => {
+  /**
+   * ห้ามข้าม Onboarding ไปหน้าหลัก — ทางออกเดียวคือกลับไปหน้าสมัคร
+   * ต้อง logout ก่อน ไม่งั้น GuestRoute เห็น session แล้วเด้งกลับมาที่นี่ (หรือไปหน้าหลัก)
+   * บัญชีที่สมัครไว้ยังอยู่ — ถ้าเข้าสู่ระบบอีกครั้ง PatientOnboardingGuard จะพากลับมาหน้านี้
+   */
+  const handleBackToRegister = async () => {
     if (isSubmitting) return;
-    goToHome();
+    await logout();
+    navigate('/register', { replace: true });
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -423,7 +438,7 @@ export default function OnboardingPage() {
         </p>
 
         <p className="mt-3 text-[13px] text-[#228B55] bg-[#EEF9F5] border border-[#A7D8C2]/30 rounded-xl px-4 py-3 leading-[20px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-          เพื่อความสะดวกในการเรียกใช้บริการ สามารถกรอกที่อยู่เอาไว้เพื่อความรวดเร็วในการจอง โดยคุณสามารถเข้ามาอัปเดตข้อมูลที่อยู่ภายหลังได้
+          กรุณากรอกเบอร์โทรศัพท์และที่อยู่ให้ครบ เพื่อใช้ติดต่อและจองบริการ โดยคุณสามารถเข้ามาแก้ไขข้อมูลภายหลังได้
         </p>
 
         <Alert message={formError} id="onboarding-error-banner" />
@@ -449,6 +464,7 @@ export default function OnboardingPage() {
           onChange={(e) => setPhone(formatPhone(e.target.value))}
           placeholder="0X-XXXX-XXXX"
           maxLength={12}
+          required
           error={submitted ? errors.phone : undefined}
           disabled={isSubmitting}
           wrapperClassName="mt-6"
@@ -461,6 +477,7 @@ export default function OnboardingPage() {
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           placeholder="บ้านเลขที่ ถนน ซอย"
+          required
           error={submitted ? errors.address : undefined}
           disabled={isSubmitting}
           wrapperClassName="mt-4"
@@ -476,6 +493,7 @@ export default function OnboardingPage() {
             onAmphoeChange={setDistrict}
             onDistrictChange={setSubDistrict}
             onZipcodeChange={setPostalCode}
+            required
             error={submitted ? {
               province: errors.province,
               amphoe: errors.district,
@@ -492,6 +510,7 @@ export default function OnboardingPage() {
           value={postalCode}
           readOnly
           placeholder="กรอกอัตโนมัติเมื่อเลือกตำบล"
+          required
           error={submitted ? errors.postalCode : undefined}
           disabled={isSubmitting}
           wrapperClassName="mt-4"
@@ -562,8 +581,8 @@ export default function OnboardingPage() {
         <button
           type="submit"
           id="onboarding-submit"
-          disabled={isSubmitting}
-          className={`mt-6 mx-auto flex h-[52px] w-[240px] items-center justify-center gap-2 rounded-lg bg-[#52B69A] text-xl font-bold text-white shadow-[0_4px_12px_rgba(82,182,154,0.2)] transition-all duration-200 hover:bg-[#45a085] hover:shadow-[0_6px_20px_rgba(82,182,154,0.35)] active:scale-[0.98] ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+          disabled={submitDisabled}
+          className={`mt-6 mx-auto flex h-[52px] w-[240px] items-center justify-center gap-2 rounded-lg bg-[#52B69A] text-xl font-bold text-white shadow-[0_4px_12px_rgba(82,182,154,0.2)] transition-all duration-200 hover:bg-[#45a085] hover:shadow-[0_6px_20px_rgba(82,182,154,0.35)] active:scale-[0.98] ${submitDisabled ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
           style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
         >
           {isSubmitting && <Spinner size="sm" />}
@@ -573,12 +592,13 @@ export default function OnboardingPage() {
         <div className="mt-5 text-center">
           <button
             type="button"
-            onClick={handleSkip}
+            id="onboarding-back-to-register"
+            onClick={handleBackToRegister}
             disabled={isSubmitting}
             className="cursor-pointer border-none bg-none p-0 text-base font-semibold text-[#52B69A] transition hover:underline disabled:cursor-not-allowed disabled:opacity-60"
             style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
           >
-            ข้ามขั้นตอนนี้ →
+            ← กลับไปหน้าสมัครสมาชิก
           </button>
         </div>
       </form>

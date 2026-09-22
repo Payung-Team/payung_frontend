@@ -82,6 +82,25 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * ผู้สูงอายุที่ยังไม่ทำ Onboarding ห้ามเข้าหน้าในแอป — ส่งกลับไป /onboarding เสมอ
+ * กันทั้งพิมพ์ URL เอง และกด back จากหน้า Onboarding (/register → GuestRoute → /patient-home)
+ * ใช้เงื่อนไขเดียวกับ OnboardingGuard (มี phone = ทำแล้ว) ไม่งั้นสอง guard จะเด้งกันไปมา
+ */
+function PatientOnboardingGuard({ children }: { children: React.ReactNode }) {
+  const { userRole } = useAuth();
+  const { data, loading } = useQuery<{ me?: { role: number; phone: string | null } }>(GET_USER);
+
+  if (loading) return <PageSkeleton />;
+
+  const role = data?.me?.role ?? userRole;
+  if (role === 1 && data?.me && !data.me.phone) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function CaregiverAvailabilityGuard() {
   const { data, loading } = useQuery<{
     myCaregiverProfile?: { kycStatus: string };
@@ -171,9 +190,11 @@ function App() {
           element={
             <ProtectedRoute>
               <MustChangePasswordGuard>
-                <AppLayout>
-                  <Outlet />
-                </AppLayout>
+                <PatientOnboardingGuard>
+                  <AppLayout>
+                    <Outlet />
+                  </AppLayout>
+                </PatientOnboardingGuard>
               </MustChangePasswordGuard>
             </ProtectedRoute>
           }

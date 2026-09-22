@@ -45,6 +45,7 @@ export default function AuthInput({
         style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
       >
         {label}
+        {props.required && <span className="text-red-500"> *</span>}
       </label>
       <div className="relative mt-1">
         <span className={`pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 ${iconColor}`}>
