@@ -24,8 +24,26 @@ function serverMessage(body: unknown): string | null {
   return null;
 }
 
+/**
+ * PYG-502 — BE ปฏิเสธเพราะผู้ใช้ยังไม่ได้กรอก Onboarding
+ *
+ * ★ optional chain ทั้งเส้นเพราะ **BE ยังไม่ส่ง code นี้มาเลย** (เป็นของ PYG-499
+ *   ซึ่งยังไม่ได้ทำ) เขียนรองรับไว้ก่อนเพื่อให้วันที่ BE ขึ้นแล้ว FE ไม่ต้องแก้
+ *   และตอนนี้ไม่มีทางเข้าเงื่อนไขนี้ จึงไม่กระทบพฤติกรรมเดิม
+ */
+export const BOOKING_ONBOARDING_REQUIRED_CODE = 'ONBOARDING_REQUIRED';
+
+export function isOnboardingRequiredError(body: unknown): boolean {
+  const code = (body as { code?: unknown } | null)?.code;
+  return code === BOOKING_ONBOARDING_REQUIRED_CODE;
+}
+
 export function bookingHttpErrorMessage(status: number, body: unknown): string {
   const msg = serverMessage(body);
+  // ★ ตรวจก่อน status เพราะข้อความทั่วไปของ 4xx ไม่ได้บอกว่าต้องไปกรอก Onboarding
+  if (isOnboardingRequiredError(body)) {
+    return msg ?? 'กรุณากรอกข้อมูลผู้รับบริการให้ครบก่อนจองผู้ดูแล';
+  }
   if (status === 401) return BOOKING_SESSION_EXPIRED_MESSAGE;
   if (status === 403) return 'บัญชีนี้ไม่มีสิทธิ์สร้างการจอง';
   if (status === 409) return msg ?? 'คุณมีนัดหมายในช่วงเวลาเดียวกันอยู่แล้ว กรุณาเลือกเวลาอื่น';
