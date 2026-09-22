@@ -24,6 +24,13 @@ interface SavedRecipient {
   name: string;
   nickname?: string | null;
   /**
+   * PYG-502 — โปรไฟล์ "ของตัวเอง" ที่สร้างตอน Onboarding
+   *
+   * ⚠ optional เพราะ BE เพิ่งเริ่มคืนค่านี้ (PYG-502) — ระหว่างที่ FE ขึ้นก่อน BE
+   *   ทุกใบจะเป็น undefined แล้วหน้าจอกลับไปเป็นลิสต์ธรรมดาแบบเดิม ไม่พัง
+   */
+  isSelf?: boolean;
+  /**
    * ข้อมูลสุขภาพที่จะเติมให้อัตโนมัติเมื่อเลือกโปรไฟล์นี้
    *
    * ⚠ อาจไม่มีคีย์นี้เลย (ไม่ใช่ `{}`) ในโปรไฟล์ที่ไม่เคยกรอกข้อมูลสุขภาพ
@@ -37,11 +44,14 @@ interface SavedRecipient {
 function RecipientRow({
   selected,
   title,
+  badge,
   onSelect,
   onDelete,
 }: {
   selected: boolean;
   title: string;
+  /** ป้ายกำกับข้างชื่อ เช่น "ตัวเอง" (PYG-502) */
+  badge?: string;
   onSelect: () => void;
   onDelete?: () => void;
 }) {
@@ -67,6 +77,11 @@ function RecipientRow({
           {selected && <span className="w-2.5 h-2.5 rounded-full bg-[#1B5C48]" />}
         </span>
         <span className="flex-1 min-w-0 text-sm font-bold text-[#1A1A1A] truncate">{title}</span>
+        {badge && (
+          <span className="shrink-0 rounded-full bg-[#F0FAF4] px-2.5 py-1 text-xs font-bold text-[#1B5C48]">
+            {badge}
+          </span>
+        )}
       </button>
       {onDelete && (
         <button
@@ -358,6 +373,11 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
   const [name, setName] = useState(
     previousPatient?.name || initialSavedRecipient?.name || memberContext?.memberName || '',
   );
+  // PYG-502: ชื่อเล่นเก็บอยู่ในโปรไฟล์แต่เดิมไม่เคยถูกเติมกลับเข้าฟอร์ม/draft
+  //   ไม่มีช่องกรอกในหน้านี้ — พกไว้เพื่อส่งต่อค่าที่มาจากโปรไฟล์เท่านั้น
+  const [nickname, setNickname] = useState(
+    previousPatient?.nickname || initialSavedRecipient?.nickname || '',
+  );
   const [age, setAge] = useState(
     initialPatient?.age?.toString() || '',
   );
@@ -466,6 +486,8 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
         saveAsProfile,
         patientDetails: {
           name,
+          // PYG-502: ส่งต่อชื่อเล่นจากโปรไฟล์ — ว่าง = ไม่ส่ง ไม่ใช่ส่งสตริงว่าง
+          nickname: nickname.trim() || undefined,
           // เดิมเป็น `Number(age) || 0` — ช่องที่ว่างกลายเป็นอายุ 0 ปีซึ่ง BE รับเป็น
           // ค่าที่ถูกต้อง (0-130 เพราะผู้รับบริการอาจเป็นทารก) แล้วบันทึกไปเงียบ ๆ
           age: age.trim() ? Number(age) : undefined,
@@ -507,6 +529,19 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
     isMemberBooking,
   ]);
 
+  /**
+   * PYG-502 — ใบ "ของตัวเอง" อยู่บนสุดเสมอ
+   *
+   * ★ เป็นตัวเลือกที่ผู้ใช้กดบ่อยที่สุด (จองให้ตัวเอง) และข้อมูลครบที่สุดเพราะมาจาก
+   *   Onboarding ที่บังคับกรอก — ปล่อยให้เรียงตามชื่อจะทำให้จมอยู่กลางลิสต์
+   * ★ เรียงแบบคงที่: ของตัวเองก่อน ที่เหลือคงลำดับเดิมจาก API (เรียงตามชื่อมาแล้ว)
+   */
+  const orderedRecipients = useMemo(() => {
+    const self = savedRecipients.filter((r) => r.isSelf);
+    const others = savedRecipients.filter((r) => !r.isSelf);
+    return [...self, ...others];
+  }, [savedRecipients]);
+
   // เลือกโปรไฟล์ที่บันทึกไว้ — เติมทุกช่องที่โปรไฟล์นั้นมี ที่เหลือล้างให้ว่าง
   // กดซ้ำที่ใบเดิม = ยกเลิกการเลือก แล้วกลับไปกรอกเอง
   const handleSelectRecipient = (recipient: SavedRecipient) => {
@@ -518,6 +553,8 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
     setSelectedRecipientId(recipient.id);
     setSaveAsProfile(false);
     setName(recipient.name);
+    // PYG-502: ชื่อเล่นเคยตกหล่น — โปรไฟล์เก็บไว้แต่ไม่เคยถูกเติมกลับเข้า draft
+    setNickname(recipient.nickname ?? '');
 
     // ⚠ API คืน age/weight/height เป็น number แต่ช่องกรอกเป็น controlled input
     //   ที่รับ string — ต้อง String() ก่อน ไม่งั้น React เตือนเรื่องชนิดของ value
@@ -639,14 +676,20 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
             เลือกจากรายชื่อที่บันทึกไว้ หรือกรอกข้อมูลใหม่ด้านล่าง
           </p>
           <div className="mt-4 space-y-2">
-            {savedRecipients.map((r) => (
+            {orderedRecipients.map((r) => (
               <RecipientRow
                 key={r.id}
                 selected={selectedRecipientId === r.id}
                 title={r.name}
+                // PYG-502: บอกว่าใบไหนคือของตัวเอง ไม่งั้นผู้ใช้ที่มีหลายโปรไฟล์
+                //   แยกไม่ออกจากชื่อเฉย ๆ
+                badge={r.isSelf ? 'ตัวเอง' : undefined}
                 onSelect={() => handleSelectRecipient(r)}
                 onDelete={
-                  isMemberBooking
+                  // ★ ห้ามลบใบของตัวเอง — เป็นใบเดียวกับที่ Onboarding สร้าง
+                  //   ลบแล้ว onboardingCompleted กลับเป็น false (PYG-538) ผู้ใช้จะโดนเด้ง
+                  //   ไปกรอก Onboarding ใหม่ทั้งชุดโดยไม่รู้ว่าเกิดจากการกดลบตรงนี้
+                  isMemberBooking || r.isSelf
                     ? undefined
                     : () => {
                         setDeleteError(null);
