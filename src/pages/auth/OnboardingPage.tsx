@@ -30,6 +30,7 @@ import {
   CONSENT_POLICY,
   type ConsentPolicyData,
 } from '../../graphql/consent';
+import { extractGraphQLErrorCode } from '../../lib/apolloErrors';
 
 const PhoneIcon = <Icon name="phone" size="small" color="currentColor" />;
 const LocationIcon = <Icon name="location_on" size="small" color="currentColor" />;
@@ -387,7 +388,7 @@ export default function OnboardingPage() {
     } catch (err) {
       // PYG-539: BE ตอบ code เฉพาะเรื่อง consent มา — แปลเป็นข้อความที่บอกว่าต้องทำอะไรต่อ
       //   ถ้าโชว์ message ดิบของ GraphQL ผู้ใช้จะไม่รู้ว่าต้องรีเฟรชหรือต้องติ๊กอะไร
-      const code = consentErrorCodeOf(err);
+      const code = extractGraphQLErrorCode(err);
       if (code === CONSENT_ERROR.VERSION_MISMATCH) {
         setFormError(
           'นโยบายความเป็นส่วนตัวมีฉบับใหม่แล้ว กรุณารีเฟรชหน้าเว็บแล้วอ่านอีกครั้ง',
@@ -583,32 +584,4 @@ export default function OnboardingPage() {
       </form>
     </AuthLayout>
   );
-}
-
-/**
- * ดึงรหัส error เรื่อง consent ออกจาก error ของ Apollo — PYG-539
- *
- * BE โยน BadRequest/Forbidden ที่มี body เป็น object { code, message, ... }
- * ซึ่ง Apollo ห่อไว้ใน graphQLErrors[].extensions โดยรูปทรงต่างกันได้ตามชั้นที่โยน
- * จึงค้นแบบยอมพลาด: หาไม่เจอคืน null แล้วไปใช้ข้อความทั่วไปแทน
- */
-function consentErrorCodeOf(err: unknown): string | null {
-  const graphQLErrors = (err as { graphQLErrors?: unknown[] })?.graphQLErrors;
-  if (!Array.isArray(graphQLErrors)) return null;
-
-  for (const gqlError of graphQLErrors) {
-    const extensions = (gqlError as { extensions?: Record<string, unknown> })?.extensions;
-    if (!extensions) continue;
-
-    const direct = extensions.code;
-    if (typeof direct === 'string' && direct.startsWith('CONSENT_')) return direct;
-
-    // Nest ห่อ body ของ HttpException ไว้ใน extensions.originalError.response
-    const original = extensions.originalError as
-      | { response?: { code?: unknown } }
-      | undefined;
-    const nested = original?.response?.code;
-    if (typeof nested === 'string' && nested.startsWith('CONSENT_')) return nested;
-  }
-  return null;
 }
