@@ -11,6 +11,9 @@ import {
   type GroupCareRecipient,
 } from '../../../graphql/familyGroup';
 import { GroupAvatar } from '../../family/components/familyUi';
+// PYG-500: ตัวเลือกย้ายไปอยู่ที่เดียวแล้ว — หน้า Onboarding ใช้ชุดเดียวกันนี้
+import { REL_OPTIONS, type GenderOption } from '../../../components/patient/patientFieldOptions';
+import PatientDetailsFields from '../../../components/patient/PatientDetailsFields';
 
 const API_BASE = ((import.meta.env.VITE_GRAPHQL_URL as string) || 'http://localhost:3000/graphql')
   .replace('/graphql', '');
@@ -80,32 +83,6 @@ function RecipientRow({
   );
 }
 
-const PREDEFINED_CONDITIONS = ['เบาหวาน', 'ความดันสูง', 'โรคหัวใจ', 'สมองเสื่อม'];
-
-const SUPPORT_LEVELS = [
-  {
-    id: 'ช่วยเหลือตัวเองได้ดี',
-    icon: 'directions_walk',
-    label: 'ช่วยเหลือตัวเองได้ดี',
-    desc: 'เดิน กินข้าว เข้าห้องน้ำได้เอง',
-  },
-  {
-    id: 'ช่วยเหลือตัวเองได้เล็กน้อย / ต้องการการช่วยพยุงเดิน',
-    icon: 'accessible',
-    label: 'ต้องมีคนช่วยพยุง',
-    desc: 'เดินได้ช้า ต้องช่วยประคอง',
-  },
-  {
-    id: 'ช่วยเหลือตัวเองไม่ได้ / ติดเตียง',
-    icon: 'bed',
-    label: 'ช่วยเหลือตัวเองไม่ได้ / ติดเตียง',
-    desc: 'ต้องพลิกตัวและป้อนอาหาร',
-  },
-];
-
-const BLOOD_GROUPS = ['A', 'B', 'AB', 'O', 'A+', 'B+', 'AB+', 'O+'];
-
-const REL_OPTIONS = ['บุตร', 'คู่สมรส', 'ญาติ', 'ตัวคนไข้เอง'];
 
 /**
  * Step 4 "ผู้รับบริการ".
@@ -606,12 +583,6 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
   // กรอกเอง (ไม่ได้เลือกจากลิสต์) และมีชื่อแล้ว → ค่อยถามเรื่องบันทึกโปรไฟล์
   const isManualEntry = !selectedRecipientId && name.trim().length > 0;
 
-  const toggleCondition = (cond: string) => {
-    setConditions((prev) =>
-      prev.includes(cond) ? prev.filter((c) => c !== cond) : [...prev, cond],
-    );
-  };
-
   const handleSubmit = () => {
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = 'กรุณากรอกชื่อคนไข้';
@@ -694,240 +665,71 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
       {/* Patient info */}
       <section className="bg-white p-6 rounded-2xl border border-gray-100">
         <h3 className="text-base font-bold text-[#1A1A1A]">ข้อมูลที่ผู้ดูแลต้องรู้</h3>
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
-            <label className="text-xs font-semibold text-[#575859]">
-              ชื่อ-นามสกุลคนไข้ <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              placeholder="ชื่อจริงตามบัตรประชาชน"
-              className={`mt-1.5 w-full p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
-                error.name
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-[#E0E2E5] focus:ring-[#52B69A]'
-              }`}
-            />
-            {error.name && (
-              <p className="mt-1 text-[11px] text-red-500 font-semibold">{error.name}</p>
-            )}
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-[#575859]">
-              อายุ (ปี) <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
-              placeholder="72"
-              className={`mt-1.5 w-full p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
-                error.age
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-[#E0E2E5] focus:ring-[#52B69A]'
-              }`}
-            />
-            {error.age && (
-              <p className="mt-1 text-[11px] text-red-500 font-semibold">{error.age}</p>
-            )}
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-[#575859]">
-              เพศ <span className="text-red-500">*</span>
-            </label>
-            <div className="mt-1.5 flex gap-2">
-              {(['หญิง', 'ชาย'] as const).map((g) => {
-                const active = gender === g;
-                return (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => setGender(g)}
-                    className={`flex-1 px-4 py-3 rounded-xl border text-sm font-semibold transition cursor-pointer ${
-                      active
-                        ? 'bg-[#52B69A] border-[#52B69A] text-white'
-                        : 'bg-white border-[#E0E2E5] text-[#575859] hover:bg-gray-50'
-                    }`}
-                  >
-                    {g}
-                  </button>
-                );
-              })}
-            </div>
-            {error.gender && (
-              <p className="mt-1 text-[11px] text-red-500 font-semibold">{error.gender}</p>
-            )}
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-[#575859]">น้ำหนัก (กก.)</label>
-            <input
-              type="number"
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              placeholder="58"
-              className="mt-1.5 w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A]"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-[#575859]">ส่วนสูง (ซม.)</label>
-            <input
-              type="number"
-              value={height}
-              onChange={(e) => setHeight(e.target.value)}
-              placeholder="155"
-              className="mt-1.5 w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A]"
-            />
-          </div>
-        </div>
-
-        {/* Support level */}
-        <div className="mt-5">
-          <div className="text-xs font-semibold text-[#575859]">
-            ช่วยเหลือตัวเองได้แค่ไหน <span className="text-red-500">*</span>
-          </div>
-          <div className="mt-2 flex flex-col gap-2">
-            {SUPPORT_LEVELS.map((o) => {
-              const active = supportLevel === o.id;
-              return (
-                <button
-                  key={o.id}
-                  type="button"
-                  onClick={() => setSupportLevel(o.id)}
-                  className={`flex items-start gap-3 p-4 rounded-xl border text-left transition cursor-pointer ${
-                    active
-                      ? 'bg-[#F0FAF4] border-[#52B69A]'
-                      : 'bg-white border-[#E0E2E5] hover:bg-gray-50'
-                  }`}
-                >
-                  <span
-                    className={`material-icons ${active ? 'text-[#52B69A]' : 'text-[#8A8C8E]'}`}
-                    style={{ fontSize: 20 }}
-                  >
-                    {o.icon}
-                  </span>
-                  <span>
-                    <span className="block text-sm font-bold text-[#1A1A1A]">{o.label}</span>
-                    <span className="block text-xs text-[#8A8C8E] mt-0.5">{o.desc}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {error.supportLevel && (
-            <p className="mt-2 text-[11px] text-red-500 font-semibold">{error.supportLevel}</p>
-          )}
-        </div>
-
-        {/* Health section */}
-        <div className="mt-6 pt-5 border-t border-[#E0E2E5]">
-          <h3 className="text-base font-bold text-[#1A1A1A]">
-            ข้อมูลสุขภาพเพิ่มเติม <span className="font-semibold text-[#8A8C8E]">(ไม่บังคับ)</span>
-          </h3>
-          <p className="text-xs text-[#8A8C8E] mt-2">
-            โรคประจำตัว ยา การแพ้ยา กรอกข้อมูลเพื่อช่วยให้ผู้ดูแลดูแลคุณได้อย่างปลอดภัยมากขึ้น
-          </p>
-        </div>
-
-        <div className="mt-4 space-y-4">
-          {/* Blood group */}
-            <div>
-              <label className="text-xs font-semibold text-[#575859]">กรุ๊ปเลือด</label>
-              <div className="mt-1.5 flex flex-wrap gap-2">
-                {BLOOD_GROUPS.map((bg) => {
-                  const active = bloodGroup === bg;
-                  return (
-                    <button
-                      key={bg}
-                      type="button"
-                      onClick={() => setBloodGroup(bg)}
-                      className={`px-4 py-2 rounded-full border text-sm font-semibold transition cursor-pointer ${
-                        active
-                          ? 'bg-[#52B69A] border-[#52B69A] text-white'
-                          : 'bg-white border-[#E0E2E5] text-[#575859] hover:bg-gray-50'
-                      }`}
-                    >
-                      {bg}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Conditions */}
-            <div>
-              <label className="text-xs font-semibold text-[#575859]">โรคประจำตัว</label>
-              <div className="mt-1.5 flex flex-wrap gap-2">
-                {PREDEFINED_CONDITIONS.map((c) => {
-                  const active = conditions.includes(c);
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => toggleCondition(c)}
-                      className={`px-4 py-2 rounded-full border text-sm font-semibold transition cursor-pointer ${
-                        active
-                          ? 'bg-[#F0FAF4] border-[#52B69A] text-[#1B5C48]'
-                          : 'bg-white border-[#E0E2E5] text-[#575859] hover:bg-gray-50'
-                      }`}
-                    >
-                      {c}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-semibold text-[#575859]">ยาที่ทานประจำ</label>
-                <input
-                  type="text"
-                  value={medicines}
-                  onChange={(e) => setMedicines(e.target.value)}
-                  placeholder="ชื่อยา · มื้อที่ทาน"
-                  className="mt-1.5 w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A]"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-[#575859]">แพ้ยา / แพ้อาหาร</label>
-                <input
-                  type="text"
-                  value={allergies}
-                  onChange={(e) => setAllergies(e.target.value)}
-                  placeholder="เช่น แพ้เพนิซิลิน"
-                  className="mt-1.5 w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-[#575859]">
-                สิ่งที่ผู้ดูแลควรรู้เพิ่มเติม
-              </label>
-              <textarea
-                value={careInstructions}
-                onChange={(e) => setCareInstructions(e.target.value)}
-                rows={3}
-                placeholder="เช่น เพิ่งผ่าตัดสะโพก 2 สัปดาห์ ต้องพลิกตัวทุก 2 ชม."
-                className="mt-1.5 w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A] resize-none"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-[#575859]">
-                โรงพยาบาลที่ใช้บริการประจำ
-              </label>
-              <input
-                type="text"
-                value={regularHospital}
-                onChange={(e) => setRegularHospital(e.target.value)}
-                placeholder="เช่น โรงพยาบาลศิริราช"
-                className="mt-1.5 w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A]"
-              />
-            </div>
-        </div>
+        {/* PYG-500: ฟอร์มชุดนี้ใช้ร่วมกับหน้า Onboarding — แก้ช่อง/ตัวเลือกที่ PatientDetailsFields */}
+        <PatientDetailsFields
+          nameMode="single"
+          values={{
+            name,
+            firstName: '',
+            lastName: '',
+            age,
+            gender,
+            weight,
+            height,
+            supportLevel,
+            bloodGroup,
+            conditions,
+            medicines,
+            allergies,
+            careInstructions,
+            regularHospital,
+          }}
+          errors={error}
+          onChange={(field, value) => {
+            switch (field) {
+              // แก้ชื่อเองเมื่อไหร่ = หลุดจากใบที่เลือกไว้ (พฤติกรรมเดิมของหน้า Booking)
+              case 'name':
+                handleNameChange(value as string);
+                break;
+              case 'age':
+                setAge(value as string);
+                break;
+              case 'gender':
+                setGender(value as GenderOption);
+                break;
+              case 'weight':
+                setWeight(value as string);
+                break;
+              case 'height':
+                setHeight(value as string);
+                break;
+              case 'supportLevel':
+                setSupportLevel(value as string);
+                break;
+              case 'bloodGroup':
+                setBloodGroup(value as string);
+                break;
+              case 'conditions':
+                setConditions(value as string[]);
+                break;
+              case 'medicines':
+                setMedicines(value as string);
+                break;
+              case 'allergies':
+                setAllergies(value as string);
+                break;
+              case 'careInstructions':
+                setCareInstructions(value as string);
+                break;
+              case 'regularHospital':
+                setRegularHospital(value as string);
+                break;
+              // firstName / lastName ใช้เฉพาะ nameMode='split' (หน้า Onboarding) — ที่นี่ไม่มี
+              default:
+                break;
+            }
+          }}
+        />
 
         {/* กรอกเองโดยไม่ได้เลือกจากลิสต์ → ถามว่าจะเก็บโปรไฟล์นี้ไว้ใช้ครั้งหน้าไหม */}
         {isManualEntry && !isMemberBooking && (
