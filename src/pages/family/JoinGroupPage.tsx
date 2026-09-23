@@ -291,10 +291,10 @@ function JoinShell({ children }: { children: ReactNode }) {
       className="min-h-screen bg-[#F6FAF9] px-4 py-8"
       style={{ fontFamily: FONT }}
     >
-      <div className="mx-auto max-w-[480px] text-center">
+      <div className="mx-auto max-w-[560px] text-center">
         <span className="text-[22px] font-bold tracking-tight text-[#005C3E]">payung</span>
       </div>
-      <div className="mx-auto mt-8 w-full max-w-[480px] rounded-2xl border border-gray-100 bg-white p-8 shadow-[0_10px_40px_rgba(0,0,0,0.06)]">
+      <div className="mx-auto mt-8 w-full max-w-[560px] rounded-2xl border border-gray-100 bg-white p-8 shadow-[0_10px_40px_rgba(0,0,0,0.06)]">
         {children}
       </div>
     </div>

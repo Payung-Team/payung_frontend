@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery } from '@apollo/client/react';
-import ConsentBox from '../../../components/consent/ConsentBox';
 import {
   CONSENT_POLICY,
   MY_CONSENTS,
@@ -67,26 +66,67 @@ export function FamilyGroupConsentSection({
   disabled?: boolean;
 }) {
   const { policy, shouldAsk, granted, toggle } = consent;
+  const [noticeOpen, setNoticeOpen] = useState(false);
   if (!shouldAsk || !policy) return null;
 
+  /**
+   *   แบบกะทัดรัดแทน ConsentBox — จุดนี้มีข้อเดียวและข้อความสั้น 2 บรรทัด
+   *   กล่องเลื่อนอ่านของ ConsentBox ออกแบบไว้กับข้อความยาว ที่นี่กินที่เกินเหตุ
+   *   สิ่งที่ต้องคงไว้ตามกฎหมาย (PDPA ม.26) ยังครบ:
+   *     - ไม่ติ๊กมาให้ (เริ่มจาก granted ว่างเสมอ)
+   *     - เห็นข้อความเต็มของสิ่งที่ยินยอมก่อนติ๊ก (label + คำอธิบายแสดงครบ ไม่ถูกตัด)
+   *     - แยกจากข้อตกลงอื่น และเปิดอ่านประกาศฉบับเต็ม + สิทธิ์ของเจ้าของข้อมูลได้
+   */
   return (
     <section className="mt-5 text-left">
-      {policy.screen && (
-        <>
-          <h3 className="text-[15px] font-bold text-[#1A1A1A]">{policy.screen.titleTh}</h3>
-          <p className="mt-1 text-[13px] leading-6 text-[#8A8C8E]">{policy.screen.introTh}</p>
-        </>
+      {policy.items.map((item) => (
+        <label
+          key={item.type}
+          className={`flex items-start gap-3 rounded-xl border border-[#E0E2E5] bg-white p-3.5 ${
+            disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-gray-50'
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={granted.has(item.type)}
+            disabled={disabled}
+            onChange={(e) => toggle(item.type, e.target.checked)}
+            className="mt-0.5 h-5 w-5 shrink-0 accent-[#009265]"
+          />
+          <span className="min-w-0">
+            {/* ป้ายอยู่ข้างหัวข้อเสมอ — ถ้าต่อท้ายข้อความ หัวข้อยาวแล้วป้ายตกไปบรรทัดใหม่ */}
+            <span className="flex items-start gap-2">
+              <span className="min-w-0 text-[13px] font-semibold leading-6 text-[#1A1A1A]">
+                {item.labelTh}
+              </span>
+              {item.sensitive && (
+                <span className="mt-0.5 inline-flex h-5 shrink-0 items-center whitespace-nowrap rounded-full bg-[#FFF1F2] px-2 text-[11px] font-semibold text-[#BE123C]">
+                  ข้อมูลอ่อนไหว
+                </span>
+              )}
+            </span>
+            <span className="mt-0.5 block text-[12px] leading-5 text-[#8A8C8E]">
+              {item.descriptionTh}
+            </span>
+          </span>
+        </label>
+      ))}
+
+      <p className="mt-2 text-[12px] leading-5 text-[#8A8C8E]">
+        {policy.rightsNoteTh}{' '}
+        <button
+          type="button"
+          onClick={() => setNoticeOpen((open) => !open)}
+          className="font-semibold text-[#009265] hover:underline"
+        >
+          {noticeOpen ? 'ปิดประกาศความเป็นส่วนตัว' : 'อ่านประกาศความเป็นส่วนตัว'}
+        </button>
+      </p>
+      {noticeOpen && (
+        <div className="mt-2 max-h-60 overflow-y-auto whitespace-pre-wrap rounded-xl border border-[#E0E2E5] bg-[#FAFAFA] p-3 text-[12px] leading-6 text-[#575859]">
+          {policy.privacyNoticeTh}
+        </div>
       )}
-      <div className="mt-3">
-        <ConsentBox
-          items={policy.items}
-          granted={granted}
-          onToggle={toggle}
-          rightsNote={policy.rightsNoteTh}
-          privacyNotice={policy.privacyNoticeTh}
-          disabled={disabled}
-        />
-      </div>
     </section>
   );
 }
