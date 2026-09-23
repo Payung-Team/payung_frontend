@@ -550,7 +550,10 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
         ? {
             familyGroupId: memberGroupId,
             memberUserId,
-            careRecipientId: selectedRecipientId ?? undefined,
+            // ★ ไม่ส่ง careRecipientId: ในโหมดจองแทน selectedRecipientId คือ memberUserId
+            //   ที่ toSavedRecipients ยืมมาเป็น key ชั่วคราว ไม่ใช่ id ของโปรไฟล์จริง
+            //   ส่งคู่กับ memberUserId แล้ว BE หาโปรไฟล์ด้วย id นั้นไม่เจอ → RECIPIENT_NOT_IN_GROUP
+            //   BE หาโปรไฟล์ให้เองจาก memberUserId (PYG-500)
             recipientName: name,
           }
         : undefined,
