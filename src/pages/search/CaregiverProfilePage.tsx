@@ -65,9 +65,9 @@ const SKILL_TRANSLATIONS: Record<string, string> = {
 
 const DAYS = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
 const TIME_SLOTS = [
-  { label: 'เช้า', abbr: 'เช' },
-  { label: 'บ่าย', abbr: 'บ่' },
-  { label: 'เย็น', abbr: 'เย' },
+  { label: 'เช้า' },
+  { label: 'บ่าย' },
+  { label: 'เย็น' },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -216,7 +216,7 @@ function WeeklySchedule({ avail }: Readonly<{ avail: boolean[][] }>) {
         ))}
       </div>
       {/* Time rows */}
-      {TIME_SLOTS.map(({ label, abbr }, rowIdx) => (
+      {TIME_SLOTS.map(({ label }, rowIdx) => (
         <div key={label} className="flex items-center mb-[3px]">
           <div style={{ width: 26, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E', lineHeight: '16px', flexShrink: 0 }}>
             {label}
@@ -230,17 +230,17 @@ function WeeklySchedule({ avail }: Readonly<{ avail: boolean[][] }>) {
                 style={{
                   height: 26,
                   borderRadius: 5,
-                  background: available ? '#E6F5ED' : '#F6FAF9',
-                  border: available ? '0.8px solid #A7D8C2' : '0.8px solid #F0F1F3',
+                  background: available ? '#E6F5ED' : '#FDECEC',
+                  border: available ? '0.8px solid #A7D8C2' : '0.8px solid #F5C2C2',
                 }}
+                title={available ? 'ว่าง' : 'ไม่ว่าง'}
               >
-                {available ? (
-                  <span className="font-bold" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 9, color: '#3A9A7E', lineHeight: '14px' }}>
-                    {abbr}
-                  </span>
-                ) : (
-                  <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 9, color: '#D1D5DB' }}>—</span>
-                )}
+                <span
+                  className="material-icons"
+                  style={{ fontSize: 14, fontWeight: 700, color: available ? '#3A9A7E' : '#E05252' }}
+                >
+                  {available ? 'check' : 'close'}
+                </span>
               </div>
             );
           })}
@@ -444,22 +444,22 @@ const CaregiverProfilePage: React.FC = () => {
   return (
     <div className="min-h-screen" style={{ background: '#F6FAF9' }}>
       <div className="mx-auto px-4 sm:px-6 py-7" style={{ maxWidth: 1040 }}>
+        {/* Back link — อยู่เหนือทั้งสองคอลัมน์ เพื่อให้การ์ดซ้าย/ขวาเริ่มที่ระดับเดียวกัน */}
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1.5 hover:opacity-75 transition-opacity cursor-pointer w-fit mb-3.5"
+        >
+          <span className="material-icons" style={{ fontSize: 16, color: '#52B69A' }}>arrow_back</span>
+          <span className="font-semibold" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#52B69A', lineHeight: '20px' }}>
+            กลับไปยังผลการค้นหา
+          </span>
+        </button>
+
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-7 items-start">
 
           {/* ── LEFT COLUMN ── */}
           <div className="flex flex-col gap-3.5 w-full lg:w-[664px] lg:flex-shrink-0">
-
-            {/* Back link */}
-            <button
-              type="button"
-              onClick={handleBack}
-              className="inline-flex items-center gap-1.5 hover:opacity-75 transition-opacity cursor-pointer w-fit"
-            >
-              <span className="material-icons" style={{ fontSize: 16, color: '#52B69A' }}>arrow_back</span>
-              <span className="font-semibold" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#52B69A', lineHeight: '20px' }}>
-                กลับไปยังผลการค้นหา
-              </span>
-            </button>
 
             {/* Profile Card */}
             <div className="flex flex-col overflow-hidden" style={{ background: '#FFFFFF', boxShadow: '0px 1px 4px rgba(0,0,0,0.04)', borderRadius: 20 }}>
