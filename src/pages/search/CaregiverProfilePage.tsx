@@ -360,7 +360,8 @@ const CaregiverProfilePage: React.FC = () => {
                 // PYG-500: ส่ง memberUserId (backend หา/สร้างโปรไฟล์ในกลุ่มให้)
                 memberUserId: bookingDraft.onBehalf.memberUserId,
                 careRecipientId: bookingDraft.onBehalf.careRecipientId,
-                patientName: bookingDraft.onBehalf.recipientName,
+                // ★ PYG-519: ไม่ส่ง patientName — ชื่อ-นามสกุลมาจากบัญชีของสมาชิกเสมอ
+                //   BE ปฏิเสธด้วย PATIENT_NAME_NOT_ALLOWED ถ้าส่งมา (PYG-516) · ต้องตรงกับ SearchPage
                 caregiverId: payload.caregiverId,
                 tasks: payload.tasks,
                 serviceLocations: payload.serviceLocations,

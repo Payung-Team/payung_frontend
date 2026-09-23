@@ -19,6 +19,7 @@ export interface PreShiftCardProps {
   canCheckInToday: boolean;
   patientName: string;
   careRecipientName?: string | null;
+  recipientAvatarUrl?: string | null;
   patientProfile?: PatientProfile | null;
   onViewProfile: () => void;
   onViewBookingDetails: () => void;
@@ -85,6 +86,7 @@ export default function PreShiftCard({
   canCheckInToday,
   patientName,
   careRecipientName,
+  recipientAvatarUrl,
   patientProfile,
   onViewProfile,
   onViewBookingDetails,
@@ -145,6 +147,7 @@ export default function PreShiftCard({
       <RecipientActionRow
         patientName={patientName}
         careRecipientName={careRecipientName}
+        avatarUrl={recipientAvatarUrl}
         patientProfile={patientProfile}
         onViewProfile={onViewProfile}
         onViewBookingDetails={onViewBookingDetails}

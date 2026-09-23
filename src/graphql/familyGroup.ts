@@ -54,10 +54,11 @@ export const MY_FAMILY_GROUPS = gql`
  * PYG-517 — สมาชิก ACTIVE ทุกคนในกลุ่มพร้อมข้อมูลสำหรับ autofill ตอนจองแทน
  *
  * ต่างจาก GROUP_CARE_RECIPIENTS ตรงที่คืน "คน" ไม่ใช่ "โปรไฟล์" — สมาชิกทุกคนได้
- * หนึ่งรายการเสมอ แม้ยังไม่มีโปรไฟล์ในกลุ่ม (hasProfile=false, details=null)
+ * หนึ่งรายการเสมอ แม้ไม่มีข้อมูลให้เติม (hasProfile=false, details=null)
  *
- * ★ BE ตั้งใจไม่คืนข้อมูลจากโปรไฟล์ส่วนตัวของสมาชิก (ยังไม่ได้แชร์เข้ากลุ่ม — PDPA)
- *   ดังนั้น details=null ไม่ได้แปลว่า "คนนี้ไม่มีข้อมูล" แต่แปลว่า "ยังไม่มีในกลุ่มนี้"
+ * ★ details มาจากโปรไฟล์ในกลุ่มก่อน ถ้าไม่มี BE ใช้ใบ is_self จาก Onboarding
+ *   เฉพาะสมาชิกที่ยินยอม disclose_to_family_group ชัดแจ้ง (PDPA ม.26)
+ *   details=null จึงไม่ได้แปลว่า "คนนี้ไม่มีข้อมูล" — อาจแค่ยังไม่ได้ยินยอมให้กลุ่มเห็น
  */
 export const GROUP_BOOKING_RECIPIENTS = gql`
   query GroupBookingRecipients($groupId: ID!) {
@@ -406,8 +407,8 @@ export const REVOKE_JOIN_LINK = gql`
  *   family mutation; when PYG-417 lands this needs no FE change if it keeps that shape.
  */
 export const JOIN_GROUP_BY_LINK = gql`
-  mutation JoinGroupByLink($token: String!) {
-    joinGroupByLink(token: $token) {
+  mutation JoinGroupByLink($token: String!, $consents: [ConsentAnswerInput!]) {
+    joinGroupByLink(token: $token, consents: $consents) {
       id
       name
       myRole

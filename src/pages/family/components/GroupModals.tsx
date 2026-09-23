@@ -15,6 +15,8 @@ import {
 import { useStrings } from '../familyStrings';
 import { fgErrorMessage } from '../familyErrors';
 import { ModalShell, ModalHeader, GroupAvatar, ConfirmDialog } from './familyUi';
+import { FamilyGroupConsentSection, useFamilyGroupConsent } from './FamilyGroupConsent';
+import { MY_CONSENTS } from '../../../graphql/consent';
 
 const NAME_MAX = 80; // GROUP_NAME_MAX_LENGTH on the API
 
@@ -43,9 +45,11 @@ export function CreateGroupWizard({
   const [link, setLink] = useState<FamilyGroupJoinLink | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const consent = useFamilyGroupConsent();
   const [create, { loading: creating }] = useMutation<{ createFamilyGroup: FamilyGroup }>(
     CREATE_FAMILY_GROUP,
-    { refetchQueries: [{ query: MY_FAMILY_GROUPS }] },
+    // MY_CONSENTS: สถานะความยินยอมเพิ่งถูกบันทึก — หน้า Privacy/ครั้งถัดไปต้องเห็นค่าใหม่
+    { refetchQueries: [{ query: MY_FAMILY_GROUPS }, { query: MY_CONSENTS }] },
   );
   const [rename, { loading: renaming }] = useMutation(RENAME_FAMILY_GROUP);
   const [createLink, { loading: linking }] = useMutation<{
@@ -66,7 +70,9 @@ export function CreateGroupWizard({
     try {
       let g = group;
       if (!g) {
-        const res = await create({ variables: { input: { name: trimmed } } });
+        const res = await create({
+          variables: { input: { name: trimmed, consents: consent.answers() } },
+        });
         g = res.data?.createFamilyGroup ?? null;
         if (!g) return;
         setGroup(g);
@@ -127,6 +133,8 @@ export function CreateGroupWizard({
           count={s.charCount([...name].length, NAME_MAX)}
           autoFocus
         />
+        {/* ถามแค่ตอนสร้างครั้งแรก — ย้อนกลับมาแก้ชื่อ = กลุ่มถูกสร้างและบันทึกคำตอบไปแล้ว */}
+        {!group && <FamilyGroupConsentSection consent={consent} disabled={busy} />}
         <FormActions
           cancelText={s.cancel}
           confirmText={s.next}
@@ -351,7 +359,7 @@ export function TransferOwnershipModal({
                   checked={active}
                   onChange={() => setSelected(m.userId)}
                 />
-                <GroupAvatar name={m.displayName || m.email} seed={m.userId} size={36} />
+                <GroupAvatar name={m.displayName || m.email} seed={m.userId} src={m.avatarUrl} size={36} />
                 <div className="min-w-0">
                   <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
                     {m.displayName || m.email}

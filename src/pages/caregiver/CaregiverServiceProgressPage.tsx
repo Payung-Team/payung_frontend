@@ -73,6 +73,7 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
           bookedDurationText={booking.durationText}
           patientName={booking.patientName}
           careRecipientName={booking.careRecipientName}
+          recipientAvatarUrl={booking.recipientAvatarUrl}
           patientProfile={booking.patientProfile}
           netEarningsText={booking.price > 0 ? formatBaht(earnings.net) : undefined}
           netIsActual={earnings.isActual}

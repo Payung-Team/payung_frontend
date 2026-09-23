@@ -356,7 +356,7 @@ function GroupHeaderCard({
               className="rounded-full ring-2 ring-white"
               style={{ marginLeft: i === 0 ? 0 : -8 }}
             >
-              <GroupAvatar name={m.displayName || m.email} seed={m.userId} size={30} />
+              <GroupAvatar name={m.displayName || m.email} seed={m.userId} src={m.avatarUrl} size={30} />
             </span>
           ))}
           {extra > 0 && (
@@ -602,8 +602,10 @@ function GroupSwitcher({
 
 type ApptTab = 'confirmed' | 'pending' | 'history';
 
-const PENDING_STATUSES = ['unmatched', 'pending'];
-const CONFIRMED_STATUSES = ['accepted', 'confirmed', 'in_progress'];
+// ★ accepted = ผู้ดูแลตอบรับแล้วแต่ยังไม่ชำระเงิน → ยังไม่ใช่ "ยืนยันแล้ว"
+//   การจองยืนยันจริงเมื่อชำระแล้ว (confirmed) จึงอยู่แท็บรอยืนยันการจอง
+const PENDING_STATUSES = ['unmatched', 'pending', 'accepted'];
+const CONFIRMED_STATUSES = ['confirmed', 'in_progress'];
 
 function bucketOf(status: string): ApptTab {
   if (PENDING_STATUSES.includes(status)) return 'pending';
@@ -622,7 +624,9 @@ function statusTone(status: string): string {
     case 'unmatched':
     case 'pending':
       return 'bg-[#FEF6E7] text-[#B45309]';
-    default: // accepted / confirmed / in_progress / …
+    case 'accepted': // รอชำระเงิน — สีฟ้าเดียวกับ BookingDetailPage (รอผู้จองลงมือ ไม่ใช่รอผู้ดูแล)
+      return 'bg-[#EFF6FF] text-[#1D4ED8]';
+    default: // confirmed / in_progress / …
       return 'bg-[#ECFDF5] text-[#047857]';
   }
 }
@@ -928,7 +932,9 @@ function RichAppointmentCard({ b, onOpen }: { b: GroupBookingSummary; onOpen: ()
       <div className="mt-4 space-y-2 border-t border-[#F1E7D3] pt-3">
         {b.locationAddress && <ApptDetailRow icon="location_on" label={s.apptLocationLabel} value={b.locationAddress} />}
         <ApptDetailRow
-          icon="home_health"
+          // ★ ต้องเป็นชื่อที่มีใน Material Icons (index.html โหลดแค่ชุดนี้) — "home_health" เป็นของ
+          //   Material Symbols: ฟอนต์วาดได้แค่ "home" แต่กันความกว้างของทั้งคำ ป้ายเลยถูกดันไปไกล
+          icon="home"
           label={s.apptServiceFormatLabel}
           value={s.serviceFormatLabel(b.serviceLocations ?? [])}
         />
@@ -940,7 +946,13 @@ function RichAppointmentCard({ b, onOpen }: { b: GroupBookingSummary; onOpen: ()
 function ApptDetailRow({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
     <div className="flex items-start gap-2 text-[13px]">
-      <Icon name={icon} size="small" className="mt-0.5 text-[#8FA6A0]" />
+      {/* สีต้องส่งผ่าน color — Icon ใส่ color: currentColor แบบ inline ซึ่งชนะคลาส text-[…] */}
+      <Icon
+        name={icon}
+        color="#8FA6A0"
+        className="w-[18px] shrink-0 overflow-hidden"
+        style={{ fontSize: 18 }}
+      />
       <span className="shrink-0 text-[#8A8C8E]">{label}</span>
       <span className="min-w-0 flex-1 text-[#1A1A1A]">{value}</span>
     </div>

@@ -14,6 +14,8 @@ import { useStrings, type Strings } from './familyStrings';
 import { FONT, GroupAvatar } from './components/familyUi';
 import { fgErrorMessage } from './familyErrors';
 import { setPendingJoinToken, joinPath } from './joinRedirect';
+import { FamilyGroupConsentSection, useFamilyGroupConsent } from './components/FamilyGroupConsent';
+import { MY_CONSENTS } from '../../graphql/consent';
 
 const GROUP_HOME = '/family-group';
 
@@ -60,9 +62,12 @@ function AuthedJoin({ token }: { token: string }) {
     { variables: { token }, fetchPolicy: 'network-only' },
   );
 
+  const consent = useFamilyGroupConsent();
   const [join, { loading: joining, error: joinError }] = useMutation<{
     joinGroupByLink: { id: string; name: string };
-  }>(JOIN_GROUP_BY_LINK, { refetchQueries: [{ query: MY_FAMILY_GROUPS }] });
+  }>(JOIN_GROUP_BY_LINK, {
+    refetchQueries: [{ query: MY_FAMILY_GROUPS }, { query: MY_CONSENTS }],
+  });
 
   if (loading) return <Checking s={s} />;
 
@@ -115,7 +120,7 @@ function AuthedJoin({ token }: { token: string }) {
 
   const handleJoin = async () => {
     try {
-      const res = await join({ variables: { token } });
+      const res = await join({ variables: { token, consents: consent.answers() } });
       setJoined({ name: res.data?.joinGroupByLink?.name || preview.groupName });
     } catch {
       // Link could have gone stale between preview and confirm — the joinError banner
@@ -149,6 +154,8 @@ function AuthedJoin({ token }: { token: string }) {
           {s.joinBenefits3}
         </li>
       </ul>
+
+      <FamilyGroupConsentSection consent={consent} disabled={joining} />
 
       {joinError && (
         <p className="mt-4 rounded-lg bg-[#FEF2F2] px-4 py-2.5 text-[13px] text-[#B42318]">
