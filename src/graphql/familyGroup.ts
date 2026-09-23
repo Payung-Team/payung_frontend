@@ -233,6 +233,25 @@ export const GROUP_BOOKING_DETAIL = gql`
   }
 `;
 
+/**
+ * ความคืบหน้างานย่อยสำหรับสมาชิกกลุ่มที่ไม่ได้เป็นผู้จอง (หน้า Service Tracking)
+ * คู่กับ GET_MY_BOOKING_TASKS — myBooking คืนเฉพาะคำจองของผู้เรียกเอง สมาชิกคนอื่นจึงต้องมาทาง groupBooking
+ */
+export const GROUP_BOOKING_TASKS = gql`
+  query GroupBookingTasks($groupId: ID!, $bookingId: ID!) {
+    groupBooking(groupId: $groupId, bookingId: $bookingId) {
+      id
+      bookingTasks {
+        id
+        description
+        timeNote
+        sortOrder
+        doneAt
+      }
+    }
+  }
+`;
+
 /** The current usable join link (OWNER only). Throws JOIN_LINK_NOT_FOUND when the group has none. */
 export const GROUP_JOIN_LINK = gql`
   query GroupJoinLink($groupId: ID!) {
