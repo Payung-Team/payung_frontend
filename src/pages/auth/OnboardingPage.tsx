@@ -9,7 +9,7 @@ import Spinner from '../../components/ui/Spinner';
 import { Icon } from '../../components/ui/Icon';
 import { GET_USER, UPDATE_PROFILE } from '../../graphql/queries';
 import { useAuth } from '../../context/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { uploadProfilePhoto } from '../../lib/profilePhoto';
 import { getPostLoginRedirect } from '../../utils/getRedirectPath';
 import { takePendingJoinPath } from '../family/joinRedirect';
 import ThaiAddressSelector from '../../components/ui/ThaiAddressSelector';
@@ -62,9 +62,6 @@ interface FormErrors {
 /** role ผู้สูงอายุ — มีเฉพาะ role นี้ที่เป็นผู้รับบริการเอง */
 const ROLE_ELDER = 1;
 
-const API_BASE = ((import.meta.env.VITE_GRAPHQL_URL as string) || 'http://localhost:3000/graphql')
-  .replace('/graphql', '');
-
 const EMPTY_PATIENT: PatientDetailsValues = {
   name: '',
   firstName: '',
@@ -81,38 +78,6 @@ const EMPTY_PATIENT: PatientDetailsValues = {
   careInstructions: '',
   regularHospital: '',
 };
-
-/**
- * อัปรูปโปรไฟล์ผ่าน backend — PYG-507
- *
- * ไม่คืนค่าอะไรกลับ เพราะหน้านี้ไปต่อที่หน้าหลักทันที และรูปของผู้ดูแลต้องรอแอดมินอนุมัติ
- * ก่อนแสดงอยู่แล้ว (BE ตัดสินตาม role ให้เอง) ที่นี่สนใจแค่ "สำเร็จหรือไม่"
- */
-async function uploadProfilePhoto(file: File): Promise<void> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  if (!token) throw new Error('กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
-
-  const body = new FormData();
-  body.append('photo', file);
-
-  const res = await fetch(`${API_BASE}/api/v1/profile/photo`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body,
-  });
-
-  if (!res.ok) {
-    // BE ตอบข้อความไทยที่โชว์ได้เลย (เช่น "รองรับเฉพาะรูป JPEG") — ใช้ของ BE ก่อนเสมอ
-    const detail = await res
-      .json()
-      .then((b: { message?: string }) => b.message)
-      .catch(() => undefined);
-    throw new Error(detail ?? 'อัปโหลดรูปโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
-  }
-}
 
 const PHONE_DIGITS_REGEX = /^0[0-9]{9}$/;
 const POSTAL_CODE_REGEX = /^[0-9]{5}$/;
