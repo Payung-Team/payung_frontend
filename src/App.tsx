@@ -48,6 +48,8 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
 import AuthCallback from './pages/auth/AuthCallback';
 import NotificationsPage from './pages/notifications/NotificationsPage';
+// PYG-540: หน้าความเป็นส่วนตัว (ดู/ถอน/ให้ความยินยอม PDPA)
+import PrivacySettingsPage from './pages/settings/PrivacySettingsPage';
 import CaregiverProfilePage from './pages/search/CaregiverProfilePage';
 import BookingSuccessPage from './pages/booking/BookingSuccessPage';
 import PaymentPage from './pages/booking/PaymentPage';
@@ -286,6 +288,17 @@ function App() {
             }
           />
           <Route path="/notifications" element={<NotificationsPage />} />
+
+          {/* PYG-540: ความเป็นส่วนตัว (PDPA) — ผู้รับบริการ + ผู้ดูแล
+              ทุกคนที่มีบัญชีต้องเข้าถึงสิทธิ์ถอนความยินยอมได้ แอดมินไม่มีรายการความยินยอมจึงไม่เปิดให้ */}
+          <Route
+            path="/settings/privacy"
+            element={
+              <RoleRoute requiredRole={[1, 2]}>
+                <PrivacySettingsPage />
+              </RoleRoute>
+            }
+          />
 
           {/* Caregiver settings */}
           <Route

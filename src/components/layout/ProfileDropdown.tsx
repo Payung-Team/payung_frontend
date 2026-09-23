@@ -44,6 +44,12 @@ export default function ProfileDropdown({
     onViewProfileClick?.();
   };
 
+  // PYG-540: หน้าความเป็นส่วนตัว — แสดงให้ทุก role รวมผู้รับบริการ (อยู่นอกบล็อก !isPatient)
+  const handlePrivacy = () => {
+    setIsOpen(false);
+    navigate('/settings/privacy');
+  };
+
   return (
     <div className="relative">
       <button
@@ -92,6 +98,19 @@ export default function ProfileDropdown({
                 </div>
               </button>
             )}
+
+            <button
+              onClick={handlePrivacy}
+              className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
+            >
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                <Icon name="privacy_tip" size="small" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-medium text-gray-900">ความเป็นส่วนตัว</p>
+                <p className="text-xs text-gray-500">ความยินยอมและสิทธิ์ของฉัน</p>
+              </div>
+            </button>
 
             {!isPatient && (
             <>

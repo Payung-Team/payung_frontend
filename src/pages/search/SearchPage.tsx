@@ -15,6 +15,7 @@ import {
   BOOKING_UNCONFIRMED_MESSAGE,
   BOOKING_UNKNOWN_ERROR_MESSAGE,
   bookingHttpErrorMessage,
+  onBehalfBookingErrorMessage,
 } from '../../lib/bookingSubmitError';
 import ThailandAddressSimple from 'thailand-address-simple';
 
@@ -744,13 +745,8 @@ function SearchPageContent() {
             },
           });
         } catch (err) {
-          const gqlErr = err as { graphQLErrors?: { extensions?: { code?: string } }[] };
-          const code = gqlErr.graphQLErrors?.[0]?.extensions?.code;
-          if (code === 'RECIPIENT_NOT_IN_GROUP') {
-            setBookingError('ผู้รับบริการนี้ไม่ได้อยู่ในกลุ่มแล้ว ลองเลือกผู้รับบริการใหม่');
-          } else {
-            setBookingError('จองแทนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
-          }
+          // PYG-540: อ่าน code แบบ Apollo 4 + รองรับ CONSENT_WITHDRAWN (ดู bookingSubmitError.ts)
+          setBookingError(onBehalfBookingErrorMessage(err));
         }
         return;
       }
