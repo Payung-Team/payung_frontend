@@ -322,7 +322,8 @@ const S: Strings = {
     ({
       unmatched: 'รอจับคู่ผู้ดูแล',
       pending: 'รอผู้ดูแลยืนยัน',
-      accepted: 'ยืนยันแล้ว',
+      // ผู้ดูแลตอบรับแล้วแต่ผู้จองยังไม่ชำระ — ตรงกับ BookingDetailPage (ชำระแล้วถึงเป็น confirmed)
+      accepted: 'รอชำระเงิน',
       confirmed: 'ยืนยันแล้ว',
       in_progress: 'กำลังดูแล',
       completed: 'เสร็จสิ้น',

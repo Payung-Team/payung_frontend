@@ -602,8 +602,10 @@ function GroupSwitcher({
 
 type ApptTab = 'confirmed' | 'pending' | 'history';
 
-const PENDING_STATUSES = ['unmatched', 'pending'];
-const CONFIRMED_STATUSES = ['accepted', 'confirmed', 'in_progress'];
+// ★ accepted = ผู้ดูแลตอบรับแล้วแต่ยังไม่ชำระเงิน → ยังไม่ใช่ "ยืนยันแล้ว"
+//   การจองยืนยันจริงเมื่อชำระแล้ว (confirmed) จึงอยู่แท็บรอยืนยันการจอง
+const PENDING_STATUSES = ['unmatched', 'pending', 'accepted'];
+const CONFIRMED_STATUSES = ['confirmed', 'in_progress'];
 
 function bucketOf(status: string): ApptTab {
   if (PENDING_STATUSES.includes(status)) return 'pending';
@@ -622,7 +624,9 @@ function statusTone(status: string): string {
     case 'unmatched':
     case 'pending':
       return 'bg-[#FEF6E7] text-[#B45309]';
-    default: // accepted / confirmed / in_progress / …
+    case 'accepted': // รอชำระเงิน — สีฟ้าเดียวกับ BookingDetailPage (รอผู้จองลงมือ ไม่ใช่รอผู้ดูแล)
+      return 'bg-[#EFF6FF] text-[#1D4ED8]';
+    default: // confirmed / in_progress / …
       return 'bg-[#ECFDF5] text-[#047857]';
   }
 }
