@@ -932,7 +932,9 @@ function RichAppointmentCard({ b, onOpen }: { b: GroupBookingSummary; onOpen: ()
       <div className="mt-4 space-y-2 border-t border-[#F1E7D3] pt-3">
         {b.locationAddress && <ApptDetailRow icon="location_on" label={s.apptLocationLabel} value={b.locationAddress} />}
         <ApptDetailRow
-          icon="home_health"
+          // ★ ต้องเป็นชื่อที่มีใน Material Icons (index.html โหลดแค่ชุดนี้) — "home_health" เป็นของ
+          //   Material Symbols: ฟอนต์วาดได้แค่ "home" แต่กันความกว้างของทั้งคำ ป้ายเลยถูกดันไปไกล
+          icon="home"
           label={s.apptServiceFormatLabel}
           value={s.serviceFormatLabel(b.serviceLocations ?? [])}
         />
@@ -944,7 +946,13 @@ function RichAppointmentCard({ b, onOpen }: { b: GroupBookingSummary; onOpen: ()
 function ApptDetailRow({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
     <div className="flex items-start gap-2 text-[13px]">
-      <Icon name={icon} size="small" className="mt-0.5 text-[#8FA6A0]" />
+      {/* สีต้องส่งผ่าน color — Icon ใส่ color: currentColor แบบ inline ซึ่งชนะคลาส text-[…] */}
+      <Icon
+        name={icon}
+        color="#8FA6A0"
+        className="w-[18px] shrink-0 overflow-hidden"
+        style={{ fontSize: 18 }}
+      />
       <span className="shrink-0 text-[#8A8C8E]">{label}</span>
       <span className="min-w-0 flex-1 text-[#1A1A1A]">{value}</span>
     </div>
