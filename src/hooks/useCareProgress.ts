@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { GET_CARE_LOGS, GET_MY_BOOKING_TASKS } from '../graphql/queries';
+import { GROUP_BOOKING_TASKS } from '../graphql/familyGroup';
 
 // ── Live task progress + care logs for the patient tracking view ─────────────
 //
@@ -30,14 +31,32 @@ export interface PatientCareLog {
   serverTs: string;
 }
 
-export function useCareProgress(bookingId: string | undefined, { live }: { live: boolean }) {
+/**
+ * @param groupId ส่งมาเมื่อผู้ดูเป็นสมาชิกกลุ่มครอบครัวที่ไม่ได้จองเอง — myBooking คืนเฉพาะคำจองของผู้เรียก
+ *   จึงต้องอ่านงานย่อยผ่าน groupBooking แทน (careLogs ใช้ตัวเดิมได้ BE เปิดสิทธิ์ให้สมาชิกกลุ่มแล้ว)
+ */
+export function useCareProgress(
+  bookingId: string | undefined,
+  { live, groupId }: { live: boolean; groupId?: string | null },
+) {
   const skip = !bookingId;
   const pollInterval = live ? POLL_INTERVAL_MS : 0;
 
-  const tasksQuery = useQuery<{ myBooking: { id: string; bookingTasks: PatientBookingTask[] } }>(
+  const myTasksQuery = useQuery<{ myBooking: { id: string; bookingTasks: PatientBookingTask[] } }>(
     GET_MY_BOOKING_TASKS,
-    { variables: { id: bookingId ?? '' }, skip, fetchPolicy: 'cache-and-network', pollInterval, errorPolicy: 'all' },
+    { variables: { id: bookingId ?? '' }, skip: skip || Boolean(groupId), fetchPolicy: 'cache-and-network', pollInterval, errorPolicy: 'all' },
   );
+  const groupTasksQuery = useQuery<{ groupBooking: { id: string; bookingTasks: PatientBookingTask[] } }>(
+    GROUP_BOOKING_TASKS,
+    {
+      variables: { groupId: groupId ?? '', bookingId: bookingId ?? '' },
+      skip: skip || !groupId,
+      fetchPolicy: 'cache-and-network',
+      pollInterval,
+      errorPolicy: 'all',
+    },
+  );
+  const tasksQuery = groupId ? groupTasksQuery : myTasksQuery;
   const logsQuery = useQuery<{ careLogs: PatientCareLog[] }>(
     GET_CARE_LOGS,
     {
@@ -67,7 +86,9 @@ export function useCareProgress(bookingId: string | undefined, { live }: { live:
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [bookingId, live, refetch]);
 
-  const tasks = tasksQuery.data?.myBooking?.bookingTasks ?? null;
+  const tasks = (groupId
+    ? groupTasksQuery.data?.groupBooking?.bookingTasks
+    : myTasksQuery.data?.myBooking?.bookingTasks) ?? null;
   const logs = logsQuery.data?.careLogs ?? null;
 
   return {
