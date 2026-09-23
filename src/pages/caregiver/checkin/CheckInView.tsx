@@ -61,6 +61,7 @@ export default function CheckInView({ booking, dateText, canCheckInToday, onChec
         canCheckInToday={canCheckInToday}
         patientName={booking.patientName}
         careRecipientName={booking.careRecipientName}
+        recipientAvatarUrl={booking.recipientAvatarUrl}
         patientProfile={booking.patientProfile}
         onViewProfile={() => setInfoPanel('profile')}
         onViewBookingDetails={() => setInfoPanel('details')}

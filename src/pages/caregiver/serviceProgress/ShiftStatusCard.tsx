@@ -13,6 +13,7 @@ export interface ShiftStatusCardProps {
   bookedDurationText?: string;
   patientName: string;
   careRecipientName?: string | null;
+  recipientAvatarUrl?: string | null;
   /** PYG-460 — ใช้เฉพาะดึง "ประวัติแพ้ยา" ขึ้นมาโชว์ในการ์ด · รายละเอียดเต็มอยู่ในป๊อปอัปโปรไฟล์ */
   patientProfile?: PatientProfile | null;
   /** รายได้สุทธิหลังหักค่าธรรมเนียม (ข้อความจัดรูปแล้ว) — ไม่ส่งมา = งานนี้ไม่มียอด */
@@ -94,6 +95,7 @@ export default function ShiftStatusCard({
   bookedDurationText,
   patientName,
   careRecipientName,
+  recipientAvatarUrl,
   patientProfile,
   netEarningsText,
   netIsActual,
@@ -190,6 +192,7 @@ export default function ShiftStatusCard({
       <RecipientActionRow
         patientName={patientName}
         careRecipientName={careRecipientName}
+        avatarUrl={recipientAvatarUrl}
         patientProfile={patientProfile}
         onViewProfile={onViewProfile}
         onViewBookingDetails={onViewBookingDetails}

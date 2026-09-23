@@ -754,6 +754,8 @@ const CAREGIVER_BOOKING_SUMMARY_FIELDS = `
     avatarUrl
   }
   careRecipientName
+  # รูปของ "ผู้รับบริการ" (signed URL) — ไม่ใช่รูปคนกดจองเสมอไป · null = ใช้ตัวอักษรย่อ
+  recipientAvatarUrl
   confirmedAt
   rejectionReason
   createdAt

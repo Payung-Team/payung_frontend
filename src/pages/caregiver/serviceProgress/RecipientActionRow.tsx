@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Icon } from '../../../components/ui/Icon';
 import type { PatientProfile } from '../../../lib/patientProfile';
 
@@ -6,6 +7,8 @@ const FONT = { fontFamily: "'Bai Jamjuree', sans-serif" } as const;
 export interface RecipientActionRowProps {
   patientName: string;
   careRecipientName?: string | null;
+  /** รูปของผู้รับบริการ — ไม่มี/โหลดไม่ขึ้น = ตัวอักษรย่อ */
+  avatarUrl?: string | null;
   /** PYG-460 — ใช้เฉพาะดึง "ประวัติแพ้ยา" ขึ้นมาโชว์ · รายละเอียดเต็มอยู่ในป๊อปอัปโปรไฟล์ */
   patientProfile?: PatientProfile | null;
   onViewProfile: () => void;
@@ -22,22 +25,36 @@ export interface RecipientActionRowProps {
 export default function RecipientActionRow({
   patientName,
   careRecipientName,
+  avatarUrl,
   patientProfile,
   onViewProfile,
   onViewBookingDetails,
 }: Readonly<RecipientActionRowProps>) {
   const displayName = careRecipientName || patientName;
+  // จำ URL ที่โหลดพัง (signed URL หมดอายุ ฯลฯ) → ตกเป็นตัวอักษรย่อ ไม่โชว์รูปแตก
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const showPhoto = !!avatarUrl && avatarUrl !== failedSrc;
 
   return (
     <div className="flex flex-wrap items-center gap-4 p-5">
-      <span
-        className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full text-white shadow-[0_4px_16px_rgba(82,182,154,0.25)]"
-        style={{ background: 'linear-gradient(135deg, #168AAD 0%, #52B69A 100%)' }}
-      >
-        <span className="text-lg font-bold" style={FONT}>
-          {displayName.charAt(0) || '?'}
+      {showPhoto ? (
+        <img
+          src={avatarUrl}
+          alt=""
+          aria-hidden="true"
+          onError={() => setFailedSrc(avatarUrl)}
+          className="h-[46px] w-[46px] shrink-0 rounded-full object-cover shadow-[0_4px_16px_rgba(82,182,154,0.25)]"
+        />
+      ) : (
+        <span
+          className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full text-white shadow-[0_4px_16px_rgba(82,182,154,0.25)]"
+          style={{ background: 'linear-gradient(135deg, #168AAD 0%, #52B69A 100%)' }}
+        >
+          <span className="text-lg font-bold" style={FONT}>
+            {displayName.charAt(0) || '?'}
+          </span>
         </span>
-      </span>
+      )}
 
       <div className="min-w-0 flex-[1_1_200px]">
         <p className="text-[11px] font-semibold tracking-wide text-[#8A8C8E]" style={FONT}>

@@ -55,6 +55,8 @@ export interface Booking {
   bookingTasks?: BookingTask[];
   receivedTimeText?: string;
   careRecipientName?: string;
+  /** รูปของผู้รับบริการ (signed URL) — undefined = ตกเป็นตัวอักษรย่อ */
+  recipientAvatarUrl?: string;
   dayOfContactName?: string;
   dayOfContactPhone?: string;
   dayOfContactRelationship?: string;
@@ -150,6 +152,7 @@ export function mapToBooking(summary: any): Booking {
     receivedTimeText,
     notes: summary.notes ?? undefined,
     careRecipientName: summary.patientName || summary.careRecipientName || undefined,
+    recipientAvatarUrl: summary.recipientAvatarUrl ?? undefined,
     dayOfContactName: summary.dayOfContactName ?? undefined,
     dayOfContactPhone: summary.dayOfContactPhone ?? undefined,
     dayOfContactRelationship: summary.dayOfContactRelationship ?? undefined,
