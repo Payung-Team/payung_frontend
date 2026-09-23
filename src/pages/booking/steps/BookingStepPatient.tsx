@@ -200,6 +200,11 @@ function MemberBookingSection({
 
   // จองแทน = จองให้ "คนอื่น" — ตัวเองออกจากลิสต์ (จองให้ตัวเองใช้ flow ปกติ)
   const myUserId = (group?.members ?? []).find((m) => m.isMe)?.userId;
+  // groupBookingRecipients ไม่มีรูป — ยืมจากรายชื่อสมาชิกของกลุ่ม (backend sign URL ให้แล้ว)
+  const avatarByUserId = useMemo(
+    () => new Map((group?.members ?? []).map((m) => [m.userId, m.avatarUrl])),
+    [group?.members],
+  );
   const options = useMemo(
     () => members.filter((m) => m.memberUserId !== myUserId),
     [members, myUserId],
@@ -280,7 +285,12 @@ function MemberBookingSection({
                     checked={active}
                     onChange={() => handlePickMember(member.memberUserId)}
                   />
-                  <GroupAvatar name={member.name} seed={member.memberUserId} size={40} />
+                  <GroupAvatar
+                    name={member.name}
+                    seed={member.memberUserId}
+                    src={avatarByUserId.get(member.memberUserId)}
+                    size={40}
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
                       {member.name || 'สมาชิกที่ยังไม่ได้กรอกชื่อ'}
@@ -731,12 +741,12 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
 
   return (
     <div className="space-y-4">
-      {/* เลือกจากโปรไฟล์ที่เคยบันทึกไว้ — ไม่เลือกก็กรอกเองได้ในการ์ดถัดไป */}
-      {savedRecipients.length > 0 && (
+      {/* เลือกจากโปรไฟล์ที่เคยบันทึกไว้ — ไม่เลือกก็กรอกเองได้ในการ์ดถัดไป
+          ★ จองแทนสมาชิกไม่แสดงการ์ดนี้: ผู้รับบริการคือ "ตัวสมาชิกคนนั้น" เสมอ
+            ข้อมูลของเขาเติมลงฟอร์มให้แล้ว (initialPatient) ไม่มีอะไรให้เลือก */}
+      {!isMemberBooking && savedRecipients.length > 0 && (
         <section className="bg-white p-6 rounded-2xl border border-gray-100">
-          <h2 className="text-lg font-bold text-[#1A1A1A]">
-            {isMemberBooking ? `โปรไฟล์ที่ ${memberContext?.memberName} เคยบันทึกไว้` : 'ผู้รับบริการคือใคร'}
-          </h2>
+          <h2 className="text-lg font-bold text-[#1A1A1A]">ผู้รับบริการคือใคร</h2>
           <p className="text-sm text-[#8A8C8E] mt-1">
             เลือกจากรายชื่อที่บันทึกไว้ หรือกรอกข้อมูลใหม่ด้านล่าง
           </p>
@@ -754,7 +764,7 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
                   // ★ ห้ามลบใบของตัวเอง — เป็นใบเดียวกับที่ Onboarding สร้าง
                   //   ลบแล้ว onboardingCompleted กลับเป็น false (PYG-538) ผู้ใช้จะโดนเด้ง
                   //   ไปกรอก Onboarding ใหม่ทั้งชุดโดยไม่รู้ว่าเกิดจากการกดลบตรงนี้
-                  isMemberBooking || r.isSelf
+                  r.isSelf
                     ? undefined
                     : () => {
                         setDeleteError(null);
