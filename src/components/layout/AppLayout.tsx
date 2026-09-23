@@ -185,6 +185,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         currentPhone={userData?.me?.phone || ''}
         currentAddress={userData?.me?.address || ''}
         currentBio={userData?.me?.bio || ''}
+        currentAvatarUrl={userData?.me?.avatarUrl ?? undefined}
       />
 
       {/* Toast Notifications */}
