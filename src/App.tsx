@@ -1,7 +1,8 @@
-import { Routes, Route, Outlet, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useQuery } from '@apollo/client/react';
-import { GET_CAREGIVER_PROFILE, GET_USER } from './graphql/queries';
+import { GET_CAREGIVER_PROFILE } from './graphql/queries';
+import { GET_ONBOARDING_STATUS, type OnboardingStatusData } from './graphql/onboarding';
 import PageSkeleton from './components/ui/PageSkeleton';
 import { useAuth } from './context/AuthContext';
 import { getPostLoginRedirect } from './utils/getRedirectPath';
@@ -72,12 +73,36 @@ function KycFormGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * PYG-501 — ผู้สูงอายุที่ยังไม่ผ่าน Onboarding หรือไม่ (ตัดสินจาก me.onboardingCompleted ของ BE)
+ *
+ * ★ ทั้งสอง guard ข้างล่างต้องใช้ hook นี้ตัวเดียว — ถ้าเงื่อนไขไม่ตรงกันจะเด้งกันไปมาไม่รู้จบ
+ *   (เดิมใช้ "มีเบอร์โทร = ทำแล้ว" ซึ่งบัญชีเก่าที่มีเบอร์แต่ไม่มีโปรไฟล์ผู้รับบริการหลุดผ่าน)
+ *
+ * ★ query ล้ม → ถือว่าไม่ต้อง onboard (ปล่อยผ่าน) ไม่ใช่ส่งไป /onboarding
+ *   ถ้าส่งไป ผู้ใช้จะวนอยู่ที่หน้า Onboarding ตลอด: กดบันทึกสำเร็จแล้ว guard ก็ยังล้มเหมือนเดิม
+ *   ด่านจริงอยู่ที่ BE (completeOnboarding / ONBOARDING_REQUIRED ตอนจอง) ตัวนี้แค่พาไปถูกหน้า
+ */
+function useNeedsOnboarding() {
+  const { data, loading, error } = useQuery<OnboardingStatusData>(GET_ONBOARDING_STATUS);
+
+  if (error) {
+    console.warn('Failed to fetch onboarding status, skipping redirect:', error.message);
+  }
+
+  const me = data?.me;
+  return {
+    loading,
+    needsOnboarding: !!me && me.role === 1 && !me.onboardingCompleted,
+  };
+}
+
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
-  const { data, loading } = useQuery<{ me?: { phone: string | null } }>(GET_USER);
+  const { loading, needsOnboarding } = useNeedsOnboarding();
 
   if (loading) return <PageSkeleton />;
 
-  if (data?.me?.phone) {
+  if (!needsOnboarding) {
     return <Navigate to="/patient-home" replace />;
   }
 
@@ -85,18 +110,26 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * หน้าที่ผู้สูงอายุเข้าได้แม้ยังไม่ผ่าน Onboarding
+ * /settings/privacy — PYG-540 สิทธิ์ถอนความยินยอมต้องใช้ได้เสมอ (เหมือนผู้ดูแลที่ KYC ยังไม่ผ่าน
+ *   ใน AppLayout) และ BE นับ "ถอนความยินยอมข้อมูลสุขภาพ" ว่ายังไม่ผ่าน Onboarding (PYG-538)
+ *   ถ้าไม่ยกเว้น กดถอนแล้วจะโดนพาออกจากหน้านี้ไปหน้า Onboarding ทันที
+ */
+const ONBOARDING_EXEMPT_PATHS = ['/settings/privacy'];
+
+/**
  * ผู้สูงอายุที่ยังไม่ทำ Onboarding ห้ามเข้าหน้าในแอป — ส่งกลับไป /onboarding เสมอ
+ * ครอบทุกช่องทาง login (Email/Password, Google, ?redirect=) เพราะทุกทางต้องผ่าน layout นี้
  * กันทั้งพิมพ์ URL เอง และกด back จากหน้า Onboarding (/register → GuestRoute → /patient-home)
- * ใช้เงื่อนไขเดียวกับ OnboardingGuard (มี phone = ทำแล้ว) ไม่งั้นสอง guard จะเด้งกันไปมา
  */
 function PatientOnboardingGuard({ children }: { children: React.ReactNode }) {
-  const { userRole } = useAuth();
-  const { data, loading } = useQuery<{ me?: { role: number; phone: string | null } }>(GET_USER);
+  const { pathname } = useLocation();
+  const { loading, needsOnboarding } = useNeedsOnboarding();
 
   if (loading) return <PageSkeleton />;
 
-  const role = data?.me?.role ?? userRole;
-  if (role === 1 && data?.me && !data.me.phone) {
+  const isExempt = ONBOARDING_EXEMPT_PATHS.some((path) => pathname.startsWith(path));
+  if (needsOnboarding && !isExempt) {
     return <Navigate to="/onboarding" replace />;
   }
 
