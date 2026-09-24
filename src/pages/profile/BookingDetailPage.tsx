@@ -319,7 +319,9 @@ export default function BookingDetailPage() {
 
   // Patients see the Tracking Service view instead of the static summary (PYG-361).
   // Once the job has actually started the date no longer matters.
-  const isTrackingDue = canManageBooking && isPatient && (
+  // สมาชิกกลุ่มครอบครัว (ไม่จำกัด role — ผู้ดูแลก็เป็นสมาชิกกลุ่มได้) เห็นหน้านี้เหมือนผู้จอง
+  // แต่อ่านอย่างเดียวถ้าไม่ได้จองเอง (trackingReadOnly)
+  const isTrackingDue = (isFamilyView || (canManageBooking && isPatient)) && (
     ACTIVE_JOB_STATUSES.has(booking.status) ||
     (booking.status === 'confirmed' && isServiceDatePassed)
   );
@@ -527,6 +529,9 @@ export default function BookingDetailPage() {
             if (booking.caregiverId) navigate(`/caregivers/${booking.caregiverId}`);
           }}
           hasReviewed={!!existingReview}
+          readOnly={!canManageBooking}
+          familyGroupId={familyGroupId}
+          backLabel={isFamilyView ? 'กลับไปยังกลุ่มครอบครัว' : undefined}
         />
         {disputeModal}
         <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />

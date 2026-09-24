@@ -285,6 +285,35 @@ function CallCaregiverButton({
   );
 }
 
+/**
+ * ปุ่ม "แจ้งปัญหา" มุมขวาบน — ซ่อนในโหมดอ่านอย่างเดียว (สมาชิกกลุ่มครอบครัว)
+ * เพราะการแจ้งปัญหา/ข้อพิพาทเป็นสิทธิ์ของผู้จองเท่านั้น
+ */
+function ReportProblemButton({ onClick, emphasized = false }: Readonly<{ onClick: () => void; emphasized?: boolean }>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 16px', height: 40, background: '#FFFFFF', border: `0.8px solid ${emphasized ? '#FCA5A5' : '#E5E7EB'}`, borderRadius: 8, cursor: 'pointer', flexShrink: 0 }}
+    >
+      <span className="material-icons" style={{ fontSize: 17, color: '#DC2626' }}>flag</span>
+      <span style={{ fontFamily: FONT_TH, fontSize: 13, fontWeight: 600, color: '#DC2626', lineHeight: '20px' }}>แจ้งปัญหา</span>
+    </button>
+  );
+}
+
+/** แถบบอกว่ากำลังดูในฐานะสมาชิกครอบครัว — ใช้ทั้งหน้ารอเช็คอินและหน้ากำลังดูแล */
+function FamilyViewerNotice() {
+  return (
+    <div style={{ marginTop: 16, display: 'flex', alignItems: 'flex-start', gap: 10, padding: 14, background: '#F0F9FF', border: '0.8px solid #BAE6FD', borderRadius: 12 }}>
+      <span className="material-icons" style={{ fontSize: 18, color: '#0284C7', flexShrink: 0, marginTop: 1 }}>visibility</span>
+      <p style={{ fontFamily: FONT_TH, fontSize: 13, fontWeight: 600, color: '#075985', margin: 0, lineHeight: '20px' }}>
+        คุณกำลังติดตามการดูแลของสมาชิกในครอบครัว การเปิด QR เช็คอิน/จบการดูแล การแจ้งปัญหา และการรีวิวทำได้โดยผู้จองเท่านั้น
+      </p>
+    </div>
+  );
+}
+
 function AwaitingCheckInView({
   booking,
   durationStr,
@@ -292,7 +321,9 @@ function AwaitingCheckInView({
   showDetails,
   onToggleDetails,
   onBack,
+  backLabel,
   onReportProblem,
+  readOnly,
 }: Readonly<{
   booking: ConfirmedBooking;
   durationStr: string;
@@ -300,7 +331,9 @@ function AwaitingCheckInView({
   showDetails: boolean;
   onToggleDetails: () => void;
   onBack: () => void;
+  backLabel: string;
   onReportProblem: () => void;
+  readOnly: boolean;
 }>) {
   // กด "เปิด QR Code" แล้ว QR ขึ้นแทนที่เนื้อหาการ์ดเลย (ไม่ใช่ modal)
   // ไม่มีปุ่มปิด — พอผู้ดูแลสแกนสำเร็จ หน้าจะสลับเป็นสถานะกำลังให้บริการเอง
@@ -318,7 +351,7 @@ function AwaitingCheckInView({
         >
           <span className="material-icons" style={{ fontSize: 18, color: '#8A8C8E' }}>arrow_back</span>
           <span style={{ fontFamily: FONT_TH, fontSize: 13, fontWeight: 500, color: '#8A8C8E', lineHeight: '20px' }}>
-            กลับไปนัดหมายของฉัน
+            {backLabel}
           </span>
         </button>
 
@@ -332,15 +365,10 @@ function AwaitingCheckInView({
               ติดตามการทำงานของผู้ดูแล
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onReportProblem}
-            style={{ boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 16px', height: 40, background: '#FFFFFF', border: '0.8px solid #E5E7EB', borderRadius: 8, cursor: 'pointer', flexShrink: 0 }}
-          >
-            <span className="material-icons" style={{ fontSize: 17, color: '#DC2626' }}>flag</span>
-            <span style={{ fontFamily: FONT_TH, fontSize: 13, fontWeight: 600, color: '#DC2626', lineHeight: '20px' }}>แจ้งปัญหา</span>
-          </button>
+          {!readOnly && <ReportProblemButton onClick={onReportProblem} />}
         </div>
+
+        {readOnly && <FamilyViewerNotice />}
 
         {/* Status + QR call-to-action */}
         <div style={{ marginTop: 20, boxSizing: 'border-box', background: '#FFFFFF', border: '1.6px solid rgba(0,146,101,0.25)', boxShadow: '0px 6px 24px rgba(0,146,101,0.1)', borderRadius: 16, overflow: 'hidden' }}>
@@ -358,7 +386,17 @@ function AwaitingCheckInView({
             </div>
           </div>
 
-          {showQr ? (
+          {/* QR เช็คอินเปิดได้เฉพาะผู้จอง — สมาชิกครอบครัวเห็นแค่ว่ากำลังรอผู้ดูแลเช็คอิน */}
+          {readOnly ? (
+            <div style={{ boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 16, padding: 28 }}>
+              <div style={{ width: 56, height: 56, borderRadius: 9999, background: '#F0FAF4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span className="material-icons" style={{ fontSize: 28, color: '#009265' }}>hourglass_top</span>
+              </div>
+              <p style={{ fontFamily: FONT_TH, fontSize: 14, color: '#575859', margin: 0, lineHeight: '24px' }}>
+                เมื่อผู้ดูแลมาถึง ผู้จองจะเปิด QR ให้ผู้ดูแลสแกนเพื่อเริ่มการดูแล หน้านี้จะอัปเดตความคืบหน้าให้อัตโนมัติ
+              </p>
+            </div>
+          ) : showQr ? (
             <InlineCheckInQr bookingId={booking.id} bookingStatus={booking.status} />
           ) : (
           <div style={{ boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, padding: 28, flexWrap: 'wrap' }}>
@@ -739,7 +777,9 @@ function InProgressView({
   careLogs,
   finished,
   onBack,
+  backLabel,
   onReportProblem,
+  readOnly,
 }: Readonly<{
   booking: ConfirmedBooking;
   steps: InProgressStep[];
@@ -759,7 +799,10 @@ function InProgressView({
     onWriteReview: () => void;
   };
   onBack: () => void;
+  backLabel: string;
   onReportProblem: () => void;
+  /** สมาชิกกลุ่มครอบครัวที่ไม่ได้จอง — ดูได้อย่างเดียว ไม่มี QR จบงาน / แจ้งปัญหา / รีวิว */
+  readOnly: boolean;
 }>) {
   const [showQr, setShowQr] = useState(false);
   const [showAllLogs, setShowAllLogs] = useState(false);
@@ -782,7 +825,7 @@ function InProgressView({
         >
           <span className="material-icons" style={{ fontSize: 18, color: '#8A8C8E' }}>arrow_back</span>
           <span style={{ fontFamily: FONT_TH, fontSize: 13, fontWeight: 500, color: '#8A8C8E', lineHeight: '20px' }}>
-            กลับไปนัดหมายของฉัน
+            {backLabel}
           </span>
         </button>
 
@@ -796,15 +839,10 @@ function InProgressView({
               ติดตามการทำงานของผู้ดูแล
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onReportProblem}
-            style={{ boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 16px', height: 40, background: '#FFFFFF', border: `0.8px solid ${finished ? '#FCA5A5' : '#E5E7EB'}`, borderRadius: 8, cursor: 'pointer', flexShrink: 0 }}
-          >
-            <span className="material-icons" style={{ fontSize: 17, color: '#DC2626' }}>flag</span>
-            <span style={{ fontFamily: FONT_TH, fontSize: 13, fontWeight: 600, color: '#DC2626', lineHeight: '20px' }}>แจ้งปัญหา</span>
-          </button>
+          {!readOnly && <ReportProblemButton onClick={onReportProblem} emphasized={Boolean(finished)} />}
         </div>
+
+        {readOnly && <FamilyViewerNotice />}
 
         {/* Stepper (หรือแถบ "การดูแลเสร็จสิ้น" หลังปิดงาน) + caregiver */}
         <div style={{ ...IN_PROGRESS_CARD, marginTop: 20, borderRadius: 16 }}>
@@ -816,10 +854,12 @@ function InProgressView({
               <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                 <p style={{ fontFamily: FONT_TH, fontSize: 17, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '26px' }}>การดูแลเสร็จสิ้น</p>
                 <p style={{ fontFamily: FONT_TH, fontSize: 13, color: '#8A8C8E', margin: '2px 0 0', lineHeight: '20px' }}>
-                  รีวิวผู้ดูแล หรือแจ้งปัญหาได้ภายใน 24 ชั่วโมง ก่อนระบบโอนเงิน
+                  {readOnly
+                    ? 'ผู้จองสามารถรีวิวผู้ดูแล หรือแจ้งปัญหาได้ภายใน 24 ชั่วโมง'
+                    : 'รีวิวผู้ดูแล หรือแจ้งปัญหาได้ภายใน 24 ชั่วโมง ก่อนระบบโอนเงิน'}
                 </p>
               </div>
-              {finished.hasReviewed ? (
+              {readOnly ? null : finished.hasReviewed ? (
                 <span style={{ boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 20px', height: 44, background: '#ECFDF5', border: '0.8px solid rgba(16,185,129,0.3)', borderRadius: 12, flexShrink: 0 }}>
                   <span className="material-icons" style={{ fontSize: 18, color: '#047857' }}>check_circle</span>
                   <span style={{ fontFamily: FONT_TH, fontSize: 14, fontWeight: 700, color: '#047857', lineHeight: '21px' }}>คุณรีวิวแล้ว</span>
@@ -1015,7 +1055,9 @@ function InProgressView({
       {/* Fixed action bar — เฉพาะระหว่างทำงาน ปิดงานแล้วไม่มีอะไรให้กด */}
       {!finished && (
       <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, background: '#FFFFFF', borderTop: '0.8px solid #F3F4F6', boxShadow: '0px -4px 16px rgba(0,0,0,0.04)' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '12px 24px', boxSizing: 'border-box', display: 'flex', gap: 16 }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '12px 24px', boxSizing: 'border-box', display: 'flex', gap: 16, justifyContent: readOnly ? 'flex-end' : undefined }}>
+          {/* จบการดูแล = เปิด QR ให้ผู้ดูแลสแกนปิดงาน → ผู้จองเท่านั้น; โทรฉุกเฉินให้ทุกคนที่ดูอยู่ */}
+          {!readOnly && (
           <button
             type="button"
             onClick={() => setShowQr(true)}
@@ -1023,6 +1065,7 @@ function InProgressView({
           >
             <span style={{ fontFamily: FONT_TH, fontSize: 16, fontWeight: 700, color: '#FFFFFF', lineHeight: '24px' }}>จบการดูแล</span>
           </button>
+          )}
           <a
             href={toTelHref(EMERGENCY_PHONE)}
             title={`โทรสายด่วนฉุกเฉิน ${EMERGENCY_PHONE}`}
@@ -1035,7 +1078,7 @@ function InProgressView({
       </div>
       )}
 
-      {showQr && (
+      {showQr && !readOnly && (
         <CheckoutQrModal bookingId={booking.id} bookingStatus={booking.status} onClose={() => setShowQr(false)} />
       )}
     </div>
@@ -1065,6 +1108,9 @@ export function BookingTrackingView({
   onReportProblem,
   onWriteReview,
   hasReviewed = false,
+  readOnly = false,
+  familyGroupId = null,
+  backLabel = 'กลับไปนัดหมายของฉัน',
 }: Readonly<{
   booking: ConfirmedBooking;
   onBack: () => void;
@@ -1073,6 +1119,14 @@ export function BookingTrackingView({
   /** No longer rendered — the finished layout has no rebook button. Kept optional so callers still compile. */
   onRebook?: () => void;
   hasReviewed?: boolean;
+  /**
+   * สมาชิกกลุ่มครอบครัวที่ไม่ได้จอง — เห็นความคืบหน้าเหมือนผู้จอง แต่ไม่มี QR เช็คอิน/จบการดูแล,
+   * แจ้งปัญหา หรือรีวิว (สิทธิ์ของผู้จองเท่านั้น)
+   */
+  readOnly?: boolean;
+  /** มีค่า = ดูผ่านกลุ่มครอบครัว → อ่านงานย่อยผ่าน groupBooking (myBooking ไม่คืนคำจองของคนอื่น) */
+  familyGroupId?: string | null;
+  backLabel?: string;
 }>) {
   const [showDetails, setShowDetails] = useState(false);
 
@@ -1122,7 +1176,7 @@ export function BookingTrackingView({
   // after check-out they're history.
   const { tasks: liveTasks, logs: liveLogs } = useCareProgress(
     isCheckedIn ? booking.id : undefined,
-    { live: isCheckedIn && !hasCheckedOut },
+    { live: isCheckedIn && !hasCheckedOut, groupId: familyGroupId },
   );
 
   // Mock clock, used only when `?mock=` is driving a state that has no real
@@ -1302,7 +1356,9 @@ export function BookingTrackingView({
         showDetails={showDetails}
         onToggleDetails={() => setShowDetails((v) => !v)}
         onBack={onBack}
+        backLabel={backLabel}
         onReportProblem={onReportProblem}
+        readOnly={readOnly}
       />
     );
   }
@@ -1339,7 +1395,9 @@ export function BookingTrackingView({
         onWriteReview,
       } : undefined}
       onBack={onBack}
+      backLabel={backLabel}
       onReportProblem={onReportProblem}
+      readOnly={readOnly}
     />
   );
 }
