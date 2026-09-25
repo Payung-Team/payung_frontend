@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { NetworkStatus } from '@apollo/client';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { useBooking } from '../../context/BookingContext';
 import { supabase } from '../../lib/supabase';
@@ -8,8 +9,9 @@ import { SEARCH_CAREGIVERS } from '../../graphql/queries';
 import { CREATE_BOOKING_ON_BEHALF } from '../../graphql/familyGroup';
 import Pagination from '../../components/ui/Pagination';
 import Skeleton from '../../components/ui/Skeleton';
-import Avatar from '../../components/ui/Avatar';
+import CaregiverPhoto from '../../components/ui/CaregiverPhoto';
 import BookingConfirmModal from '../../components/ui/BookingConfirmModal';
+import { useSignedUrlRefresh } from '../../hooks/useSignedPhoto';
 import {
   BOOKING_SESSION_EXPIRED_MESSAGE,
   BOOKING_UNCONFIRMED_MESSAGE,
@@ -133,7 +135,7 @@ function StarRating({ rating, count, size = 16 }: { rating: number; count?: numb
 
 // ── Caregiver Card (horizontal CGRow layout, mirrors Patient_Information.html) ───
 
-function CaregiverCard({ cg, onSelect, onViewProfile }: { cg: CaregiverSummary; onSelect?: (cg: CaregiverSummary) => void; onViewProfile?: (cg: CaregiverSummary) => void }) {
+function CaregiverCard({ cg, onSelect, onViewProfile, onPhotoExpired }: { cg: CaregiverSummary; onSelect?: (cg: CaregiverSummary) => void; onViewProfile?: (cg: CaregiverSummary) => void; onPhotoExpired?: () => void }) {
   const fullName = cg.fullName;
   const hasRating = cg.avgRating != null && cg.reviewCount > 0;
   const translatedSkills = cg.skills.map((skill) => SKILL_TRANSLATIONS[skill] || skill);
@@ -153,11 +155,11 @@ function CaregiverCard({ cg, onSelect, onViewProfile }: { cg: CaregiverSummary; 
 
         {/* ── Avatar (120px) + verified badge ── */}
         <div className="relative flex-shrink-0 mx-auto sm:mx-0">
-          <Avatar
-            src={cg.avatarUrl ?? undefined}
-            name={fullName}
+          <CaregiverPhoto
+            src={cg.avatarUrl}
             size={120}
-            fallbackColor="#52B69A"
+            onExpired={onPhotoExpired}
+            frameStyle={{ border: '3px solid #FFFFFF', boxShadow: '0 4px 16px rgba(82,182,154,0.2)' }}
           />
           {cg.verified && (
             <span
@@ -639,17 +641,21 @@ function SearchPageContent() {
     limit: PAGE_LIMIT,
   }), [appliedFilters, sortBy, page]);
 
-  const { data, loading: gqlLoading, error: gqlError } = useQuery<SearchResult>(SEARCH_CAREGIVERS, {
+  const { data, loading: gqlLoading, error: gqlError, refetch, networkStatus } = useQuery<SearchResult>(SEARCH_CAREGIVERS, {
     variables: { input: queryInput },
     fetchPolicy: 'cache-and-network',
     notifyOnNetworkStatusChange: true,
   });
 
+  // PYG-512: รูปผู้ดูแลเป็น signed URL อายุ 1 ชม. — โหลดไม่ขึ้นเมื่อไหร่ค่อยขอผลค้นหาชุดใหม่
+  const refreshPhotos = useSignedUrlRefresh(refetch);
+
   const caregivers = data?.searchCaregivers.data ?? [];
   const pagination = data?.searchCaregivers.pagination;
   const totalPages = pagination?.totalPages ?? 1;
   const totalResults = pagination?.total ?? 0;
-  const loading = gqlLoading;
+  // refetch เพื่อเอารูปใบใหม่ต้องเกิดเงียบ ๆ ข้างหลัง ไม่สลับทั้งรายการเป็น skeleton
+  const loading = gqlLoading && networkStatus !== NetworkStatus.refetch;
   const error = gqlError;
 
   const handleSortChange = (value: string) => {
@@ -944,7 +950,7 @@ function SearchPageContent() {
               <>
                 <div className="flex flex-col gap-3">
                   {caregivers.map((cg) => (
-                    <CaregiverCard key={cg.id} cg={cg} onSelect={handleSelect} onViewProfile={handleViewProfile} />
+                    <CaregiverCard key={cg.id} cg={cg} onSelect={handleSelect} onViewProfile={handleViewProfile} onPhotoExpired={refreshPhotos} />
                   ))}
                 </div>
 
@@ -984,6 +990,7 @@ function SearchPageContent() {
       bookingDraft={bookingDraft}
       isSubmitting={isSubmitting}
       errorMessage={bookingError ?? undefined}
+      onPhotoExpired={refreshPhotos}
     />
     </>
   );

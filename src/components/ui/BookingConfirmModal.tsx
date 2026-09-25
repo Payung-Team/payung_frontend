@@ -1,6 +1,7 @@
 import React from 'react';
 import type { BookingRequest } from '../../context/BookingContext';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
+import CaregiverPhoto from './CaregiverPhoto';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,8 @@ interface BookingConfirmModalProps {
   bookingDraft: BookingRequest | null;
   isSubmitting?: boolean;
   errorMessage?: string;
+  /** รูปผู้ดูแล (signed URL) โหลดไม่ขึ้น → ให้หน้าแม่โหลดข้อมูลผู้ดูแลใหม่ (PYG-512) */
+  onPhotoExpired?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -95,6 +98,7 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
   bookingDraft,
   isSubmitting = false,
   errorMessage,
+  onPhotoExpired,
 }) => {
   if (!isOpen) return null;
 
@@ -105,7 +109,6 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
   const province = caregiver?.province ?? '';
   const verified = caregiver?.verified ?? false;
   const avatarUrl = caregiver?.avatarUrl ?? null;
-  const initial = fullName.charAt(0);
   const skills = (caregiver?.skills ?? []).map((s) => SKILL_TRANSLATIONS[s] || s);
 
   // Booking details
@@ -203,27 +206,12 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
             {/* Caregiver row */}
             <div className="flex items-center gap-3">
               {/* Avatar */}
-              <div
-                className="flex-shrink-0 flex items-center justify-center"
-                style={{
-                  width: 56,
-                  height: 56,
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  border: '2px solid rgba(255, 255, 255, 0.5)',
-                  borderRadius: '50%',
-                }}
-              >
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={fullName} className="w-full h-full object-cover rounded-full" />
-                ) : (
-                  <span
-                    className="text-white font-bold"
-                    style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 20 }}
-                  >
-                    {initial}
-                  </span>
-                )}
-              </div>
+              <CaregiverPhoto
+                src={avatarUrl}
+                size={56}
+                onExpired={onPhotoExpired}
+                frameStyle={{ border: '2px solid rgba(255, 255, 255, 0.5)' }}
+              />
 
               {/* Info */}
               <div className="flex-1 min-w-0">

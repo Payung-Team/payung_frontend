@@ -10,6 +10,8 @@ import { shouldShowJobQr } from '../../lib/jobQr';
 import { copyTextToClipboard, QR_TEST_TOOLS_ENABLED } from '../../lib/qrTestTools';
 import { JobQrCard } from './JobQrCard';
 import ImageModal from '../ui/ImageModal';
+import CaregiverPhoto from '../ui/CaregiverPhoto';
+import { useSignedPhoto } from '../../hooks/useSignedPhoto';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 
 // ── Tracking Service view (PYG-361) ─────────────────────────────────────────────
@@ -83,31 +85,18 @@ const FIELD_GRID = {
 } as const;
 
 function CaregiverAvatar({
-  name, avatarUrl, size = 56, online = false,
-  fallbackBg = 'linear-gradient(135deg, #F0A500 0%, #FFC570 100%)',
+  avatarUrl, size = 56, online = false,
   shadow = '0px 4px 16px rgba(82,182,154,0.2)',
-}: Readonly<{ name: string; avatarUrl?: string | null; size?: number; online?: boolean; fallbackBg?: string; shadow?: string }>) {
-  const initial = name?.charAt(0) ?? '?';
-  const frameStyle = {
-    width: size, height: size, borderRadius: size / 2,
-    border: '2.4px solid #FFFFFF', boxShadow: shadow,
-    boxSizing: 'border-box' as const,
-  };
+  onPhotoExpired,
+}: Readonly<{ avatarUrl?: string | null; size?: number; online?: boolean; shadow?: string; onPhotoExpired?: () => void }>) {
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-      {avatarUrl ? (
-        <img src={avatarUrl} alt={name} style={{ ...frameStyle, objectFit: 'cover' }} />
-      ) : (
-        <div
-          style={{
-            ...frameStyle,
-            background: fallbackBg,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: size * 0.38, fontWeight: 700, color: '#FFFFFF' }}>{initial}</span>
-        </div>
-      )}
+      <CaregiverPhoto
+        src={avatarUrl}
+        size={size}
+        onExpired={onPhotoExpired}
+        frameStyle={{ border: '2.4px solid #FFFFFF', boxShadow: shadow }}
+      />
       {online && (
         <span
           aria-hidden
@@ -302,6 +291,83 @@ function ReportProblemButton({ onClick, emphasized = false }: Readonly<{ onClick
   );
 }
 
+/** ขนาดรูปบนการ์ดยืนยันตัวตน — ใหญ่พอเทียบหน้าได้ แต่ยังพอดีจอมือถือ 320px */
+const IDENTITY_PHOTO_SIZE = 200;
+
+/**
+ * การ์ดยืนยันตัวตนผู้ดูแล บนสุดของหน้ารอเช็คอิน (PYG-512 · ฟีดแบ็กอาจารย์ Sprint 9 ข้อ 1)
+ *
+ * จุดประสงค์เดียว: ผู้ใช้เทียบหน้าคนที่มาถึงกับรูปในระบบ "ก่อน" เปิด QR ให้สแกน
+ * รูปนี้คือรูปที่แอดมินอนุมัติแล้วเท่านั้น (BE คัดให้ — PYG-509) FE ไม่ต้องกรองเอง
+ *
+ * ไม่มีรูป (ยังไม่อนุมัติ / โหลดไม่ขึ้น) → ห้ามบอกให้ "ดูรูป" เปลี่ยนเป็นให้ขอดูบัตรเทียบชื่อแทน
+ */
+function CheckInIdentityCard({
+  booking,
+  readOnly,
+  onPhotoExpired,
+}: Readonly<{ booking: ConfirmedBooking; readOnly: boolean; onPhotoExpired?: () => void }>) {
+  const photo = useSignedPhoto(booking.caregiverAvatarUrl, onPhotoExpired);
+  const name = booking.caregiverName;
+
+  let title: string;
+  let detail: string;
+  if (photo.src) {
+    title = 'ตรวจสอบว่าผู้ดูแลที่มาถึงเป็นคนในรูป';
+    detail = readOnly
+      ? 'หากไม่ใช่คนเดียวกัน โปรดแจ้งผู้จองทันที'
+      : 'หากไม่ใช่คนเดียวกัน อย่าเปิด QR ให้สแกน และกด “แจ้งปัญหา”';
+  } else {
+    title = 'ผู้ดูแลยังไม่มีรูปที่ยืนยันแล้วในระบบ';
+    detail = readOnly
+      ? `ขอดูบัตรประจำตัวของผู้ดูแล และตรวจสอบว่าชื่อตรงกับ “${name}”`
+      : `ขอดูบัตรประจำตัวของผู้ดูแล และตรวจสอบว่าชื่อตรงกับ “${name}” ก่อนเปิด QR`;
+  }
+
+  return (
+    <section
+      aria-label="ยืนยันตัวตนผู้ดูแล"
+      style={{ marginTop: 20, boxSizing: 'border-box', background: '#FFFFFF', border: '1.6px solid rgba(0,146,101,0.25)', boxShadow: '0px 6px 24px rgba(0,146,101,0.1)', borderRadius: 16, padding: 24, display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 24 }}
+    >
+      <CaregiverPhoto
+        src={photo.src}
+        onExpired={photo.onError}
+        size={IDENTITY_PHOTO_SIZE}
+        shape="rounded"
+        alt={`รูปผู้ดูแล ${name}`}
+        placeholderLabel="ยังไม่มีรูป"
+        frameStyle={{ border: '4px solid #FFFFFF', boxShadow: '0px 8px 24px rgba(0,146,101,0.18)' }}
+      />
+
+      <div style={{ flex: '1 1 280px', minWidth: 0 }}>
+        <p style={{ fontFamily: FONT_TH, fontSize: 12, fontWeight: 600, color: '#8A8C8E', margin: 0, lineHeight: '18px', letterSpacing: 0.4 }}>
+          ผู้ดูแลที่จะมาดูแลคุณ
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontFamily: FONT_TH, fontSize: 24, fontWeight: 700, color: '#1A1A1A', lineHeight: '34px', overflowWrap: 'anywhere' }}>{name}</span>
+            <span className="material-icons" role="img" aria-label="ยืนยันตัวตนแล้ว" style={{ fontSize: 20, color: '#009265', flexShrink: 0 }}>verified</span>
+          </div>
+          <CallCaregiverButton phone={booking.caregiverPhone} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 4, flexWrap: 'wrap' }}>
+          <CaregiverStats booking={booking} />
+        </div>
+
+        <div role="note" style={{ marginTop: 16, boxSizing: 'border-box', display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px', background: '#FFFBEB', border: '0.8px solid rgba(245,158,11,0.35)', borderRadius: 12 }}>
+          <span className="material-icons" aria-hidden="true" style={{ fontSize: 24, color: '#B45309', flexShrink: 0 }}>
+            {photo.src ? 'face' : 'badge'}
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontFamily: FONT_TH, fontSize: 16, fontWeight: 700, color: '#92400E', margin: 0, lineHeight: '24px' }}>{title}</p>
+            <p style={{ fontFamily: FONT_TH, fontSize: 13, color: '#8A6A2A', margin: '2px 0 0', lineHeight: '20px' }}>{detail}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /** แถบบอกว่ากำลังดูในฐานะสมาชิกครอบครัว — ใช้ทั้งหน้ารอเช็คอินและหน้ากำลังดูแล */
 function FamilyViewerNotice() {
   return (
@@ -324,6 +390,7 @@ function AwaitingCheckInView({
   backLabel,
   onReportProblem,
   readOnly,
+  onPhotoExpired,
 }: Readonly<{
   booking: ConfirmedBooking;
   durationStr: string;
@@ -334,6 +401,7 @@ function AwaitingCheckInView({
   backLabel: string;
   onReportProblem: () => void;
   readOnly: boolean;
+  onPhotoExpired?: () => void;
 }>) {
   // กด "เปิด QR Code" แล้ว QR ขึ้นแทนที่เนื้อหาการ์ดเลย (ไม่ใช่ modal)
   // ไม่มีปุ่มปิด — พอผู้ดูแลสแกนสำเร็จ หน้าจะสลับเป็นสถานะกำลังให้บริการเอง
@@ -370,8 +438,11 @@ function AwaitingCheckInView({
 
         {readOnly && <FamilyViewerNotice />}
 
+        {/* รูปผู้ดูแลขึ้นก่อน QR — ต้องเทียบหน้าให้เสร็จก่อนเปิด QR ให้สแกน (PYG-512) */}
+        <CheckInIdentityCard booking={booking} readOnly={readOnly} onPhotoExpired={onPhotoExpired} />
+
         {/* Status + QR call-to-action */}
-        <div style={{ marginTop: 20, boxSizing: 'border-box', background: '#FFFFFF', border: '1.6px solid rgba(0,146,101,0.25)', boxShadow: '0px 6px 24px rgba(0,146,101,0.1)', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ marginTop: 16, boxSizing: 'border-box', background: '#FFFFFF', border: '1.6px solid rgba(0,146,101,0.25)', boxShadow: '0px 6px 24px rgba(0,146,101,0.1)', borderRadius: 16, overflow: 'hidden' }}>
           <div style={{ boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 16, padding: '16px 28px', background: '#FFFBEB', borderBottom: '0.8px solid rgba(245,158,11,0.25)' }}>
             <div style={{ width: 44, height: 44, borderRadius: 9999, background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <span className="material-icons" style={{ fontSize: 22, color: '#B45309' }}>schedule</span>
@@ -436,50 +507,26 @@ function AwaitingCheckInView({
           )}
         </div>
 
-        {/* Caregiver card */}
-        <div style={{ marginTop: 16, boxSizing: 'border-box', background: '#FFFFFF', border: '0.8px solid #F3F4F6', boxShadow: '0px 1px 2px rgba(0,0,0,0.05)', borderRadius: 16, padding: 28 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <CaregiverAvatar
-              name={booking.caregiverName}
-              avatarUrl={booking.caregiverAvatarUrl}
-              size={68}
-              fallbackBg="#0EA5E9"
-              shadow="0px 4px 16px rgba(14,165,233,0.25)"
-            />
-            <div style={{ flex: '1 1 240px', minWidth: 0, paddingTop: 4 }}>
-              <p style={{ fontFamily: FONT_TH, fontSize: 11, fontWeight: 600, color: '#8A8C8E', margin: 0, lineHeight: '16px', letterSpacing: 0.4 }}>ผู้ดูแล</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 6 }}>
-                <span style={{ fontFamily: FONT_TH, fontSize: 19, fontWeight: 700, color: '#1A1A1A', lineHeight: '28px' }}>{booking.caregiverName}</span>
-                <span className="material-icons" style={{ fontSize: 18, color: '#009265' }}>verified</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 6, flexWrap: 'wrap' }}>
-                <CaregiverStats booking={booking} />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-              <CallCaregiverButton phone={booking.caregiverPhone} />
-              <button
-                type="button"
-                onClick={onToggleDetails}
-                aria-expanded={showDetails}
-                style={{ boxSizing: 'border-box', height: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0 20px', background: '#FFFFFF', border: '0.8px solid #E5E7EB', borderRadius: 12, cursor: 'pointer' }}
-              >
-                <span style={{ fontFamily: FONT_TH, fontSize: 14, fontWeight: 600, color: '#1A1A1A', lineHeight: '21px' }}>รายละเอียดการจอง</span>
-                <span
-                  className="material-icons"
-                  style={{ fontSize: 18, color: '#1A1A1A', transition: 'transform 0.15s ease', transform: showDetails ? 'rotate(180deg)' : 'none' }}
-                >
-                  expand_more
-                </span>
-              </button>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 20, paddingTop: 20, borderTop: '0.8px solid #F3F4F6', display: 'flex' }}>
+        {/* Booking summary — ชื่อ/รูป/สถิติ/ปุ่มโทรของผู้ดูแลย้ายขึ้นไปอยู่การ์ดยืนยันตัวตนแล้ว */}
+        <div style={{ marginTop: 16, boxSizing: 'border-box', background: '#FFFFFF', border: '0.8px solid #F3F4F6', boxShadow: '0px 1px 2px rgba(0,0,0,0.05)', borderRadius: 16, padding: '20px 28px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 260px', display: 'flex' }}>
             <AwaitingStat label="เช็คอิน" value="ยังไม่เริ่ม" />
             <AwaitingStat label="ระยะเวลา" value={durationStr} divided />
           </div>
+          <button
+            type="button"
+            onClick={onToggleDetails}
+            aria-expanded={showDetails}
+            style={{ boxSizing: 'border-box', height: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0 20px', background: '#FFFFFF', border: '0.8px solid #E5E7EB', borderRadius: 12, cursor: 'pointer', flexShrink: 0 }}
+          >
+            <span style={{ fontFamily: FONT_TH, fontSize: 14, fontWeight: 600, color: '#1A1A1A', lineHeight: '21px' }}>รายละเอียดการจอง</span>
+            <span
+              className="material-icons"
+              style={{ fontSize: 18, color: '#1A1A1A', transition: 'transform 0.15s ease', transform: showDetails ? 'rotate(180deg)' : 'none' }}
+            >
+              expand_more
+            </span>
+          </button>
         </div>
 
         {showDetails && detailsPanel}
@@ -780,6 +827,7 @@ function InProgressView({
   backLabel,
   onReportProblem,
   readOnly,
+  onPhotoExpired,
 }: Readonly<{
   booking: ConfirmedBooking;
   steps: InProgressStep[];
@@ -803,6 +851,7 @@ function InProgressView({
   onReportProblem: () => void;
   /** สมาชิกกลุ่มครอบครัวที่ไม่ได้จอง — ดูได้อย่างเดียว ไม่มี QR จบงาน / แจ้งปัญหา / รีวิว */
   readOnly: boolean;
+  onPhotoExpired?: () => void;
 }>) {
   const [showQr, setShowQr] = useState(false);
   const [showAllLogs, setShowAllLogs] = useState(false);
@@ -882,12 +931,11 @@ function InProgressView({
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 24px', flexWrap: 'wrap' }}>
             <CaregiverAvatar
-              name={booking.caregiverName}
               avatarUrl={booking.caregiverAvatarUrl}
               size={46}
               online
-              fallbackBg="#F59E0B"
               shadow="0px 4px 16px rgba(245,158,11,0.25)"
+              onPhotoExpired={onPhotoExpired}
             />
             <div style={{ flex: '1 1 240px', minWidth: 0 }}>
               <p style={{ fontFamily: FONT_TH, fontSize: 11, fontWeight: 600, color: '#8A8C8E', margin: 0, lineHeight: '16px', letterSpacing: 0.4 }}>ผู้ดูแล</p>
@@ -1111,6 +1159,7 @@ export function BookingTrackingView({
   readOnly = false,
   familyGroupId = null,
   backLabel = 'กลับไปนัดหมายของฉัน',
+  onPhotoExpired,
 }: Readonly<{
   booking: ConfirmedBooking;
   onBack: () => void;
@@ -1127,6 +1176,8 @@ export function BookingTrackingView({
   /** มีค่า = ดูผ่านกลุ่มครอบครัว → อ่านงานย่อยผ่าน groupBooking (myBooking ไม่คืนคำจองของคนอื่น) */
   familyGroupId?: string | null;
   backLabel?: string;
+  /** รูปผู้ดูแล (signed URL) โหลดไม่ขึ้น → ให้หน้าแม่โหลดใบจองใหม่ (PYG-512) */
+  onPhotoExpired?: () => void;
 }>) {
   const [showDetails, setShowDetails] = useState(false);
 
@@ -1359,6 +1410,7 @@ export function BookingTrackingView({
         backLabel={backLabel}
         onReportProblem={onReportProblem}
         readOnly={readOnly}
+        onPhotoExpired={onPhotoExpired}
       />
     );
   }
@@ -1398,6 +1450,7 @@ export function BookingTrackingView({
       backLabel={backLabel}
       onReportProblem={onReportProblem}
       readOnly={readOnly}
+      onPhotoExpired={onPhotoExpired}
     />
   );
 }

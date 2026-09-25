@@ -1,5 +1,6 @@
 import React from 'react';
 import type { BookingReviewData } from './BookingReviewForm';
+import CaregiverPhoto from '../ui/CaregiverPhoto';
 import '../../styles/review-page.css';
 
 const RATING_LABELS: Record<number, string> = {
@@ -25,12 +26,15 @@ function SubmittedStarIcon({ active }: { active: boolean }) {
 interface SubmittedReviewCardProps {
   caregiverName: string;
   caregiverAvatarUrl?: string;
+  /** รูปผู้ดูแล (signed URL) โหลดไม่ขึ้น → ให้หน้าแม่โหลดใบจองใหม่ (PYG-512) */
+  onPhotoExpired?: () => void;
   review: BookingReviewData;
 }
 
 export const SubmittedReviewCard: React.FC<SubmittedReviewCardProps> = ({
   caregiverName,
   caregiverAvatarUrl,
+  onPhotoExpired,
   review,
 }) => (
   <div className="review-card submitted-review-card">
@@ -38,13 +42,12 @@ export const SubmittedReviewCard: React.FC<SubmittedReviewCardProps> = ({
 
     <div className="caregiver-details" style={{ marginBottom: 16 }}>
       <div className="avatar-container">
-        <div className="avatar-circle">
-          {caregiverAvatarUrl ? (
-            <img src={caregiverAvatarUrl} alt={caregiverName} />
-          ) : (
-            caregiverName.charAt(0) || 'ด'
-          )}
-        </div>
+        <CaregiverPhoto
+          src={caregiverAvatarUrl}
+          size={72}
+          onExpired={onPhotoExpired}
+          frameStyle={{ border: '3px solid #FFFFFF', boxShadow: '0 0 0 1.5px #FFA92C' }}
+        />
       </div>
       <h2 className="caregiver-name">{caregiverName}</h2>
     </div>

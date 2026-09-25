@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import CaregiverPhoto from '../ui/CaregiverPhoto';
 import '../../styles/review-page.css';
 
 const RATING_LABELS: Record<number, string> = {
@@ -32,6 +33,8 @@ export interface BookingReviewData {
 interface BookingReviewFormProps {
   caregiverName: string;
   caregiverAvatarUrl?: string;
+  /** รูปผู้ดูแล (signed URL) โหลดไม่ขึ้น → ให้หน้าแม่โหลดใบจองใหม่ (PYG-512) */
+  onPhotoExpired?: () => void;
   onBack: () => void;
   onSubmit: (review: BookingReviewData) => void;
   isSubmitting?: boolean;
@@ -40,6 +43,7 @@ interface BookingReviewFormProps {
 export const BookingReviewForm: React.FC<BookingReviewFormProps> = ({
   caregiverName,
   caregiverAvatarUrl,
+  onPhotoExpired,
   onBack,
   onSubmit,
   isSubmitting = false,
@@ -81,13 +85,12 @@ export const BookingReviewForm: React.FC<BookingReviewFormProps> = ({
           <div className="card-subtitle">คุณกำลังรีวิว</div>
           <div className="caregiver-details">
             <div className="avatar-container">
-              <div className="avatar-circle">
-                {caregiverAvatarUrl ? (
-                  <img src={caregiverAvatarUrl} alt={caregiverName} />
-                ) : (
-                  caregiverName.charAt(0) || 'ด'
-                )}
-              </div>
+              <CaregiverPhoto
+                src={caregiverAvatarUrl}
+                size={72}
+                onExpired={onPhotoExpired}
+                frameStyle={{ border: '3px solid #FFFFFF', boxShadow: '0 0 0 1.5px #FFA92C' }}
+              />
               <div className="avatar-verified-badge" title="ยืนยันตัวตนแล้ว">
                 <svg className="avatar-verified-icon" viewBox="0 0 24 24" aria-hidden>
                   <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />

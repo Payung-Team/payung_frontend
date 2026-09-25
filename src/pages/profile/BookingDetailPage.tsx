@@ -20,6 +20,8 @@ import { BookingTrackingView } from '../../components/booking/BookingTrackingVie
 import { hasAnyProfileData, type PatientProfile } from '../../lib/patientProfile';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import { GROUP_BOOKING_DETAIL } from '../../graphql/familyGroup';
+import CaregiverPhoto from '../../components/ui/CaregiverPhoto';
+import { useSignedUrlRefresh } from '../../hooks/useSignedPhoto';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -203,6 +205,10 @@ export default function BookingDetailPage() {
 
   const payment = (gqlData?.myBooking?.payment ?? undefined) as PaymentInfo | undefined;
 
+  // PYG-512: รูปผู้ดูแลเป็น signed URL อายุ 1 ชม. — หน้างานเปิดค้างได้เป็นชั่วโมง
+  // รูปโหลดไม่ขึ้นเมื่อไหร่ค่อยขอใบจองใหม่ให้ได้ URL ใบใหม่ (ระหว่างนั้นเป็น placeholder)
+  const refreshPhotos = useSignedUrlRefresh(refetch);
+
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
@@ -287,7 +293,6 @@ export default function BookingDetailPage() {
   const total = est?.total ?? 0;
   const tasks = booking.draft.jobDetails?.tasks ?? [];
   const tasksText = tasks.length > 0 ? tasks.map((t) => t.name).join(', ') : null;
-  const cgInitial = booking.caregiverName?.charAt(0) ?? '?';
   const isCancellable = CANCELLABLE_STATUSES.has(booking.status);
   const caregiverDisplayName = booking.caregiverName === '(รอจับคู่)' ? 'ผู้ดูแล' : booking.caregiverName;
   const disputeStatus = (gqlData?.myBooking?.disputeStatus ?? 'none') as string;
@@ -437,6 +442,7 @@ export default function BookingDetailPage() {
         <BookingReviewForm
           caregiverName={booking.caregiverName}
           caregiverAvatarUrl={booking.caregiverAvatarUrl ?? undefined}
+          onPhotoExpired={refreshPhotos}
           onBack={() => setShowReviewForm(false)}
           onSubmit={handleSubmitReview}
           isSubmitting={isSubmittingReview}
@@ -532,6 +538,7 @@ export default function BookingDetailPage() {
           readOnly={!canManageBooking}
           familyGroupId={familyGroupId}
           backLabel={isFamilyView ? 'กลับไปยังกลุ่มครอบครัว' : undefined}
+          onPhotoExpired={refreshPhotos}
         />
         {disputeModal}
         <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />
@@ -674,13 +681,12 @@ export default function BookingDetailPage() {
               <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 {/* Avatar + check badge */}
                 <div style={{ position: 'relative', width: 48, height: 48, flexShrink: 0 }}>
-                  {booking.caregiverAvatarUrl ? (
-                    <img src={booking.caregiverAvatarUrl} alt={booking.caregiverName} style={{ width: 48, height: 48, borderRadius: 24, objectFit: 'cover', border: '2.4px solid #FFFFFF', boxShadow: '0px 4px 16px rgba(82,182,154,0.2)' }} />
-                  ) : (
-                    <div style={{ width: 48, height: 48, borderRadius: 24, background: 'linear-gradient(135deg, #52B69A 0%, #76C893 100%)', border: '2.4px solid #FFFFFF', boxShadow: '0px 4px 16px rgba(82,182,154,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 18, fontWeight: 700, color: '#FFFFFF' }}>{cgInitial}</span>
-                    </div>
-                  )}
+                  <CaregiverPhoto
+                    src={booking.caregiverAvatarUrl}
+                    size={48}
+                    onExpired={refreshPhotos}
+                    frameStyle={{ border: '2.4px solid #FFFFFF', boxShadow: '0px 4px 16px rgba(82,182,154,0.2)' }}
+                  />
                   <div style={{ position: 'absolute', bottom: -1, right: -1, width: 18, height: 18, borderRadius: 9, background: '#52B69A', border: '1.6px solid #FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span className="material-icons" style={{ fontSize: 11, color: '#FFFFFF' }}>check</span>
                   </div>
@@ -843,6 +849,7 @@ export default function BookingDetailPage() {
               <SubmittedReviewCard
                 caregiverName={booking.caregiverName}
                 caregiverAvatarUrl={booking.caregiverAvatarUrl ?? undefined}
+                onPhotoExpired={refreshPhotos}
                 review={existingReview}
               />
             </div>

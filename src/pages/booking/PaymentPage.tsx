@@ -6,6 +6,8 @@ import { GET_MY_BOOKING, CREATE_PAYMENT, GET_PAYMENT_BY_BOOKING } from '../../gr
 import { mapGqlStatus } from '../../utils/bookingStatus';
 import { loadOmiseJs } from '../../lib/omise-loader';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
+import CaregiverPhoto from '../../components/ui/CaregiverPhoto';
+import { useSignedUrlRefresh } from '../../hooks/useSignedPhoto';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -244,11 +246,13 @@ export default function PaymentPage() {
 
   const stateBooking = location.state?.booking as ConfirmedBooking | undefined;
 
-  const { data, loading } = useQuery(GET_MY_BOOKING, {
+  const { data, loading, refetch } = useQuery(GET_MY_BOOKING, {
     variables: { id },
     skip: !id,
     fetchPolicy: 'cache-and-network',
   });
+  // PYG-512: รูปผู้ดูแลเป็น signed URL อายุ 1 ชม. — โหลดไม่ขึ้นเมื่อไหร่ค่อยขอใบจองใหม่
+  const refreshPhotos = useSignedUrlRefresh(refetch);
 
   const booking = useMemo<ConfirmedBooking | undefined>(() => {
     const gql = data as { myBooking?: Record<string, unknown> } | undefined;
@@ -347,8 +351,6 @@ export default function PaymentPage() {
   const serviceCost = hourlyRate * hours;
   const platformFee = est?.platformFee ?? Math.round(serviceCost * 0.1);
   const total = est?.total ?? serviceCost + platformFee;
-
-  const cgInitial = booking.caregiverName?.charAt(0) ?? '?';
 
   const handleSubmit = async () => {
     if (isSubmitting || !booking || !id) return;
@@ -718,13 +720,7 @@ export default function PaymentPage() {
               {/* Caregiver row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ position: 'relative', width: 44, height: 44, flexShrink: 0 }}>
-                  {booking.caregiverAvatarUrl ? (
-                    <img src={booking.caregiverAvatarUrl} alt={booking.caregiverName} style={{ width: 44, height: 44, borderRadius: 22, objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: 44, height: 44, borderRadius: 22, background: '#009688', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 16, fontWeight: 700, color: '#FFFFFF' }}>{cgInitial}</span>
-                    </div>
-                  )}
+                  <CaregiverPhoto src={booking.caregiverAvatarUrl} size={44} onExpired={refreshPhotos} />
                   <div style={{ position: 'absolute', bottom: -1, right: -1, width: 16, height: 16, borderRadius: 8, background: '#10B981', border: '1.6px solid #FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span className="material-icons" style={{ fontSize: 10, color: '#FFFFFF' }}>check</span>
                   </div>

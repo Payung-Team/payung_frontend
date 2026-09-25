@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { useBooking } from '../../context/BookingContext';
@@ -7,6 +7,8 @@ import { CREATE_BOOKING_ON_BEHALF } from '../../graphql/familyGroup';
 import { RatingDistribution } from '../../components/ui/RatingDistribution';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 import BookingConfirmModal from '../../components/ui/BookingConfirmModal';
+import CaregiverPhoto from '../../components/ui/CaregiverPhoto';
+import { useSignedUrlRefresh } from '../../hooks/useSignedPhoto';
 import {
   BOOKING_SESSION_EXPIRED_MESSAGE,
   BOOKING_UNCONFIRMED_MESSAGE,
@@ -281,17 +283,26 @@ const CaregiverProfilePage: React.FC = () => {
   const totalPages = reviewPagination?.totalPages ?? 1;
   const visibleReviews = allReviews.filter(r => r.isVisible);
 
+  // PYG-512: รูปจาก endpoint นี้คือค่าล่าสุด — ใช้แทนรูปที่ติดมากับ location.state
+  // (state อยู่ใน history ของเบราว์เซอร์ กด back กลับมาอีกวัน signed URL ในนั้นหมดอายุไปแล้ว)
+  // undefined = ยังโหลดไม่เสร็จ → ระหว่างนั้นใช้รูปจาก state ไปก่อน
+  const [publicAvatarUrl, setPublicAvatarUrl] = useState<string | null | undefined>(undefined);
+  const [publicReloadKey, setPublicReloadKey] = useState(0);
+  const reloadPublicProfile = useCallback(() => setPublicReloadKey((k) => k + 1), []);
+  const refreshPhoto = useSignedUrlRefresh(reloadPublicProfile);
+
   useEffect(() => {
     if (!caregiverId) return;
     const apiBase = import.meta.env.VITE_GRAPHQL_URL?.replace('/graphql', '') ?? '';
     fetch(`${apiBase}/api/v1/caregivers/${caregiverId}/public`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { availability?: { day: number; slots: string[] }[]; completed_booking_count?: number } | null) => {
+      .then((data: { availability?: { day: number; slots: string[] }[]; completed_booking_count?: number; avatar_url?: string | null } | null) => {
         if (data?.availability) setAvail(buildAvailMatrix(data.availability));
         if (data?.completed_booking_count !== undefined) setCompletedBookingCount(data.completed_booking_count);
+        if (data && data.avatar_url !== undefined) setPublicAvatarUrl(data.avatar_url);
       })
       .catch(() => undefined);
-  }, [caregiverId]);
+  }, [caregiverId, publicReloadKey]);
 
   useEffect(() => {
     if (reviewsData?.caregiverReviews?.data) {
@@ -312,8 +323,7 @@ const CaregiverProfilePage: React.FC = () => {
   const bio = cg?.bio ?? '';
   const experience = cg?.experience ?? null;
   const verified = cg?.verified ?? false;
-  const avatarUrl = cg?.avatarUrl ?? null;
-  const initial = fullName.charAt(0);
+  const avatarUrl = publicAvatarUrl !== undefined ? publicAvatarUrl : (cg?.avatarUrl ?? null);
 
   const translatedSkills = skills.map((s) => SKILL_TRANSLATIONS[s] || s);
 
@@ -472,18 +482,12 @@ const CaregiverProfilePage: React.FC = () => {
                 <div className="absolute" style={{ width: 180, height: 180, right: -20, top: -40, background: 'rgba(255,255,255,0.08)', borderRadius: '50%' }} />
                 <div className="absolute flex items-center gap-[22px]" style={{ left: 28, top: 32, right: 28, height: 91 }}>
                   {/* Avatar */}
-                  <div
-                    className="flex-shrink-0 flex items-center justify-center"
-                    style={{ width: 80, height: 80, background: 'rgba(255,255,255,0.2)', border: '2.4px solid rgba(255,255,255,0.5)', borderRadius: '50%' }}
-                  >
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt={fullName} className="w-full h-full object-cover rounded-full" />
-                    ) : (
-                      <span className="text-white font-bold" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 28, lineHeight: '42px' }}>
-                        {initial}
-                      </span>
-                    )}
-                  </div>
+                  <CaregiverPhoto
+                    src={avatarUrl}
+                    size={80}
+                    onExpired={refreshPhoto}
+                    frameStyle={{ border: '2.4px solid rgba(255,255,255,0.5)' }}
+                  />
                   {/* Info */}
                   <div className="flex flex-col flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -707,10 +711,11 @@ const CaregiverProfilePage: React.FC = () => {
         isOpen={showModal}
         onClose={() => { setShowModal(false); setBookingError(null); }}
         onConfirm={handleConfirmBooking}
-        caregiver={cg}
+        caregiver={cg ? { ...cg, avatarUrl } : undefined}
         bookingDraft={bookingDraft}
         isSubmitting={isSubmitting}
         errorMessage={bookingError ?? undefined}
+        onPhotoExpired={refreshPhoto}
       />
       <ToastContainer
         toasts={toasts}
