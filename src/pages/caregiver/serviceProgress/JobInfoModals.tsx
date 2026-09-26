@@ -74,7 +74,8 @@ export default function JobInfoModals({ booking, open, onClose }: Readonly<JobIn
         <div className="divide-y divide-[#F5F6F7]">
           <DetailRow icon="medical_services" label="ประเภทบริการ" value={serviceTypeLabel(booking.serviceType)} />
           <DetailRow icon="calendar_today" label="วันที่" value={formatThaiDate(booking.bookingDate)} />
-          <DetailRow icon="schedule" label="เวลา" value={booking.time ? `${booking.time} น.` : '—'} />
+          {/* PYG-526: "09:00 – 13:00" — ระยะเวลาอยู่แถวถัดไปแล้ว */}
+          <DetailRow icon="schedule" label="เวลา" value={booking.time || '—'} />
           {booking.durationText && <DetailRow icon="hourglass_bottom" label="ระยะเวลา" value={booking.durationText} />}
           {booking.locationName && <DetailRow icon="place" label="สถานที่" value={booking.locationName} />}
           {booking.serviceFormat && <DetailRow icon="directions" label="รูปแบบ" value={booking.serviceFormat} />}

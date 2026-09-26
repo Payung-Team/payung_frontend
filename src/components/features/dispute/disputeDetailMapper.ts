@@ -2,6 +2,7 @@
 // เก็บ type เดิมไว้ทั้งหมด เพื่อให้ component แทบไม่ต้องแก้
 
 import { formatTHB, type DisputeFiledBy } from './disputeMeta';
+import { formatBookingTimeRange } from '../../../lib/bookingTime';
 import type {
   AuditEntry,
   DisputeDetailResponse,
@@ -59,6 +60,8 @@ export interface DisputeDetail {
   respondent: DisputePartyInfo;
   bookingId: string;
   serviceDate: string;
+  /** PYG-526: "09:00 – 13:00 (4 ชม.)" — '' ถ้า BE ไม่มีเวลาเริ่ม */
+  serviceTimeText?: string;
   amount: number;
   reason: string;
   filedAt?: string;
@@ -174,6 +177,11 @@ export function mapDetailResponse(raw: DisputeDetailResponse): DisputeDetail {
     },
     bookingId: raw.id,
     serviceDate: raw.bookingDate,
+    serviceTimeText: formatBookingTimeRange({
+      startTime: raw.startTime,
+      endTime: raw.endTime,
+      durationHours: raw.durationHours,
+    }),
     amount,
     reason: raw.disputeReason ?? '',
     filedAt,

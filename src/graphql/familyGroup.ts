@@ -146,6 +146,8 @@ export const GROUP_BOOKINGS = gql`
       id
       bookingDate
       startTime
+      # PYG-526: เวลาสิ้นสุดจาก BE — การ์ดนัดหมายแสดง "09:00 – 13:00 (4 ชม.)"
+      endTime
       status
       serviceType
       durationHours
@@ -177,8 +179,9 @@ export const GROUP_BOOKING_DETAIL = gql`
       disputeStatus
       disputeReason
       serviceType
-      timeSlot
+      # PYG-526: เวลาสิ้นสุดคำนวณที่ BE (startTime + durationHours) — ไม่ query timeSlot แล้ว เพราะห้ามแสดงชื่อ slot
       startTime
+      endTime
       durationHours
       tasks
       serviceLocations
@@ -536,6 +539,8 @@ export interface GroupBookingSummary {
   id: string;
   bookingDate: string;
   startTime?: string | null;
+  /** PYG-526: "HH:mm" = startTime + durationHours (คำนวณที่ BE) */
+  endTime?: string | null;
   status: string;
   serviceType: string;
   durationHours?: number | null;

@@ -11,6 +11,7 @@ import { copyTextToClipboard, QR_TEST_TOOLS_ENABLED } from '../../lib/qrTestTool
 import { JobQrCard } from './JobQrCard';
 import ImageModal from '../ui/ImageModal';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
+import { formatBookingTimeRange, formatDurationHours } from '../../lib/bookingTime';
 
 // ── Tracking Service view (PYG-361) ─────────────────────────────────────────────
 // Shown to patients once a confirmed booking's service date has arrived. Three
@@ -1215,8 +1216,10 @@ export function BookingTrackingView({
   const svcTypes = booking.draft.serviceTypes ?? [];
   const svcTypeLabel = svcTypes.map((t) => serviceTypeLabel(t)).join(', ') || '—';
   const dateStr = dt?.date ? formatThaiDate(dt.date) : '—';
-  const timeStr = dt?.startTime && dt?.endTime ? `${dt.startTime}–${dt.endTime} น.` : (dt?.slot ?? '—');
-  const durationStr = dt?.duration ? `${dt.duration} ชม.` : '—';
+  // PYG-526: "09:00 – 13:00" — มีช่อง "ระยะเวลา" แยกอยู่ข้าง ๆ จึงไม่ใส่ (N ชม.) ซ้ำ
+  //   เดิม fallback เป็นชื่อ slot ("morning") ตอนไม่มีเวลาสิ้นสุด → ตอนนี้แสดงเวลาเริ่มหรือ "—"
+  const timeStr = formatBookingTimeRange({ startTime: dt?.startTime, endTime: dt?.endTime }, { withDuration: false }) || '—';
+  const durationStr = formatDurationHours(dt?.duration) || '—';
   const locationStr = booking.draft.locationDetails?.at_home?.address
     || booking.draft.locationDetails?.accompany_outside?.hospitalName
     || '—';

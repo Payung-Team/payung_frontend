@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useBooking } from '../../../context/BookingContext';
+import { formatBookingTimeRange, formatDurationHours } from '../../../lib/bookingTime';
 
 const PLATFORM_FEE_PERCENT = 10;
 
@@ -13,13 +14,6 @@ function formatThaiDate(dateStr?: string) {
   if (Number.isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
 }
-
-const SLOT_LABELS: Record<string, string> = {
-  morning: 'รอบเช้า',
-  afternoon: 'รอบบ่าย',
-  evening: 'รอบเย็น',
-  night: 'รอบดึก',
-};
 
 function ReviewSection({
   title,
@@ -110,16 +104,16 @@ export default function BookingStepReview({ onStartSearch }: Props) {
     );
   const displayAddress = addressParts.length > 0 ? addressParts.join(' · ') : '-';
 
-  const slotText = SLOT_LABELS[bookingDraft?.dateTime?.slot || ''] || '';
-  const startTimeVal = bookingDraft?.dateTime?.startTime || '';
-  const displaySlotTime = startTimeVal ? `${slotText} (${startTimeVal} น.)` : '-';
+  // PYG-526: เลิกแสดงชื่อรอบ ("รอบเช้า (09:00 น.)") — ผู้ใช้ไม่ได้เลือกรอบเอง BE อนุมานจากเวลาเริ่ม
+  //   แถว "เวลานัดทำบริการ" = "09:00 – 13:00" ส่วนจำนวนชั่วโมงอยู่แถว "ระยะเวลา" ด้านล่างแล้ว
+  const displaySlotTime =
+    formatBookingTimeRange(
+      { startTime: bookingDraft?.dateTime?.startTime, endTime: bookingDraft?.dateTime?.endTime },
+      { withDuration: false },
+    ) || '-';
 
   const durationVal = bookingDraft?.dateTime?.duration || 4;
-  const endTimeVal = bookingDraft?.dateTime?.endTime || '';
-  const displayDuration =
-    startTimeVal && endTimeVal
-      ? `${durationVal} ชม. · เริ่ม ${startTimeVal} น. · สิ้นสุด ${endTimeVal} น.`
-      : `${durationVal} ชม.`;
+  const displayDuration = formatDurationHours(durationVal) || '-';
 
   const patient = bookingDraft?.recipient?.patientDetails;
   const conditions = patient?.conditions || [];

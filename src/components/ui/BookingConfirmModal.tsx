@@ -1,6 +1,7 @@
 import React from 'react';
 import type { BookingRequest } from '../../context/BookingContext';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
+import { formatBookingTimeRange } from '../../lib/bookingTime';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -309,7 +310,8 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
                 {startTime && endTime && (
                   <Row
                     label="เวลา"
-                    value={`${startTime} – ${endTime}${duration ? ` (${duration} ชั่วโมง)` : ''}`}
+                    // PYG-526: รูปแบบกลาง "09:00 – 13:00 (4 ชม.)" ตรงกับทุกหน้าและอีเมล
+                    value={formatBookingTimeRange({ startTime, endTime, durationHours: duration })}
                   />
                 )}
                 {locationText !== '—' && <Row label="สถานที่" value={locationText} />}

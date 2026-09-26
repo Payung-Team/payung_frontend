@@ -335,7 +335,8 @@ export default function CaregiverBookingDetailPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
               <InfoRow label="ประเภทงานบริการ" value={svcLabel} valueFont="thai" />
               <InfoRow label="วันที่ให้บริการ" value={dateStr} />
-              <InfoRow label="เวลาให้บริการ" value={booking.time ? `${booking.time} น.` : '—'} />
+              {/* PYG-526: "09:00 – 13:00" — ระยะเวลาอยู่แถวถัดไปแล้ว */}
+              <InfoRow label="เวลาให้บริการ" value={booking.time || '—'} />
               <InfoRow label="ระยะเวลาบริการ" value={booking.durationText ?? '—'} />
             </div>
             <InfoRow label="สถานที่รับบริการ" value={booking.locationName ?? '—'} />

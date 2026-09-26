@@ -12,6 +12,7 @@ import {
   type GroupBookingSummary,
 } from '../../graphql/familyGroup';
 import { formatDate, useStrings } from './familyStrings';
+import { formatBookingTimeRange } from '../../lib/bookingTime';
 import { FONT, ConfirmDialog, GroupAvatar, ModalShell } from './components/familyUi';
 import MembersPanel from './components/MembersPanel';
 import InviteLinkModal from './components/InviteLinkModal';
@@ -237,11 +238,16 @@ function MemberBookingsModal({
                     {s.bookingStatusLabel(b.status)}
                   </span>
                 </div>
-                <p className="mt-0.5 truncate text-[12px] text-[#8A8C8E]">
+                {/* PYG-526: "09:00 – 13:00 (4 ชม.)" แทนเวลาเริ่มอย่างเดียว
+                    ไม่ truncate บรรทัดนี้ — จอมือถือเคยตัดเหลือ "09:00 – 13:0…" จนไม่รู้เวลาเลิก
+                    ชื่อผู้ดูแลจึงแยกไปอีกบรรทัด (ตัดได้ ไม่เสียข้อมูลสำคัญ) */}
+                <p className="mt-0.5 text-[12px] text-[#8A8C8E]">
                   {formatDate(b.bookingDate)}
-                  {b.startTime && ` · ${b.startTime} น.`}
-                  {b.caregiver?.fullName && ` · ${b.caregiver.fullName}`}
+                  {b.startTime && ` · ${formatBookingTimeRange(b)}`}
                 </p>
+                {b.caregiver?.fullName && (
+                  <p className="truncate text-[12px] text-[#8A8C8E]">{b.caregiver.fullName}</p>
+                )}
               </div>
               {b.estimatedCost != null && (
                 <p className="shrink-0 text-[14px] font-bold text-[#1A1A1A]">

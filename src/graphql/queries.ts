@@ -737,9 +737,10 @@ const CAREGIVER_BOOKING_SUMMARY_FIELDS = `
   serviceType
   serviceLocations
   tasks
-  timeSlot
   bookingDate
+  # PYG-526: เวลาสิ้นสุดคำนวณที่ BE (startTime + durationHours) — ไม่ query timeSlot แล้ว เพราะห้ามแสดงชื่อ slot
   startTime
+  endTime
   durationHours
   estimatedCost
   payoutStatus
@@ -785,8 +786,9 @@ export const GET_MY_BOOKING = gql`
       disputeStatus
       disputeReason
       serviceType
-      timeSlot
+      # PYG-526: เวลาสิ้นสุดคำนวณที่ BE (startTime + durationHours) — ไม่ query timeSlot แล้ว เพราะห้ามแสดงชื่อ slot
       startTime
+      endTime
       durationHours
       tasks
       serviceLocations
@@ -881,8 +883,9 @@ export const GET_MY_BOOKING_HISTORY = gql`
         id
         status
         serviceType
-        timeSlot
+        # PYG-526: เวลาสิ้นสุดคำนวณที่ BE (startTime + durationHours) — ไม่ query timeSlot แล้ว เพราะห้ามแสดงชื่อ slot
         startTime
+        endTime
         durationHours
         tasks
         serviceLocations

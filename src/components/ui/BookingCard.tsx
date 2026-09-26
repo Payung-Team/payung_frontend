@@ -71,7 +71,8 @@ export const BookingCard: React.FC<BookingCardProps> = ({
           ) : booking.status === 'confirmed' ? (
             isDueConfirmed ? (
               <span className="font-['Inter'] font-normal text-[11px] leading-4 text-[#8A8C8E]">
-                {booking.time} น.
+                {/* PYG-526: "09:00 – 13:00 (4 ชม.)" */}
+                {booking.timeRangeText}
               </span>
             ) : (
               <div className="px-2 h-[20.5px] bg-[#EFF6FF] rounded flex items-center justify-center">
@@ -113,7 +114,8 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                 {/* Date & Time */}
                 <div className="flex flex-row items-center gap-1.5">
                   <Icon name="calendar_today" color="#8A8C8E" style={{ fontSize: '13px' }} className="flex-shrink-0" />
-                  <span>{formatThaiDate(booking.bookingDate)} ({booking.time} น.)</span>
+                  {/* PYG-526: แถวสรุปไม่มีช่องระยะเวลา → ใช้รูปแบบเต็ม "09:00 – 13:00 (4 ชม.)" */}
+                  <span>{formatThaiDate(booking.bookingDate)} · {booking.timeRangeText}</span>
                 </div>
 
                 <span className="text-[#D1D5DB] font-semibold text-[11px]">·</span>
@@ -218,7 +220,8 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                     <Icon name="schedule" color="#8A8C8E" style={{ fontSize: '16px' }} />
                   </div>
                   <span className="w-[90px] text-[#8A8C8E] flex-shrink-0 font-['Bai_Jamjuree']">เวลา</span>
-                  <span className="text-[#1A1A1A] font-['Bai_Jamjuree']">{booking.time} น.</span>
+                  {/* PYG-526: กล่องเขียวด้านล่างแสดงระยะเวลาแล้ว → แถวนี้แค่ "09:00 – 13:00" */}
+                  <span className="text-[#1A1A1A] font-['Bai_Jamjuree']">{booking.time || '—'}</span>
                 </div>
 
                 {/* Location */}
