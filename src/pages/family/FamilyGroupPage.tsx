@@ -14,6 +14,7 @@ import {
   type GroupBookingSummary,
 } from '../../graphql/familyGroup';
 import { formatDate, useStrings } from './familyStrings';
+import { formatBookingTimeRange } from '../../lib/bookingTime';
 import { FONT, GroupAvatar, RoleBadge, ConfirmDialog } from './components/familyUi';
 import InviteLinkModal from './components/InviteLinkModal';
 import { ActivityDrawer } from './components/ActivityPanel';
@@ -642,19 +643,10 @@ function formatBaht(n?: number | null): string {
   return n == null ? '' : `฿${Math.round(n).toLocaleString('th-TH')}`;
 }
 
-/** "09:00" + 4h → "13:00" (same-day care shifts). */
-function plannedEnd(startTime?: string | null, hours?: number | null): string | null {
-  if (!startTime || hours == null) return null;
-  const [h, m] = startTime.split(':').map(Number);
-  if (Number.isNaN(h)) return null;
-  const total = h * 60 + (m || 0) + Math.round(hours * 60);
-  const hh = Math.floor(total / 60) % 24;
-  return `${String(hh).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-}
-
 /** How far through the shift we are now (kept 0.06–0.94 so the marker stays on the track). */
 function shiftProgress(b: GroupBookingSummary): number {
-  const end = plannedEnd(b.startTime, b.durationHours);
+  // PYG-526: เวลาสิ้นสุดมาจาก BE (startTime + durationHours) — เลิกคำนวณเองฝั่ง FE
+  const end = b.endTime;
   if (!b.startTime || !end) return 0.5;
   const start = new Date(`${b.bookingDate}T${b.startTime}:00`).getTime();
   const finish = new Date(`${b.bookingDate}T${end}:00`).getTime();
@@ -869,7 +861,7 @@ function ApptPrice({ b }: { b: GroupBookingSummary }) {
 /** Expanded card for an in-progress job: live shift timeline + location details. */
 function RichAppointmentCard({ b, onOpen }: { b: GroupBookingSummary; onOpen: () => void }) {
   const s = useStrings();
-  const end = plannedEnd(b.startTime, b.durationHours);
+  const end = b.endTime; // PYG-526: จาก BE
   const pct = `${(shiftProgress(b) * 100).toFixed(1)}%`;
   const startLabel = b.checkInTime
     ? `${s.apptCheckIn} ${b.checkInTime}`
@@ -963,6 +955,7 @@ function ApptDetailRow({ icon, label, value }: { icon: string; label: string; va
 function CompactAppointmentCard({ b, onOpen }: { b: GroupBookingSummary; onOpen: () => void }) {
   const s = useStrings();
   const { month, day } = monthDay(b.bookingDate);
+  const timeText = formatBookingTimeRange(b);
   return (
     <li
       role="button"
@@ -979,7 +972,6 @@ function CompactAppointmentCard({ b, onOpen }: { b: GroupBookingSummary; onOpen:
       <div className="flex w-12 shrink-0 flex-col items-center rounded-lg bg-white py-1.5 text-center ring-1 ring-gray-100">
         <span className="text-[11px] font-medium text-[#8A8C8E]">{month}</span>
         <span className="text-[18px] font-bold leading-tight text-[#1A1A1A]">{day}</span>
-        {b.startTime && <span className="text-[10px] text-[#8A8C8E]">{b.startTime}</span>}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -998,6 +990,13 @@ function CompactAppointmentCard({ b, onOpen }: { b: GroupBookingSummary; onOpen:
           {bookingRef(b.id)}
           {b.caregiver?.fullName && ` · ${b.caregiver.fullName}`}
         </p>
+        {/* PYG-526: "09:00 – 13:00 (4 ชม.)" — เดิมใต้วันที่มีแค่เวลาเริ่ม ช่องแคบเกินจะใส่ช่วงเวลาได้ */}
+        {timeText && (
+          <p className="mt-0.5 flex items-center gap-1 truncate text-[12px] text-[#8A8C8E]">
+            <Icon name="schedule" size="small" style={{ fontSize: 13 }} className="text-[#B4BCBA]" />
+            <span className="truncate">{timeText}</span>
+          </p>
+        )}
         <p className="mt-0.5 flex items-center gap-1 truncate text-[12px] text-[#8A8C8E]">
           {b.locationAddress && (
             <>

@@ -4,6 +4,7 @@ import { useQuery } from '@apollo/client/react';
 import { useBooking, type ConfirmedBooking, type BookingRequest, type SavedCaregiver } from '../../context/BookingContext';
 import { GET_MY_BOOKING_HISTORY } from '../../graphql/queries';
 import { mapGqlStatus, ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
+import { formatBookingTimeRange } from '../../lib/bookingTime';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -69,24 +70,13 @@ const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: str
 
 // ── API helpers ────────────────────────────────────────────────────────────────
 
-function computeEndTime(startTime: string, durationHours: number): string {
-  try {
-    const [sh, sm] = startTime.split(':').map(Number);
-    const endMin = sh * 60 + sm + Math.round(durationHours * 60);
-    const eh = Math.floor(endMin / 60) % 24;
-    const em = endMin % 60;
-    return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
-  } catch {
-    return '';
-  }
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapGqlBooking(api: any): ConfirmedBooking {
   const idSuffix = String(api.id).toUpperCase().replace(/-/g, '').slice(-6);
   const startTime: string = api.startTime ?? '';
   const durationHours: number = api.durationHours ?? 0;
-  const endTime = startTime && durationHours ? computeEndTime(startTime, durationHours) : '';
+  // PYG-526: เวลาสิ้นสุดมาจาก BE (startTime + durationHours) — เลิกคำนวณเองฝั่ง FE
+  const endTime: string = api.endTime ?? '';
   const serviceLocations: ('at_home' | 'accompany_outside')[] = (api.serviceLocations ?? []).filter(
     (l: string) => l === 'at_home' || l === 'accompany_outside',
   );
@@ -97,7 +87,8 @@ function mapGqlBooking(api: any): ConfirmedBooking {
     serviceLocation: serviceLocations,
     dateTime: {
       date: api.bookingDate ?? '',
-      slot: api.timeSlot ?? '',
+      // PYG-526: ไม่ query timeSlot แล้ว (ห้ามแสดงชื่อ slot) — field นี้ใช้เฉพาะในฟอร์มจอง
+      slot: '',
       startTime,
       endTime,
       duration: durationHours,
@@ -145,6 +136,7 @@ function monthDay(dateStr?: string): { month: string; day: string } {
 function BookingCard({ booking, onViewDetail, isDueSection }: Readonly<{ booking: ConfirmedBooking; onViewDetail?: () => void; isDueSection?: boolean }>) {
   const dt = booking.draft.dateTime;
   const { month, day } = monthDay(dt?.date);
+  const timeText = formatBookingTimeRange({ startTime: dt?.startTime, endTime: dt?.endTime, durationHours: dt?.duration });
   // Within the "upcoming" tab's due (today/overdue) sub-tab, show a distinct badge.
   const badge = booking.status === 'confirmed' && isDueSection
     ? { label: 'ถึงกำหนดบริการแล้ว', bg: '#EFF6FF', text: '#1D4ED8' }
@@ -182,7 +174,6 @@ function BookingCard({ booking, onViewDetail, isDueSection }: Readonly<{ booking
       <div className="flex w-14 shrink-0 flex-col items-center gap-0.5 text-center">
         <span className="text-[13px] font-medium text-[#8A8C8E]">{month}</span>
         <span className="text-[24px] font-bold leading-tight text-[#064E3B]">{day}</span>
-        {dt?.startTime && <span className="text-[12px] text-[#8A8C8E]">{dt.startTime}</span>}
       </div>
 
       <div className="min-w-0 flex-1">
@@ -196,6 +187,13 @@ function BookingCard({ booking, onViewDetail, isDueSection }: Readonly<{ booking
           </span>
         </div>
         <p className="mt-1.5 truncate text-[13px] text-[#8A8C8E]">{booking.ref}</p>
+        {/* PYG-526: "09:00 – 13:00 (4 ชม.)" — เดิมใต้วันที่มีแค่เวลาเริ่ม ช่องแคบเกินจะใส่ช่วงเวลาได้ */}
+        {timeText && (
+          <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-[#8A8C8E]">
+            <span className="material-icons shrink-0 text-[#B4BCBA]" style={{ fontSize: 15 }}>schedule</span>
+            <span className="truncate">{timeText}</span>
+          </p>
+        )}
         {(address || locLabel) && (
           <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[13px] text-[#8A8C8E]">
             {address && (

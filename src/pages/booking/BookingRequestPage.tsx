@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
+import { formatBookingTimeRange } from '../../lib/bookingTime';
 import BookingStepService from './steps/BookingStepService';
 import BookingStepDateTime from './steps/BookingStepDateTime';
 import BookingStepLocation from './steps/BookingStepLocation';
@@ -196,9 +197,10 @@ export default function BookingRequestPage() {
   const planText = svcCount ? `${taskCount} งานย่อย จาก ${svcCount} บริการ` : '';
 
   const dt = bookingDraft?.dateTime;
+  // PYG-526: "15 ก.ย. · 09:00 – 13:00 (4 ชม.)" — เดิมแสดงแค่เวลาเริ่ม
   const dateTimeText =
     dt?.date && dt?.startTime
-      ? `${new Date(dt.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} · ${dt.startTime} น.`
+      ? `${new Date(dt.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} · ${formatBookingTimeRange({ startTime: dt.startTime, endTime: dt.endTime, durationHours: dt.duration })}`
       : '';
 
   const patientName = bookingDraft?.recipient?.patientDetails?.name || '';

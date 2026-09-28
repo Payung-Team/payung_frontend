@@ -111,6 +111,7 @@ const store: {
         id: 'b1',
         bookingDate: iso(0).slice(0, 10),
         startTime: '09:00',
+        endTime: '13:00', // PYG-526: BE คำนวณ startTime + durationHours
         status: 'in_progress',
         serviceType: 'elderly_care',
         durationHours: 4,
@@ -130,6 +131,7 @@ const store: {
         id: 'b2',
         bookingDate: iso(2).slice(0, 10),
         startTime: '09:00',
+        endTime: '13:00', // PYG-526: BE คำนวณ startTime + durationHours
         status: 'confirmed',
         serviceType: 'elderly_care',
         durationHours: 4,
@@ -149,6 +151,7 @@ const store: {
         id: 'b3',
         bookingDate: iso(-6).slice(0, 10),
         startTime: '09:00',
+        endTime: '13:00', // PYG-526: BE คำนวณ startTime + durationHours
         status: 'confirmed',
         serviceType: 'general_care',
         durationHours: 4,
@@ -168,6 +171,7 @@ const store: {
         id: 'b4',
         bookingDate: iso(-4).slice(0, 10),
         startTime: '13:00',
+        endTime: '19:00', // PYG-526: BE คำนวณ startTime + durationHours
         status: 'accepted',
         serviceType: 'bedridden_care',
         durationHours: 6,
@@ -187,6 +191,7 @@ const store: {
         id: 'b5',
         bookingDate: iso(-8).slice(0, 10),
         startTime: '10:00',
+        endTime: '12:00', // PYG-526: BE คำนวณ startTime + durationHours
         status: 'confirmed',
         serviceType: 'physiotherapy',
         durationHours: 2,
@@ -207,6 +212,7 @@ const store: {
         id: 'b6',
         bookingDate: iso(4).slice(0, 10),
         startTime: '13:00',
+        endTime: '16:00', // PYG-526: BE คำนวณ startTime + durationHours
         status: 'unmatched',
         serviceType: 'general_care',
         durationHours: 3,
@@ -227,6 +233,7 @@ const store: {
         id: 'b7',
         bookingDate: iso(-20).slice(0, 10),
         startTime: '09:00',
+        endTime: '13:00', // PYG-526: BE คำนวณ startTime + durationHours
         status: 'completed',
         serviceType: 'elderly_care',
         durationHours: 4,

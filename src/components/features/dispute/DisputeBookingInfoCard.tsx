@@ -30,7 +30,11 @@ export default function DisputeBookingInfoCard({ dispute }: DisputeBookingInfoCa
         </DisputeField>
 
         <DisputeField label="วันที่ให้บริการ">
-          <span className="font-[Inter]">{formatThaiDate(dispute.serviceDate)}</span>
+          <span className="font-[Inter]">
+            {formatThaiDate(dispute.serviceDate)}
+            {/* PYG-526: เวลาจริงของใบจอง "09:00 – 13:00 (4 ชม.)" — เดิมมีแต่วันที่ */}
+            {dispute.serviceTimeText && ` · ${dispute.serviceTimeText}`}
+          </span>
         </DisputeField>
 
         <DisputeField label="จำนวนเงินธุรกรรม">

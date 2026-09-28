@@ -8,6 +8,7 @@ import { loadOmiseJs } from '../../lib/omise-loader';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import CaregiverPhoto from '../../components/ui/CaregiverPhoto';
 import { useSignedUrlRefresh } from '../../hooks/useSignedPhoto';
+import { formatBookingTimeRange, formatDurationHours } from '../../lib/bookingTime';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -24,16 +25,6 @@ const SERVICE_LOCATION_LABELS: Record<string, string> = {
   at_home: 'ที่บ้านและนอกสถานที่',
   accompany_outside: 'นอกสถานที่',
 };
-
-function computeEndTime(startTime: string, durationHours: number): string {
-  try {
-    const [sh, sm] = startTime.split(':').map(Number);
-    const endMin = sh * 60 + sm + Math.round(durationHours * 60);
-    const eh = Math.floor(endMin / 60) % 24;
-    const em = endMin % 60;
-    return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
-  } catch { return ''; }
-}
 
 function extractErrorMessage(err: unknown): string {
   if (err instanceof Error) {
@@ -57,7 +48,8 @@ function mapGqlBooking(api: any): ConfirmedBooking {
   const idSuffix = String(api.id).toUpperCase().replaceAll('-', '').slice(-6);
   const startTime: string = api.startTime ?? '';
   const durationHours: number = api.durationHours ?? 0;
-  const endTime = startTime && durationHours ? computeEndTime(startTime, durationHours) : '';
+  // PYG-526: เวลาสิ้นสุดมาจาก BE (startTime + durationHours) — เลิกคำนวณเองฝั่ง FE
+  const endTime: string = api.endTime ?? '';
   const serviceLocations: ('at_home' | 'accompany_outside')[] = (api.serviceLocations ?? []).filter(
     (l: string) => l === 'at_home' || l === 'accompany_outside',
   );
@@ -68,7 +60,8 @@ function mapGqlBooking(api: any): ConfirmedBooking {
   const draft: BookingRequest = {
     serviceTypes: api.serviceType ? [api.serviceType] : [],
     serviceLocation: serviceLocations,
-    dateTime: { date: api.bookingDate ?? '', slot: api.timeSlot ?? '', startTime, endTime, duration: durationHours },
+    // PYG-526: slot = '' — ไม่ query timeSlot แล้ว (ห้ามแสดงชื่อ slot) field นี้ใช้เฉพาะในฟอร์มจอง
+    dateTime: { date: api.bookingDate ?? '', slot: '', startTime, endTime, duration: durationHours },
     locationDetails: { at_home: { address: api.locationAddress ?? '', lat: 0, lng: 0 } },
     jobDetails: { tasks, notes: api.notes ?? '' },
     estimatedCost: (() => {
@@ -331,8 +324,10 @@ export default function PaymentPage() {
   const svcTypes = booking.draft.serviceTypes ?? [];
   const svcTypeLabel = svcTypes.map((t) => serviceTypeLabel(t)).join(', ') || '—';
   const dateStr = dt?.date ? formatThaiDate(dt.date) : '—';
-  const timeStr = dt?.startTime && dt?.endTime ? `${dt.startTime}–${dt.endTime} น.` : (dt?.slot ?? '—');
-  const durationStr = dt?.duration ? `${dt.duration} ชั่วโมง` : '—';
+  // PYG-526: "09:00 – 13:00" — มีแถว "ระยะเวลา" แยกอยู่ข้าง ๆ จึงไม่ใส่ (N ชม.) ซ้ำ
+  //   เดิม fallback เป็นชื่อ slot ("morning") ตอนไม่มีเวลาสิ้นสุด → ตอนนี้แสดงเวลาเริ่มหรือ "—"
+  const timeStr = formatBookingTimeRange({ startTime: dt?.startTime, endTime: dt?.endTime }, { withDuration: false }) || '—';
+  const durationStr = formatDurationHours(dt?.duration) || '—';
   const locationStr = booking.draft.locationDetails?.at_home?.address
     || booking.draft.locationDetails?.accompany_outside?.hospitalName
     || '—';

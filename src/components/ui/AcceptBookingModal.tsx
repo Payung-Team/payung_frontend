@@ -67,7 +67,8 @@ export const AcceptBookingModal: React.FC<AcceptBookingModalProps> = ({
               {/* Row 3: Service Time */}
               <div className="flex flex-row justify-between items-start p-0 w-[412px] h-[19.5px] self-stretch">
                 <span className="font-normal text-[13px] leading-[20px] text-[#8A8C8E]">เวลา:</span>
-                <span className="font-semibold text-[13px] leading-[20px] text-[#1A1A1A]">{booking.time} น.</span>
+                {/* PYG-526: ป๊อปอัปนี้ไม่มีแถวระยะเวลา → "09:00 – 13:00 (4 ชม.)" */}
+                <span className="font-semibold text-[13px] leading-[20px] text-[#1A1A1A]">{booking.timeRangeText}</span>
               </div>
 
               {/* Row 4: Estimated Income */}

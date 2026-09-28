@@ -90,7 +90,8 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
                 วันเวลาให้บริการ
               </span>
               <span className="font-['Bai_Jamjuree'] font-semibold text-[13px] leading-5 text-[#1A1A1A] mt-1">
-                {formatThaiDate(booking.bookingDate)} · {booking.time} น.
+                {/* PYG-526: บล็อกขวาแสดงระยะเวลาแล้ว → ที่นี่แค่ "09:00 – 13:00" */}
+                {formatThaiDate(booking.bookingDate)} · {booking.time}
               </span>
             </div>
             {/* Right Block */}

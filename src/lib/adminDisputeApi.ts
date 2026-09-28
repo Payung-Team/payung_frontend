@@ -98,7 +98,13 @@ export interface DisputeDetailResponse {
   bookingDate: string;
   status: string;
   serviceType: string;
+  /** PYG-526: ข้อมูลภายในของการจับคู่ — ห้ามแสดง ใช้ startTime / endTime แทน */
   timeSlot: string;
+  /** "HH:mm" (เวลาไทย) */
+  startTime?: string;
+  /** "HH:mm" = startTime + durationHours (BE คำนวณ) */
+  endTime?: string;
+  durationHours?: number;
   locationAddress: string;
   estimatedCost?: number;
 

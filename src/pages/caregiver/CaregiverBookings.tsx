@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import Icon from '../../components/ui/Icon';
 import type { PatientProfile } from '../../lib/patientProfile';
+import { formatBookingTimeRange, formatDurationHours } from '../../lib/bookingTime';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
 import { BookingCard } from '../../components/ui/BookingCard';
@@ -30,7 +31,13 @@ export interface BookingTask {
 export interface Booking {
   id: string;
   bookingDate: string;
+  /**
+   * "09:00 – 13:00" (ไม่มีจำนวนชั่วโมง) — ใช้ในจุดที่มีช่อง "ระยะเวลา" แยกอยู่ข้าง ๆ แล้ว
+   * ขึ้นต้นด้วยเวลาเริ่มเสมอ: หน้าเช็คอิน (PreShiftCard) และการเรียงลำดับงานอ่านเวลาเริ่มจากตรงนี้
+   */
   time: string;
+  /** PYG-526: "09:00 – 13:00 (4 ชม.)" — ใช้ในจุดที่แสดงเวลาบรรทัดเดียว ไม่มีช่องระยะเวลาแยก */
+  timeRangeText: string;
   serviceType: string;
   patientName: string;
   price: number;
@@ -88,23 +95,11 @@ function serviceLocationLabel(loc: string): string {
 // eslint-disable-next-line react-refresh/only-export-components -- shared pure mapper, not a component
 export function mapToBooking(summary: any): Booking {
   const durationHours = summary.durationHours;
-  const startTime = summary.startTime; // "HH:mm"
-  
-  let time = startTime || '';
-  if (startTime && durationHours) {
-    try {
-      const [sh, sm] = startTime.split(':').map(Number);
-      const startMinutes = sh * 60 + sm;
-      const endMinutes = startMinutes + Math.round(durationHours * 60);
-      const eh = Math.floor(endMinutes / 60) % 24;
-      const em = endMinutes % 60;
-      const ehStr = String(eh).padStart(2, '0');
-      const emStr = String(em).padStart(2, '0');
-      time = `${startTime} - ${ehStr}:${emStr}`;
-    } catch (e) {
-      time = startTime;
-    }
-  }
+  // PYG-526: เวลาสิ้นสุดมาจาก BE (startTime + durationHours) — เลิกคำนวณเองฝั่ง FE
+  //   รูปแบบมาจาก lib/bookingTime ที่เดียว → หน้าผู้ดูแลกับหน้าผู้จองแสดงเวลาเหมือนกัน
+  const timeParts = { startTime: summary.startTime, endTime: summary.endTime, durationHours };
+  const time = formatBookingTimeRange(timeParts, { withDuration: false });
+  const timeRangeText = formatBookingTimeRange(timeParts);
 
   // receivedTimeText relative time helper
   let receivedTimeText = undefined;
@@ -135,6 +130,7 @@ export function mapToBooking(summary: any): Booking {
     id: summary.id,
     bookingDate: summary.bookingDate,
     time,
+    timeRangeText,
     serviceType: summary.serviceType,
     patientName: summary.patient?.displayName ?? 'ผู้ใช้บริการ',
     price: summary.estimatedCost ?? 0,
@@ -146,7 +142,7 @@ export function mapToBooking(summary: any): Booking {
     relation: summary.careRecipientName ? `สำหรับ: ${summary.careRecipientName}` : 'สำหรับตัวเอง',
     locationName: summary.locationAddress || undefined,
     serviceFormat: summary.serviceLocations?.[0] ? serviceLocationLabel(summary.serviceLocations[0]) : undefined,
-    durationText: `${durationHours} ชม.`,
+    durationText: formatDurationHours(durationHours) || undefined,
     tasks: summary.tasks && summary.tasks.length > 0 ? summary.tasks : undefined,
     bookingTasks: Array.isArray(summary.bookingTasks) ? summary.bookingTasks : undefined,
     receivedTimeText,
