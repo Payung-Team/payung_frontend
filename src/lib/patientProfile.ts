@@ -7,6 +7,15 @@
 // ค่าที่เพิ่งบันทึกจึงเอามาเติมฟอร์มรอบหน้าได้โดยไม่ต้องแปลงอีกชั้น
 
 /**
+ * PYG-464 follow-up (พบตอน QA ของ PYG-427 TC-BS-03/06, PYG-427_32) — เพดานความยาว
+ * medicines/allergies ต้องตรงกับ BE ทั้งสองเส้นทาง (จองแทน + จองปกติ) ซึ่งตอนนี้เท่ากันที่
+ * 2000 ตัวอักษร (ดู payung_backend/src/patient/dto/patient-profile.constants.ts)
+ * ใช้ค่าคงที่นี้แทนการฮาร์ดโค้ดตัวเลขซ้ำใน component ที่กรอกฟิลด์เหล่านี้
+ */
+export const MEDICINES_MAX_LENGTH = 2000;
+export const ALLERGIES_MAX_LENGTH = 2000;
+
+/**
  * ⚠ `gender` / `supportLevel` เป็น "ข้อความไทย" ตามที่ปุ่มในฟอร์มส่งอยู่แล้ว
  *   BE แปลงเป็น enum เองที่ patient-profile.mapper.ts — ห้ามแปลงเป็น
  *   male / assisted ที่ฝั่งนี้ ไม่งั้นตาราง mapping จะอยู่สองที่แล้วแก้ไม่ครบ

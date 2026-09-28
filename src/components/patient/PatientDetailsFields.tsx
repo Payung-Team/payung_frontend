@@ -21,6 +21,7 @@ import {
   PREDEFINED_CONDITIONS,
   SUPPORT_LEVELS,
 } from './patientFieldOptions';
+import { ALLERGIES_MAX_LENGTH, MEDICINES_MAX_LENGTH } from '../../lib/patientProfile';
 
 /** ข้อความ error ต่อช่อง — คีย์ที่ไม่มีค่า = ช่องนั้นไม่มี error */
 export interface PatientFieldErrors {
@@ -353,9 +354,13 @@ export default function PatientDetailsFields({
               value={values.medicines}
               onChange={(e) => onChange('medicines', e.target.value)}
               disabled={disabled}
+              maxLength={MEDICINES_MAX_LENGTH}
               placeholder="ชื่อยา · มื้อที่ทาน"
               className={`${inputBase} ${inputOk}`}
             />
+            <p className="mt-1 text-[11px] text-[#8A8C8E]">
+              {values.medicines.length}/{MEDICINES_MAX_LENGTH} ตัวอักษร
+            </p>
           </div>
           <div>
             <label className="text-xs font-semibold text-[#575859]">แพ้ยา / แพ้อาหาร</label>
@@ -364,9 +369,13 @@ export default function PatientDetailsFields({
               value={values.allergies}
               onChange={(e) => onChange('allergies', e.target.value)}
               disabled={disabled}
+              maxLength={ALLERGIES_MAX_LENGTH}
               placeholder="เช่น แพ้เพนิซิลิน"
               className={`${inputBase} ${inputOk}`}
             />
+            <p className="mt-1 text-[11px] text-[#8A8C8E]">
+              {values.allergies.length}/{ALLERGIES_MAX_LENGTH} ตัวอักษร
+            </p>
           </div>
         </div>
 
