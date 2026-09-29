@@ -7,6 +7,7 @@ import {
   type ConsentPolicyData,
   type MyConsentsData,
 } from '../../../graphql/consent';
+import { PrivacyNoticeDialog } from '../../../components/consent/PrivacyNoticeDialog';
 
 const TYPE = 'disclose_to_family_group';
 
@@ -116,16 +117,18 @@ export function FamilyGroupConsentSection({
         {policy.rightsNoteTh}{' '}
         <button
           type="button"
-          onClick={() => setNoticeOpen((open) => !open)}
+          onClick={() => setNoticeOpen(true)}
+          aria-haspopup="dialog"
           className="font-semibold text-[#009265] hover:underline"
         >
-          {noticeOpen ? 'ปิดประกาศความเป็นส่วนตัว' : 'อ่านประกาศความเป็นส่วนตัว'}
+          อ่านประกาศความเป็นส่วนตัว
         </button>
       </p>
       {noticeOpen && (
-        <div className="mt-2 max-h-60 overflow-y-auto whitespace-pre-wrap rounded-xl border border-[#E0E2E5] bg-[#FAFAFA] p-3 text-[12px] leading-6 text-[#575859]">
-          {policy.privacyNoticeTh}
-        </div>
+        <PrivacyNoticeDialog
+          notice={{ th: policy.privacyNoticeTh, en: policy.privacyNoticeEn }}
+          onClose={() => setNoticeOpen(false)}
+        />
       )}
     </section>
   );

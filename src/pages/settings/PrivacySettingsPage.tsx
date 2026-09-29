@@ -229,7 +229,10 @@ export default function PrivacySettingsPage() {
         />
       )}
       {noticeOpen && policy && (
-        <PrivacyNoticeModal markdown={policy.privacyNoticeTh} onClose={closeNotice} />
+        <PrivacyNoticeModal
+          notice={{ th: policy.privacyNoticeTh, en: policy.privacyNoticeEn }}
+          onClose={closeNotice}
+        />
       )}
 
       <ToastContainer toasts={toasts} onRemove={removeToast} position="bottom-right" variant="booking-toast" />

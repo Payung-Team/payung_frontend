@@ -1,22 +1,22 @@
 import { ModalShell } from '../../family/components/familyUi';
-import { PRIVACY_EMAIL } from '../../../lib/consentErrors';
-import { SimpleMarkdown } from './SimpleMarkdown';
+import {
+  PrivacyNoticeView,
+  type PrivacyNoticeText,
+} from '../../../components/consent/PrivacyNoticeView';
 
 /**
  * ประกาศความเป็นส่วนตัวฉบับเต็ม — PYG-540
  *
- * เนื้อหามาจาก consentPolicy.privacyNoticeTh (markdown ไฟล์เดียวกับที่ BE ใช้อ้างอิง)
- * ★ BE คืน '' เมื่อหาไฟล์ไม่เจอ → แสดงช่องทางขอสำเนาทางอีเมลแทน ไม่ใช่ modal ว่างเปล่า
+ * เนื้อหามาจาก consentPolicy.privacyNoticeTh/En (markdown ไฟล์เดียวกับที่ BE ใช้อ้างอิง)
+ * ★ BE คืน '' เมื่อหาไฟล์ไม่เจอ → PrivacyNoticeView แสดงช่องทางขอสำเนาทางอีเมลแทน ไม่ใช่ modal ว่างเปล่า
  */
 export function PrivacyNoticeModal({
-  markdown,
+  notice,
   onClose,
 }: {
-  markdown: string;
+  notice: PrivacyNoticeText;
   onClose: () => void;
 }) {
-  const hasNotice = markdown.trim() !== '';
-
   return (
     <ModalShell onClose={onClose} maxWidth={820} labelledBy="privacy-notice-title" showClose>
       <h2 id="privacy-notice-title" className="pr-10 text-xl font-bold text-[#064E3B]">
@@ -24,19 +24,7 @@ export function PrivacyNoticeModal({
       </h2>
 
       <div className="mt-4">
-        {hasNotice ? (
-          <SimpleMarkdown source={markdown} />
-        ) : (
-          <p className="text-[15px] leading-7 text-[#374151]">
-            ขณะนี้ไม่สามารถแสดงประกาศฉบับเต็มได้ ขอสำเนาประกาศความเป็นส่วนตัวได้ทางอีเมล{' '}
-            <a
-              href={`mailto:${PRIVACY_EMAIL}`}
-              className="font-semibold text-[#009265] underline underline-offset-2"
-            >
-              {PRIVACY_EMAIL}
-            </a>
-          </p>
-        )}
+        <PrivacyNoticeView notice={notice} />
       </div>
 
       <div className="mt-6 flex justify-end">

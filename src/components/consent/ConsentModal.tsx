@@ -4,18 +4,21 @@
  * ใช้หลังกดปุ่มสมัคร: ฟอร์มผ่าน validation แล้วเด้งกล่องนี้ขึ้นมา **ก่อนสร้างบัญชี**
  * ★ ความยินยอมต้องมาก่อนการเก็บข้อมูลเสมอ — กดยกเลิก = ไม่มีบัญชีถูกสร้าง
  *
- * ★ ปุ่มยินยอมปลดล็อกเมื่อครบสองอย่าง:
- *     ① เลื่อนอ่านจนสุด — ไม่ให้กดผ่านโดยไม่เห็นเนื้อหา
- *     ② ติ๊กข้อบังคับครบ
- *   ข้อ ① ไม่ใช่แค่ UX: กล่องนี้มีประกาศความเป็นส่วนตัวฉบับเต็มอยู่ข้างใน
- *   ถ้ากดยินยอมได้ทันทีโดยไม่เลื่อน เท่ากับเราบันทึกว่าเขาอ่านแล้วทั้งที่เขาไม่เคยเห็น
+ * ★ ปุ่มยินยอมปลดล็อกเมื่อครบสามอย่าง:
+ *     ① เลื่อนอ่านข้อยินยอมในกล่องนี้จนสุด
+ *     ② เปิดประกาศความเป็นส่วนตัวฉบับเต็ม (popup แยก) แล้วเลื่อนอ่านจนสุด
+ *     ③ ติ๊กข้อบังคับครบ
+ *   ① ② ไม่ใช่แค่ UX: ข้อ "ฉันได้อ่านและยอมรับประกาศความเป็นส่วนตัว" จะเป็นจริงได้ก็ต่อเมื่อเขาเห็นประกาศ
+ *   ถ้าติ๊กแล้วกดยินยอมได้เลย เท่ากับเราบันทึกว่าเขาอ่านแล้วทั้งที่ไม่เคยเปิด
+ *   (ติ๊กก่อนอ่านได้ — แต่ปุ่มยินยอมยังล็อกจนกว่าจะอ่านจบ)
  *
  * ★ ข้อความทั้งหมดมาจาก `consentPolicy` ของ BE — component นี้ไม่มีเนื้อความยินยอม
  *   ของตัวเองสักคำ (ที่เป็นภาษาไทยในไฟล์คือป้ายกำกับ UI เท่านั้น)
  */
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ConsentItem, ConsentScreenCopy } from '../../graphql/consent';
 import ConsentBox from './ConsentBox';
+import type { PrivacyNoticeText } from './PrivacyNoticeView';
 import { useScrolledToEnd } from './useScrolledToEnd';
 
 export interface ConsentModalProps {
@@ -25,7 +28,7 @@ export interface ConsentModalProps {
   onToggle: (type: string, next: boolean) => void;
   screen: ConsentScreenCopy | null;
   rightsNote: string;
-  privacyNotice: string;
+  privacyNotice: PrivacyNoticeText;
   policyVersion: string;
   effectiveDate: string;
   /** กำลังสร้างบัญชีอยู่ — ล็อกปุ่มทั้งกล่อง */
@@ -53,11 +56,15 @@ export default function ConsentModal({
 }: ConsentModalProps) {
   const [reachedEnd, attachScroller] = useScrolledToEnd();
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  // อ่านจบแล้วถือว่าจบตลอด (เหมือน reachedEnd) — ปิดแล้วเปิดกล่องใหม่ก็ไม่ต้องอ่านซ้ำ
+  const [noticeRead, setNoticeRead] = useState(false);
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const markNoticeRead = useCallback(() => setNoticeRead(true), []);
 
   const missingRequired = items.some(
     (item) => item.required && !granted.has(item.type),
   );
-  const canAccept = open && reachedEnd && !missingRequired && !submitting;
+  const canAccept = open && reachedEnd && noticeRead && !missingRequired && !submitting;
 
   // Esc = ยกเลิก · ล็อก scroll ของหน้าหลังไม่ให้เลื่อนตามขณะกล่องเปิด
   useEffect(() => {
@@ -109,7 +116,7 @@ export default function ConsentModal({
           )}
         </div>
 
-        {/* ★ กล่องเลื่อนอ่านเดียวครอบทั้ง checkbox และประกาศฉบับเต็ม */}
+        {/* ★ กล่องเลื่อนอ่านเดียวครอบข้อยินยอมทั้งหมด */}
         <div ref={attachScroller} className="flex-1 overflow-y-auto px-6 py-5">
           <ConsentBox
             items={items}
@@ -119,6 +126,10 @@ export default function ConsentModal({
             privacyNotice={privacyNotice}
             disabled={submitting}
             showErrors={false}
+            noticeRead={noticeRead}
+            onNoticeRead={markNoticeRead}
+            noticeOpen={noticeOpen}
+            onNoticeOpenChange={setNoticeOpen}
           />
 
           <p className="mt-5 text-xs text-[#B0B2B5]">
@@ -136,7 +147,24 @@ export default function ConsentModal({
               เลื่อนอ่านให้จบก่อนจึงจะกดยินยอมได้
             </p>
           )}
-          {reachedEnd && missingRequired && (
+          {reachedEnd && !noticeRead && (
+            <p className="mb-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm font-semibold text-[#B8860B]">
+              <span className="material-icons" style={{ fontSize: 18 }}>
+                description
+              </span>
+              อ่านประกาศความเป็นส่วนตัวฉบับเต็มให้จบก่อนจึงจะกดยินยอมได้
+              {/* ลิงก์ในกล่องอยู่ท้ายสุดของรายการ — ให้เปิดได้จากตรงนี้เลย ไม่ต้องเลื่อนหา */}
+              <button
+                type="button"
+                onClick={() => setNoticeOpen(true)}
+                disabled={submitting}
+                className="cursor-pointer border-none bg-transparent p-0 font-bold text-[#52B69A] underline underline-offset-2 hover:text-[#45a085]"
+              >
+                เปิดอ่าน
+              </button>
+            </p>
+          )}
+          {reachedEnd && noticeRead && missingRequired && (
             <p className="mb-3 text-sm font-semibold text-[#B8860B]">
               กรุณาติ๊กข้อที่มีเครื่องหมาย * ให้ครบ
             </p>

@@ -16,6 +16,8 @@ import { useState } from 'react';
 import type { ConsentItem } from '../../graphql/consent';
 // PYG-541: แยกออกมาเป็นไฟล์ของตัวเอง ให้ ConsentModal ใช้ร่วมกันได้
 import { useScrolledToEnd } from './useScrolledToEnd';
+import type { PrivacyNoticeText } from './PrivacyNoticeView';
+import { PrivacyNoticeDialog } from './PrivacyNoticeDialog';
 
 export interface ConsentBoxProps {
   items: ConsentItem[];
@@ -24,11 +26,21 @@ export interface ConsentBoxProps {
   onToggle: (type: string, next: boolean) => void;
   /** ข้อความสิทธิ์เจ้าของข้อมูลจาก BE — แสดงท้ายกล่องเสมอ */
   rightsNote: string;
-  /** ประกาศความเป็นส่วนตัวฉบับเต็ม (Markdown) — เปิดอ่านได้จากลิงก์ */
-  privacyNotice: string;
+  /** ประกาศความเป็นส่วนตัวฉบับเต็ม (Markdown TH/EN) — เปิดอ่านได้จากลิงก์ */
+  privacyNotice: PrivacyNoticeText;
   disabled?: boolean;
   /** แสดง error ใต้ข้อที่ยังไม่ติ๊ก (ตั้งหลังผู้ใช้กดบันทึกแล้ว) */
   showErrors?: boolean;
+  /**
+   * บังคับอ่านประกาศฉบับเต็มจนจบ (ConsentModal ใช้)
+   * ส่ง onNoticeRead มา = แสดงสถานะ "ยังไม่ได้อ่าน/อ่านจบแล้ว" ข้างลิงก์ และแจ้งกลับเมื่ออ่านถึงท้าย
+   * ไม่ส่ง = เปิดอ่านได้ แต่ไม่ติดตามการอ่าน (เช่น onboarding)
+   */
+  noticeRead?: boolean;
+  onNoticeRead?: () => void;
+  /** ส่งคู่กัน = parent คุมการเปิด popup เอง (ให้ปุ่มท้าย modal เปิดประกาศได้) · ไม่ส่ง = ConsentBox คุมเอง */
+  noticeOpen?: boolean;
+  onNoticeOpenChange?: (open: boolean) => void;
 }
 
 function SensitiveItem({
@@ -148,8 +160,16 @@ export default function ConsentBox({
   privacyNotice,
   disabled = false,
   showErrors = false,
+  noticeRead = false,
+  onNoticeRead,
+  noticeOpen: noticeOpenProp,
+  onNoticeOpenChange,
 }: ConsentBoxProps) {
-  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [noticeOpenLocal, setNoticeOpenLocal] = useState(false);
+  const controlled = noticeOpenProp !== undefined && onNoticeOpenChange !== undefined;
+  const noticeOpen = controlled ? noticeOpenProp : noticeOpenLocal;
+  const setNoticeOpen = controlled ? onNoticeOpenChange : setNoticeOpenLocal;
+  const trackRead = onNoticeRead !== undefined;
 
   const errorFor = (item: ConsentItem) =>
     showErrors && item.required && !granted.has(item.type)
@@ -182,18 +202,47 @@ export default function ConsentBox({
 
       <p className="text-sm leading-6 text-[#8A8C8E]">{rightsNote}</p>
 
-      <button
-        type="button"
-        onClick={() => setNoticeOpen((open) => !open)}
-        className="cursor-pointer border-none bg-none p-0 text-sm font-semibold text-[#52B69A] hover:underline"
-      >
-        {noticeOpen ? 'ปิดประกาศความเป็นส่วนตัว' : 'อ่านประกาศความเป็นส่วนตัวฉบับเต็ม'}
-      </button>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <button
+          type="button"
+          onClick={() => setNoticeOpen(true)}
+          aria-haspopup="dialog"
+          className="flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-sm font-semibold text-[#52B69A] hover:underline"
+        >
+          <span className="material-icons" style={{ fontSize: 18 }}>
+            description
+          </span>
+          อ่านประกาศความเป็นส่วนตัวฉบับเต็ม
+          <span className="material-icons" style={{ fontSize: 16 }}>
+            open_in_new
+          </span>
+        </button>
 
+        {trackRead &&
+          (noticeRead ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#E8F6F1] px-2.5 py-0.5 text-xs font-semibold text-[#2F8F74]">
+              <span className="material-icons" style={{ fontSize: 14 }} aria-hidden="true">
+                check_circle
+              </span>
+              อ่านจบแล้ว
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#FFF6DD] px-2.5 py-0.5 text-xs font-semibold text-[#B8860B]">
+              <span className="material-icons" style={{ fontSize: 14 }} aria-hidden="true">
+                schedule
+              </span>
+              ต้องอ่านให้จบก่อนยินยอม
+            </span>
+          ))}
+      </div>
+
+      {/* เปิดเป็น popup ซ้อน — ประกาศยาว 9 หัวข้อ ถ้าแสดงในกล่อง consent จะดันข้อยินยอมหายไปไกล */}
       {noticeOpen && (
-        <div className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-xl border border-[#E0E2E5] bg-[#FAFAFA] p-4 text-sm leading-7 text-[#575859]">
-          {privacyNotice}
-        </div>
+        <PrivacyNoticeDialog
+          notice={privacyNotice}
+          onClose={() => setNoticeOpen(false)}
+          onReadToEnd={onNoticeRead}
+        />
       )}
     </div>
   );

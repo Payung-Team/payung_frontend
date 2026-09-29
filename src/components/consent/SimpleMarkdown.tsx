@@ -134,21 +134,37 @@ function renderInline(text: string): ReactNode[] {
   );
 }
 
-const HEADING_CLASS: Record<number, string> = {
-  1: 'text-xl font-bold text-[#064E3B]',
-  2: 'mt-2 text-lg font-bold text-[#064E3B]',
-  3: 'text-base font-semibold text-[#1A1A1A]',
+const HEADING_CLASS: Record<'md' | 'sm', Record<number, string>> = {
+  md: {
+    1: 'text-xl font-bold text-[#064E3B]',
+    2: 'mt-2 text-lg font-bold text-[#064E3B]',
+    3: 'text-base font-semibold text-[#1A1A1A]',
+  },
+  sm: {
+    1: 'text-base font-bold text-[#064E3B]',
+    2: 'mt-1 text-[15px] font-bold text-[#064E3B]',
+    3: 'text-sm font-semibold text-[#1A1A1A]',
+  },
 };
 
-export function SimpleMarkdown({ source }: { source: string }) {
+const BODY_CLASS: Record<'md' | 'sm', string> = {
+  md: 'space-y-3 text-[15px] leading-7 text-[#374151]',
+  sm: 'space-y-2.5 text-[13px] leading-6 text-[#374151]',
+};
+
+/**
+ * @param size `sm` = ใช้ในพื้นที่แคบ (กล่อง consent ในหน้าอื่น) · `md` = modal/หน้าเต็ม
+ */
+export function SimpleMarkdown({ source, size = 'md' }: { source: string; size?: 'md' | 'sm' }) {
   const blocks = parseMarkdown(source);
+  const headingClass = HEADING_CLASS[size];
 
   return (
-    <div className="space-y-3 text-[15px] leading-7 text-[#374151]">
+    <div className={BODY_CLASS[size]}>
       {blocks.map((block, i) => {
         switch (block.kind) {
           case 'heading': {
-            const className = HEADING_CLASS[block.level] ?? HEADING_CLASS[3];
+            const className = headingClass[block.level] ?? headingClass[3];
             // h1 ของไฟล์ = หัวเรื่องของประกาศ → ใช้ h3 ขึ้นไปในหน้า เพื่อไม่ชนกับ h1 ของหน้าเว็บ
             if (block.level <= 1) return <h3 key={i} className={className}>{renderInline(block.text)}</h3>;
             if (block.level === 2) return <h4 key={i} className={className}>{renderInline(block.text)}</h4>;
@@ -187,11 +203,12 @@ export function SimpleMarkdown({ source }: { source: string }) {
             // ตารางกว้างกว่าจอมือถือได้ → เลื่อนแนวนอนเฉพาะตาราง ไม่ให้ทั้งหน้าเลื่อน
             return (
               <div key={i} className="overflow-x-auto rounded-lg border border-[#E5E7EB]">
-                <table className="w-full border-collapse text-left text-sm">
+                <table className={`w-full border-collapse text-left ${size === 'sm' ? 'text-[12px]' : 'text-sm'}`}>
                   <thead className="bg-[#F9FAFB]">
                     <tr>
                       {block.header.map((cell, j) => (
-                        <th key={j} scope="col" className="border-b border-[#E5E7EB] px-3 py-2 font-semibold text-[#1A1A1A]">
+                        // min-w: กล่องแคบแล้วคอลัมน์ไม่ถูกบีบจนภาษาไทยตัดคำทีละพยางค์ — เลื่อนแนวนอนแทน
+                        <th key={j} scope="col" className="min-w-[7.5rem] border-b border-[#E5E7EB] px-3 py-2 font-semibold text-[#1A1A1A]">
                           {renderInline(cell)}
                         </th>
                       ))}

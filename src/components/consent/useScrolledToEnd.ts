@@ -12,46 +12,45 @@
  *   แล้วปุ่มจะค้าง disabled ตลอดกาลโดยไม่มีอะไรบอกผู้ใช้
  *
  * ★ เนื้อหาสั้นกว่ากล่อง (ไม่มีอะไรให้เลื่อน) = ถือว่าอ่านจบแล้ว ไม่งั้นผู้ใช้ติดตาย
+ *
+ * ★ เก็บ element ใน state ไม่ใช่ ref: component ที่ใช้ hook นี้อาจ mount ก่อนกล่องจะมีจริง
+ *   (ConsentModal ตอน open=false คืน null) ถ้าเก็บใน ref แล้วผูก listener ใน effect ที่รันครั้งเดียว
+ *   effect จะเจอ null แล้วไม่รันอีกเลย → ไม่มี scroll listener → ปุ่มยินยอมค้าง disabled ตลอด
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 /** ระยะเผื่อจากท้ายกล่อง (px) ที่ยังนับว่า "ถึงท้ายแล้ว" */
 const END_THRESHOLD_PX = 8;
 
 export function useScrolledToEnd(): [boolean, (el: HTMLElement | null) => void] {
   const [reachedEnd, setReachedEnd] = useState(false);
-  const elRef = useRef<HTMLElement | null>(null);
+  const [el, setEl] = useState<HTMLElement | null>(null);
 
-  const check = useCallback((el: HTMLElement) => {
+  const check = useCallback((target: HTMLElement) => {
     const atEnd =
-      el.scrollTop + el.clientHeight >= el.scrollHeight - END_THRESHOLD_PX;
+      target.scrollTop + target.clientHeight >= target.scrollHeight - END_THRESHOLD_PX;
     if (atEnd) setReachedEnd(true);
   }, []);
 
-  const attach = useCallback(
-    (el: HTMLElement | null) => {
-      elRef.current = el;
-      if (el) check(el);
-    },
-    [check],
-  );
-
   useEffect(() => {
-    const el = elRef.current;
     if (!el) return;
 
     const onScroll = () => check(el);
     el.addEventListener('scroll', onScroll, { passive: true });
 
-    // เนื้อหามาทีหลัง (โหลดจาก query) → ขนาดเปลี่ยนหลัง mount ต้องตรวจซ้ำ
+    // ResizeObserver เรียก callback ทันทีหนึ่งครั้งหลัง observe() → ใช้เป็นการตรวจครั้งแรกด้วย
+    // (กรณีเนื้อหาสั้นกว่ากล่อง) แล้วตรวจซ้ำเมื่อขนาดเปลี่ยน (เนื้อหาโหลดทีหลัง, ย่อ/ขยายหน้าต่าง)
+    // ดูทั้งตัวกล่องและลูกชั้นแรก: เนื้อหาข้างในสูงขึ้นไม่ทำให้ขนาดของกล่องเลื่อนเปลี่ยน
     const observer = new ResizeObserver(() => check(el));
     observer.observe(el);
+    Array.from(el.children).forEach((child) => observer.observe(child));
 
     return () => {
       el.removeEventListener('scroll', onScroll);
       observer.disconnect();
     };
-  }, [check]);
+  }, [el, check]);
 
-  return [reachedEnd, attach];
+  // setEl คงที่ตลอดอายุ component → ใช้เป็น callback ref ได้ตรง ๆ
+  return [reachedEnd, setEl];
 }

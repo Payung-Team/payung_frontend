@@ -527,7 +527,7 @@ export default function OnboardingPage() {
                 granted={grantedConsents}
                 onToggle={toggleConsent}
                 rightsNote={policy.rightsNoteTh}
-                privacyNotice={policy.privacyNoticeTh}
+                privacyNotice={{ th: policy.privacyNoticeTh, en: policy.privacyNoticeEn }}
                 disabled={isSubmitting}
                 showErrors={submitted}
               />
