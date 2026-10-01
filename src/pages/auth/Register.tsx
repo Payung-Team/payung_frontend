@@ -463,6 +463,7 @@ export default function Register() {
           onToggle={toggleConsent}
           screen={policy.screen}
           rightsNote={policy.rightsNoteTh}
+          termsOfService={{ th: policy.termsOfServiceTh, en: policy.termsOfServiceEn }}
           privacyNotice={{ th: policy.privacyNoticeTh, en: policy.privacyNoticeEn }}
           policyVersion={policy.version}
           effectiveDate={policy.effectiveDate}

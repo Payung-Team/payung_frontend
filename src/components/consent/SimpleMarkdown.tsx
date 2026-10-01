@@ -141,15 +141,15 @@ const HEADING_CLASS: Record<'md' | 'sm', Record<number, string>> = {
     3: 'text-base font-semibold text-[#1A1A1A]',
   },
   sm: {
-    1: 'text-base font-bold text-[#064E3B]',
-    2: 'mt-1 text-[15px] font-bold text-[#064E3B]',
-    3: 'text-sm font-semibold text-[#1A1A1A]',
+    1: 'text-[17px] font-bold leading-7 text-[#064E3B]',
+    2: 'mt-1 text-[15px] font-bold leading-7 text-[#064E3B]',
+    3: 'text-sm font-semibold leading-6 text-[#1A1A1A]',
   },
 };
 
 const BODY_CLASS: Record<'md' | 'sm', string> = {
   md: 'space-y-3 text-[15px] leading-7 text-[#374151]',
-  sm: 'space-y-2.5 text-[13px] leading-6 text-[#374151]',
+  sm: 'space-y-3 text-sm leading-[1.75] text-[#4B5563]',
 };
 
 /**
@@ -203,7 +203,7 @@ export function SimpleMarkdown({ source, size = 'md' }: { source: string; size?:
             // ตารางกว้างกว่าจอมือถือได้ → เลื่อนแนวนอนเฉพาะตาราง ไม่ให้ทั้งหน้าเลื่อน
             return (
               <div key={i} className="overflow-x-auto rounded-lg border border-[#E5E7EB]">
-                <table className={`w-full border-collapse text-left ${size === 'sm' ? 'text-[12px]' : 'text-sm'}`}>
+                <table className={`w-full border-collapse text-left ${size === 'sm' ? 'text-[13px] leading-6' : 'text-sm'}`}>
                   <thead className="bg-[#F9FAFB]">
                     <tr>
                       {block.header.map((cell, j) => (

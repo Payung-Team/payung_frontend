@@ -36,7 +36,7 @@ export function NoticeLanguageToggle({
     <div
       role="group"
       aria-label="ภาษาของประกาศ / Notice language"
-      className="inline-flex shrink-0 rounded-full border border-[#E0E2E5] bg-[#F6F7F8] p-1"
+      className="inline-flex shrink-0 rounded-full border border-[#E0E2E5] bg-[#F6F7F8] p-0.5"
     >
       {available.map((l) => {
         const active = l === shown;
@@ -47,7 +47,7 @@ export function NoticeLanguageToggle({
             lang={l}
             aria-pressed={active}
             onClick={() => onChange(l)}
-            className={`min-w-[76px] cursor-pointer rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+            className={`min-w-[64px] cursor-pointer rounded-full px-3 py-1 text-[13px] font-semibold transition-colors ${
               active
                 ? 'bg-white text-[#064E3B] shadow-sm'
                 : 'bg-transparent text-[#8A8C8E] hover:text-[#374151]'
@@ -66,16 +66,19 @@ export function NoticeContent({
   shown,
   lang,
   size = 'md',
+  unavailable = UNAVAILABLE,
 }: {
   notice: PrivacyNoticeText;
   shown: NoticeLang | null;
   lang: NoticeLang;
   size?: 'md' | 'sm';
+  /** ข้อความเมื่อเอกสารว่างทั้งสองภาษา (ตามด้วยอีเมล) — ค่าเริ่มต้นพูดถึงประกาศความเป็นส่วนตัว */
+  unavailable?: Record<NoticeLang, string>;
 }) {
   if (!shown) {
     return (
       <p className={size === 'sm' ? 'text-[13px] leading-6 text-[#374151]' : 'text-[15px] leading-7 text-[#374151]'}>
-        {UNAVAILABLE[lang]}{' '}
+        {unavailable[lang]}{' '}
         <a
           href={`mailto:${PRIVACY_EMAIL}`}
           className="font-semibold text-[#009265] underline underline-offset-2"

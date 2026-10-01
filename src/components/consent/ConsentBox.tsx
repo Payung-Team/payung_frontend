@@ -26,21 +26,14 @@ export interface ConsentBoxProps {
   onToggle: (type: string, next: boolean) => void;
   /** ข้อความสิทธิ์เจ้าของข้อมูลจาก BE — แสดงท้ายกล่องเสมอ */
   rightsNote: string;
-  /** ประกาศความเป็นส่วนตัวฉบับเต็ม (Markdown TH/EN) — เปิดอ่านได้จากลิงก์ */
-  privacyNotice: PrivacyNoticeText;
+  /**
+   * ประกาศความเป็นส่วนตัวฉบับเต็ม (Markdown TH/EN) — เปิดอ่านได้จากลิงก์
+   * ไม่ส่ง = ไม่แสดงลิงก์ (ConsentModal ขั้นสุดท้าย: ผู้ใช้อ่านประกาศไปแล้วในขั้นก่อนหน้า)
+   */
+  privacyNotice?: PrivacyNoticeText;
   disabled?: boolean;
   /** แสดง error ใต้ข้อที่ยังไม่ติ๊ก (ตั้งหลังผู้ใช้กดบันทึกแล้ว) */
   showErrors?: boolean;
-  /**
-   * บังคับอ่านประกาศฉบับเต็มจนจบ (ConsentModal ใช้)
-   * ส่ง onNoticeRead มา = แสดงสถานะ "ยังไม่ได้อ่าน/อ่านจบแล้ว" ข้างลิงก์ และแจ้งกลับเมื่ออ่านถึงท้าย
-   * ไม่ส่ง = เปิดอ่านได้ แต่ไม่ติดตามการอ่าน (เช่น onboarding)
-   */
-  noticeRead?: boolean;
-  onNoticeRead?: () => void;
-  /** ส่งคู่กัน = parent คุมการเปิด popup เอง (ให้ปุ่มท้าย modal เปิดประกาศได้) · ไม่ส่ง = ConsentBox คุมเอง */
-  noticeOpen?: boolean;
-  onNoticeOpenChange?: (open: boolean) => void;
 }
 
 function SensitiveItem({
@@ -65,23 +58,23 @@ function SensitiveItem({
         <span className="material-icons text-[#B8860B]" style={{ fontSize: 22 }}>
           shield
         </span>
-        <p className="text-sm font-bold leading-6 text-[#7A5C00]">
+        <p className="text-[13px] font-bold leading-5 text-[#7A5C00]">
           ข้อมูลที่กฎหมายคุ้มครองเป็นพิเศษ — กรุณาอ่านให้จบก่อนให้ความยินยอม
         </p>
       </div>
 
-      <p className="mt-3 text-base font-bold leading-7 text-[#1A1A1A]">{item.labelTh}</p>
+      <p className="mt-3 text-sm font-bold leading-6 text-[#1A1A1A]">{item.labelTh}</p>
 
       {/* กล่องเลื่อนอ่าน — ปุ่มติ๊กปลดล็อกเมื่อเลื่อนถึงท้าย */}
       <div
         ref={attachScroller}
-        className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-[#E0E2E5] bg-white p-4 text-sm leading-7 text-[#575859]"
+        className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-[#E0E2E5] bg-white p-3.5 text-[13px] leading-6 text-[#575859]"
       >
         {item.descriptionTh}
       </div>
 
       {!reachedEnd && (
-        <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-[#B8860B]">
+        <p className="mt-2 flex items-center gap-1.5 text-[13px] font-semibold text-[#B8860B]">
           <span className="material-icons" style={{ fontSize: 18 }}>
             expand_more
           </span>
@@ -103,13 +96,13 @@ function SensitiveItem({
           onChange={(e) => onToggle(e.target.checked)}
           className="mt-0.5 h-5 w-5 shrink-0 accent-[#52B69A]"
         />
-        <span className="text-base font-bold leading-7 text-[#1A1A1A]">
+        <span className="text-sm font-bold leading-6 text-[#1A1A1A]">
           ฉันยินยอม
           {item.required && <span className="ml-1 text-red-500">*</span>}
         </span>
       </label>
 
-      {error && <p className="mt-2 text-sm font-semibold text-red-500">{error}</p>}
+      {error && <p className="mt-2 text-[13px] font-semibold text-red-500">{error}</p>}
     </div>
   );
 }
@@ -129,7 +122,7 @@ function PlainItem({
 }) {
   return (
     <div>
-      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#E0E2E5] bg-white p-4 hover:bg-gray-50">
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#E0E2E5] bg-white px-4 py-3 hover:bg-gray-50">
         <input
           type="checkbox"
           checked={checked}
@@ -138,16 +131,16 @@ function PlainItem({
           className="mt-0.5 h-5 w-5 shrink-0 accent-[#52B69A]"
         />
         <span>
-          <span className="block text-base font-bold leading-7 text-[#1A1A1A]">
+          <span className="block text-sm font-bold leading-6 text-[#1A1A1A]">
             {item.labelTh}
             {item.required && <span className="ml-1 text-red-500">*</span>}
           </span>
-          <span className="mt-1 block text-sm leading-6 text-[#8A8C8E]">
+          <span className="mt-0.5 block text-[13px] leading-5 text-[#8A8C8E]">
             {item.descriptionTh}
           </span>
         </span>
       </label>
-      {error && <p className="mt-1.5 text-sm font-semibold text-red-500">{error}</p>}
+      {error && <p className="mt-1.5 text-[13px] font-semibold text-red-500">{error}</p>}
     </div>
   );
 }
@@ -160,16 +153,8 @@ export default function ConsentBox({
   privacyNotice,
   disabled = false,
   showErrors = false,
-  noticeRead = false,
-  onNoticeRead,
-  noticeOpen: noticeOpenProp,
-  onNoticeOpenChange,
 }: ConsentBoxProps) {
-  const [noticeOpenLocal, setNoticeOpenLocal] = useState(false);
-  const controlled = noticeOpenProp !== undefined && onNoticeOpenChange !== undefined;
-  const noticeOpen = controlled ? noticeOpenProp : noticeOpenLocal;
-  const setNoticeOpen = controlled ? onNoticeOpenChange : setNoticeOpenLocal;
-  const trackRead = onNoticeRead !== undefined;
+  const [noticeOpen, setNoticeOpen] = useState(false);
 
   const errorFor = (item: ConsentItem) =>
     showErrors && item.required && !granted.has(item.type)
@@ -177,7 +162,7 @@ export default function ConsentBox({
       : undefined;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {items.map((item) =>
         item.sensitive ? (
           <SensitiveItem
@@ -200,49 +185,28 @@ export default function ConsentBox({
         ),
       )}
 
-      <p className="text-sm leading-6 text-[#8A8C8E]">{rightsNote}</p>
+      <p className="text-xs leading-5 text-[#8A8C8E]">{rightsNote}</p>
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      {privacyNotice && (
         <button
           type="button"
           onClick={() => setNoticeOpen(true)}
           aria-haspopup="dialog"
-          className="flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-sm font-semibold text-[#52B69A] hover:underline"
+          className="flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-[13px] font-semibold text-[#52B69A] hover:underline"
         >
-          <span className="material-icons" style={{ fontSize: 18 }}>
+          <span className="material-icons" style={{ fontSize: 16 }}>
             description
           </span>
           อ่านประกาศความเป็นส่วนตัวฉบับเต็ม
-          <span className="material-icons" style={{ fontSize: 16 }}>
+          <span className="material-icons" style={{ fontSize: 14 }}>
             open_in_new
           </span>
         </button>
-
-        {trackRead &&
-          (noticeRead ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#E8F6F1] px-2.5 py-0.5 text-xs font-semibold text-[#2F8F74]">
-              <span className="material-icons" style={{ fontSize: 14 }} aria-hidden="true">
-                check_circle
-              </span>
-              อ่านจบแล้ว
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#FFF6DD] px-2.5 py-0.5 text-xs font-semibold text-[#B8860B]">
-              <span className="material-icons" style={{ fontSize: 14 }} aria-hidden="true">
-                schedule
-              </span>
-              ต้องอ่านให้จบก่อนยินยอม
-            </span>
-          ))}
-      </div>
+      )}
 
       {/* เปิดเป็น popup ซ้อน — ประกาศยาว 9 หัวข้อ ถ้าแสดงในกล่อง consent จะดันข้อยินยอมหายไปไกล */}
-      {noticeOpen && (
-        <PrivacyNoticeDialog
-          notice={privacyNotice}
-          onClose={() => setNoticeOpen(false)}
-          onReadToEnd={onNoticeRead}
-        />
+      {privacyNotice && noticeOpen && (
+        <PrivacyNoticeDialog notice={privacyNotice} onClose={() => setNoticeOpen(false)} />
       )}
     </div>
   );

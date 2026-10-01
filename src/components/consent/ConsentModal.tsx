@@ -1,24 +1,26 @@
 /**
- * ConsentModal — pop-up ขอความยินยอม PDPA (PYG-541)
+ * ConsentModal — pop-up ขอความยินยอม PDPA แบบทีละขั้น (PYG-541)
  *
  * ใช้หลังกดปุ่มสมัคร: ฟอร์มผ่าน validation แล้วเด้งกล่องนี้ขึ้นมา **ก่อนสร้างบัญชี**
  * ★ ความยินยอมต้องมาก่อนการเก็บข้อมูลเสมอ — กดยกเลิก = ไม่มีบัญชีถูกสร้าง
  *
- * ★ ปุ่มยินยอมปลดล็อกเมื่อครบสามอย่าง:
- *     ① เลื่อนอ่านข้อยินยอมในกล่องนี้จนสุด
- *     ② เปิดประกาศความเป็นส่วนตัวฉบับเต็ม (popup แยก) แล้วเลื่อนอ่านจนสุด
- *     ③ ติ๊กข้อบังคับครบ
- *   ① ② ไม่ใช่แค่ UX: ข้อ "ฉันได้อ่านและยอมรับประกาศความเป็นส่วนตัว" จะเป็นจริงได้ก็ต่อเมื่อเขาเห็นประกาศ
- *   ถ้าติ๊กแล้วกดยินยอมได้เลย เท่ากับเราบันทึกว่าเขาอ่านแล้วทั้งที่ไม่เคยเปิด
- *   (ติ๊กก่อนอ่านได้ — แต่ปุ่มยินยอมยังล็อกจนกว่าจะอ่านจบ)
+ * ขั้นตอน (ข้ามขั้นที่ policy ไม่มีข้อนั้น):
+ *   1. ข้อกำหนดการใช้บริการ — อ่านฉบับเต็ม → ติ๊กยอมรับ → ถัดไป
+ *   2. ประกาศความเป็นส่วนตัว — อ่านฉบับเต็ม → ติ๊กยอมรับ → ถัดไป
+ *   3. ข้อที่เหลือ (เช่น การรับข่าวสาร — ไม่บังคับ) → ยินยอมและสมัครสมาชิก
  *
- * ★ ข้อความทั้งหมดมาจาก `consentPolicy` ของ BE — component นี้ไม่มีเนื้อความยินยอม
- *   ของตัวเองสักคำ (ที่เป็นภาษาไทยในไฟล์คือป้ายกำกับ UI เท่านั้น)
+ * ★ checkbox ของขั้นเอกสารกดได้หลังเลื่อนอ่านถึงท้ายเอกสารเท่านั้น
+ *   ข้อ "ฉันได้อ่านและยอมรับ..." จะเป็นจริงได้ก็ต่อเมื่อเขาเห็นเนื้อหา ถ้าติ๊กได้ทันที
+ *   เท่ากับเราบันทึกว่าเขาอ่านแล้วทั้งที่ไม่เคยเห็น
+ * ★ "อ่านจบแล้ว" เก็บไว้ที่ ConsentModal (ไม่ใช่ในขั้น) — ย้อนกลับหรือปิดแล้วเปิดใหม่ไม่ต้องอ่านซ้ำ
+ *
+ * ★ เนื้อความยินยอมทั้งหมดมาจาก `consentPolicy` ของ BE — ภาษาไทยในไฟล์นี้คือป้ายกำกับ UI เท่านั้น
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ConsentItem, ConsentScreenCopy } from '../../graphql/consent';
 import ConsentBox from './ConsentBox';
-import type { PrivacyNoticeText } from './PrivacyNoticeView';
+import { NoticeContent, NoticeLanguageToggle } from './PrivacyNoticeView';
+import { useNoticeLanguage, type NoticeLang, type PrivacyNoticeText } from './useNoticeLanguage';
 import { useScrolledToEnd } from './useScrolledToEnd';
 
 export interface ConsentModalProps {
@@ -28,6 +30,7 @@ export interface ConsentModalProps {
   onToggle: (type: string, next: boolean) => void;
   screen: ConsentScreenCopy | null;
   rightsNote: string;
+  termsOfService: PrivacyNoticeText;
   privacyNotice: PrivacyNoticeText;
   policyVersion: string;
   effectiveDate: string;
@@ -39,13 +42,62 @@ export interface ConsentModalProps {
   onAccept: () => void;
 }
 
-export default function ConsentModal({
-  open,
+type DocKey = 'terms' | 'privacy';
+
+/** ขั้นเอกสาร — type ต้องตรงกับ CONSENT_TYPE ฝั่ง BE (consent.constants.ts) */
+const DOC_STEPS: readonly {
+  key: DocKey;
+  type: string;
+  title: Record<NoticeLang, string>;
+  unavailable: Record<NoticeLang, string>;
+}[] = [
+  {
+    key: 'terms',
+    type: 'terms_of_service',
+    title: { th: 'ข้อกำหนดการใช้บริการ', en: 'Terms of Service' },
+    unavailable: {
+      th: 'ขณะนี้ไม่สามารถแสดงข้อกำหนดฉบับเต็มได้ ขอสำเนาได้ทางอีเมล',
+      en: 'The full terms cannot be displayed right now. You can request a copy by email at',
+    },
+  },
+  {
+    key: 'privacy',
+    type: 'privacy_policy',
+    title: { th: 'ประกาศความเป็นส่วนตัว', en: 'Privacy Notice' },
+    unavailable: {
+      th: 'ขณะนี้ไม่สามารถแสดงประกาศฉบับเต็มได้ ขอสำเนาประกาศความเป็นส่วนตัวได้ทางอีเมล',
+      en: 'The full notice cannot be displayed right now. You can request a copy by email at',
+    },
+  },
+];
+
+const FONT = { fontFamily: "'Bai Jamjuree', sans-serif" };
+
+type Step =
+  | { kind: 'doc'; doc: (typeof DOC_STEPS)[number]; item: ConsentItem; text: PrivacyNoticeText }
+  | { kind: 'rest'; items: ConsentItem[] };
+
+export default function ConsentModal(props: ConsentModalProps) {
+  // อยู่นอก ConsentWizard: wizard ถูก unmount ตอนปิดกล่อง แต่ "อ่านจบแล้ว" ต้องจำข้ามการเปิดใหม่
+  const [readDocs, setReadDocs] = useState<ReadonlySet<DocKey>>(new Set());
+  const markRead = useCallback(
+    (key: DocKey) =>
+      setReadDocs((prev) => (prev.has(key) ? prev : new Set(prev).add(key))),
+    [],
+  );
+
+  if (!props.open) return null;
+  // ★ mount ใหม่ทุกครั้งที่เปิด → เริ่มที่ขั้นแรกเสมอ (ติ๊กที่เคยติ๊กยังอยู่ — state อยู่ที่ Register)
+  return <ConsentWizard {...props} readDocs={readDocs} onRead={markRead} />;
+}
+
+function ConsentWizard({
   items,
   granted,
   onToggle,
   screen,
   rightsNote,
+  termsOfService,
   privacyNotice,
   policyVersion,
   effectiveDate,
@@ -53,44 +105,72 @@ export default function ConsentModal({
   error,
   onCancel,
   onAccept,
-}: ConsentModalProps) {
-  const [reachedEnd, attachScroller] = useScrolledToEnd();
+  readDocs,
+  onRead,
+}: ConsentModalProps & { readDocs: ReadonlySet<DocKey>; onRead: (key: DocKey) => void }) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  // อ่านจบแล้วถือว่าจบตลอด (เหมือน reachedEnd) — ปิดแล้วเปิดกล่องใหม่ก็ไม่ต้องอ่านซ้ำ
-  const [noticeRead, setNoticeRead] = useState(false);
-  const [noticeOpen, setNoticeOpen] = useState(false);
-  const markNoticeRead = useCallback(() => setNoticeRead(true), []);
+  const [stepIndex, setStepIndex] = useState(0);
 
-  const missingRequired = items.some(
-    (item) => item.required && !granted.has(item.type),
-  );
-  const canAccept = open && reachedEnd && noticeRead && !missingRequired && !submitting;
+  const texts: Record<DocKey, PrivacyNoticeText> = { terms: termsOfService, privacy: privacyNotice };
+  const docSteps: Step[] = DOC_STEPS.flatMap((doc) => {
+    const item = items.find((i) => i.type === doc.type);
+    return item ? [{ kind: 'doc' as const, doc, item, text: texts[doc.key] }] : [];
+  });
+  const docTypes = new Set(DOC_STEPS.map((d) => d.type));
+  const restItems = items.filter((i) => !docTypes.has(i.type));
+  const steps: Step[] = restItems.length > 0 ? [...docSteps, { kind: 'rest', items: restItems }] : docSteps;
 
-  // Esc = ยกเลิก · ล็อก scroll ของหน้าหลังไม่ให้เลื่อนตามขณะกล่องเปิด
+  const current = steps[Math.min(stepIndex, steps.length - 1)];
+  const isFirst = stepIndex === 0;
+  const isLast = stepIndex >= steps.length - 1;
+
+  const docRead = (step: Step) => step.kind !== 'doc' || readDocs.has(step.doc.key);
+  const missingRequired = items.some((item) => item.required && !granted.has(item.type));
+  const allDocsRead = steps.every(docRead);
+
+  const canNext =
+    current.kind === 'doc'
+      ? docRead(current) && (!current.item.required || granted.has(current.item.type))
+      : true;
+  const canAccept = isLast && canNext && allDocsRead && !missingRequired && !submitting;
+
+  // Esc = ยกเลิก · onCancel มักเป็น arrow ใหม่ทุก render — เก็บใน ref
+  // ไม่งั้น effect รันใหม่ทุกครั้งที่ติ๊ก แล้วดึงโฟกัสกลับไปที่กล่อง ผู้ใช้คีย์บอร์ดหลงตำแหน่ง
+  const cancelRef = useRef({ onCancel, submitting });
   useEffect(() => {
-    if (!open) return;
+    cancelRef.current = { onCancel, submitting };
+  }, [onCancel, submitting]);
 
+  useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !submitting) onCancel();
+      if (e.key === 'Escape' && !cancelRef.current.submitting) cancelRef.current.onCancel();
     };
     document.addEventListener('keydown', onKeyDown);
 
+    // ล็อก scroll ของหน้าหลังไม่ให้เลื่อนตามขณะกล่องเปิด
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-
     dialogRef.current?.focus();
 
     return () => {
       document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open, submitting, onCancel]);
+  }, []);
 
-  if (!open) return null;
+  const goBack = () => setStepIndex((i) => Math.max(0, i - 1));
+  const goNext = () => setStepIndex((i) => Math.min(steps.length - 1, i + 1));
+
+  const stepTitle =
+    current.kind === 'doc'
+      ? current.doc.title.th
+      : restItems.every((i) => !i.required)
+        ? 'ตัวเลือกเพิ่มเติม'
+        : 'ความยินยอมเพิ่มเติม';
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4"
       // คลิกนอกกล่อง = ยกเลิก · ระหว่างสร้างบัญชีห้ามปิด ไม่งั้นผู้ใช้ไม่รู้ว่าสมัครสำเร็จไหม
       onClick={() => !submitting && onCancel()}
     >
@@ -101,100 +181,201 @@ export default function ConsentModal({
         aria-labelledby="consent-modal-title"
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[90vh] w-full max-w-[560px] flex-col rounded-2xl bg-white shadow-xl outline-none"
+        // ★ ความสูงคงที่ทุกขั้น — กล่องไม่ยืด/หดตอนกดถัดไป ปุ่มอยู่ที่เดิมให้กดต่อได้เลย
+        className="flex h-[min(680px,92vh)] w-full max-w-[560px] flex-col rounded-2xl bg-white shadow-xl outline-none"
       >
-        <div className="border-b border-[#E0E2E5] px-6 pb-4 pt-6">
+        <header className="px-6 pb-3 pt-5">
+          <p className="text-xs font-semibold text-[#8A8C8E]">
+            {screen?.titleTh ?? 'ความยินยอม'}
+            {steps.length > 1 && ` · ขั้นตอนที่ ${stepIndex + 1} จาก ${steps.length}`}
+          </p>
+          {steps.length > 1 && (
+            <div className="mt-2 flex gap-1.5" aria-hidden="true">
+              {steps.map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1 flex-1 rounded-full transition-colors ${
+                    i <= stepIndex ? 'bg-[#52B69A]' : 'bg-[#E5E7EB]'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
           <h2
             id="consent-modal-title"
-            className="text-2xl font-bold leading-9 text-[#1A1A1A]"
-            style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+            className="mt-3 text-xl font-bold leading-8 text-[#1A1A1A]"
+            style={FONT}
           >
-            {screen?.titleTh ?? 'ความยินยอม'}
+            {stepTitle}
           </h2>
-          {screen?.introTh && (
-            <p className="mt-1.5 text-base leading-7 text-[#8A8C8E]">{screen.introTh}</p>
-          )}
-        </div>
+        </header>
 
-        {/* ★ กล่องเลื่อนอ่านเดียวครอบข้อยินยอมทั้งหมด */}
-        <div ref={attachScroller} className="flex-1 overflow-y-auto px-6 py-5">
-          <ConsentBox
-            items={items}
-            granted={granted}
-            onToggle={onToggle}
-            rightsNote={rightsNote}
-            privacyNotice={privacyNotice}
+        {current.kind === 'doc' ? (
+          <DocStep
+            key={current.doc.key}
+            step={current}
+            checked={granted.has(current.item.type)}
+            onToggle={(next) => onToggle(current.item.type, next)}
+            read={readDocs.has(current.doc.key)}
+            onRead={onRead}
             disabled={submitting}
-            showErrors={false}
-            noticeRead={noticeRead}
-            onNoticeRead={markNoticeRead}
-            noticeOpen={noticeOpen}
-            onNoticeOpenChange={setNoticeOpen}
           />
-
-          <p className="mt-5 text-xs text-[#B0B2B5]">
-            นโยบายเวอร์ชัน {policyVersion} · เริ่มใช้ {effectiveDate}
-          </p>
-        </div>
-
-        <div className="border-t border-[#E0E2E5] px-6 pb-6 pt-4">
-          {/* บอกเหตุผลที่ปุ่มยังกดไม่ได้ — ปุ่มเทาเฉย ๆ ผู้ใช้จะไม่รู้ว่าต้องทำอะไร */}
-          {!reachedEnd && (
-            <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-[#B8860B]">
-              <span className="material-icons" style={{ fontSize: 18 }}>
-                expand_more
-              </span>
-              เลื่อนอ่านให้จบก่อนจึงจะกดยินยอมได้
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-4">
+            {restItems.every((i) => !i.required) && (
+              <p className="mb-3 text-sm leading-6 text-[#8A8C8E]">
+                ข้อต่อไปนี้ไม่บังคับ ไม่เลือกก็สมัครและใช้บริการได้ตามปกติ
+              </p>
+            )}
+            <ConsentBox
+              items={current.items}
+              granted={granted}
+              onToggle={onToggle}
+              rightsNote={rightsNote}
+              disabled={submitting}
+            />
+            <p className="mt-4 text-xs text-[#B0B2B5]">
+              นโยบายเวอร์ชัน {policyVersion} · เริ่มใช้ {effectiveDate}
             </p>
-          )}
-          {reachedEnd && !noticeRead && (
-            <p className="mb-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm font-semibold text-[#B8860B]">
-              <span className="material-icons" style={{ fontSize: 18 }}>
-                description
-              </span>
-              อ่านประกาศความเป็นส่วนตัวฉบับเต็มให้จบก่อนจึงจะกดยินยอมได้
-              {/* ลิงก์ในกล่องอยู่ท้ายสุดของรายการ — ให้เปิดได้จากตรงนี้เลย ไม่ต้องเลื่อนหา */}
-              <button
-                type="button"
-                onClick={() => setNoticeOpen(true)}
-                disabled={submitting}
-                className="cursor-pointer border-none bg-transparent p-0 font-bold text-[#52B69A] underline underline-offset-2 hover:text-[#45a085]"
-              >
-                เปิดอ่าน
-              </button>
-            </p>
-          )}
-          {reachedEnd && noticeRead && missingRequired && (
-            <p className="mb-3 text-sm font-semibold text-[#B8860B]">
-              กรุณาติ๊กข้อที่มีเครื่องหมาย * ให้ครบ
-            </p>
-          )}
-          {error && <p className="mb-3 text-sm font-semibold text-red-500">{error}</p>}
+          </div>
+        )}
 
+        <footer className="border-t border-[#E0E2E5] px-6 pb-5 pt-4">
+          {error && <p className="mb-3 text-[13px] font-semibold text-red-500">{error}</p>}
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={onCancel}
+              onClick={isFirst ? onCancel : goBack}
               disabled={submitting}
-              className="h-[52px] flex-1 cursor-pointer rounded-lg border border-[#E0E2E5] bg-white text-lg font-bold text-[#575859] transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+              className="h-12 flex-1 cursor-pointer rounded-lg border border-[#E0E2E5] bg-white text-base font-bold text-[#575859] transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              style={FONT}
             >
-              ยกเลิก
+              {isFirst ? 'ยกเลิก' : 'ย้อนกลับ'}
             </button>
-            <button
-              type="button"
-              onClick={onAccept}
-              disabled={!canAccept}
-              className={`h-[52px] flex-1 rounded-lg bg-[#52B69A] text-lg font-bold text-white transition ${
-                canAccept ? 'cursor-pointer hover:bg-[#45a085]' : 'cursor-not-allowed opacity-60'
-              }`}
-              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-            >
-              {submitting ? 'กำลังสมัครสมาชิก...' : 'ยินยอมและสมัครสมาชิก'}
-            </button>
+            {isLast ? (
+              <button
+                type="button"
+                onClick={onAccept}
+                disabled={!canAccept}
+                className={`h-12 flex-1 rounded-lg bg-[#52B69A] text-base font-bold text-white transition ${
+                  canAccept ? 'cursor-pointer hover:bg-[#45a085]' : 'cursor-not-allowed opacity-60'
+                }`}
+                style={FONT}
+              >
+                {submitting ? 'กำลังสมัครสมาชิก...' : 'ยินยอมและสมัครสมาชิก'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={!canNext || submitting}
+                className={`h-12 flex-1 rounded-lg bg-[#52B69A] text-base font-bold text-white transition ${
+                  canNext && !submitting ? 'cursor-pointer hover:bg-[#45a085]' : 'cursor-not-allowed opacity-60'
+                }`}
+                style={FONT}
+              >
+                ถัดไป
+              </button>
+            )}
           </div>
-        </div>
+        </footer>
       </div>
+    </div>
+  );
+}
+
+/** ขั้นเอกสาร: อ่านฉบับเต็มในกล่องเลื่อน → ถึงท้ายแล้ว checkbox ยอมรับจึงกดได้ */
+function DocStep({
+  step,
+  checked,
+  onToggle,
+  read,
+  onRead,
+  disabled,
+}: {
+  step: Extract<Step, { kind: 'doc' }>;
+  checked: boolean;
+  onToggle: (next: boolean) => void;
+  read: boolean;
+  onRead: (key: DocKey) => void;
+  disabled: boolean;
+}) {
+  const { doc, item, text } = step;
+  const { lang, setLang, available, shown } = useNoticeLanguage(text);
+  const uiLang = shown ?? lang;
+
+  // ★ ตัวตรวจเดียวกับกล่องอื่น: เผื่อ 8px · เนื้อหาสั้นกว่ากล่อง = อ่านจบ
+  //   BE หาไฟล์ไม่เจอ → เหลือข้อความขอสำเนาทางอีเมลสั้น ๆ → นับว่าอ่านจบ
+  //   (ตั้งใจ: ไฟล์หายเป็นปัญหา deploy ถ้าล็อกไว้จะไม่มีใครสมัครได้เลย)
+  const [reachedEnd, attachScroller] = useScrolledToEnd();
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const attachBody = useCallback(
+    (el: HTMLDivElement | null) => {
+      bodyRef.current = el;
+      attachScroller(el);
+    },
+    [attachScroller],
+  );
+  useEffect(() => {
+    if (reachedEnd) onRead(doc.key);
+  }, [reachedEnd, onRead, doc.key]);
+
+  const isRead = read || reachedEnd;
+  const canTick = !disabled && isRead;
+
+  const changeLang = (next: NoticeLang) => {
+    setLang(next);
+    bodyRef.current?.scrollTo({ top: 0 });
+  };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col px-6 pb-4">
+      {available.length > 1 && (
+        <div className="mb-2.5 flex justify-end">
+          <NoticeLanguageToggle available={available} shown={shown} onChange={changeLang} />
+        </div>
+      )}
+
+      <div
+        ref={attachBody}
+        tabIndex={0}
+        aria-label={doc.title[uiLang]}
+        className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-[#E0E2E5] bg-[#FAFBFB] px-4 py-4 outline-none focus-visible:ring-2 focus-visible:ring-[#52B69A] sm:px-5"
+      >
+        <NoticeContent notice={text} shown={shown} lang={lang} size="sm" unavailable={doc.unavailable} />
+      </div>
+
+      <p
+        role="status"
+        className={`mt-2.5 flex items-center gap-1.5 text-[13px] font-semibold ${
+          isRead ? 'text-[#2F8F74]' : 'text-[#B8860B]'
+        }`}
+      >
+        <span className="material-icons" style={{ fontSize: 16 }} aria-hidden="true">
+          {isRead ? 'check_circle' : 'expand_more'}
+        </span>
+        {isRead ? 'อ่านจบแล้ว' : 'เลื่อนอ่านให้จบก่อนจึงจะกดยอมรับได้'}
+      </p>
+
+      <label
+        className={`mt-2.5 flex items-start gap-3 rounded-xl border px-4 py-3 ${
+          canTick
+            ? 'cursor-pointer border-[#E0E2E5] bg-white hover:bg-gray-50'
+            : 'cursor-not-allowed border-[#EDEEF0] bg-[#F6F7F8] opacity-60'
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={!canTick}
+          onChange={(e) => onToggle(e.target.checked)}
+          className="mt-0.5 h-5 w-5 shrink-0 accent-[#52B69A]"
+        />
+        <span lang={uiLang} className="text-sm font-bold leading-6 text-[#1A1A1A]">
+          {uiLang === 'en' ? item.labelEn : item.labelTh}
+          {item.required && <span className="ml-1 text-red-500">*</span>}
+        </span>
+      </label>
     </div>
   );
 }

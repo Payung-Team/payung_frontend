@@ -31,6 +31,8 @@ export const CONSENT_POLICY = gql`
       rightsNoteEn
       privacyNoticeTh
       privacyNoticeEn
+      termsOfServiceTh
+      termsOfServiceEn
     }
   }
 `;
@@ -63,6 +65,8 @@ export interface ConsentPolicyData {
     rightsNoteEn: string;
     privacyNoticeTh: string;
     privacyNoticeEn: string;
+    termsOfServiceTh: string;
+    termsOfServiceEn: string;
   };
 }
 
