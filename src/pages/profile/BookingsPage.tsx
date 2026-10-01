@@ -5,6 +5,7 @@ import { useBooking, type ConfirmedBooking, type BookingRequest, type SavedCareg
 import { GET_MY_BOOKING_HISTORY } from '../../graphql/queries';
 import { mapGqlStatus, ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
 import { formatBookingTimeRange } from '../../lib/bookingTime';
+import { formatDisplayPrice, NO_PRICE_LABEL } from '../../lib/displayPrice';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -437,10 +438,16 @@ function SavedCaregiversModal({ isOpen, onClose, caregivers, onRemove, onViewPro
                             {cg.fullName}
                           </p>
                           <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                            <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 800, color: '#52B69A' }}>
-                              ฿{cg.hourlyRate.toLocaleString()}
-                            </span>
-                            <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E' }}>/ชม.</span>
+                            {formatDisplayPrice(cg.hourlyRate) ? (
+                              <>
+                                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 800, color: '#52B69A' }}>
+                                  {formatDisplayPrice(cg.hourlyRate)}
+                                </span>
+                                <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E' }}>/ชม.</span>
+                              </>
+                            ) : (
+                              <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E' }}>{NO_PRICE_LABEL}</span>
+                            )}
                           </div>
                         </div>
 

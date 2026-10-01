@@ -9,7 +9,6 @@ export interface KycStep1Data {
   phone: string;
   skills: string[];
   experienceYears: number;
-  hourlyRate: number;
   bio: string;
 }
 

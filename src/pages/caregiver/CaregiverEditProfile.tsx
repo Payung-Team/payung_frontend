@@ -28,7 +28,6 @@ function formatPhone(val?: string | null): string {
 // Zod Schema สำหรับ validation
 const CaregiverProfileSchema = z.object({
   bio: z.string().max(500, 'แนะนำตัวต้องไม่เกิน 500 ตัวอักษร').optional().nullable(),
-  hourlyRate: z.number().positive('ค่าชั่วโมงต้องเป็นจำนวนบวก').optional().nullable(),
   skills: z.array(z.string()).optional().nullable(),
   experienceYears: z.number().min(0, 'ประสบการณ์ต้องเป็นจำนวนไม่ติดลบ').optional().nullable(),
   phone: z
@@ -57,7 +56,6 @@ interface CaregiverData {
   email?: string;
   address?: string;
   bio?: string;
-  hourlyRate?: number;
   skills?: string[];
   experienceYears?: number;
   kycStatus?: string;
@@ -142,7 +140,6 @@ const CaregiverEditProfile: React.FC = () => {
     mode: 'onChange',
     defaultValues: {
       bio: caregiver?.bio || '',
-      hourlyRate: caregiver?.hourlyRate || 0,
       skills: caregiver?.skills || [],
       experienceYears: caregiver?.experienceYears || 0,
       phone: formatPhone(caregiver?.phone),
@@ -161,7 +158,6 @@ const CaregiverEditProfile: React.FC = () => {
     if (!caregiver) return;
     reset({
       bio: caregiver.bio || '',
-      hourlyRate: caregiver.hourlyRate || 0,
       skills: caregiver.skills || [],
       experienceYears: caregiver.experienceYears || 0,
       phone: formatPhone(caregiver.phone),
@@ -177,7 +173,6 @@ const CaregiverEditProfile: React.FC = () => {
   useEffect(() => {
     const isFormDirty =
       watchedValues.bio !== (caregiver?.bio || '') ||
-      watchedValues.hourlyRate !== (caregiver?.hourlyRate || 0) ||
       watchedValues.experienceYears !== (caregiver?.experienceYears || 0) ||
       watchedValues.phone !== formatPhone(caregiver?.phone) ||
       watchedValues.address !== (caregiver?.address || '') ||
@@ -193,7 +188,7 @@ const CaregiverEditProfile: React.FC = () => {
       
       // bio is optional — send even if empty to allow clearing
       if (data.bio !== undefined && data.bio !== null) input.bio = data.bio;
-      if (data.hourlyRate && data.hourlyRate > 0) input.hourlyRate = data.hourlyRate;
+      // ไม่ส่ง hourlyRate แล้ว (PYG-536) — ผู้ดูแลตั้งราคาเองไม่ได้ ราคามาจาก catalog ฝั่ง BE
       if (data.experienceYears !== undefined && data.experienceYears !== null) input.experienceYears = data.experienceYears;
       if (data.phone) input.phone = data.phone.replace(/-/g, '');
       const addressParts = [data.address, data.district, data.amphoe, data.province, data.postalCode].filter(Boolean);
@@ -430,39 +425,20 @@ const CaregiverEditProfile: React.FC = () => {
               <h3 className="text-[14px] font-semibold text-[#0A0A0A] mb-6">ข้อมูลวิชาชีพ</h3>
 
               <div className="space-y-6">
-                {/* Experience Years + Hourly Rate row */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Experience Years */}
-                  <div>
-                    <label htmlFor="experienceYears" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ประสบการณ์ทำงาน (ปี)</label>
-                    <input
-                      id="experienceYears"
-                      type="number"
-                      {...register('experienceYears', { valueAsNumber: true })}
-                      placeholder="0"
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-white text-[#0A0A0A] focus:outline-none focus:ring-2 focus:ring-[#52B69A]"
-                    />
-                    {errors.experienceYears && (
-                      <p className="text-[12px] text-red-500 mt-1">{errors.experienceYears.message}</p>
-                    )}
-                  </div>
-
-                  {/* Hourly Rate */}
-                  <div>
-                    <label htmlFor="hourlyRate" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ค่าชั่วโมง (บาท)</label>
-                    <input
-                      id="hourlyRate"
-                      type="number"
-                      {...register('hourlyRate', { valueAsNumber: true })}
-                      placeholder="0"
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-white text-[#0A0A0A] focus:outline-none focus:ring-2 focus:ring-[#52B69A]"
-                    />
-                    {errors.hourlyRate && (
-                      <p className="text-[12px] text-red-500 mt-1">{errors.hourlyRate.message}</p>
-                    )}
-                  </div>
+                {/* Experience Years — ไม่มีช่องค่าชั่วโมงแล้ว (PYG-536) */}
+                <div>
+                  <label htmlFor="experienceYears" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">ประสบการณ์ทำงาน (ปี)</label>
+                  <input
+                    id="experienceYears"
+                    type="number"
+                    {...register('experienceYears', { valueAsNumber: true })}
+                    placeholder="0"
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-white text-[#0A0A0A] focus:outline-none focus:ring-2 focus:ring-[#52B69A]"
+                  />
+                  {errors.experienceYears && (
+                    <p className="text-[12px] text-red-500 mt-1">{errors.experienceYears.message}</p>
+                  )}
                 </div>
 
                 {/* Skills */}
@@ -602,15 +578,6 @@ const CaregiverEditProfile: React.FC = () => {
                   <div className="mb-6">
                     <h4 className="text-[18px] font-semibold text-[#52B69A] mb-2">เกี่ยวกับฉัน</h4>
                     <p className="text-[14px] text-[rgba(0,0,0,0.5)]">{watchedValues.bio || <span className="text-[#BDBDBD]">ยังไม่มีแนะนำตัว</span>}</p>
-                  </div>
-
-                  <div className="mb-6 p-3 bg-[#F3F3F5] rounded-lg">
-                    <p className="text-[14px] font-semibold text-[#0A0A0A]">
-                      ค่าชั่วโมง:{' '}
-                      {watchedValues.hourlyRate
-                        ? <span className="text-[#52B69A]">{new Intl.NumberFormat('th-TH').format(watchedValues.hourlyRate)} บาท</span>
-                        : <span className="text-[#BDBDBD]">ยังไม่ได้กำหนด</span>}
-                    </p>
                   </div>
 
                   <div>

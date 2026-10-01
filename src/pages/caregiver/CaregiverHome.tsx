@@ -88,10 +88,10 @@ function kycBadgeMeta(status: string) {
 function calcCompleteness(profile: CaregiverProfile): number {
   const checks: { weight: number; filled: boolean }[] = [
     { weight: 15, filled: !!profile.fullName },
-    { weight: 10, filled: !!profile.bio },
-    { weight: 10, filled: !!profile.phone },
-    { weight: 10, filled: !!profile.address },
-    { weight: 15, filled: !!profile.hourlyRate },
+    // ไม่นับ hourlyRate แล้ว (PYG-536) — ผู้ดูแลตั้งราคาเองไม่ได้ น้ำหนัก 15 เดิมกระจายให้ bio/phone/address
+    { weight: 15, filled: !!profile.bio },
+    { weight: 15, filled: !!profile.phone },
+    { weight: 15, filled: !!profile.address },
     { weight: 15, filled: (profile.skills?.length ?? 0) > 0 },
     { weight: 15, filled: !!profile.experienceYears },
     { weight: 5,  filled: !!profile.gender },

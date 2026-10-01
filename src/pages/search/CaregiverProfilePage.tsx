@@ -20,6 +20,7 @@ import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
 import { supabase } from '../../lib/supabase';
 import { buildBookingPayload } from '../../lib/buildBookingPayload';
+import { formatDisplayPrice, hasDisplayPrice, NO_PRICE_LABEL } from '../../lib/displayPrice';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -287,6 +288,8 @@ const CaregiverProfilePage: React.FC = () => {
   // (state อยู่ใน history ของเบราว์เซอร์ กด back กลับมาอีกวัน signed URL ในนั้นหมดอายุไปแล้ว)
   // undefined = ยังโหลดไม่เสร็จ → ระหว่างนั้นใช้รูปจาก state ไปก่อน
   const [publicAvatarUrl, setPublicAvatarUrl] = useState<string | null | undefined>(undefined);
+  // ราคาจาก BE (/public → hourly_rate, ราคา catalog) — undefined = ยังโหลดไม่เสร็จ ใช้ค่าจาก location.state ไปก่อน
+  const [publicHourlyRate, setPublicHourlyRate] = useState<number | null | undefined>(undefined);
   const [publicReloadKey, setPublicReloadKey] = useState(0);
   const reloadPublicProfile = useCallback(() => setPublicReloadKey((k) => k + 1), []);
   const refreshPhoto = useSignedUrlRefresh(reloadPublicProfile);
@@ -296,8 +299,9 @@ const CaregiverProfilePage: React.FC = () => {
     const apiBase = import.meta.env.VITE_GRAPHQL_URL?.replace('/graphql', '') ?? '';
     fetch(`${apiBase}/api/v1/caregivers/${caregiverId}/public`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { availability?: { day: number; slots: string[] }[]; completed_booking_count?: number; avatar_url?: string | null } | null) => {
+      .then((data: { availability?: { day: number; slots: string[] }[]; completed_booking_count?: number; avatar_url?: string | null; hourly_rate?: number | null } | null) => {
         if (data?.availability) setAvail(buildAvailMatrix(data.availability));
+        if (data && data.hourly_rate !== undefined) setPublicHourlyRate(data.hourly_rate);
         if (data?.completed_booking_count !== undefined) setCompletedBookingCount(data.completed_booking_count);
         if (data && data.avatar_url !== undefined) setPublicAvatarUrl(data.avatar_url);
       })
@@ -315,7 +319,8 @@ const CaregiverProfilePage: React.FC = () => {
   const cg = location.state?.caregiver as CaregiverSummary | undefined;
 
   const fullName = cg?.fullName ?? '—';
-  const hourlyRate = cg?.hourlyRate ?? 0;
+  const hourlyRate = publicHourlyRate !== undefined ? publicHourlyRate : cg?.hourlyRate;
+  const priceText = formatDisplayPrice(hourlyRate);
   const avgRating = cg?.avgRating ?? 0;
   const reviewCount = cg?.reviewCount ?? 0;
   const skills = cg?.skills ?? [];
@@ -615,16 +620,22 @@ const CaregiverProfilePage: React.FC = () => {
             {/* Booking Card */}
             <div className="flex flex-col" style={{ background: '#FFFFFF', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 16, padding: 20 }}>
               {/* Price */}
-              <div className="flex items-end gap-1">
-                <span className="font-bold num" style={{ fontFamily: "'Inter', sans-serif", fontSize: 26, color: '#1A1A1A', lineHeight: '39px' }}>
-                  ฿{hourlyRate.toLocaleString()}
+              {priceText ? (
+                <div className="flex items-end gap-1">
+                  <span className="font-bold num" style={{ fontFamily: "'Inter', sans-serif", fontSize: 26, color: '#1A1A1A', lineHeight: '39px' }}>
+                    {priceText}
+                  </span>
+                  <span className="mb-[13px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E', lineHeight: '20px' }}>
+                    /ชม.
+                  </span>
+                </div>
+              ) : (
+                <span className="font-bold" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 18, color: '#8A8C8E', lineHeight: '39px' }}>
+                  {NO_PRICE_LABEL}
                 </span>
-                <span className="mb-[13px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E', lineHeight: '20px' }}>
-                  /ชม.
-                </span>
-              </div>
+              )}
               <p className="mb-3.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#8A8C8E', lineHeight: '18px' }}>
-                ราคาคงที่ ไม่มีค่าใช้จ่ายแอบแฝง
+                {priceText ? 'ราคาเริ่มต้นตามประเภทงาน ไม่มีค่าใช้จ่ายแอบแฝง' : 'ราคาจะแสดงเมื่อเลือกประเภทงานตอนจอง'}
               </p>
 
               {/* Book button */}
@@ -649,7 +660,7 @@ const CaregiverProfilePage: React.FC = () => {
                         id: cg.id,
                         fullName: cg.fullName,
                         avatarUrl: cg.avatarUrl,
-                        hourlyRate: cg.hourlyRate,
+                        hourlyRate: hasDisplayPrice(hourlyRate) ? hourlyRate : 0,
                         avgRating: cg.avgRating,
                         skills: cg.skills,
                         province: cg.province,
@@ -711,7 +722,7 @@ const CaregiverProfilePage: React.FC = () => {
         isOpen={showModal}
         onClose={() => { setShowModal(false); setBookingError(null); }}
         onConfirm={handleConfirmBooking}
-        caregiver={cg ? { ...cg, avatarUrl } : undefined}
+        caregiver={cg ? { ...cg, avatarUrl, hourlyRate: hasDisplayPrice(hourlyRate) ? hourlyRate : 0 } : undefined}
         bookingDraft={bookingDraft}
         isSubmitting={isSubmitting}
         errorMessage={bookingError ?? undefined}
