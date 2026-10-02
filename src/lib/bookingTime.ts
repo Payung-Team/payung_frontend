@@ -54,3 +54,81 @@ export function formatBookingTimeRange(
   const duration = withDuration ? formatDurationHours(durationHours) : '';
   return duration ? `${range} (${duration})` : range;
 }
+
+// ── กฎเวลาตอนจอง — PYG-525 ─────────────────────────────────────────────────────
+//
+// ★ ต้องตรงกับ BE (payung_backend/src/booking/booking-time.ts) ทุกค่า
+//   ฟอร์มซ่อนตัวเลือกที่ผิดกฎไว้ตั้งแต่ต้น ผู้ใช้จะได้ไม่ต้องเจอ error ตอนกดยืนยัน
+//   ถ้า BE เปลี่ยนกฎแต่ตรงนี้ไม่เปลี่ยน BE ยังปฏิเสธได้ถูก แค่ข้อความจะไปโผล่ตอนยืนยันแทน
+
+export const BOOKING_TIME_STEP_MINUTES = 30;
+export const BOOKING_MIN_DURATION_MINUTES = 60;
+export const BOOKING_MAX_DURATION_MINUTES = 12 * 60;
+/** BE อนุมาน timeSlot จากเวลาเริ่ม — นอก 06:00–21:30 ไม่มี slot รองรับ */
+export const BOOKING_EARLIEST_START_MINUTES = 6 * 60;
+export const BOOKING_LATEST_START_MINUTES = 21 * 60 + 30;
+/** BE รับชั่วโมง 00–23 ("24:00" ไม่ผ่าน) และไม่รับข้ามเที่ยงคืน → สิ้นสุดช้าสุด 23:30 */
+export const BOOKING_LATEST_END_MINUTES = 23 * 60 + 30;
+/** เลือกเวลาเริ่มแล้ว ตั้งเวลาสิ้นสุดให้ก่อนที่ +4 ชม. */
+export const BOOKING_DEFAULT_DURATION_MINUTES = 4 * 60;
+
+/** "HH:mm" (หรือ "HH:mm:ss") → นาทีนับจากเที่ยงคืน · รูปแบบผิดคืน null */
+export function timeToMinutes(time?: string | null): number | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(time ?? '');
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
+/** นาทีนับจากเที่ยงคืน → "HH:mm" */
+export function minutesToTime(minutes: number): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
+}
+
+/**
+ * เวลาเริ่มที่เลือกได้ ทีละ 30 นาที
+ * @param afterMinute ส่งเมื่อเป็น "วันนี้" — ซ่อนเวลาที่ไม่ได้อยู่หลังนาทีนี้ (เวลาที่ผ่านไปแล้ว)
+ */
+export function bookingStartOptions(afterMinute?: number): string[] {
+  const options: string[] = [];
+  for (
+    let m = BOOKING_EARLIEST_START_MINUTES;
+    m <= BOOKING_LATEST_START_MINUTES;
+    m += BOOKING_TIME_STEP_MINUTES
+  ) {
+    if (afterMinute === undefined || m > afterMinute) options.push(minutesToTime(m));
+  }
+  return options;
+}
+
+/** เวลาสิ้นสุดที่เลือกได้สำหรับเวลาเริ่มนี้ — ตัดตัวที่สั้น/ยาวเกิน และข้ามเที่ยงคืนออก */
+export function bookingEndOptions(startTime: string): string[] {
+  const start = timeToMinutes(startTime);
+  if (start === null) return [];
+  const last = Math.min(start + BOOKING_MAX_DURATION_MINUTES, BOOKING_LATEST_END_MINUTES);
+  const options: string[] = [];
+  for (
+    let m = start + BOOKING_MIN_DURATION_MINUTES;
+    m <= last;
+    m += BOOKING_TIME_STEP_MINUTES
+  ) {
+    options.push(minutesToTime(m));
+  }
+  return options;
+}
+
+/** เวลาสิ้นสุดตั้งต้น = เริ่ม + 4 ชม. (ตัดที่ 23:30 ถ้าเริ่มดึก) · เวลาเริ่มผิดรูปแบบคืน '' */
+export function defaultBookingEndTime(startTime: string): string {
+  const start = timeToMinutes(startTime);
+  if (start === null) return '';
+  return minutesToTime(
+    Math.min(start + BOOKING_DEFAULT_DURATION_MINUTES, BOOKING_LATEST_END_MINUTES),
+  );
+}
+
+/** จำนวนชั่วโมงระหว่างสองเวลา — คืน 0 ถ้าไม่ครบหรือสิ้นสุดไม่หลังเริ่ม */
+export function bookingDurationHours(startTime?: string | null, endTime?: string | null): number {
+  const start = timeToMinutes(startTime);
+  const end = timeToMinutes(endTime);
+  if (start === null || end === null || end <= start) return 0;
+  return (end - start) / 60;
+}

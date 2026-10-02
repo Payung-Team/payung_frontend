@@ -381,9 +381,9 @@ const CaregiverProfilePage: React.FC = () => {
                 tasks: payload.tasks,
                 serviceLocations: payload.serviceLocations,
                 serviceType: payload.serviceType,
-                timeSlot: payload.timeSlot,
+                // PYG-525: ส่งเวลาเริ่ม + สิ้นสุด — BE คำนวณ durationHours / timeSlot เอง
                 startTime: payload.startTime,
-                durationHours: payload.durationHours,
+                endTime: payload.endTime,
                 locationAddress: payload.locationAddress,
                 lat: payload.lat,
                 lng: payload.lng,

@@ -60,8 +60,7 @@ function mapGqlBooking(api: any): ConfirmedBooking {
   const draft: BookingRequest = {
     serviceTypes: api.serviceType ? [api.serviceType] : [],
     serviceLocation: serviceLocations,
-    // PYG-526: slot = '' — ไม่ query timeSlot แล้ว (ห้ามแสดงชื่อ slot) field นี้ใช้เฉพาะในฟอร์มจอง
-    dateTime: { date: api.bookingDate ?? '', slot: '', startTime, endTime, duration: durationHours },
+    dateTime: { date: api.bookingDate ?? '', startTime, endTime, duration: durationHours },
     locationDetails: { at_home: { address: api.locationAddress ?? '', lat: 0, lng: 0 } },
     jobDetails: { tasks, notes: api.notes ?? '' },
     estimatedCost: (() => {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
 import { formatBookingTimeRange } from '../../lib/bookingTime';
+import { estimateBookingCost } from '../../lib/bookingPrice';
 import BookingStepService from './steps/BookingStepService';
 import BookingStepDateTime from './steps/BookingStepDateTime';
 import BookingStepLocation from './steps/BookingStepLocation';
@@ -175,13 +176,15 @@ export default function BookingRequestPage() {
       : 'ข้อมูลถูกบันทึกอัตโนมัติทุกขั้น';
 
   // Sidebar summary values
-  // duration จะมีค่าก็ต่อเมื่อผู้ใช้เลือกจำนวนชั่วโมงเองในขั้นวันเวลา
+  // PYG-525: duration มีค่าเมื่อเลือกเวลาเริ่ม + เวลาสิ้นสุดครบในขั้นวันเวลา (คำนวณจากสองเวลานั้น)
   const selectedDuration = bookingDraft?.dateTime?.duration || 0;
   const duration = selectedDuration;
-  const averageHourlyRate = 250;
-  const rawCost = averageHourlyRate * duration;
-  const platformFee = Math.round(rawCost * 0.1);
-  const totalEstimated = rawCost + platformFee;
+  const {
+    hourlyRate: averageHourlyRate,
+    serviceCost: rawCost,
+    platformFee,
+    total: totalEstimated,
+  } = estimateBookingCost(duration);
 
   const locs = bookingDraft?.serviceLocation || [];
   const locName =
@@ -392,7 +395,7 @@ export default function BookingRequestPage() {
                       <span>{platformFee.toLocaleString()} ฿</span>
                     </div>
                     <div className="flex justify-between font-bold text-base pt-1">
-                      <span>ประมาณการรวม</span>
+                      <span>ราคาค่าบริการ</span>
                       <span>{totalEstimated.toLocaleString()} ฿</span>
                     </div>
                   </>
@@ -406,8 +409,8 @@ export default function BookingRequestPage() {
                 )}
                 <p className="text-xs text-[#8A8C8E] leading-relaxed pt-1">
                   {selectedDuration
-                    ? 'ยังไม่ตัดเงิน — ชำระหลังผู้ดูแลรับงาน'
-                    : 'เลือกจำนวนชั่วโมงเพื่อดูประมาณการรวม'}
+                    ? 'ชำระหลังผู้ดูแลรับงาน'
+                    : 'เลือกเวลาเริ่มและเวลาสิ้นสุดเพื่อดูประมาณการรวม'}
                 </p>
               </div>
             </div>

@@ -21,9 +21,13 @@ export interface BookingPayload {
   tasks: string[];
   serviceLocations: string[];
   serviceType: string;
-  timeSlot: string;
+  /** "HH:mm" */
   startTime: string;
-  durationHours: number;
+  /**
+   * PYG-525 — "HH:mm" · BE คำนวณ durationHours + timeSlot เองจากสองเวลานี้
+   * (เลิกส่ง timeSlot / durationHours แล้ว — BE รับไว้แค่ช่วงเปลี่ยนผ่านของ FE เก่า)
+   */
+  endTime: string;
   locationAddress: string;
   lat?: number;
   lng?: number;
@@ -76,9 +80,10 @@ export function buildBookingPayload(
     tasks: tasksList.length > 0 ? tasksList : ['ดูแลทั่วไป'],
     serviceLocations: serviceLocs.length > 0 ? serviceLocs : ['at_home'],
     serviceType: SERVICE_TYPE_MAP[draft.serviceTypes?.[0] ?? ''] ?? 'general_care',
-    timeSlot: draft.dateTime?.slot ?? 'morning',
-    startTime: draft.dateTime?.startTime ? `${draft.dateTime.startTime}:00` : '09:00:00',
-    durationHours: draft.dateTime?.duration ?? 4,
+    // ★ ไม่เติมค่าเริ่มต้นเอง (เดิม '09:00:00' / 4 ชม.) — ขั้นวันเวลาบังคับเลือกครบก่อนไปต่อแล้ว
+    //   ถ้ายังว่างอยู่ให้ BE ปฏิเสธพร้อมข้อความ ดีกว่าจองเวลาที่ผู้ใช้ไม่ได้เลือกไปเงียบ ๆ
+    startTime: draft.dateTime?.startTime ?? '',
+    endTime: draft.dateTime?.endTime ?? '',
     locationAddress: addrParts.length > 0 ? addrParts.join(' / ') : '-',
     lat: pinLat,
     lng: pinLng,

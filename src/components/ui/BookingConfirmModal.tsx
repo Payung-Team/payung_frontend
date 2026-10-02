@@ -3,6 +3,7 @@ import type { BookingRequest } from '../../context/BookingContext';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import CaregiverPhoto from './CaregiverPhoto';
 import { formatBookingTimeRange } from '../../lib/bookingTime';
+import { isBookingTimeErrorMessage } from '../../lib/bookingSubmitError';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -120,6 +121,10 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
   const duration = dateTime?.duration ?? 0;
   const startTime = dateTime?.startTime ?? '';
   const endTime = dateTime?.endTime ?? '';
+  // PYG-525: error เรื่องเวลา (ผู้ดูแลไม่ว่างช่วงนี้ / นัดชน / เวลาผิดกฎ) แสดงใต้แถวเวลา
+  //   ส่วน error อื่นยังอยู่ในกล่องรวมด้านล่างเหมือนเดิม
+  const timeError = isBookingTimeErrorMessage(errorMessage) ? errorMessage : undefined;
+  const generalError = timeError ? undefined : errorMessage;
   const locationDetails = bookingDraft?.locationDetails;
   const atHome = locationDetails?.at_home;
   const accompany = locationDetails?.accompany_outside;
@@ -302,6 +307,19 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
                     value={formatBookingTimeRange({ startTime, endTime, durationHours: duration })}
                   />
                 )}
+                {timeError && (
+                  <div
+                    role="alert"
+                    className="flex items-start gap-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+                  >
+                    <span className="material-icons text-red-500 shrink-0" style={{ fontSize: 16, marginTop: 1 }}>
+                      schedule
+                    </span>
+                    <p className="text-xs font-semibold text-red-600 leading-relaxed" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                      {timeError}
+                    </p>
+                  </div>
+                )}
                 {locationText !== '—' && <Row label="สถานที่" value={locationText} />}
                 {recipientName !== '—' && <Row label="ผู้รับบริการ" value={recipientName} />}
 
@@ -382,11 +400,11 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
             </div>
 
             {/* Conflict / Error Message */}
-            {errorMessage && (
+            {generalError && (
               <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
                 <span className="material-icons text-red-500 text-base mt-0.5 shrink-0">error_outline</span>
                 <p className="text-xs font-semibold text-red-600 leading-relaxed" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                  {errorMessage}
+                  {generalError}
                 </p>
               </div>
             )}

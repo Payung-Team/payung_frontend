@@ -47,8 +47,32 @@ export function isOnboardingRequiredError(body: unknown): boolean {
  */
 const CONSENT_WITHDRAWN_CODE = CONSENT_ERROR.WITHDRAWN;
 
+/**
+ * PYG-525 — ข้อความจาก BE ที่เป็นเรื่อง "เวลาที่เลือก" → modal ยืนยันแสดงใต้แถวเวลา
+ * แทนกล่อง error รวมด้านล่าง ผู้ใช้จะรู้ทันทีว่าต้องแก้ที่เวลา
+ *
+ * ★ เทียบด้วยท่อนข้อความเพราะ BE ยังไม่ส่ง code แยกให้ — ข้อความต้นทาง:
+ *   booking/booking-time.ts       รูปแบบเวลา / ลง :00 :30 / สิ้นสุดก่อนเริ่ม / ขั้นต่ำ-สูงสุด / ช่วงเวลาเริ่ม
+ *   booking/booking.service.ts    ผู้ดูแลไม่เปิดรับช่วงนี้ (PYG-524) / นัดชนกัน (PYG-424)
+ *   ถ้า BE เปลี่ยนข้อความแล้วไม่ตรง ข้อความยังแสดงครบ แค่ย้ายไปอยู่ในกล่องรวม
+ */
+const TIME_ERROR_FRAGMENTS = [
+  'เวลาเริ่ม',
+  'เวลาสิ้นสุด',
+  'ต้องจองอย่างน้อย',
+  'จองได้สูงสุด',
+  'ไม่ได้เปิดรับงานในช่วงเวลานี้',
+  'ในช่วงเวลาเดียวกัน',
+];
+
+export function isBookingTimeErrorMessage(message?: string | null): boolean {
+  return !!message && TIME_ERROR_FRAGMENTS.some((f) => message.includes(f));
+}
+
 export function bookingHttpErrorMessage(status: number, body: unknown): string {
   const msg = serverMessage(body);
+  // PYG-525: ข้อความเรื่องเวลาจาก BE อ่านเข้าใจอยู่แล้ว — ไม่เติมคำนำ "ข้อมูลการจองไม่ถูกต้อง:"
+  if (isBookingTimeErrorMessage(msg)) return msg as string;
   // ★ ตรวจก่อน status เพราะข้อความทั่วไปของ 4xx ไม่ได้บอกว่าต้องไปกรอก Onboarding
   if (isOnboardingRequiredError(body)) {
     return msg ?? 'กรุณากรอกข้อมูลผู้รับบริการให้ครบก่อนจองผู้ดูแล';
@@ -88,5 +112,9 @@ export function onBehalfBookingErrorMessage(err: unknown): string {
       'ผู้รับบริการคนนี้ยังไม่ได้ให้ความยินยอมที่จำเป็นสำหรับการจองแทน จึงจองแทนไม่ได้ในตอนนี้'
     );
   }
+  // PYG-525: เวลาผิดกฎ / ผู้ดูแลไม่ว่าง / นัดชน — ใช้ข้อความจาก BE ตรง ๆ ผู้ใช้จะรู้ว่าต้องเปลี่ยนเวลา
+  //   (เดิมทุกกรณีตกไปที่ "จองแทนไม่สำเร็จ" ซึ่งไม่บอกว่าต้องแก้อะไร)
+  const message = extractGraphQLErrorMessage(err);
+  if (isBookingTimeErrorMessage(message)) return message as string;
   return 'จองแทนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
 }

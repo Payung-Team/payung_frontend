@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { useBooking } from '../../../context/BookingContext';
 import { formatBookingTimeRange, formatDurationHours } from '../../../lib/bookingTime';
-
-const PLATFORM_FEE_PERCENT = 10;
+import {
+  ESTIMATED_PLATFORM_FEE_PERCENT as PLATFORM_FEE_PERCENT,
+  estimateBookingCost,
+} from '../../../lib/bookingPrice';
 
 interface Props {
   onStartSearch: () => void;
@@ -112,7 +114,8 @@ export default function BookingStepReview({ onStartSearch }: Props) {
       { withDuration: false },
     ) || '-';
 
-  const durationVal = bookingDraft?.dateTime?.duration || 4;
+  // PYG-525: เลิก fallback เป็น 4 ชม. — ขั้นวันเวลาบังคับเลือกเวลาสิ้นสุดแล้ว ถ้ายังว่างให้เห็นเป็น "-"
+  const durationVal = bookingDraft?.dateTime?.duration || 0;
   const displayDuration = formatDurationHours(durationVal) || '-';
 
   const patient = bookingDraft?.recipient?.patientDetails;
@@ -126,11 +129,13 @@ export default function BookingStepReview({ onStartSearch }: Props) {
     (bookingDraft?.jobDetails?.tasks?.length || 0) +
     (bookingDraft?.jobDetails?.customTasks?.length || 0);
 
-  const caregiverRate = 250;
-  const hours = durationVal;
-  const caregiverCost = caregiverRate * hours;
-  const platformFee = Math.round(caregiverCost * (PLATFORM_FEE_PERCENT / 100));
-  const totalCost = caregiverCost + platformFee;
+  const {
+    hourlyRate: caregiverRate,
+    hours,
+    serviceCost: caregiverCost,
+    platformFee,
+    total: totalCost,
+  } = estimateBookingCost(durationVal);
 
   return (
     <div className="space-y-4">
