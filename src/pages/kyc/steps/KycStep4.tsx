@@ -107,7 +107,7 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
         phone: step1Data.phone,
         skills: step1Data.skills,
         experienceYears: Number(step1Data.experienceYears),
-        hourlyRate: Number(step1Data.hourlyRate),
+        // ไม่ส่ง hourlyRate แล้ว (PYG-536) — ผู้ดูแลตั้งราคาเองไม่ได้ ราคามาจาก catalog ฝั่ง BE
         bio: step1Data.bio,
         documentIds: uploadedDocs.map((doc) => doc.docId),
       };
@@ -211,7 +211,6 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
             <InfoRow label="เบอร์โทรศัพท์" value={step1Data?.phone || '-'} />
             <InfoRow label="อีเมล" value={user?.email || '-'} />
             <InfoRow label="ประสบการณ์" value={`${step1Data?.experienceYears || 0} ปี`} />
-            <InfoRow label="ค่าบริการเริ่มต้น" value={`${step1Data?.hourlyRate || 0} บาท/ชม.`} />
             <div className="py-2.5 border-b border-[#F1F5F9]">
               <p className="text-[13px] font-medium text-[#64748B] mb-2" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
                 ทักษะการดูแล

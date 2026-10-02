@@ -5,6 +5,7 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import { useBooking } from '../../context/BookingContext';
 import { supabase } from '../../lib/supabase';
 import { buildBookingPayload } from '../../lib/buildBookingPayload';
+import { formatDisplayPrice, NO_PRICE_LABEL } from '../../lib/displayPrice';
 import { SEARCH_CAREGIVERS } from '../../graphql/queries';
 import { CREATE_BOOKING_ON_BEHALF } from '../../graphql/familyGroup';
 import Pagination from '../../components/ui/Pagination';
@@ -254,10 +255,14 @@ function CaregiverCard({ cg, onSelect, onViewProfile, onPhotoExpired }: { cg: Ca
         <div className="flex-shrink-0 self-stretch sm:self-center w-full sm:w-[120px]
                         flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-3 sm:gap-2 sm:text-center
                         pt-3 sm:pt-0 border-t border-[#F0F1F3] sm:border-t-0">
-          <div className="num text-[24px] font-bold text-[#1A1A1A] leading-none mb-1">
-            ฿{cg.hourlyRate.toLocaleString()}
-            <span className="text-[13px] text-[#8A8C8E] font-medium">/ชม.</span>
-          </div>
+          {formatDisplayPrice(cg.hourlyRate) ? (
+            <div className="num text-[24px] font-bold text-[#1A1A1A] leading-none mb-1">
+              {formatDisplayPrice(cg.hourlyRate)}
+              <span className="text-[13px] text-[#8A8C8E] font-medium">/ชม.</span>
+            </div>
+          ) : (
+            <div className="text-[13px] text-[#8A8C8E] font-medium leading-none mb-1">{NO_PRICE_LABEL}</div>
+          )}
           <div className="flex flex-row sm:flex-col gap-2 w-full">
             <button
               type="button"

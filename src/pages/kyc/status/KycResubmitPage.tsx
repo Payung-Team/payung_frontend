@@ -46,7 +46,6 @@ export default function KycResubmitPage() {
             phone: caregiver.phone || '',
             skills: caregiver.skills || [],
             experienceYears: caregiver.experienceYears || 0,
-            hourlyRate: caregiver.hourlyRate || 0,
             bio: caregiver.bio || '',
           },
           docs: (kyc.documents || []).map((d: any) => ({

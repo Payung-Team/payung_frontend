@@ -70,7 +70,6 @@ export const JobReceptionTab: React.FC = () => {
       id: string;
       kycStatus: string;
       isSearchable: boolean;
-      hourlyRate: number;
       languages: string[];
     };
   }>(GET_CAREGIVER_PROFILE);
@@ -150,8 +149,6 @@ export const JobReceptionTab: React.FC = () => {
 
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(['thai']);
 
-  const [hourlyRate, setHourlyRate] = useState<number>(0);
-
   // Saved snapshot copy for clear/reset operations and change tracking
   const [savedSnapshot, setSavedSnapshot] = useState<{
     weeklyAvailability: WeeklyAvailability;
@@ -160,7 +157,6 @@ export const JobReceptionTab: React.FC = () => {
     province: string;
     selectedDistricts: string[];
     selectedLanguages: string[];
-    hourlyRate: number;
   } | null>(null);
 
   // Initialize Snapshot & local states from GraphQL Data
@@ -168,9 +164,6 @@ export const JobReceptionTab: React.FC = () => {
     if (caregiverData?.myCaregiverProfile && workConditionData?.myWorkCondition) {
       const caregiverProfile = caregiverData.myCaregiverProfile;
       const workCond = workConditionData.myWorkCondition;
-
-      const rate = caregiverProfile.hourlyRate || 0;
-      setHourlyRate(rate);
 
       const initialAvailability: WeeklyAvailability = {
         0: { morning: false, afternoon: false, evening: false },
@@ -225,8 +218,7 @@ export const JobReceptionTab: React.FC = () => {
         selectedServiceTypes: serviceTypes,
         province: prov,
         selectedDistricts: dists,
-        selectedLanguages: langs,
-        hourlyRate: rate
+        selectedLanguages: langs
       });
     }
   }, [caregiverData, workConditionData]);
@@ -240,8 +232,7 @@ export const JobReceptionTab: React.FC = () => {
       JSON.stringify([...selectedServiceTypes].sort()) !== JSON.stringify([...savedSnapshot.selectedServiceTypes].sort()) ||
       province !== savedSnapshot.province ||
       JSON.stringify([...selectedDistricts].sort()) !== JSON.stringify([...savedSnapshot.selectedDistricts].sort()) ||
-      JSON.stringify([...selectedLanguages].sort()) !== JSON.stringify([...savedSnapshot.selectedLanguages].sort()) ||
-      hourlyRate !== savedSnapshot.hourlyRate
+      JSON.stringify([...selectedLanguages].sort()) !== JSON.stringify([...savedSnapshot.selectedLanguages].sort())
     );
   }, [
     weeklyAvailability,
@@ -250,7 +241,6 @@ export const JobReceptionTab: React.FC = () => {
     province,
     selectedDistricts,
     selectedLanguages,
-    hourlyRate,
     savedSnapshot
   ]);
 
@@ -420,10 +410,6 @@ export const JobReceptionTab: React.FC = () => {
     );
   };
 
-  // Hourly Rate calculations
-  const platformFee = Math.round(hourlyRate * 0.1);
-  const netEarnings = Math.max(0, hourlyRate - platformFee);
-
   // Form Save & Reset Handlers
   const handleSave = async () => {
     setIsSaving(true);
@@ -468,8 +454,8 @@ export const JobReceptionTab: React.FC = () => {
       await Promise.all([
         updateCaregiverProfile({
           variables: {
+            // ไม่ส่ง hourlyRate แล้ว (PYG-536) — ผู้ดูแลตั้งราคาเองไม่ได้ ราคามาจาก catalog ฝั่ง BE
             input: {
-              hourlyRate: parseFloat(hourlyRate.toString()),
               languages: selectedLanguages
             }
           },
@@ -494,8 +480,7 @@ export const JobReceptionTab: React.FC = () => {
         selectedServiceTypes,
         province,
         selectedDistricts,
-        selectedLanguages,
-        hourlyRate
+        selectedLanguages
       };
       setSavedSnapshot(snapshot);
       setIsSaving(false);
@@ -521,7 +506,6 @@ export const JobReceptionTab: React.FC = () => {
     setProvince(savedSnapshot.province);
     setSelectedDistricts(savedSnapshot.selectedDistricts);
     setSelectedLanguages(savedSnapshot.selectedLanguages);
-    setHourlyRate(savedSnapshot.hourlyRate);
     showSuccess('ล้างการเปลี่ยนแปลงการตั้งค่าแล้ว');
   };
 
@@ -1139,68 +1123,6 @@ export const JobReceptionTab: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-
-        {/* CARD 5: อัตราค่าจ้าง */}
-        <div className="bg-white border border-[#E0E2E5] rounded-[20px] p-6 shadow-[0px_1px_4px_rgba(0,0,0,0.03)] flex flex-col gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 bg-[#EEF9F5] rounded-xl flex items-center justify-center text-[#3A9A7E] flex-shrink-0">
-              <Icon name="payments" size="medium" color="currentColor" />
-            </div>
-            <div>
-              <h3 className="text-[15px] font-bold text-[#1A1A1A]">อัตราค่าจ้าง</h3>
-              <p className="text-[12px] text-[#8A8C8E] mt-0.5">ระบุอัตราค่าจ้างและประมาณการรายได้สุทธิที่จะได้รับหลังหักค่าธรรมเนียม</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-5 mt-2">
-
-            {/* Input field */}
-            <div className="md:col-span-5 flex flex-col justify-center">
-              <label htmlFor="hourly-rate-input" className="text-[13px] font-bold text-[#1A1A1A] mb-1.5">
-                อัตราค่าบริการต่อชั่วโมง (บาท)
-              </label>
-              <div className="relative flex items-center">
-                <input
-                  id="hourly-rate-input"
-                  type="number"
-                  value={hourlyRate}
-                  onChange={(e) => setHourlyRate(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="w-full bg-white border border-[#E0E2E5] rounded-xl px-3.5 py-3 pr-20 text-[14px] font-bold text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#3A9A7E]"
-                />
-                <span className="absolute right-3.5 text-[11px] font-bold text-[#8A8C8E] pointer-events-none">
-                  บาท/ชม.
-                </span>
-              </div>
-            </div>
-
-            {/* Calculations Breakdown */}
-            <div className="md:col-span-7 bg-[#F9FAFB] border border-[#E0E2E5] rounded-xl p-4 flex flex-col gap-2.5">
-              <p className="text-[11px] font-bold text-[#8A8C8E] uppercase tracking-wider">
-                รายละเอียดประมาณการรายได้
-              </p>
-
-              <div className="flex justify-between items-center text-[13px]">
-                <span className="text-[#575859]">ค่าบริการที่เรียกเก็บจากคนไข้</span>
-                <span className="font-semibold text-[#1A1A1A]">฿{hourlyRate} / ชม.</span>
-              </div>
-
-              <div className="flex justify-between items-center text-[13px]">
-                <span className="text-[#575859]">ค่าธรรมเนียมแพลตฟอร์ม (10%)</span>
-                <span className="font-semibold text-red-500">- ฿{platformFee} / ชม.</span>
-              </div>
-
-              <div className="h-px bg-gray-200 my-1" />
-
-              <div className="flex justify-between items-center">
-                <span className="text-[13px] font-bold text-[#1A1A1A]">รายได้สุทธิที่คุณได้รับ</span>
-                <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-[#ECFDF5] text-[#047857] text-[14px] font-bold">
-                  ฿{netEarnings} / ชม.
-                </span>
-              </div>
-            </div>
-
           </div>
         </div>
 

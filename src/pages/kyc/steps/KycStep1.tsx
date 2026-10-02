@@ -58,9 +58,6 @@ const step1Schema = z.object({
     .int('จำนวนปีต้องเป็นจำนวนเต็ม')
     .min(0, 'จำนวนปีต้องไม่น้อยกว่า 0')
     .max(50, 'จำนวนปีต้องไม่เกิน 50 ปี'),
-  hourlyRate: z.coerce
-    .number()
-    .min(1, 'กรุณาเลือกค่าบริการต่อชั่วโมง'),
   bio: z.string().max(500, 'แนะนำตัวต้องไม่เกิน 500 ตัวอักษร').optional(),
 });
 
@@ -82,15 +79,6 @@ const GENDER_OPTIONS = [
   { label: 'ชาย', value: 'male' },
   { label: 'หญิง', value: 'female' },
   { label: 'อื่นๆ', value: 'other' },
-];
-
-const HOURLY_RATE_OPTIONS = [
-  { label: 'น้อยกว่า 100 บาท/ชม.', value: 80 },
-  { label: '100 – 150 บาท/ชม.', value: 125 },
-  { label: '151 – 200 บาท/ชม.', value: 175 },
-  { label: '201 – 250 บาท/ชม.', value: 225 },
-  { label: '251 – 300 บาท/ชม.', value: 275 },
-  { label: 'มากกว่า 300 บาท/ชม.', value: 350 },
 ];
 
 // ── Main Component ────────────────────────────────────────────────────────
@@ -131,7 +119,6 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
         phone: '',
         skills: [],
         experienceYears: '' as unknown as number,
-        hourlyRate: '' as unknown as number,
         bio: '',
       },
   });
@@ -283,23 +270,23 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
             </div>
           </div>
 
-          {/* เบอร์โทร — ตัวเลขและขีด */}
-          <Input
-            label="เบอร์โทรศัพท์"
-            placeholder={mode === 'resubmit' ? initialStep1Data?.phone : "+66 81-234-5678"}
-            inputMode="tel"
-            maxLength={12}
-            error={errors.phone?.message}
-            {...getFieldProps('phone')}
-            {...phoneReg}
-            onChange={(e) => {
-              e.target.value = e.target.value.replace(/[^0-9-]/g, '').slice(0, 12);
-              phoneReg.onChange(e);
-            }}
-          />
-
-          {/* ประสบการณ์ + ค่าบริการ */}
+          {/* เบอร์โทร + ประสบการณ์ — ไม่มีช่องค่าบริการแล้ว (PYG-536) ราคามาจากระบบ */}
           <div className="grid grid-cols-2 gap-4">
+            {/* เบอร์โทร — ตัวเลขและขีด */}
+            <Input
+              label="เบอร์โทรศัพท์"
+              placeholder={mode === 'resubmit' ? initialStep1Data?.phone : "+66 81-234-5678"}
+              inputMode="tel"
+              maxLength={12}
+              error={errors.phone?.message}
+              {...getFieldProps('phone')}
+              {...phoneReg}
+              onChange={(e) => {
+                e.target.value = e.target.value.replace(/[^0-9-]/g, '').slice(0, 12);
+                phoneReg.onChange(e);
+              }}
+            />
+
             {/* ประสบการณ์ — ตัวเลขเท่านั้น ไม่มี spinner */}
             <Input
               label="ประสบการณ์ (ปี)"
@@ -314,37 +301,6 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
                 expReg.onChange(e);
               }}
             />
-
-            {/* ค่าบริการ — dropdown range */}
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>ค่าบริการต่อชั่วโมง</label>
-              <div className="relative flex items-center">
-                <select
-                  {...register('hourlyRate')}
-                  className={`w-full px-3 py-2 border rounded-lg outline-none transition-colors text-sm appearance-none pr-10 ${
-                    mode === 'resubmit'
-                      ? checkEdited('hourlyRate')
-                        ? 'bg-white border-[#10B981] text-gray-900 focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]'
-                        : 'bg-gray-200 border-transparent text-[#9CA3AF] focus:border-[#2D6A58]'
-                      : errors.hourlyRate
-                        ? 'border-red-500'
-                        : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58]'
-                  }`}
-                  style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-                >
-                  <option value="" disabled>เลือกช่วงราคา</option>
-                  {HOURLY_RATE_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                <div className="absolute right-3 flex items-center gap-1.5 pointer-events-none">
-                  <Icon name="expand_more" color="#717182" style={{ fontSize: '20px' }} />
-                </div>
-              </div>
-              {errors.hourlyRate && (
-                <span className="text-sm text-red-500" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>{errors.hourlyRate.message}</span>
-              )}
-            </div>
           </div>
 
           {/* ทักษะ */}
