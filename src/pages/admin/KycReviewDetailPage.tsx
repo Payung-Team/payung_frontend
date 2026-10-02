@@ -124,6 +124,39 @@ const docTypeLabel: Record<string, string> = {
   license: 'ใบอนุญาต',
 };
 
+const skillLabel: Record<string, string> = {
+  mobility: 'ช่วยเคลื่อนไหว',
+  medication: 'ดูแลยา',
+  bathing: 'อาบน้ำ / สุขอนามัย',
+  cooking: 'ทำอาหาร',
+  companionship: 'เป็นเพื่อนคุย',
+  wound_care: 'ดูแลแผล',
+  physical_therapy: 'กายภาพบำบัด',
+  dementia_care: 'ดูแลสมองเสื่อม',
+};
+
+const genderLabel: Record<string, string> = {
+  male: 'ชาย',
+  female: 'หญิง',
+  other: 'อื่นๆ',
+};
+
+/** 1509966392215 → 1-5099-66392-21-5 (รูปแบบเดียวกับบนบัตร ช่วยให้เทียบกับเอกสารง่าย) */
+function formatIdCard(value?: string | null) {
+  if (!value) return '-';
+  const digits = value.replace(/\D/g, '');
+  if (digits.length !== 13) return value;
+  return `${digits[0]}-${digits.slice(1, 5)}-${digits.slice(5, 10)}-${digits.slice(10, 12)}-${digits[12]}`;
+}
+
+function formatPhone(value?: string | null) {
+  if (!value) return '-';
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  if (digits.length === 9) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
+  return value;
+}
+
 function formatThaiDate(value?: string | null, options?: Intl.DateTimeFormatOptions) {
   if (!value) return '-';
   const date = new Date(value);
@@ -589,21 +622,8 @@ export default function KycReviewDetailPage() {
     };
   }, [caregiver?.fullName]);
 
-  const personalFields = useMemo(
-    () => [
-      { label: 'ชื่อ', value: nameParts.firstName },
-      { label: 'นามสกุล', value: nameParts.lastName },
-      { label: 'เลขบัตรประชาชน', value: caregiver?.idCardNumber },
-      { label: 'เพศ', value: caregiver?.gender || '-' },
-      { label: 'วันเกิด', value: formatThaiDate(caregiver?.dateOfBirth) },
-      { label: 'อายุ', value: getAge(caregiver?.dateOfBirth) },
-      { label: 'อีเมล', value: caregiver?.email },
-      { label: 'เบอร์โทรศัพท์', value: caregiver?.phone },
-      { label: 'ประสบการณ์', value: `${caregiver?.experienceYears ?? 0} ปี` },
-      { label: 'ค่าบริการต่อชั่วโมง', value: `${caregiver?.hourlyRate ?? 0} บาท` },
-    ],
-    [nameParts, caregiver],
-  );
+  const genderText = caregiver?.gender ? genderLabel[caregiver.gender] ?? caregiver.gender : '-';
+  const ageText = getAge(caregiver?.dateOfBirth);
 
   const handleApprove = async () => {
     if (!caregiverId) return;
@@ -687,30 +707,45 @@ export default function KycReviewDetailPage() {
                     ส่งใหม่ {resubmitCount} ครั้ง
                   </span>
                 </div>
-                {/*Avatar*/}
+                {/*Profile header*/}
                 <div className="mt-4 flex items-center gap-4">
                   <Avatar name={caregiver.fullName} size={56} className="shrink-0" />
-                  <div>
-                    <p className="text-[13px] leading-4 text-[#6B7280]">หมายเลขประจำตัวผู้ดูแล</p>
-                    <p className="mt-1 text-lg font-bold leading-[22px] text-[#111827]">
+                  <div className="min-w-0">
+                    <p className="truncate text-base font-semibold leading-6 text-[#111827]">{caregiver.fullName || '-'}</p>
+                    <p className="text-[13px] leading-5 text-[#6B7280]">
                       {caregiver.caregiverNumber || caregiver.id.slice(0, 8)}
                     </p>
                   </div>
                 </div>
+
                 {/*Personal Information*/}
-                <dl className="mt-5 grid gap-x-6 gap-y-4 sm:grid-cols-2">
-                  {personalFields.map((field) => (
-                    <CaregiverField key={field.label} label={field.label} value={field.value} />
-                  ))}
+                <dl className="mt-5 grid gap-x-6 gap-y-4 border-t border-[#F3F4F6] pt-5 sm:grid-cols-2">
+                  <CaregiverField label="ชื่อ" value={nameParts.firstName} />
+                  <CaregiverField label="นามสกุล" value={nameParts.lastName} />
+                  <CaregiverField label="เลขบัตรประชาชน" value={formatIdCard(caregiver.idCardNumber)} />
+                  <CaregiverField label="เพศ" value={genderText} />
+                  <CaregiverField
+                    label="วันเกิด"
+                    value={ageText !== '-' ? `${formatThaiDate(caregiver.dateOfBirth)} (${ageText})` : formatThaiDate(caregiver.dateOfBirth)}
+                  />
+                  <CaregiverField label="ประสบการณ์" value={`${caregiver.experienceYears ?? 0} ปี`} />
+                  <CaregiverField label="อีเมล" value={caregiver.email} />
+                  <CaregiverField label="เบอร์โทรศัพท์" value={formatPhone(caregiver.phone)} />
+                  {caregiver.address ? (
+                    <div className="min-w-0 sm:col-span-2">
+                      <dt className="text-[13px] font-medium leading-5 text-[#9CA3AF]">ที่อยู่</dt>
+                      <dd className="mt-1 text-[15px] leading-6 text-[#1F2937]">{caregiver.address}</dd>
+                    </div>
+                  ) : null}
                 </dl>
 
-                <div className="mt-4">
+                <div className="mt-5 border-t border-[#F3F4F6] pt-5">
                   <dt className="text-[13px] font-medium leading-5 text-[#9CA3AF]">ทักษะการดูแล</dt>
                   <dd className="mt-2 flex flex-wrap gap-2">
                     {caregiver.skills.length > 0 ? (
                       caregiver.skills.map((skill) => (
-                        <span key={skill} className="inline-flex h-[22px] items-center rounded-lg bg-[#88D2BD] px-3 text-xs font-medium text-[#030213]">
-                          {skill}
+                        <span key={skill} className="inline-flex items-center rounded-md bg-[#F3F4F6] px-2.5 py-1 text-[13px] text-[#374151]">
+                          {skillLabel[skill] ?? skill}
                         </span>
                       ))
                     ) : (
