@@ -43,7 +43,7 @@ export function validateEvidenceFile(file: File): string | null {
  * (รูปถ่ายแนวตั้งจากมือถือจะได้ไม่ตะแคงหลังย่อ)
  * เบราว์เซอร์เก่าที่ยังไม่รองรับ option นี้ → fallback ไปทาง <img>
  */
-async function decodeImage(file: File): Promise<ImageBitmap | HTMLImageElement> {
+export async function decodeImage(file: File): Promise<ImageBitmap | HTMLImageElement> {
   if (typeof createImageBitmap === 'function') {
     try {
       return await createImageBitmap(file, { imageOrientation: 'from-image' });
