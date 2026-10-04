@@ -88,8 +88,6 @@ function mapGqlBooking(api: any): ConfirmedBooking {
     serviceLocation: serviceLocations,
     dateTime: {
       date: api.bookingDate ?? '',
-      // PYG-526: ไม่ query timeSlot แล้ว (ห้ามแสดงชื่อ slot) — field นี้ใช้เฉพาะในฟอร์มจอง
-      slot: '',
       startTime,
       endTime,
       duration: durationHours,

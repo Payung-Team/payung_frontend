@@ -1,105 +1,180 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useBooking } from '../../../context/BookingContext';
+import {
+  bookingDurationHours,
+  bookingEndOptions,
+  bookingStartOptions,
+  defaultBookingEndTime,
+} from '../../../lib/bookingTime';
+import { estimateBookingCost } from '../../../lib/bookingPrice';
 
-const BUSY_SLOTS: string[] = [];
+// PYG-525 (การ์ดแม่ PYG-490): เลือกแค่ "วันที่ + เวลาเริ่ม + เวลาสิ้นสุด"
+//   เลิกให้เลือกช่วงเช้า/บ่าย/เย็น และจำนวนชั่วโมงเอง — BE อนุมาน timeSlot และคำนวณ durationHours
+//   ตัวเลือกเวลาทั้งหมดมาจาก lib/bookingTime.ts ซึ่งตรงกับกฎของ BE (booking-time.ts)
+//   ใช้ทั้งจองให้ตัวเองและจองแทนในกลุ่มครอบครัว (ฟอร์มเดียวกัน)
 
-// ช่วงเวลาต่อกันครบ 24 ชม. ไม่มีช่องว่าง (ตรงกับ JobReceptionTab ฝั่งผู้ดูแล: 06–12, 12–17, 17–22)
-// from/to เป็นชั่วโมง — ขอบเขตรวมทั้งสองฝั่ง เวลาตรงรอยต่อ (เช่น 17:00) จึงเลือกได้ทั้งสองช่วงที่ติดกัน
-// start = เวลาที่เติมให้อัตโนมัติเมื่อแตะเลือกช่วง
-const SLOTS = [
-  { id: 'morning', label: 'ช่วงเช้า', range: '06:00 - 12:00', start: '08:00', from: 6, to: 12 },
-  { id: 'afternoon', label: 'ช่วงบ่าย', range: '12:00 - 17:00', start: '13:00', from: 12, to: 17 },
-  { id: 'evening', label: 'ช่วงเย็น', range: '17:00 - 22:00', start: '17:00', from: 17, to: 22 },
-  { id: 'night', label: 'ช่วงดึก', range: '22:00 - 06:00', start: '22:00', from: 22, to: 6 },
+const QUICK_DATES = [
+  { offset: 0, label: 'วันนี้' },
+  { offset: 1, label: 'พรุ่งนี้' },
+  { offset: 2, label: 'มะรืนนี้' },
 ];
 
-const HOURLY_RATE = 250;
-
-function isTimeInSlot(time: string, slotName: string) {
-  if (!time || !slotName) return true;
-  const s = SLOTS.find((x) => x.id === slotName);
-  if (!s) return true;
-  const [h, m] = time.split(':').map(Number);
-  const val = h + m / 60;
-  // ช่วงข้ามเที่ยงคืน (from > to) เช่น ช่วงดึก 22:00 - 06:00
-  return s.from <= s.to ? val >= s.from && val <= s.to : val >= s.from || val <= s.to;
+/**
+ * "YYYY-MM-DD" ตามเวลาเครื่อง
+ * ★ เดิมใช้ toISOString() ซึ่งเป็นวันที่ UTC — ในไทย (UTC+7) ช่วง 00:00–06:59
+ *   ปุ่ม "วันนี้" จะกลายเป็นเมื่อวาน และการซ่อนเวลาที่ผ่านไปแล้วจะเทียบผิดวัน
+ */
+function localIsoDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function computeEndTime(start: string, duration: number) {
-  if (!start) return '';
-  const [h, m] = start.split(':').map(Number);
-  const endH = (h + duration) % 24;
-  return `${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+function addDays(base: Date, days: number): Date {
+  const d = new Date(base);
+  d.setDate(d.getDate() + days);
+  return d;
 }
 
-function fmtThai(iso: string) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+/** แปลง "YYYY-MM-DD" เป็นเวลาเที่ยงคืนตามเครื่อง (new Date(iso) อ่านเป็น UTC) */
+function fromIsoDate(iso: string): Date {
+  return new Date(`${iso}T00:00:00`);
+}
+
+function fmtThaiShort(iso: string) {
+  return fromIsoDate(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+}
+
+function fmtThaiLong(iso: string) {
+  return fromIsoDate(iso).toLocaleDateString('th-TH', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function fmtHours(hours: number) {
+  return `${Math.round(hours * 100) / 100} ชั่วโมง`;
+}
+
+function TimeButton({
+  label,
+  sub,
+  active,
+  onClick,
+}: {
+  label: string;
+  sub?: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex flex-col items-center justify-center min-h-[52px] px-2 py-2 rounded-xl border transition cursor-pointer ${
+        active
+          ? 'bg-[#52B69A] border-[#52B69A] text-white'
+          : 'bg-white border-[#E0E2E5] text-[#1A1A1A] hover:bg-gray-50'
+      }`}
+    >
+      <span className="text-base font-bold">{label}</span>
+      {sub && (
+        <span className={`text-[11px] ${active ? 'text-white/90' : 'text-[#8A8C8E]'}`}>{sub}</span>
+      )}
+    </button>
+  );
 }
 
 export default function BookingStepDateTime() {
   const { bookingDraft, setBookingDraft, goToStep, setStepSubmit, setStepMissing } = useBooking();
 
   const [date, setDate] = useState(bookingDraft?.dateTime?.date || '');
-  const [slot, setSlot] = useState(bookingDraft?.dateTime?.slot || '');
   const [startTime, setStartTime] = useState(bookingDraft?.dateTime?.startTime || '');
-  // 0 = ยังไม่เลือกจำนวนชั่วโมง — ไม่ตั้งค่าเริ่มต้นให้ ผู้ใช้ต้องเลือกเอง
-  const [duration, setDuration] = useState<number>(bookingDraft?.dateTime?.duration || 0);
+  const [endTime, setEndTime] = useState(bookingDraft?.dateTime?.endTime || '');
   const [error, setError] = useState<Record<string, string>>({});
 
-  const endTime = useMemo(
-    () => (duration ? computeEndTime(startTime, duration) : ''),
-    [startTime, duration],
-  );
+  // นาฬิกาเดินทุกนาที — เปิดหน้าค้างไว้แล้วเวลาที่ผ่านไปต้องหายไปเองด้วย
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
-  // Auto-save
+  const todayIso = localIsoDate(now);
+  const nowMinute = now.getHours() * 60 + now.getMinutes();
+  const optionsFor = (iso: string) => bookingStartOptions(iso === todayIso ? nowMinute : undefined);
+
+  // ร่างที่ค้างใน sessionStorage อาจเป็นวันที่ผ่านไปแล้ว — ถือว่ายังไม่ได้เลือก
+  const dateValid = !!date && date >= todayIso;
+  const startOptions = dateValid ? optionsFor(date) : [];
+  const endOptions = bookingEndOptions(startTime);
+  const startValid = startOptions.includes(startTime);
+  const endValid = startValid && endOptions.includes(endTime);
+  const duration = endValid ? bookingDurationHours(startTime, endTime) : 0;
+  const cost = estimateBookingCost(duration);
+
+  // Auto-save — duration เก็บเฉพาะเมื่อเวลาครบและถูกกฎ (sidebar ใช้แสดงราคา)
   useEffect(() => {
     setBookingDraft((prev) => ({
       ...(prev || { serviceLocation: [], serviceTypes: [] }),
-      dateTime: { date, slot, startTime, duration, endTime },
+      dateTime: { date, startTime, endTime, duration },
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, slot, startTime, duration, endTime]);
+  }, [date, startTime, endTime, duration]);
 
-  const selectSlot = (s: (typeof SLOTS)[number]) => {
-    setSlot(s.id);
-    setStartTime(s.start);
+  const clearError = (...keys: string[]) =>
     setError((prev) => {
       const next = { ...prev };
-      delete next.slot;
-      delete next.startTime;
+      keys.forEach((k) => delete next[k]);
       return next;
     });
+
+  const selectDate = (iso: string) => {
+    setDate(iso);
+    clearError('date');
+    // เวลาเริ่มที่เลือกไว้ใช้ไม่ได้กับวันใหม่ (เช่น เปลี่ยนเป็น "วันนี้" แล้วเวลานั้นผ่านไปแล้ว)
+    // → ล้างทิ้ง ไม่ปล่อยให้ค่าที่ถูกซ่อนอยู่ค้างในฟอร์มโดยผู้ใช้มองไม่เห็น
+    if (startTime && !optionsFor(iso).includes(startTime)) {
+      setStartTime('');
+      setEndTime('');
+    }
   };
 
-  const handleStartChange = (val: string) => {
-    setStartTime(val);
-    if (slot && val && !isTimeInSlot(val, slot)) {
-      const slotObj = SLOTS.find((s) => s.id === slot);
-      setError((prev) => ({
-        ...prev,
-        startTime: `เวลาเริ่มต้นต้องอยู่ใน ${slotObj?.label} (${slotObj?.range} น.)`,
-      }));
-    } else {
-      setError((prev) => {
-        const next = { ...prev };
-        delete next.startTime;
-        return next;
-      });
+  const selectStart = (t: string) => {
+    setStartTime(t);
+    setEndTime(defaultBookingEndTime(t));
+    clearError('startTime', 'endTime');
+  };
+
+  const selectEnd = (t: string) => {
+    setEndTime(t);
+    clearError('endTime');
+  };
+
+  // "เลือกวันอื่น" — เปิดปฏิทินของเบราว์เซอร์ (ปฏิทินของ PYG-493 ยังไม่มีฝั่ง FE)
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const openCalendar = () => {
+    const input = dateInputRef.current;
+    if (!input) return;
+    try {
+      input.showPicker();
+    } catch {
+      // เบราว์เซอร์ที่ไม่มี showPicker — โฟกัสช่องแทน ผู้ใช้ยังเปิดปฏิทินเองได้
+      input.focus();
+      input.click();
     }
   };
 
   const handleSubmit = () => {
     const errs: Record<string, string> = {};
-    if (!date) errs.date = 'กรุณาเลือกวันที่รับบริการ';
-    if (!slot) errs.slot = 'กรุณาเลือกช่วงเวลานัดหมาย';
-    if (!startTime) errs.startTime = 'กรุณาระบุเวลาเริ่ม';
-    else if (slot && !isTimeInSlot(startTime, slot)) {
-      const slotObj = SLOTS.find((s) => s.id === slot);
-      errs.startTime = `เวลาเริ่มต้นต้องอยู่ใน ${slotObj?.label} (${slotObj?.range} น.)`;
-    }
-    if (!duration) errs.duration = 'กรุณาเลือกจำนวนชั่วโมง';
+    if (!dateValid) errs.date = 'กรุณาเลือกวันที่รับบริการ';
+    else if (!startValid) {
+      errs.startTime = startTime
+        ? 'เวลาเริ่มที่เลือกไว้ผ่านไปแล้ว กรุณาเลือกใหม่'
+        : 'กรุณาเลือกเวลาเริ่ม';
+    } else if (!endValid) errs.endTime = 'กรุณาเลือกเวลาสิ้นสุด';
     setError(errs);
     if (Object.keys(errs).length === 0) goToStep(3);
   };
@@ -107,13 +182,12 @@ export default function BookingStepDateTime() {
   // Report missing required fields so the sticky "Next" button can disable itself
   useEffect(() => {
     const missing: string[] = [];
-    if (!date) missing.push('วันที่');
-    if (!slot) missing.push('ช่วงเวลานัดหมาย');
-    if (!startTime || (slot && !isTimeInSlot(startTime, slot))) missing.push('เวลาเริ่มงาน');
-    if (!duration) missing.push('จำนวนชั่วโมง');
+    if (!dateValid) missing.push('วันที่');
+    if (!startValid) missing.push('เวลาเริ่ม');
+    if (!endValid) missing.push('เวลาสิ้นสุด');
     setStepMissing(missing);
     return () => setStepMissing([]);
-  }, [date, slot, startTime, duration, setStepMissing]);
+  }, [dateValid, startValid, endValid, setStepMissing]);
 
   // Register submit
   const submitRef = useRef<() => void>(() => {});
@@ -123,167 +197,152 @@ export default function BookingStepDateTime() {
     return () => setStepSubmit(null);
   }, [setStepSubmit]);
 
-  const todayIso = new Date().toISOString().split('T')[0];
-  // วันที่จากปุ่มลัด 3 ใบแรก — ถ้าเลือกวันอื่นนอกเหนือจากนี้ ให้ไฮไลต์ช่องเลือกวันเอง
-  const quickPickIsos = [0, 1, 2].map((offset) => {
-    const d = new Date();
-    d.setDate(d.getDate() + offset);
-    return d.toISOString().split('T')[0];
-  });
-  const customDateActive = !!date && !quickPickIsos.includes(date);
-  const scheduleSentence =
-    date && startTime && duration
-      ? `ผู้ดูแลมาถึง ${startTime} น. วันที่ ${fmtThai(date)} และอยู่จนถึง ${endTime} น. (${duration} ชั่วโมง)`
-      : 'เลือกวัน เวลา และจำนวนชั่วโมง แล้วระบบจะสรุปช่วงเวลาทำงานให้ตรวจสอบที่นี่';
+  const quickPickIsos = QUICK_DATES.map(({ offset }) => localIsoDate(addDays(now, offset)));
+  const customDateActive = dateValid && !quickPickIsos.includes(date);
+  // หลัง 21:00 วันนี้ไม่เหลือเวลาเริ่มให้เลือก (เริ่มได้ถึง 21:30 และต้องหลังเวลาปัจจุบัน)
+  const todayClosed = optionsFor(todayIso).length === 0;
+  const startPassed = dateValid && !!startTime && !startValid;
 
   return (
     <div className="space-y-4">
       {/* Date */}
       <section className="bg-white p-6 rounded-2xl border border-gray-100">
         <h2 className="text-lg font-bold text-[#1A1A1A]">วันที่ต้องการ</h2>
-        <div className="mt-8 flex flex-wrap items-start gap-2">
-          {[0, 1, 2].map((offset) => {
-            const d = new Date();
-            d.setDate(d.getDate() + offset);
-            const iso = d.toISOString().split('T')[0];
-            const label = offset === 0 ? 'วันนี้' : offset === 1 ? 'พรุ่งนี้' : 'มะรืนนี้';
-            const sub = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-            const active = date === iso;
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {QUICK_DATES.map(({ offset, label }, i) => {
+            const iso = quickPickIsos[i];
+            const closed = offset === 0 && todayClosed;
+            const active = !closed && date === iso;
             return (
               <button
-                key={iso}
+                key={label}
                 type="button"
-                onClick={() => setDate(iso)}
-                className={`flex flex-col items-start px-4 py-3 rounded-xl border text-left cursor-pointer transition min-w-[120px] ${
-                  active
-                    ? 'bg-[#52B69A] border-[#52B69A] text-white'
-                    : 'bg-white border-[#E0E2E5] text-[#575859] hover:bg-gray-50'
-                }`}
-              >
-                <span className="text-sm font-bold">{label}</span>
-                <span className={`text-xs mt-0.5 ${active ? 'text-white/90' : 'text-[#8A8C8E]'}`}>
-                  {sub}
-                </span>
-              </button>
-            );
-          })}
-          <span className="flex items-center min-h-[64px] text-sm font-semibold text-[#8A8C8E] px-1">
-            หรือ
-          </span>
-          <label className="relative block min-w-[200px] cursor-pointer">
-            <span className="absolute -top-5 left-0 text-xs font-semibold text-[#8A8C8E]">
-              เลือกวันอื่น
-            </span>
-            <div
-              className={`relative flex items-center gap-1.5 px-4 py-3 min-h-[64px] rounded-xl border transition ${
-                customDateActive ? 'border-[#52B69A] bg-[#F2FAF7]' : 'border-[#E0E2E5] bg-white'
-              }`}
-            >
-              <span
-                className={`material-icons text-sm ${customDateActive ? 'text-[#52B69A]' : 'text-[#AAB2BA]'}`}
-              >
-                calendar_today
-              </span>
-              <input
-                type="date"
-                value={date}
-                min={todayIso}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-transparent text-sm font-bold text-[#1A1A1A] focus:outline-none cursor-pointer"
-              />
-            </div>
-          </label>
-        </div>
-        {error.date && <p className="mt-3 text-xs font-semibold text-red-600">{error.date}</p>}
-      </section>
-
-      {/* Time slot */}
-      <section className="bg-white p-6 rounded-2xl border border-gray-100">
-        <h2 className="text-lg font-bold text-[#1A1A1A]">ช่วงเวลานัดหมาย</h2>
-        <p className="text-sm text-[#8A8C8E] mt-1">แตะเลือกช่วงเวลา — ระบบจะเติมเวลาเริ่มให้อัตโนมัติ</p>
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-          {SLOTS.map((s) => {
-            const busy = BUSY_SLOTS.includes(s.id);
-            const active = slot === s.id;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                disabled={busy}
-                onClick={() => selectSlot(s)}
-                className={`flex flex-col items-start px-4 py-3 rounded-xl border text-left transition ${
-                  busy
-                    ? 'bg-gray-50 border-[#E0E2E5] text-gray-300 cursor-not-allowed'
+                disabled={closed}
+                onClick={() => selectDate(iso)}
+                aria-pressed={active}
+                className={`flex flex-col items-start px-4 py-3 min-h-[64px] rounded-xl border text-left transition ${
+                  closed
+                    ? 'bg-gray-50 border-[#E0E2E5] text-gray-400 cursor-not-allowed'
                     : active
                       ? 'bg-[#52B69A] border-[#52B69A] text-white cursor-pointer'
                       : 'bg-white border-[#E0E2E5] text-[#575859] hover:bg-gray-50 cursor-pointer'
                 }`}
               >
-                <span className="text-sm font-bold">{s.label}</span>
-                <span
-                  className={`text-xs mt-0.5 ${active ? 'text-white/90' : 'text-[#8A8C8E]'}`}
-                >
-                  {s.range} น.
+                <span className="text-sm font-bold">{label}</span>
+                <span className={`text-xs mt-0.5 ${active ? 'text-white/90' : 'text-[#8A8C8E]'}`}>
+                  {closed ? 'เลยเวลาจองแล้ว' : fmtThaiShort(iso)}
                 </span>
-                {busy && <span className="text-[10px] text-red-500 mt-0.5">ไม่ว่าง</span>}
               </button>
             );
           })}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={openCalendar}
+              aria-pressed={customDateActive}
+              className={`w-full h-full flex flex-col items-start px-4 py-3 min-h-[64px] rounded-xl border text-left transition cursor-pointer ${
+                customDateActive
+                  ? 'bg-[#52B69A] border-[#52B69A] text-white'
+                  : 'bg-white border-[#E0E2E5] text-[#575859] hover:bg-gray-50'
+              }`}
+            >
+              <span className="flex items-center gap-1 text-sm font-bold">
+                <span className="material-icons" style={{ fontSize: 16 }}>calendar_today</span>
+                เลือกวันอื่น
+              </span>
+              <span className={`text-xs mt-0.5 ${customDateActive ? 'text-white/90' : 'text-[#8A8C8E]'}`}>
+                {customDateActive ? fmtThaiShort(date) : 'เปิดปฏิทิน'}
+              </span>
+            </button>
+            {/* ช่องจริงซ่อนไว้ใต้ปุ่ม — ปฏิทินของเบราว์เซอร์จะเปิดตรงตำแหน่งปุ่ม */}
+            <input
+              ref={dateInputRef}
+              type="date"
+              tabIndex={-1}
+              aria-hidden="true"
+              value={dateValid ? date : ''}
+              min={todayIso}
+              onChange={(e) => {
+                if (e.target.value && e.target.value >= todayIso) selectDate(e.target.value);
+              }}
+              className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
+            />
+          </div>
         </div>
-        {error.slot && <p className="mt-3 text-xs font-semibold text-red-600">{error.slot}</p>}
-
-        {/* Start time (custom) */}
-        <h2 className="mt-6 text-lg font-bold text-[#1A1A1A]">เวลาเริ่มงาน</h2>
-        <p className="text-sm text-[#8A8C8E] mt-1">
-          ปรับเวลาเริ่มได้เอง หากต้องการเวลาที่ต่างจากช่วงเวลาที่เลือกไว้
-        </p>
-        <input
-          type="time"
-          value={startTime}
-          onChange={(e) => handleStartChange(e.target.value)}
-          className={`block w-[160px] mt-4 p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1 ${
-            error.startTime
-              ? 'border-red-500 focus:ring-red-500'
-              : 'border-[#E0E2E5] focus:ring-[#52B69A]'
-          }`}
-        />
-        {error.startTime && (
-          <p className="mt-2 text-xs font-semibold text-red-600">{error.startTime}</p>
-        )}
+        {error.date && <p className="mt-3 text-xs font-semibold text-red-600">{error.date}</p>}
       </section>
 
-      {/* Duration */}
+      {/* Time */}
       <section className="bg-white p-6 rounded-2xl border border-gray-100">
-        <h2 className="text-lg font-bold text-[#1A1A1A]">ต้องการกี่ชั่วโมง</h2>
-        <div className="mt-4 grid grid-cols-3 md:grid-cols-5 gap-2">
-          {[2, 3, 4, 6, 8].map((h) => {
-            const active = duration === h;
-            return (
-              <button
-                key={h}
-                type="button"
-                onClick={() => setDuration(h)}
-                className={`flex flex-col items-center px-3 py-3 rounded-xl border transition cursor-pointer ${
-                  active
-                    ? 'bg-[#52B69A] border-[#52B69A] text-white'
-                    : 'bg-white border-[#E0E2E5] text-[#575859] hover:bg-gray-50'
-                }`}
-              >
-                <span className="text-base font-bold">{h} ชม.</span>
-                <span
-                  className={`text-xs mt-0.5 ${active ? 'text-white/90' : 'text-[#8A8C8E]'}`}
-                >
-                  ≈ {(HOURLY_RATE * h).toLocaleString()} ฿
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        {error.duration && (
-          <p className="mt-3 text-xs font-semibold text-red-600">{error.duration}</p>
+        <h2 className="text-lg font-bold text-[#1A1A1A]">เวลาเริ่ม</h2>
+        {!dateValid ? (
+          <p className="text-sm text-[#8A8C8E] mt-1">เลือกวันที่ก่อน แล้วจะแสดงเวลาที่จองได้</p>
+        ) : (
+          <>
+            <p className="text-sm text-[#8A8C8E] mt-1">
+              ระบุเวลาเริ่มที่ต้องการให้ผู้ดูแลมาถึง
+            </p>
+            <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+              {startOptions.map((t) => (
+                <TimeButton
+                  key={t}
+                  label={t}
+                  active={startTime === t}
+                  onClick={() => selectStart(t)}
+                />
+              ))}
+            </div>
+          </>
         )}
-        <div className="mt-4 bg-[#F0FAF4] border border-[#BFE0D6] rounded-xl p-4 text-sm font-semibold text-[#1B5C48] leading-relaxed">
-          {scheduleSentence}
+        {(error.startTime || startPassed) && (
+          <p className="mt-3 text-xs font-semibold text-red-600">
+            {error.startTime || 'เวลาเริ่มที่เลือกไว้ผ่านไปแล้ว กรุณาเลือกใหม่'}
+          </p>
+        )}
+
+        {startValid && (
+          <>
+            <h2 className="mt-6 text-lg font-bold text-[#1A1A1A]">เวลาสิ้นสุด</h2>
+            <p className="text-sm text-[#8A8C8E] mt-1">
+              กรุณาระบุเวลาสิ้นสุดงาน
+            </p>
+            <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+              {endOptions.map((t) => (
+                <TimeButton
+                  key={t}
+                  label={t}
+                  sub={`${Math.round(bookingDurationHours(startTime, t) * 100) / 100} ชม.`}
+                  active={endTime === t}
+                  onClick={() => selectEnd(t)}
+                />
+              ))}
+            </div>
+            {error.endTime && (
+              <p className="mt-3 text-xs font-semibold text-red-600">{error.endTime}</p>
+            )}
+          </>
+        )}
+
+        {/* สรุปอัปเดตทันที: "09:00 – 13:00 · 4 ชั่วโมง · ฿xxx" */}
+        <div
+          aria-live="polite"
+          className="mt-6 bg-[#F0FAF4] border border-[#BFE0D6] rounded-xl p-4 text-[#1B5C48]"
+        >
+          {duration > 0 ? (
+            <>
+              <div className="text-xs font-semibold text-[#52B69A]">{fmtThaiLong(date)}</div>
+              <div className="mt-1 text-base font-bold leading-relaxed">
+                {startTime} – {endTime} | {fmtHours(duration)} | ฿{cost.total.toLocaleString()}
+              </div>
+              <div className="mt-1 text-xs text-[#575859]">
+                ราคาประมาณการ
+              </div>
+            </>
+          ) : (
+            <div className="text-sm font-semibold leading-relaxed">
+              เลือกวัน เวลาเริ่ม และเวลาสิ้นสุด แล้วระบบจะสรุปจำนวนชั่วโมงและราคาให้ที่นี่
+            </div>
+          )}
         </div>
       </section>
     </div>

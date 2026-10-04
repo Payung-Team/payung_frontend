@@ -24,12 +24,15 @@ export interface BookingRequest {
       lng?: number;
     };
   };
+  /**
+   * PYG-525 — ผู้ใช้เลือกแค่วัน + เวลาเริ่ม + เวลาสิ้นสุด ("HH:mm")
+   * duration คำนวณจากสองเวลานี้ (ไว้แสดงผล) — BE คำนวณ durationHours / timeSlot เองจาก startTime + endTime
+   */
   dateTime?: {
     date: string;
-    slot: string;
     startTime: string;
-    duration: number;
     endTime: string;
+    duration: number;
   };
   recipient?: {
     type: 'self' | 'member';
