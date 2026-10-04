@@ -26,7 +26,9 @@ export type NotificationType =
   | 'payment_captured'
   | 'refund_issued'
   | 'dispute_created'
-  | 'dispute_resolved';
+  | 'dispute_resolved'
+  | 'profile_photo_approved'
+  | 'profile_photo_rejected';
 
 export interface NotificationItem {
   id: string;
@@ -136,6 +138,12 @@ export function notificationIcon(type: NotificationType): IconStyle {
     case 'dispute_resolved':
       return { icon: 'fact_check', ...INFO };
 
+    // รูปโปรไฟล์ผู้ดูแล (PYG-508)
+    case 'profile_photo_approved':
+      return { icon: 'face', ...SUCCESS };
+    case 'profile_photo_rejected':
+      return { icon: 'no_photography', ...DANGER };
+
     default:
       return { icon: 'notifications', ...INFO };
   }
@@ -168,6 +176,10 @@ export function resolveDeepLink(item: NotificationItem): string {
 
   if (item.type.startsWith('kyc_')) {
     return '/kyc/status';
+  }
+
+  if (item.type.startsWith('profile_photo_')) {
+    return link ?? '/caregiver/edit-profile';
   }
 
   // dispute_created (admin) หรือ fallback อื่น ๆ

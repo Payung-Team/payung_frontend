@@ -403,6 +403,87 @@ export const ADMIN_KYC_DETAIL = gql`
         recipientStatus
         hasOmiseRecipient
       }
+      pendingProfilePhotoDocumentId
+    }
+  }
+`;
+
+/** PYG-511: คิวรูปโปรไฟล์ผู้ดูแลที่รออนุมัติ (รวมผู้ดูแลที่ verified แล้วแต่เปลี่ยนรูป) */
+export const ADMIN_PROFILE_PHOTO_QUEUE = gql`
+  query AdminProfilePhotoQueue($search: String, $page: Int, $limit: Int) {
+    adminProfilePhotoQueue(input: { search: $search, page: $page, limit: $limit }) {
+      items {
+        documentId
+        caregiverId
+        caregiverNumber
+        fullName
+        email
+        kycStatus
+        uploadedAt
+        hasApprovedPhoto
+      }
+      total
+      page
+      totalPages
+    }
+  }
+`;
+
+/** PYG-511: หน้าเทียบรูปโปรไฟล์กับบัตรประชาชน */
+export const ADMIN_PROFILE_PHOTO_REVIEW = gql`
+  query AdminProfilePhotoReview($caregiverId: ID!) {
+    adminProfilePhotoReview(caregiverId: $caregiverId) {
+      caregiver {
+        id
+        caregiverNumber
+        fullName
+        email
+        idCardNumber
+        kycStatus
+      }
+      pendingPhoto {
+        documentId
+        reviewStatus
+        signedUrl
+        uploadedAt
+      }
+      approvedPhotoUrl
+      idCardDocuments {
+        id
+        docType
+        fileName
+        mimeType
+        signedUrl
+        uploadedAt
+      }
+      reviews {
+        id
+        action
+        reason
+        reviewerName
+        reviewedAt
+        documentId
+      }
+    }
+  }
+`;
+
+export const APPROVE_PROFILE_PHOTO = gql`
+  mutation ApproveProfilePhoto($documentId: ID!) {
+    approveProfilePhoto(documentId: $documentId) {
+      documentId
+      reviewStatus
+      reviewedAt
+    }
+  }
+`;
+
+export const REJECT_PROFILE_PHOTO = gql`
+  mutation RejectProfilePhoto($documentId: ID!, $reason: String!) {
+    rejectProfilePhoto(input: { documentId: $documentId, reason: $reason }) {
+      documentId
+      reviewStatus
+      reviewedAt
     }
   }
 `;

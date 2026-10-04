@@ -82,6 +82,8 @@ interface AdminKycDetailResponse {
     reviews: KycReview[];
     editHistory: CaregiverEditLog[];
     payoutAccount?: AdminPayoutAccountSummary | null;
+    /** PYG-511: มีรูปโปรไฟล์รออนุมัติ → แสดงลิงก์ไปหน้าเทียบรูป */
+    pendingProfilePhotoDocumentId?: string | null;
   };
 }
 
@@ -797,6 +799,23 @@ export default function KycReviewDetailPage() {
             
             {/*Right Column: Documents Preview + Action Buttons*/}
             <div className="space-y-6 self-start">
+              {/* PYG-511: อนุมัติ KYC ไม่อนุมัติรูปโปรไฟล์ให้ — ต้องเทียบหน้าแยกอีกหน้า */}
+              {data?.adminKycDetail.pendingProfilePhotoDocumentId ? (
+                <div className="flex flex-col gap-3 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3 text-sm text-[#92400E]">
+                    <Icon name="face" />
+                    <span>ผู้ดูแลมีรูปโปรไฟล์รออนุมัติ — การอนุมัติ KYC ไม่ได้อนุมัติรูปให้อัตโนมัติ</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/admin/kyc/${caregiver.id}/profile-photo`)}
+                    className="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-[#D97706] px-3 text-[13px] font-semibold text-white hover:bg-[#B45309]"
+                  >
+                    ตรวจรูปโปรไฟล์
+                  </button>
+                </div>
+              ) : null}
+
               <KycDocumentsPreview documents={documents} docTypeLabel={docTypeLabel} />
               
               {/*Action Buttons*/}

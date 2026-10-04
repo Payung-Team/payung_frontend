@@ -19,6 +19,7 @@ import KycResubmit from './pages/kyc/status/KycResubmitPage';
 import Admin from './pages/admin/Admin';
 import KycReviewListPage from './pages/admin/KycReviewListPage';
 import KycReviewDetailPage from './pages/admin/KycReviewDetailPage';
+import ProfilePhotoReviewPage from './pages/admin/ProfilePhotoReviewPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminCaregiverDetailPage from './pages/admin/AdminCaregiverDetailPage';
 import AdminPaymentsPage from './pages/admin/AdminPaymentsPage';
@@ -430,6 +431,7 @@ function App() {
           <Route path="/admin" element={<Admin />} />
           <Route path="/admin/kyc" element={<KycReviewListPage />} />
           <Route path="/admin/kyc/:caregiverId" element={<KycReviewDetailPage />} />
+          <Route path="/admin/kyc/:caregiverId/profile-photo" element={<ProfilePhotoReviewPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/users/:caregiverId" element={<AdminCaregiverDetailPage />} />
           <Route path="/admin/payments" element={<AdminPaymentsPage />} />
