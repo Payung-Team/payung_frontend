@@ -36,14 +36,12 @@ export function validateProfilePhoto(file: File): string | null {
   return null;
 }
 
-export async function uploadProfilePhoto(file: File): Promise<ProfilePhotoResult> {
+async function postProfilePhoto(jpeg: Blob): Promise<ProfilePhotoResult> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
   const token = session?.access_token;
   if (!token) throw new Error('กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
-
-  const jpeg = await resizeToJpeg(file);
 
   const body = new FormData();
   body.append('photo', jpeg, 'profile.jpg');
@@ -55,6 +53,10 @@ export async function uploadProfilePhoto(file: File): Promise<ProfilePhotoResult
   });
 
   if (!res.ok) {
+    // multer ตอบ 413 เป็นข้อความอังกฤษ ("File too large") — แปลเป็นไทยเอง ที่เหลือ BE ตอบไทยอยู่แล้ว ใช้ต่อได้เลย
+    if (res.status === 413) {
+      throw new Error('ไฟล์รูปมีขนาดใหญ่เกินไป กรุณาเลือกรูปอื่น');
+    }
     // BE ตอบข้อความไทยที่โชว์ได้เลย (เช่น "รองรับเฉพาะรูป JPEG") — ใช้ของ BE ก่อนเสมอ
     const detail = await res
       .json()
@@ -64,4 +66,15 @@ export async function uploadProfilePhoto(file: File): Promise<ProfilePhotoResult
   }
 
   return (await res.json()) as ProfilePhotoResult;
+}
+
+export async function uploadProfilePhoto(file: File): Promise<ProfilePhotoResult> {
+  const jpeg = await resizeToJpeg(file);
+  return postProfilePhoto(jpeg);
+}
+
+/** อัปโหลดรูปที่ crop เป็นสี่เหลี่ยมจัตุรัสและ export เป็น JPEG มาแล้ว (ดู src/lib/profilePhotoCrop.ts)
+ *  ไม่ต้อง resize ซ้ำ — canvas ตอน crop คุมขนาด/คุณภาพให้พอดีเพดานของ backend อยู่แล้ว */
+export async function uploadCroppedProfilePhoto(jpeg: Blob): Promise<ProfilePhotoResult> {
+  return postProfilePhoto(jpeg);
 }

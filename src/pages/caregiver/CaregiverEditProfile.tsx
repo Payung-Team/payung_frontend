@@ -16,6 +16,7 @@ import type { ToastType } from '../../components/ui/Toast';
 import ProfileFormFields from '../../components/ui/ProfileFormFields';
 import ThaiAddressSelector from '../../components/ui/ThaiAddressSelector';
 import AlertModal from '../../components/ui/AlertModal';
+import ProfilePhotoUploadCard from '../../components/caregiver/ProfilePhotoUploadCard';
 
 function formatPhone(val?: string | null): string {
   if (!val) return '';
@@ -300,6 +301,14 @@ const CaregiverEditProfile: React.FC = () => {
         {/* ═══ Center Edit Form ═══ */}
         <div className="flex-1 overflow-y-auto bg-[#F6FAF9] px-4 sm:px-6 lg:px-8 py-6 lg:py-7 flex justify-center">
           <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-[700px] space-y-6">
+            {/* Profile Photo Card */}
+            <ProfilePhotoUploadCard
+              caregiverId={caregiver?.id}
+              currentAvatarUrl={user?.avatarUrl}
+              displayName={caregiver?.fullName || displayName}
+              onToast={(type, message) => setToastMessage({ type, message })}
+            />
+
             {/* Personal Info Card - Read Only */}
             <div className="bg-white rounded-xl border border-[rgba(0,0,0,0.1)] p-6">
               <h3 className="text-[16px] font-semibold text-[#0A0A0A] mb-1">ข้อมูลส่วนตัว</h3>
@@ -562,7 +571,12 @@ const CaregiverEditProfile: React.FC = () => {
                 <div className="p-6">
                   <div className="flex items-start gap-6 mb-6">
                     <div className="relative -mt-16">
-                      <Avatar name={caregiver?.fullName || displayName} size={128} fallbackColor="#52B69A" />
+                      <Avatar
+                        src={user?.avatarUrl}
+                        name={caregiver?.fullName || displayName}
+                        size={128}
+                        fallbackColor="#52B69A"
+                      />
                     </div>
                     <div className="flex-1 pt-6">
                       <div className="flex items-center gap-2 mb-2">
