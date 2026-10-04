@@ -128,7 +128,8 @@ function PhotoFrame({
         <h3 className="text-base font-semibold leading-5 text-[#064E3B]">{title}</h3>
         {headerExtra}
       </div>
-      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-[#1F2937]">
+      {/* ความสูงคงที่เท่ากันทั้งสองฝั่ง — เดิมเป็น aspect 3:4 เต็มคอลัมน์ รูปสูงเกือบ 1,000px ต้องเลื่อนดู */}
+      <div className="relative h-[320px] w-full overflow-hidden rounded-lg bg-[#1F2937] sm:h-[380px]">
         {imageUrl ? (
           <>
             <img src={imageUrl} alt={title} className="h-full w-full object-contain" />
@@ -454,8 +455,9 @@ export default function ProfilePhotoReviewPage() {
                     <div className="min-w-0">
                       <p className="text-base font-semibold text-[#064E3B]">รูปที่อนุมัติอยู่ปัจจุบัน</p>
                       <p className="mt-1 text-sm text-[#6B7280]">
-                        ผู้ดูแลขอเปลี่ยนรูป — ตรวจว่ารูปใหม่เป็นคนเดียวกับรูปเดิม
-                        ถ้าปฏิเสธ ผู้ใช้จะยังเห็นรูปนี้ต่อไป
+                        {pendingPhoto
+                          ? 'ผู้ดูแลขอเปลี่ยนรูป — ตรวจว่ารูปใหม่เป็นคนเดียวกับรูปเดิม ถ้าปฏิเสธ ผู้ใช้จะยังเห็นรูปนี้ต่อไป'
+                          : 'รูปที่ผู้ใช้บริการเห็นอยู่ตอนนี้ (ผ่านการอนุมัติแล้ว)'}
                       </p>
                     </div>
                   </div>

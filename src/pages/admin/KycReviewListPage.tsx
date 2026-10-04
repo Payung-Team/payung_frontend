@@ -16,6 +16,34 @@ type KycStatusFilter = 'all' | 'pending' | 'verified' | 'rejected';
 /** PYG-511: แท็บ "รูปโปรไฟล์รออนุมัติ" อ่านจากคิวรูป ไม่ใช่ kycStatus */
 type KycTab = KycStatusFilter | 'profile_photo';
 
+/** ตัวกรองย่อยในแท็บรูปโปรไฟล์ — ค่าตรงกับ kyc_documents.review_status */
+type PhotoStatusFilter = 'pending' | 'approved' | 'rejected';
+
+const PHOTO_STATUS_FILTERS: Array<{ key: PhotoStatusFilter; label: string; emptyTitle: string; emptyBody: string }> = [
+  {
+    key: 'pending',
+    label: 'รออนุมัติ',
+    emptyTitle: 'ไม่มีรูปโปรไฟล์รออนุมัติ',
+    emptyBody: 'เมื่อผู้ดูแลอัปโหลดหรือเปลี่ยนรูปโปรไฟล์ รายการจะแสดงที่นี่',
+  },
+  {
+    key: 'approved',
+    label: 'อนุมัติแล้ว',
+    emptyTitle: 'ยังไม่มีรูปที่อนุมัติ',
+    emptyBody: 'รูปที่แอดมินอนุมัติแล้วจะแสดงที่นี่',
+  },
+  {
+    key: 'rejected',
+    label: 'ปฏิเสธแล้ว',
+    emptyTitle: 'ยังไม่มีรูปที่ถูกปฏิเสธ',
+    emptyBody: 'รูปที่แอดมินปฏิเสธพร้อมเหตุผลจะแสดงที่นี่',
+  },
+];
+
+function parsePhotoStatus(value: string | null): PhotoStatusFilter {
+  return PHOTO_STATUS_FILTERS.some((filter) => filter.key === value) ? (value as PhotoStatusFilter) : 'pending';
+}
+
 interface ProfilePhotoQueueItem {
   documentId: string;
   caregiverId: string;
@@ -25,6 +53,11 @@ interface ProfilePhotoQueueItem {
   kycStatus: KycStatus;
   uploadedAt: string;
   hasApprovedPhoto: boolean;
+  reviewStatus: string;
+  reviewedAt?: string | null;
+  reviewerName?: string | null;
+  reason?: string | null;
+  isCurrentAvatar: boolean;
 }
 
 interface AdminProfilePhotoQueueResponse {
@@ -34,6 +67,7 @@ interface AdminProfilePhotoQueueResponse {
     page: number;
     totalPages: number;
   };
+  pendingCount: { total: number };
 }
 
 type KycStatus = 'pending' | 'verified' | 'rejected' | 'none' | string;
@@ -64,6 +98,7 @@ interface AdminKycListResponse {
 const PAGE_SIZE = 20;
 const TABLE_GRID_COLUMNS = '130px minmax(180px, 1.4fr) 200px 130px 140px 120px 100px';
 const PHOTO_TABLE_GRID_COLUMNS = '130px minmax(180px, 1.4fr) 200px 150px 140px 140px 100px';
+const DECIDED_PHOTO_TABLE_GRID_COLUMNS = '130px minmax(160px, 1.1fr) 130px 170px 140px minmax(180px, 1.4fr) 100px';
 
 const FILTERS: Array<{ key: KycTab; label: string; emptyTitle: string; emptyBody: string }> = [
   {
@@ -175,11 +210,15 @@ export default function KycReviewListPage() {
   const [activeFilter, setActiveFilter] = useState<KycTab>(() =>
     parseTab(searchParams.get('tab') ?? searchParams.get('status')),
   );
+  const [photoStatus, setPhotoStatus] = useState<PhotoStatusFilter>(() =>
+    parsePhotoStatus(searchParams.get('photoStatus')),
+  );
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
 
   const trimmedSearch = search.trim();
   const isPhotoTab = activeFilter === 'profile_photo';
+  const isDecidedPhotoView = isPhotoTab && photoStatus !== 'pending';
 
   const { data, loading, error } = useQuery<AdminKycListResponse>(ADMIN_KYC_LIST, {
     variables: {
@@ -192,13 +231,14 @@ export default function KycReviewListPage() {
     fetchPolicy: 'cache-and-network',
   });
 
-  // นอกแท็บรูปใช้แค่ total ไปโชว์บนแท็บ จึงขอแค่ 1 แถว
+  // นอกแท็บรูปใช้แค่ pendingCount ไปโชว์บนแท็บ จึงขอรายการแค่ 1 แถว
   const {
     data: photoData,
     loading: photoLoading,
     error: photoError,
   } = useQuery<AdminProfilePhotoQueueResponse>(ADMIN_PROFILE_PHOTO_QUEUE, {
     variables: {
+      status: isPhotoTab ? photoStatus : 'pending',
       search: trimmedSearch || undefined,
       page: isPhotoTab ? page : 1,
       limit: isPhotoTab ? PAGE_SIZE : 1,
@@ -212,7 +252,9 @@ export default function KycReviewListPage() {
   const totalPages = (isPhotoTab ? photoData?.adminProfilePhotoQueue.totalPages : data?.list.totalPages) ?? 1;
   const isInitialLoading = loading && !data;
   const isPhotoInitialLoading = photoLoading && !photoData;
-  const selectedFilter = FILTERS.find((filter) => filter.key === activeFilter) ?? FILTERS[0];
+  const selectedFilter = isPhotoTab
+    ? PHOTO_STATUS_FILTERS.find((filter) => filter.key === photoStatus) ?? PHOTO_STATUS_FILTERS[0]
+    : FILTERS.find((filter) => filter.key === activeFilter) ?? FILTERS[0];
 
   const counts = useMemo<Record<KycTab, number>>(
     () => ({
@@ -220,7 +262,7 @@ export default function KycReviewListPage() {
       pending: data?.pendingCount.total ?? 0,
       verified: data?.verifiedCount.total ?? 0,
       rejected: data?.rejectedCount.total ?? 0,
-      profile_photo: photoData?.adminProfilePhotoQueue.total ?? 0,
+      profile_photo: photoData?.pendingCount.total ?? 0,
     }),
     [data, photoData],
   );
@@ -364,6 +406,65 @@ export default function KycReviewListPage() {
     [navigate],
   );
 
+  /** รูปที่ตัดสินแล้ว (อนุมัติ / ปฏิเสธ) — แสดงผล ผู้ตรวจ และเหตุผลแทนประเภทคำขอ */
+  const decidedPhotoColumns = useMemo<DataTableColumn<ProfilePhotoQueueItem>[]>(
+    () => [
+      photoColumns[0],
+      photoColumns[1],
+      {
+        key: 'reviewedAt',
+        header: 'ตัดสินเมื่อ',
+        className: 'text-gray-500',
+        render: (item) => formatSubmittedDate(item.reviewedAt),
+      },
+      {
+        key: 'reviewStatus',
+        header: 'ผลรีวิว',
+        render: (item) => (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {item.reviewStatus === 'approved' ? (
+              <StatusBadge label="อนุมัติแล้ว" badgeClass="bg-[#ECFDF5] text-[#0D9488]" dotClass="bg-[#0D9488]" />
+            ) : (
+              <StatusBadge label="ปฏิเสธ" badgeClass="bg-[#FEF2F2] text-[#DC2626]" dotClass="bg-[#DC2626]" />
+            )}
+            {item.reviewStatus === 'approved' && !item.isCurrentAvatar ? (
+              <span className="text-[11px] text-gray-400">ถูกแทนด้วยรูปใหม่</span>
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        key: 'reviewerName',
+        header: 'ผู้ตรวจ',
+        className: 'truncate text-gray-600',
+        render: (item) => item.reviewerName || '-',
+      },
+      {
+        key: 'reason',
+        header: 'เหตุผล',
+        render: (item) => (
+          <div className="truncate text-gray-600" title={item.reason ?? undefined}>
+            {item.reason || '-'}
+          </div>
+        ),
+      },
+      {
+        key: 'actions',
+        header: 'การจัดการ',
+        render: (item) => (
+          <button
+            type="button"
+            onClick={() => navigate(`/admin/kyc/${item.caregiverId}/profile-photo`)}
+            className="inline-flex h-8 cursor-pointer items-center rounded-md border border-[#059669] px-3 text-xs font-semibold text-[#059669] transition-colors hover:bg-[#ECFDF5]"
+          >
+            ดูประวัติ
+          </button>
+        ),
+      },
+    ],
+    [navigate, photoColumns],
+  );
+
   const renderTableError = (tableError: Error) => (
     <div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
@@ -423,11 +524,39 @@ export default function KycReviewListPage() {
         </div>
 
         {isPhotoTab ? (
+          <div className="mb-3 flex flex-wrap gap-2" role="tablist" aria-label="สถานะรูปโปรไฟล์">
+            {PHOTO_STATUS_FILTERS.map((filter) => {
+              const isActive = filter.key === photoStatus;
+              return (
+                <button
+                  key={filter.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => {
+                    setPhotoStatus(filter.key);
+                    setPage(1);
+                  }}
+                  className={`h-8 cursor-pointer rounded-full border px-3.5 text-[13px] font-semibold transition-colors ${
+                    isActive
+                      ? 'border-[#059669] bg-[#059669] text-white'
+                      : 'border-gray-300 bg-white text-gray-600 hover:border-[#059669] hover:text-[#059669]'
+                  }`}
+                >
+                  {filter.label}
+                  {filter.key === 'pending' && counts.profile_photo > 0 ? ` (${counts.profile_photo})` : ''}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {isPhotoTab ? (
           <DataTable
-            columns={photoColumns}
+            columns={isDecidedPhotoView ? decidedPhotoColumns : photoColumns}
             items={photoItems}
             getRowKey={(item) => item.documentId}
-            gridTemplateColumns={PHOTO_TABLE_GRID_COLUMNS}
+            gridTemplateColumns={isDecidedPhotoView ? DECIDED_PHOTO_TABLE_GRID_COLUMNS : PHOTO_TABLE_GRID_COLUMNS}
             loading={isPhotoInitialLoading}
             loadingContent={<KycReviewTableSkeleton />}
             error={photoError}

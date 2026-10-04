@@ -408,10 +408,18 @@ export const ADMIN_KYC_DETAIL = gql`
   }
 `;
 
-/** PYG-511: คิวรูปโปรไฟล์ผู้ดูแลที่รออนุมัติ (รวมผู้ดูแลที่ verified แล้วแต่เปลี่ยนรูป) */
+/**
+ * PYG-511: คิวรูปโปรไฟล์ผู้ดูแล (รวมผู้ดูแลที่ verified แล้วแต่เปลี่ยนรูป)
+ * status = pending (รออนุมัติ) | approved | rejected · pendingCount ใช้โชว์จำนวนบนแท็บเสมอ
+ */
 export const ADMIN_PROFILE_PHOTO_QUEUE = gql`
-  query AdminProfilePhotoQueue($search: String, $page: Int, $limit: Int) {
-    adminProfilePhotoQueue(input: { search: $search, page: $page, limit: $limit }) {
+  query AdminProfilePhotoQueue(
+    $status: ProfilePhotoReviewStatusFilter
+    $search: String
+    $page: Int
+    $limit: Int
+  ) {
+    adminProfilePhotoQueue(input: { status: $status, search: $search, page: $page, limit: $limit }) {
       items {
         documentId
         caregiverId
@@ -421,10 +429,18 @@ export const ADMIN_PROFILE_PHOTO_QUEUE = gql`
         kycStatus
         uploadedAt
         hasApprovedPhoto
+        reviewStatus
+        reviewedAt
+        reviewerName
+        reason
+        isCurrentAvatar
       }
       total
       page
       totalPages
+    }
+    pendingCount: adminProfilePhotoQueue(input: { status: pending, search: $search, page: 1, limit: 1 }) {
+      total
     }
   }
 `;
