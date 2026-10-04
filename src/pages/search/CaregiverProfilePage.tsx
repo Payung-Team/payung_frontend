@@ -21,6 +21,7 @@ import { useToast } from '../../hooks/useToast';
 import { supabase } from '../../lib/supabase';
 import { buildBookingPayload } from '../../lib/buildBookingPayload';
 import { formatDisplayPrice, hasDisplayPrice, NO_PRICE_LABEL } from '../../lib/displayPrice';
+import { skillLabel } from '../../lib/skillLabels';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -50,21 +51,6 @@ interface Review {
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-
-const SKILL_TRANSLATIONS: Record<string, string> = {
-  mobility: 'ช่วยเคลื่อนไหว',
-  medication: 'ดูแลยา',
-  bathing: 'อาบน้ำ / สุขอนามัย',
-  cooking: 'ทำอาหาร',
-  companionship: 'เป็นเพื่อนคุย',
-  wound_care: 'ดูแลแผล',
-  physical_therapy: 'กายภาพบำบัด',
-  physiotherapy: 'กายภาพบำบัด',
-  dementia_care: 'ดูแลสมองเสื่อม',
-  general_care: 'ดูแลทั่วไป',
-  bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
-  companion: 'เป็นเพื่อน/พูดคุย',
-};
 
 const DAYS = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
 const TIME_SLOTS = [
@@ -330,7 +316,7 @@ const CaregiverProfilePage: React.FC = () => {
   const verified = cg?.verified ?? false;
   const avatarUrl = publicAvatarUrl !== undefined ? publicAvatarUrl : (cg?.avatarUrl ?? null);
 
-  const translatedSkills = skills.map((s) => SKILL_TRANSLATIONS[s] || s);
+  const translatedSkills = skills.map((s) => skillLabel(s));
 
   const handleConfirmBooking = async () => {
     if (!cg || !bookingDraft) return;

@@ -21,6 +21,7 @@ import {
   onBehalfBookingErrorMessage,
 } from '../../lib/bookingSubmitError';
 import ThailandAddressSimple from 'thailand-address-simple';
+import { skillLabel } from '../../lib/skillLabels';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -77,21 +78,6 @@ const SERVICE_TYPE_MAP: Record<string, string> = {
   'เป็นเพื่อน/พูดคุย': 'companion',
 };
 
-const SKILL_TRANSLATIONS: Record<string, string> = {
-  mobility: 'ช่วยเคลื่อนไหว',
-  medication: 'ดูแลยา',
-  bathing: 'อาบน้ำ / สุขอนามัย',
-  cooking: 'ทำอาหาร',
-  companionship: 'เป็นเพื่อนคุย',
-  wound_care: 'ดูแลแผล',
-  physical_therapy: 'กายภาพบำบัด',
-  physiotherapy: 'กายภาพบำบัด',
-  dementia_care: 'ดูแลสมองเสื่อม',
-  general_care: 'ดูแลทั่วไป',
-  bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
-  companion: 'เป็นเพื่อน/พูดคุย',
-};
-
 // ค่าที่ไม่รู้จัก (หรือยังไม่ได้กรอก) → ไม่แสดงทั้งไอคอนและบรรทัดเพศ ดีกว่าเดาเป็นชาย/หญิง
 // ไอคอนมี title/aria-label กำกับเสมอ — สีอย่างเดียวสื่อความหมายไม่ได้สำหรับคนตาบอดสี
 const GENDER_DISPLAY: Record<string, { label: string; icon: string; color: string }> = {
@@ -139,7 +125,7 @@ function StarRating({ rating, count, size = 16 }: { rating: number; count?: numb
 function CaregiverCard({ cg, onSelect, onViewProfile, onPhotoExpired }: { cg: CaregiverSummary; onSelect?: (cg: CaregiverSummary) => void; onViewProfile?: (cg: CaregiverSummary) => void; onPhotoExpired?: () => void }) {
   const fullName = cg.fullName;
   const hasRating = cg.avgRating != null && cg.reviewCount > 0;
-  const translatedSkills = cg.skills.map((skill) => SKILL_TRANSLATIONS[skill] || skill);
+  const translatedSkills = cg.skills.map((skill) => skillLabel(skill));
   const visibleSkills = translatedSkills.slice(0, 3);
   const extraSkills = translatedSkills.length - 3;
   const gender = GENDER_DISPLAY[cg.gender ?? ''] ?? null;

@@ -12,6 +12,7 @@ import KycHistoryCard from '../../components/ui/KycHistoryCard';
 import StatusBadge from '../../components/ui/StatusBadge';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { getBankLabel } from '../../features/kyc/omiseBanks';
+import { skillLabel } from '../../lib/skillLabels';
 
 type KycStatus = 'pending' | 'verified' | 'rejected' | 'none' | string;
 
@@ -124,17 +125,6 @@ const docTypeLabel: Record<string, string> = {
   id_card: 'บัตรประชาชน',
   photo: 'รูปถ่าย',
   license: 'ใบอนุญาต',
-};
-
-const skillLabel: Record<string, string> = {
-  mobility: 'ช่วยเคลื่อนไหว',
-  medication: 'ดูแลยา',
-  bathing: 'อาบน้ำ / สุขอนามัย',
-  cooking: 'ทำอาหาร',
-  companionship: 'เป็นเพื่อนคุย',
-  wound_care: 'ดูแลแผล',
-  physical_therapy: 'กายภาพบำบัด',
-  dementia_care: 'ดูแลสมองเสื่อม',
 };
 
 const genderLabel: Record<string, string> = {
@@ -747,7 +737,7 @@ export default function KycReviewDetailPage() {
                     {caregiver.skills.length > 0 ? (
                       caregiver.skills.map((skill) => (
                         <span key={skill} className="inline-flex items-center rounded-md bg-[#F3F4F6] px-2.5 py-1 text-[13px] text-[#374151]">
-                          {skillLabel[skill] ?? skill}
+                          {skillLabel(skill)}
                         </span>
                       ))
                     ) : (

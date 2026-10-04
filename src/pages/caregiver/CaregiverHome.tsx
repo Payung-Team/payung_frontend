@@ -17,6 +17,7 @@ import { Icon } from '../../components/ui/Icon';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
+import { skillLabel } from '../../lib/skillLabels';
 
 interface UserData {
   me: {
@@ -135,21 +136,6 @@ function toAvatarGradient(name: string): string {
   const code = name.charCodeAt(0) || 0;
   return AVATAR_GRADIENTS[code % AVATAR_GRADIENTS.length];
 }
-
-const SKILL_TRANSLATIONS: Record<string, string> = {
-  mobility: 'ช่วยเคลื่อนไหว',
-  medication: 'ดูแลยา',
-  bathing: 'อาบน้ำ / สุขอนามัย',
-  cooking: 'ทำอาหาร',
-  companionship: 'เป็นเพื่อนคุย',
-  wound_care: 'ดูแลแผล',
-  physical_therapy: 'กายภาพบำบัด',
-  physiotherapy: 'กายภาพบำบัด',
-  dementia_care: 'ดูแลสมองเสื่อม',
-  general_care: 'ดูแลทั่วไป',
-  bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
-  companion: 'เป็นเพื่อน/พูดคุย',
-};
 
 // ─── Sub-components ───────────────────────────────────────────────────────
 
@@ -526,7 +512,7 @@ const CaregiverHome: React.FC = () => {
     reviews.length > 0
       ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
       : null;
-  const translatedSkills = (profile?.skills ?? []).map(s => SKILL_TRANSLATIONS[s] ?? s);
+  const translatedSkills = (profile?.skills ?? []).map(s => skillLabel(s));
 
   const handleToggleAvailability = async () => {
     if (!canToggle) return;

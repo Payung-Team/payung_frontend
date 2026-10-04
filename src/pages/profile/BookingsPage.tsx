@@ -6,6 +6,7 @@ import { GET_MY_BOOKING_HISTORY } from '../../graphql/queries';
 import { mapGqlStatus, ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
 import { formatBookingTimeRange } from '../../lib/bookingTime';
 import { formatDisplayPrice, NO_PRICE_LABEL } from '../../lib/displayPrice';
+import { skillLabel } from '../../lib/skillLabels';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -223,21 +224,6 @@ function BookingCard({ booking, onViewDetail, isDueSection }: Readonly<{ booking
 
 // ── Saved Caregivers Modal ─────────────────────────────────────────────────────
 
-const SKILL_LABELS: Record<string, string> = {
-  mobility: 'ช่วยเคลื่อนไหว',
-  medication: 'ดูแลยา',
-  bathing: 'อาบน้ำ / สุขอนามัย',
-  cooking: 'ทำอาหาร',
-  companionship: 'เป็นเพื่อนคุย',
-  wound_care: 'ดูแลแผล',
-  physical_therapy: 'กายภาพบำบัด',
-  physiotherapy: 'กายภาพบำบัด',
-  dementia_care: 'ดูแลสมองเสื่อม',
-  general_care: 'ดูแลทั่วไป',
-  bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
-  companion: 'เป็นเพื่อน/พูดคุย',
-};
-
 interface SavedCaregiversModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -379,7 +365,7 @@ function SavedCaregiversModal({ isOpen, onClose, caregivers, onRemove, onViewPro
             <div style={{ padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               {caregivers.map((cg) => {
                 const initial = cg.fullName.charAt(0);
-                const skillLabels = cg.skills.slice(0, 3).map((s) => SKILL_LABELS[s] ?? s);
+                const skillLabels = cg.skills.slice(0, 3).map((s) => skillLabel(s));
                 const locationStr = [cg.district, cg.province].filter(Boolean).join(', ') || cg.province;
                 return (
                   <div

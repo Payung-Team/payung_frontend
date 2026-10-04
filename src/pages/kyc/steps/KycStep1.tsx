@@ -7,6 +7,7 @@ import { useKyc } from '../../../context/KycContext';
 import Input from '../../../components/ui/Input';
 import Icon from '../../../components/ui/Icon';
 import KycStepper from '../KycStepper';
+import { SKILL_OPTIONS } from '../../../lib/skillLabels';
 
 // ── Validation helpers ────────────────────────────────────────────────────
 function isValidThaiId(id: string): boolean {
@@ -64,17 +65,6 @@ const step1Schema = z.object({
 type Step1Form = z.infer<typeof step1Schema>;
 
 // ── Options ───────────────────────────────────────────────────────────────
-const SKILL_OPTIONS = [
-  { value: 'mobility', label: 'ช่วยเคลื่อนไหว' },
-  { value: 'medication', label: 'ดูแลยา' },
-  { value: 'bathing', label: 'อาบน้ำ / สุขอนามัย' },
-  { value: 'cooking', label: 'ทำอาหาร' },
-  { value: 'companionship', label: 'เป็นเพื่อนคุย' },
-  { value: 'wound_care', label: 'ดูแลแผล' },
-  { value: 'physical_therapy', label: 'กายภาพบำบัด' },
-  { value: 'dementia_care', label: 'ดูแลสมองเสื่อม' },
-];
-
 const GENDER_OPTIONS = [
   { label: 'ชาย', value: 'male' },
   { label: 'หญิง', value: 'female' },

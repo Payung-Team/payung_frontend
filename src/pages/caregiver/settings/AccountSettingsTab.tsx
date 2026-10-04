@@ -11,6 +11,7 @@ import { Icon } from '../../../components/ui/Icon';
 import KycStatusBadge from '../../../components/ui/KycStatusBadge';
 import Avatar from '../../../components/ui/Avatar';
 import Skeleton from '../../../components/ui/Skeleton';
+import { skillLabel } from '../../../lib/skillLabels';
 
 function formatPhone(val?: string | null): string {
   if (!val) return '-';
@@ -400,7 +401,11 @@ export const AccountSettingsTab: React.FC = () => {
               <input
                 id="skills"
                 type="text"
-                value={caregiver?.skills && caregiver.skills.length > 0 ? caregiver.skills.join(', ') : 'ยังไม่ได้เลือก'}
+                value={
+                  caregiver?.skills && caregiver.skills.length > 0
+                    ? caregiver.skills.map((skill) => skillLabel(skill)).join(', ')
+                    : 'ยังไม่ได้เลือก'
+                }
                 readOnly
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
               />

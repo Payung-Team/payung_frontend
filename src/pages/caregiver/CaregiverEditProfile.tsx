@@ -17,6 +17,7 @@ import ProfileFormFields from '../../components/ui/ProfileFormFields';
 import ThaiAddressSelector from '../../components/ui/ThaiAddressSelector';
 import AlertModal from '../../components/ui/AlertModal';
 import ProfilePhotoUploadCard from '../../components/caregiver/ProfilePhotoUploadCard';
+import { SKILL_OPTIONS, skillLabel } from '../../lib/skillLabels';
 
 function formatPhone(val?: string | null): string {
   if (!val) return '';
@@ -454,79 +455,44 @@ const CaregiverEditProfile: React.FC = () => {
 
                 {/* Skills */}
                 <div>
-                  <label htmlFor="skillInput" className="text-[14px] font-semibold text-[#0A0A0A] mb-3 block">ทักษะความสามารถ</label>
-                  <div className="p-4 border border-gray-300 rounded-lg bg-white">
-                    {/* Selected Skills Chips */}
-                    {(watchedValues.skills || []).length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {(watchedValues.skills || []).map((skill) => (
-                          <div
-                            key={skill}
-                            className="px-3 py-2 bg-[#52B69A] text-white rounded-full text-[12px] font-semibold flex items-center gap-2 hover:bg-[#409E82] transition-colors"
-                          >
-                            {skill}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newSkills = (watchedValues.skills || []).filter((s) => s !== skill);
-                                setValue('skills', newSkills);
-                              }}
-                              className="text-[14px] hover:opacity-70 transition-opacity flex items-center justify-center cursor-pointer"
-                            >
-                              <Icon name="close" className="text-sm" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {/* Suggestion Chips */}
-                    <div className="mb-4">
-                      <p className="text-[12px] text-[#717182] mb-2">ทักษะแนะนำ:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          'การดูแลด้านสุขภาพ',
-                          'การเตรียมอาหาร',
-                          'การช่วยเหลือการเดิน',
-                          'การยา',
-                          'การปรึกษา',
-                        ].map((skill) => (
-                          <button
-                            key={skill}
-                            type="button"
-                            onClick={() => {
-                              if (!(watchedValues.skills || []).includes(skill)) {
-                                const newSkills = [...(watchedValues.skills || []), skill];
-                                setValue('skills', newSkills);
-                              }
-                            }}
-                            className={`px-3 py-2 rounded-full text-[12px] font-semibold transition-colors ${
-                              (watchedValues.skills || []).includes(skill)
-                                ? 'bg-[#52B69A] text-white cursor-default'
-                                : 'bg-[#F5F5F5] text-[#717182] hover:bg-[#52B69A] hover:text-white cursor-pointer'
-                            }`}
-                          >
-                            {skill}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    {/* Custom Input */}
-                    <input
-                      type="text"
-                      id="skillInput"
-                      placeholder="พิมพ์ทักษะแล้วกด Enter เพื่อเพิ่มเอง"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] focus:outline-none focus:ring-2 focus:ring-[#52B69A]"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                          const newSkill = e.currentTarget.value.trim();
-                          if (!(watchedValues.skills || []).includes(newSkill)) {
-                            const newSkills = [...(watchedValues.skills || []), newSkill];
-                            setValue('skills', newSkills);
-                          }
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                    />
+                  <p id="skills-label" className="text-[14px] font-semibold text-[#0A0A0A] mb-3">ทักษะการดูแล</p>
+                  {/*
+                    เลือกได้เฉพาะ 8 ทักษะชุดเดียวกับตอนกรอก KYC (บันทึกเป็นรหัส เช่น dementia_care)
+                    ค่าเดิมที่ไม่อยู่ในชุด (เคยพิมพ์เอง / ทักษะแนะนำแบบเก่า) ยังแสดงให้กดเอาออกได้ ไม่หายเงียบ ๆ
+                  */}
+                  <div className="flex flex-wrap gap-2" role="group" aria-labelledby="skills-label">
+                    {[
+                      ...SKILL_OPTIONS,
+                      ...(watchedValues.skills || [])
+                        .filter((skill) => !SKILL_OPTIONS.some((option) => option.value === skill))
+                        .map((skill) => ({ value: skill, label: skillLabel(skill) })),
+                    ].map((option) => {
+                      const selected = (watchedValues.skills || []).includes(option.value);
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => {
+                            const current = watchedValues.skills || [];
+                            setValue(
+                              'skills',
+                              selected
+                                ? current.filter((s) => s !== option.value)
+                                : [...current, option.value],
+                              { shouldDirty: true },
+                            );
+                          }}
+                          className={`px-4 py-2 rounded-full text-[14px] font-medium border transition-colors cursor-pointer ${
+                            selected
+                              ? 'bg-[#52B69A] text-white border-[#52B69A] hover:bg-[#409E82]'
+                              : 'bg-white text-[#0A0A0A] border-[#E2E8F0] hover:border-[#52B69A] hover:text-[#52B69A]'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -604,7 +570,7 @@ const CaregiverEditProfile: React.FC = () => {
                     {watchedValues.skills && watchedValues.skills.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {watchedValues.skills.map((skill) => (
-                          <span key={skill} className="px-3 py-1 bg-[#ECEEF2] text-[#030213] rounded-lg text-[12px] font-semibold">{skill}</span>
+                          <span key={skill} className="px-3 py-1 bg-[#ECEEF2] text-[#030213] rounded-lg text-[12px] font-semibold">{skillLabel(skill)}</span>
                         ))}
                       </div>
                     ) : (

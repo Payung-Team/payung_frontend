@@ -4,6 +4,7 @@ import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import CaregiverPhoto from './CaregiverPhoto';
 import { formatBookingTimeRange } from '../../lib/bookingTime';
 import { isBookingTimeErrorMessage } from '../../lib/bookingSubmitError';
+import { skillLabel } from '../../lib/skillLabels';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -35,21 +36,6 @@ interface BookingConfirmModalProps {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-const SKILL_TRANSLATIONS: Record<string, string> = {
-  mobility: 'ช่วยเคลื่อนไหว',
-  medication: 'ดูแลยา',
-  bathing: 'อาบน้ำ / สุขอนามัย',
-  cooking: 'ทำอาหาร',
-  companionship: 'เป็นเพื่อนคุย',
-  wound_care: 'ดูแลแผล',
-  physical_therapy: 'กายภาพบำบัด',
-  physiotherapy: 'กายภาพบำบัด',
-  dementia_care: 'ดูแลสมองเสื่อม',
-  general_care: 'ดูแลทั่วไป',
-  bedridden_care: 'ดูแลผู้ป่วยติดเตียง',
-  companion: 'เป็นเพื่อน/พูดคุย',
-};
 
 function formatThaiDate(dateStr: string): string {
   if (!dateStr) return '—';
@@ -111,7 +97,7 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
   const province = caregiver?.province ?? '';
   const verified = caregiver?.verified ?? false;
   const avatarUrl = caregiver?.avatarUrl ?? null;
-  const skills = (caregiver?.skills ?? []).map((s) => SKILL_TRANSLATIONS[s] || s);
+  const skills = (caregiver?.skills ?? []).map((s) => skillLabel(s));
 
   // Booking details
   const serviceTypes = (bookingDraft?.serviceTypes ?? [])
