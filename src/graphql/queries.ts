@@ -484,6 +484,20 @@ export const ADMIN_PROFILE_PHOTO_REVIEW = gql`
   }
 `;
 
+/** PYG-488: สถานะรีวิวรูปโปรไฟล์ใบล่าสุดของผู้ดูแลเอง (แทน localStorage เดิม) */
+export const MY_PROFILE_PHOTO_REVIEW = gql`
+  query MyProfilePhotoReview {
+    myProfilePhotoReview {
+      documentId
+      reviewStatus
+      photoUrl
+      reason
+      uploadedAt
+      reviewedAt
+    }
+  }
+`;
+
 export const APPROVE_PROFILE_PHOTO = gql`
   mutation ApproveProfilePhoto($documentId: ID!) {
     approveProfilePhoto(documentId: $documentId) {

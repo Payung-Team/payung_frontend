@@ -1,41 +1,47 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@apollo/client/react';
 import Avatar from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
 import PhotoCropModal from './PhotoCropModal';
 import { validatePhotoSourceFile } from '../../lib/profilePhotoCrop';
 import { uploadCroppedProfilePhoto } from '../../lib/profilePhoto';
-import {
-  clearPhotoReviewState,
-  getPhotoReviewState,
-  savePendingPhotoReview,
-  type PhotoReviewState,
-} from '../../lib/profilePhotoReviewState';
+import { MY_PROFILE_PHOTO_REVIEW } from '../../graphql/queries';
 import type { ToastType } from '../ui/Toast';
 
+interface MyProfilePhotoReview {
+  documentId: string;
+  reviewStatus: 'pending' | 'approved' | 'rejected' | string;
+  /** signed URL ของใบนั้น (pending / rejected) — หมดอายุ 1 ชม. จึงดึงใหม่ทุกครั้งที่เปิดหน้า */
+  photoUrl?: string | null;
+  reason?: string | null;
+  uploadedAt: string;
+  reviewedAt?: string | null;
+}
+
 interface ProfilePhotoUploadCardProps {
-  caregiverId?: string;
   currentAvatarUrl?: string;
   displayName: string;
   onToast: (type: ToastType, message: string) => void;
 }
 
 export default function ProfilePhotoUploadCard({
-  caregiverId,
   currentAvatarUrl,
   displayName,
   onToast,
 }: ProfilePhotoUploadCardProps) {
-  const [reviewState, setReviewState] = useState<PhotoReviewState | null>(null);
+  // สถานะมาจาก backend (myProfilePhotoReview) — แอดมินอนุมัติ/ปฏิเสธแล้วหน้านี้เห็นตามทันทีที่เปิดใหม่
+  const { data: reviewData, refetch: refetchReview } = useQuery<{
+    myProfilePhotoReview: MyProfilePhotoReview | null;
+  }>(MY_PROFILE_PHOTO_REVIEW, { fetchPolicy: 'cache-and-network' });
+  const review = reviewData?.myProfilePhotoReview ?? null;
+  const isPending = review?.reviewStatus === 'pending';
+  const isRejected = review?.reviewStatus === 'rejected';
+
   const [pickedFile, setPickedFile] = useState<File | null>(null);
   const [pendingBlob, setPendingBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!caregiverId) return;
-    setReviewState(getPhotoReviewState(caregiverId));
-  }, [caregiverId]);
 
   // ปล่อย object URL ของพรีวิวหลัง crop ทุกครั้งที่เปลี่ยน/เลิกใช้ ไม่งั้นค้างใน memory
   useEffect(() => {
@@ -76,12 +82,11 @@ export default function ProfilePhotoUploadCard({
   };
 
   const handleUpload = async () => {
-    if (!pendingBlob || !caregiverId) return;
+    if (!pendingBlob) return;
     setUploading(true);
     try {
-      const result = await uploadCroppedProfilePhoto(pendingBlob);
-      savePendingPhotoReview(caregiverId, result.photoUrl);
-      setReviewState(getPhotoReviewState(caregiverId));
+      await uploadCroppedProfilePhoto(pendingBlob);
+      await refetchReview();
       onToast('success', 'อัปโหลดรูปแล้ว รอแอดมินอนุมัติก่อนผู้ใช้อื่นจะเห็นรูปใหม่');
       handleDiscardPreview();
     } catch (err) {
@@ -89,12 +94,6 @@ export default function ProfilePhotoUploadCard({
     } finally {
       setUploading(false);
     }
-  };
-
-  const handleReuploadAfterRejection = () => {
-    if (caregiverId) clearPhotoReviewState(caregiverId);
-    setReviewState(null);
-    openPicker();
   };
 
   return (
@@ -144,13 +143,13 @@ export default function ProfilePhotoUploadCard({
       ) : (
         <div className="flex flex-col items-center gap-3">
           <Avatar
-            src={reviewState?.status === 'pending' ? reviewState.photoUrl ?? undefined : currentAvatarUrl}
+            src={isPending ? review?.photoUrl ?? undefined : currentAvatarUrl}
             name={displayName}
             size={112}
             fallbackColor="#52B69A"
           />
 
-          {reviewState?.status === 'pending' && (
+          {isPending && (
             <div className="flex flex-col items-center gap-1 text-center">
               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-semibold bg-[#FFF4E5] text-[#B26A00]">
                 <Icon name="hourglass_top" size="small" color="#B26A00" />
@@ -162,28 +161,38 @@ export default function ProfilePhotoUploadCard({
             </div>
           )}
 
-          {reviewState?.status === 'rejected' && (
+          {isRejected && (
             <div className="flex flex-col items-center gap-1 text-center">
               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-semibold bg-red-50 text-red-600">
                 <Icon name="cancel" size="small" color="#DC3545" />
-                ถูกปฏิเสธ
+                รูปใหม่ไม่ผ่านการอนุมัติ
               </span>
-              {reviewState.rejectionReason && (
-                <p className="text-[12px] text-red-500 max-w-[280px]">{reviewState.rejectionReason}</p>
+              {review?.reason && (
+                <p className="text-[12px] text-red-500 max-w-[280px]">เหตุผล: {review.reason}</p>
               )}
+              <p className="text-[12px] text-[#717182] max-w-[280px]">
+                {currentAvatarUrl ? 'ผู้ใช้อื่นยังเห็นรูปเดิมที่อนุมัติแล้ว' : 'กรุณาอัปโหลดรูปใหม่'}
+              </p>
             </div>
+          )}
+
+          {review?.reviewStatus === 'approved' && (
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-semibold bg-[#ECFDF5] text-[#047857]">
+              <Icon name="check_circle" size="small" color="#047857" />
+              อนุมัติแล้ว
+            </span>
           )}
 
           <div className="flex flex-col items-center gap-1">
             <button
               type="button"
-              onClick={reviewState?.status === 'rejected' ? handleReuploadAfterRejection : openPicker}
+              onClick={openPicker}
               disabled={uploading}
               className="px-4 py-2 bg-[#52B69A] text-white rounded-lg font-semibold text-[13px] hover:bg-[#409E82] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {reviewState?.status === 'rejected' ? 'อัปโหลดรูปใหม่' : 'เปลี่ยนรูปโปรไฟล์'}
+              {isRejected ? 'อัปโหลดรูปใหม่' : 'เปลี่ยนรูปโปรไฟล์'}
             </button>
-            {reviewState?.status === 'pending' && (
+            {isPending && (
               <button
                 type="button"
                 onClick={openPicker}

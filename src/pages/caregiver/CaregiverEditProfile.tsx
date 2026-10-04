@@ -83,7 +83,10 @@ const CaregiverEditProfile: React.FC = () => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
-  const { data: userData, loading: userLoading } = useQuery<UserData>(GET_USER);
+  // cache-and-network: แอดมินอนุมัติรูปใหม่แล้ว me.avatarUrl ต้องเปลี่ยนตามเมื่อเปิดหน้านี้ (header ใช้ cache เดียวกัน)
+  const { data: userData, loading: userLoading } = useQuery<UserData>(GET_USER, {
+    fetchPolicy: 'cache-and-network',
+  });
   const { data: caregiverData, loading: caregiverLoading } = useQuery<{ myCaregiverProfile: CaregiverData }>(GET_CAREGIVER_PROFILE);
 
   // Mutation สำหรับ update profile
@@ -303,7 +306,6 @@ const CaregiverEditProfile: React.FC = () => {
           <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-[700px] space-y-6">
             {/* Profile Photo Card */}
             <ProfilePhotoUploadCard
-              caregiverId={caregiver?.id}
               currentAvatarUrl={user?.avatarUrl}
               displayName={caregiver?.fullName || displayName}
               onToast={(type, message) => setToastMessage({ type, message })}

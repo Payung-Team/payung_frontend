@@ -59,7 +59,8 @@ export const AccountSettingsTab: React.FC = () => {
       createdAt?: string;
       emailPreferences?: boolean;
     };
-  }>(GET_USER);
+    // cache-and-network: แอดมินอนุมัติรูปใหม่แล้วหน้านี้ต้องได้ avatarUrl ล่าสุด (signed URL หมดอายุ 1 ชม.)
+  }>(GET_USER, { fetchPolicy: 'cache-and-network' });
 
   const { data: caregiverData, loading: caregiverLoading } = useQuery<{
     myCaregiverProfile: {
@@ -135,7 +136,8 @@ export const AccountSettingsTab: React.FC = () => {
         ) : (
           <div className="flex items-center gap-6">
             <Avatar
-              name={displayName}
+              src={user?.avatarUrl}
+              name={caregiver?.fullName || displayName}
               size={96}
               fallbackColor="#52B69A"
             />
