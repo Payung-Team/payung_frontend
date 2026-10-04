@@ -80,7 +80,6 @@ export const AccountSettingsTab: React.FC = () => {
       bio?: string;
       skills?: string[];
       experienceYears?: number;
-      hourlyRate?: number;
       resubmitCount?: number;
       createdAt?: string;
       updatedAt?: string;
@@ -406,18 +405,6 @@ export const AccountSettingsTab: React.FC = () => {
                     ? caregiver.skills.map((skill) => skillLabel(skill)).join(', ')
                     : 'ยังไม่ได้เลือก'
                 }
-                readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
-              />
-            </div>
-
-            {/* Hourly Rate */}
-            <div>
-              <label htmlFor="hourly-rate" className="text-[14px] font-semibold text-[#0A0A0A] mb-2 block">อัตราการจ้าง (บาท/ชั่วโมง)</label>
-              <input
-                id="hourly-rate"
-                type="text"
-                value={caregiver?.hourlyRate ? `฿${caregiver.hourlyRate.toFixed(2)}` : '-'}
                 readOnly
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] bg-[#F3F3F5] text-[rgba(0,0,0,0.5)]"
               />
