@@ -127,7 +127,7 @@ export default function ProfilePhotoUploadCard({
               type="button"
               onClick={handleDiscardPreview}
               disabled={uploading}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-[13px] font-medium text-[#0A0A0A] hover:bg-gray-50 disabled:opacity-50"
+              className="px-4 py-2 border border-gray-300 rounded-lg text-[13px] font-medium text-[#0A0A0A] hover:bg-gray-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               เลือกรูปใหม่
             </button>
@@ -135,7 +135,7 @@ export default function ProfilePhotoUploadCard({
               type="button"
               onClick={handleUpload}
               disabled={uploading}
-              className="px-4 py-2 rounded-lg text-[13px] font-medium text-white bg-[#52B69A] hover:bg-[#409E82] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-lg text-[13px] font-medium text-white bg-[#52B69A] hover:bg-[#409E82] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {uploading ? 'กำลังอัปโหลด...' : 'ยืนยันและอัปโหลด'}
             </button>
@@ -179,7 +179,7 @@ export default function ProfilePhotoUploadCard({
               type="button"
               onClick={reviewState?.status === 'rejected' ? handleReuploadAfterRejection : openPicker}
               disabled={uploading}
-              className="px-4 py-2 bg-[#52B69A] text-white rounded-lg font-semibold text-[13px] hover:bg-[#409E82] transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-[#52B69A] text-white rounded-lg font-semibold text-[13px] hover:bg-[#409E82] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {reviewState?.status === 'rejected' ? 'อัปโหลดรูปใหม่' : 'เปลี่ยนรูปโปรไฟล์'}
             </button>
@@ -188,7 +188,7 @@ export default function ProfilePhotoUploadCard({
                 type="button"
                 onClick={openPicker}
                 disabled={uploading}
-                className="text-[12px] text-[#717182] underline hover:text-[#0A0A0A] disabled:opacity-50"
+                className="text-[12px] text-[#717182] underline hover:text-[#0A0A0A] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 เลือกรูปใหม่อีกครั้ง
               </button>

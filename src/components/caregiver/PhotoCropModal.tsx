@@ -173,7 +173,7 @@ export default function PhotoCropModal({ file, onCancel, onConfirm }: PhotoCropM
           <button
             type="button"
             onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
+            className="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 cursor-pointer"
             aria-label="ปิด"
           >
             <Icon name="close" />
@@ -236,7 +236,7 @@ export default function PhotoCropModal({ file, onCancel, onConfirm }: PhotoCropM
                 value={zoom}
                 onChange={handleZoomChange}
                 disabled={status === 'exporting'}
-                className="flex-1 accent-[#52B69A]"
+                className="flex-1 accent-[#52B69A] cursor-pointer disabled:cursor-not-allowed"
                 aria-label="ซูมรูป"
               />
               <Icon name="zoom_in" size="small" color="#717182" />
@@ -253,7 +253,7 @@ export default function PhotoCropModal({ file, onCancel, onConfirm }: PhotoCropM
             type="button"
             onClick={onCancel}
             disabled={status === 'exporting'}
-            className="flex-1 px-4 py-2 text-sm border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 disabled:opacity-50"
+            className="flex-1 px-4 py-2 text-sm border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             ยกเลิก
           </button>
@@ -261,7 +261,7 @@ export default function PhotoCropModal({ file, onCancel, onConfirm }: PhotoCropM
             type="button"
             onClick={handleConfirm}
             disabled={status !== 'ready'}
-            className="flex-1 px-4 py-2 text-sm bg-[#52B69A] text-white rounded-lg font-semibold hover:bg-[#3d9178] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 text-sm bg-[#52B69A] text-white rounded-lg font-semibold hover:bg-[#3d9178] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {status === 'exporting' ? 'กำลังครอป...' : 'ใช้รูปนี้'}
           </button>

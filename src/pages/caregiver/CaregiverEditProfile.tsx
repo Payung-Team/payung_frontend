@@ -276,7 +276,7 @@ const CaregiverEditProfile: React.FC = () => {
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               onClick={handleCancel}
-              className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg text-[13px] sm:text-[14px] font-medium text-[#0A0A0A] hover:bg-gray-50 transition-colors"
+              className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg text-[13px] sm:text-[14px] font-medium text-[#0A0A0A] hover:bg-gray-50 transition-colors cursor-pointer"
             >
               ยกเลิก
             </button>
@@ -285,7 +285,7 @@ const CaregiverEditProfile: React.FC = () => {
               disabled={!isDirty || updateLoading}
               className={`px-3 sm:px-4 py-2 rounded-lg text-[13px] sm:text-[14px] font-medium text-white transition-colors ${
                 isDirty && !updateLoading
-                  ? 'bg-[#52B69A] hover:bg-[#409E82]'
+                  ? 'bg-[#52B69A] hover:bg-[#409E82] cursor-pointer'
                   : 'bg-gray-400 cursor-not-allowed'
               }`}
             >
@@ -469,7 +469,7 @@ const CaregiverEditProfile: React.FC = () => {
                                 const newSkills = (watchedValues.skills || []).filter((s) => s !== skill);
                                 setValue('skills', newSkills);
                               }}
-                              className="text-[14px] hover:opacity-70 transition-opacity flex items-center justify-center"
+                              className="text-[14px] hover:opacity-70 transition-opacity flex items-center justify-center cursor-pointer"
                             >
                               <Icon name="close" className="text-sm" />
                             </button>
