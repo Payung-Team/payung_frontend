@@ -1,52 +1,87 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation } from '@apollo/client/react';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery } from '@apollo/client/react';
 import { Link } from 'react-router-dom';
-import {
-  GET_USER,
-  GET_CAREGIVER_PROFILE,
-  SET_CAREGIVER_SEARCHABLE,
-  GET_UNREAD_COUNT,
-  GET_CAREGIVER_BOOKINGS,
-  CAREGIVER_REVIEWS,
-} from '../../graphql/queries';
-import Skeleton from '../../components/ui/Skeleton';
-import { RatingDistribution } from '../../components/ui/RatingDistribution';
-import { formatTimeAgo } from '../../utils/formatTimeAgo';
-import StatusBadge from '../../components/ui/StatusBadge';
+import Avatar from '../../components/ui/Avatar';
 import { Icon } from '../../components/ui/Icon';
+import { RatingDistribution } from '../../components/ui/RatingDistribution';
+import Skeleton from '../../components/ui/Skeleton';
+import StatusBadge, { type StatusBadgeMeta } from '../../components/ui/StatusBadge';
 import { ToastContainer } from '../../components/ui/Toast';
-import { useToast } from '../../hooks/useToast';
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
+import {
+  CAREGIVER_REVIEWS,
+  GET_CAREGIVER_BOOKINGS,
+  GET_CAREGIVER_PROFILE,
+  GET_UNREAD_COUNT,
+  GET_USER,
+  SET_CAREGIVER_SEARCHABLE,
+} from '../../graphql/queries';
+import { useToast } from '../../hooks/useToast';
+import { formatBookingTimeRange } from '../../lib/bookingTime';
+import { formatDisplayPrice, NO_PRICE_LABEL } from '../../lib/displayPrice';
+import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import { skillLabel } from '../../lib/skillLabels';
+import { formatTimeAgo } from '../../utils/formatTimeAgo';
 
 interface UserData {
   me: {
     id: string;
-    email: string;
-    displayName?: string;
-    role: number;
+    displayName?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    avatarUrl?: string | null;
   };
 }
 
 interface CaregiverProfile {
   id: string;
-  caregiverNumber?: string;
-  fullName?: string;
-  gender?: string;
-  dateOfBirth?: string;
-  phone?: string;
-  address?: string;
-  bio?: string;
-  hourlyRate?: number;
-  skills: string[];
-  experienceYears?: number;
+  caregiverNumber?: string | null;
+  fullName?: string | null;
+  gender?: string | null;
+  dateOfBirth?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  bio?: string | null;
+  hourlyRate?: number | null;
+  skills?: string[] | null;
+  experienceYears?: number | null;
   kycStatus: string;
   isSearchable: boolean;
-  updatedAt?: string;
+  updatedAt?: string | null;
 }
 
 interface CaregiverData {
   myCaregiverProfile: CaregiverProfile;
+}
+
+interface BookingSummary {
+  id: string;
+  status: string;
+  serviceType?: string | null;
+  tasks?: string[] | null;
+  bookingDate: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  durationHours?: number | null;
+  estimatedCost?: number | null;
+  locationAddress?: string | null;
+  notes?: string | null;
+  patient?: { displayName?: string | null; avatarUrl?: string | null } | null;
+  careRecipientName?: string | null;
+  recipientAvatarUrl?: string | null;
+  createdAt: string;
+  patientProfile?: {
+    age?: number | null;
+    gender?: string | null;
+    supportLevel?: string | null;
+  } | null;
+}
+
+interface CaregiverBookingsData {
+  caregiverBookings: {
+    data: BookingSummary[];
+    pagination: { total: number };
+  };
 }
 
 interface UnreadCountData {
@@ -58,7 +93,6 @@ interface BackendReview {
   rating: number;
   comment: string | null;
   reviewerName: string;
-  isAnonymous: boolean;
   isVisible: boolean;
   createdAt: string;
 }
@@ -66,650 +100,607 @@ interface BackendReview {
 interface CaregiverReviewsData {
   caregiverReviews: {
     data: BackendReview[];
-    pagination: { page: number; limit: number; total: number; totalPages: number };
+    pagination: { total: number };
   };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────
+interface HomeBooking {
+  id: string;
+  status: 'pending' | 'accepted' | 'confirmed';
+  patientName: string;
+  recipientAvatarUrl?: string;
+  serviceType: string;
+  bookingDate: string;
+  timeRangeText: string;
+  price: number | null;
+  locationName?: string;
+  tasks: string[];
+  notes?: string;
+  createdAt: string;
+  age?: number;
+  gender?: string;
+  supportLevel?: string;
+}
 
-function kycBadgeMeta(status: string) {
+type LoadableCount = number | null | undefined;
+
+const FONT = { fontFamily: "'Bai Jamjuree', sans-serif" } as const;
+
+function kycBadgeMeta(status: string): StatusBadgeMeta {
   switch (status) {
     case 'verified':
-      return { label: 'ยืนยันแล้ว', badgeClass: 'bg-green-100 text-green-700', dotClass: 'bg-green-500' };
+      return { label: 'ยืนยันตัวตนแล้ว', badgeClass: 'bg-[#E5F7EF] text-[#176B4A]', dotClass: 'bg-[#2F9D70]' };
     case 'pending':
-      return { label: 'รอการตรวจสอบ', badgeClass: 'bg-orange-100 text-orange-700', dotClass: 'bg-orange-500' };
+      return { label: 'กำลังตรวจสอบ', badgeClass: 'bg-[#FFF0D9] text-[#945C10]', dotClass: 'bg-[#E89A2E]' };
     case 'rejected':
-      return { label: 'เอกสารไม่ผ่าน', badgeClass: 'bg-red-100 text-red-700', dotClass: 'bg-red-500' };
+      return { label: 'ต้องแก้ไขเอกสาร', badgeClass: 'bg-[#FDE8E8] text-[#A72D39]', dotClass: 'bg-[#D14A56]' };
     default:
-      return { label: 'ยังไม่ยืนยัน', badgeClass: 'bg-gray-100 text-gray-600', dotClass: 'bg-gray-400' };
+      return { label: 'ยังไม่ยืนยันตัวตน', badgeClass: 'bg-[#EEF1F0] text-[#68736F]', dotClass: 'bg-[#98A39F]' };
   }
 }
 
+function toHomeBooking(summary: BookingSummary): HomeBooking {
+  const status = summary.status.toLowerCase();
+  return {
+    id: summary.id,
+    status: status === 'accepted' || status === 'confirmed' ? status : 'pending',
+    patientName: summary.careRecipientName?.trim() || summary.patient?.displayName?.trim() || 'ผู้ใช้บริการ',
+    recipientAvatarUrl: summary.recipientAvatarUrl ?? summary.patient?.avatarUrl ?? undefined,
+    serviceType: serviceTypeLabel(summary.serviceType),
+    bookingDate: summary.bookingDate,
+    timeRangeText: formatBookingTimeRange({
+      startTime: summary.startTime,
+      endTime: summary.endTime,
+      durationHours: summary.durationHours,
+    }),
+    price: typeof summary.estimatedCost === 'number' && summary.estimatedCost > 0 ? summary.estimatedCost : null,
+    locationName: summary.locationAddress?.trim() || undefined,
+    tasks: summary.tasks?.filter(Boolean) ?? [],
+    notes: summary.notes?.trim() || undefined,
+    createdAt: summary.createdAt,
+    age: summary.patientProfile?.age ?? undefined,
+    gender: summary.patientProfile?.gender ?? undefined,
+    supportLevel: summary.patientProfile?.supportLevel ?? undefined,
+  };
+}
 
-function calcCompleteness(profile: CaregiverProfile): number {
-  const checks: { weight: number; filled: boolean }[] = [
-    { weight: 15, filled: !!profile.fullName },
-    // ไม่นับ hourlyRate แล้ว (PYG-536) — ผู้ดูแลตั้งราคาเองไม่ได้ น้ำหนัก 15 เดิมกระจายให้ bio/phone/address
-    { weight: 15, filled: !!profile.bio },
-    { weight: 15, filled: !!profile.phone },
-    { weight: 15, filled: !!profile.address },
-    { weight: 15, filled: (profile.skills?.length ?? 0) > 0 },
-    { weight: 15, filled: !!profile.experienceYears },
-    { weight: 5,  filled: !!profile.gender },
-    { weight: 5,  filled: !!profile.dateOfBirth },
+function formatThaiDate(dateStr: string, withYear = true): string {
+  const date = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateStr;
+  return new Intl.DateTimeFormat('th-TH', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    ...(withYear ? { year: 'numeric' } : {}),
+  }).format(date);
+}
+
+function scheduleTimestamp(booking: HomeBooking): number {
+  const start = /^\d{2}:\d{2}/.exec(booking.timeRangeText)?.[0] ?? '23:59';
+  const value = new Date(`${booking.bookingDate}T${start}:00`).getTime();
+  return Number.isNaN(value) ? Number.MAX_SAFE_INTEGER : value;
+}
+
+function profileReadiness(profile: CaregiverProfile) {
+  const items = [
+    Boolean(profile.fullName?.trim()),
+    Boolean(profile.phone?.trim()),
+    Boolean(profile.address?.trim()),
+    Boolean(profile.bio?.trim()),
+    (profile.skills?.length ?? 0) > 0,
+    typeof profile.experienceYears === 'number',
+    Boolean(profile.gender),
+    Boolean(profile.dateOfBirth),
   ];
-  return checks.reduce((sum, c) => sum + (c.filled ? c.weight : 0), 0);
-}
-
-function formatUpdatedAt(iso?: string): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  const day = date.getDate();
-  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-  const month = months[date.getMonth()];
-  const year = date.getFullYear();
-  return `${day} ${month} ${year}`;
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-const cardBase =
-  'bg-white rounded-2xl p-4 border border-transparent shadow-[0_1px_4px_rgba(0,0,0,0.05)] flex flex-col gap-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)]';
-
-const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg, #E17055 0%, #FAB1A0 100%)',
-  'linear-gradient(135deg, #52B69A 0%, #76C893 100%)',
-  'linear-gradient(135deg, #3B5BDB 0%, #74C0FC 100%)',
-  'linear-gradient(135deg, #F08C00 0%, #FCC419 100%)',
-  'linear-gradient(135deg, #7950F2 0%, #DA77F2 100%)',
-  'linear-gradient(135deg, #0CA678 0%, #63E6BE 100%)',
-];
-
-function toAvatarGradient(name: string): string {
-  const code = name.charCodeAt(0) || 0;
-  return AVATAR_GRADIENTS[code % AVATAR_GRADIENTS.length];
+  const completed = items.filter(Boolean).length;
+  return { completed, total: items.length, percent: Math.round((completed / items.length) * 100) };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────
 
-interface HeroCardProps {
-  readonly displayName: string;
-  readonly caregiverNumber?: string;
-  readonly isSearchable: boolean;
-  readonly canToggle: boolean;
-  readonly onToggle: () => void;
-}
-
-function HeroCard({ displayName, caregiverNumber, isSearchable, canToggle, onToggle }: HeroCardProps) {
-  const initials = getInitials(displayName || 'C');
-
+function PageLoadingState() {
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
-      <div className="flex items-center gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#52B69A] to-[#168AAD] flex items-center justify-center flex-shrink-0">
-          <span className="text-white text-xl font-bold">{initials}</span>
+    <div className="min-h-[calc(100vh-70px)] bg-[#F5F9F7]" aria-label="กำลังโหลดหน้าหลักผู้ดูแล" aria-busy="true">
+      <div className="mx-auto max-w-[1160px] px-4 py-7 sm:px-6 lg:px-8">
+        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+          <Skeleton height={76} borderRadius={18} />
+          <Skeleton height={76} borderRadius={18} />
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-[#8A8C8E]">ยินดีต้อนรับกลับ</p>
-          <h1 className="text-[18px] font-bold text-[#1A1A1A] leading-tight truncate">{displayName}</h1>
-          {caregiverNumber && (
-            <p className="text-[11px] text-[#8A8C8E] font-mono mt-0.5">#{caregiverNumber}</p>
-          )}
+        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-5">
+            <Skeleton height={470} borderRadius={22} />
+            <Skeleton height={220} borderRadius={18} />
+            <Skeleton height={260} borderRadius={18} />
+          </div>
+          <div className="space-y-5">
+            <Skeleton height={250} borderRadius={18} />
+            <Skeleton height={285} borderRadius={18} />
+            <Skeleton height={190} borderRadius={18} />
+          </div>
         </div>
-      </div>
-
-      <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-semibold text-[#1A1A1A]">
-            {isSearchable ? 'พร้อมรับงาน' : 'ไม่พร้อมรับงาน'}
-          </p>
-          <p className="text-[11px] text-[#8A8C8E] mt-0.5">
-            {isSearchable
-              ? 'ผู้ป่วยสามารถค้นหาและจองคุณได้'
-              : canToggle
-                ? 'เปิดสวิตช์เพื่อเริ่มรับงาน'
-                : 'กรุณายืนยันตัวตนเพื่อเริ่มรับงาน'}
-          </p>
-        </div>
-        <ToggleSwitch
-          checked={isSearchable}
-          onChange={onToggle}
-          disabled={!canToggle}
-          ariaLabel={isSearchable ? 'ปิดการรับงาน' : 'เปิดการรับงาน'}
-          className="shrink-0"
-        />
       </div>
     </div>
   );
 }
 
-interface StatsRowProps {
-  readonly profile: CaregiverProfile;
-}
-
-function StatsRow({ profile }: StatsRowProps) {
-  const skillCount = profile.skills?.length ?? 0;
-  const stats = [
-    {
-      icon: 'payments',
-      value: profile.hourlyRate ? `฿${profile.hourlyRate}` : '—',
-      label: 'ต่อชั่วโมง',
-      iconColor: 'text-[#52B69A]',
-      iconBg: 'bg-[#EEF9F5]',
-    },
-    {
-      icon: 'star',
-      value: profile.experienceYears ? `${profile.experienceYears} ปี` : '—',
-      label: 'ประสบการณ์',
-      iconColor: 'text-[#F08C00]',
-      iconBg: 'bg-[#FFF3E0]',
-    },
-    {
-      icon: 'medical_services',
-      value: skillCount > 0 ? String(skillCount) : '—',
-      label: 'ทักษะ',
-      iconColor: 'text-[#3B5BDB]',
-      iconBg: 'bg-[#F0F4FF]',
-    },
-  ];
-
+function PageErrorState({ retrying, onRetry }: { retrying: boolean; onRetry: () => void }) {
   return (
-    <div className="grid grid-cols-3 gap-3">
-      {stats.map((s) => (
-        <div
-          key={s.label}
-          className="bg-white rounded-2xl p-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] flex flex-col items-center gap-1.5 text-center"
+    <div className="min-h-[calc(100vh-70px)] bg-[#F5F9F7] px-4 py-12" style={FONT}>
+      <div className="mx-auto flex min-h-[440px] max-w-[680px] flex-col items-center justify-center rounded-[24px] border border-[#DFE9E5] bg-white px-6 text-center">
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#FFF0F1] text-[#C43D4B]">
+          <Icon name="cloud_off" size="large" color="currentColor" className="!text-[30px]" />
+        </span>
+        <h1 className="mt-5 text-[24px] font-bold">โหลดข้อมูลหน้าหลักไม่สำเร็จ</h1>
+        <p className="mt-2 max-w-[440px] text-[14px] leading-6 text-[#68736F]">กรุณาตรวจสอบการเชื่อมต่อ แล้วลองโหลดข้อมูลโปรไฟล์อีกครั้ง</p>
+        <button
+          type="button"
+          onClick={onRetry}
+          disabled={retrying}
+          className="mt-7 inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-[#1B5C48] px-5 text-[14px] font-bold text-white transition hover:bg-[#144938] focus-visible:ring-2 focus-visible:ring-[#52B69A] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${s.iconBg}`}>
-            <Icon name={s.icon} size="medium" className={s.iconColor} color="currentColor" />
-          </div>
-          <span className="text-[15px] font-bold text-[#1A1A1A]">{s.value}</span>
-          <span className="text-[10px] text-[#8A8C8E]">{s.label}</span>
-        </div>
-      ))}
+          <Icon name="refresh" size="small" color="currentColor" />
+          {retrying ? 'กำลังลองใหม่...' : 'ลองโหลดอีกครั้ง'}
+        </button>
+      </div>
     </div>
   );
 }
 
-interface ProfileStatusCardProps {
-  readonly profile: CaregiverProfile;
-  readonly completeness: number;
-}
-
-function ProfileStatusCard({ profile, completeness }: ProfileStatusCardProps) {
-  const kyc = kycBadgeMeta(profile.kycStatus);
-  const barColor =
-    completeness >= 80
-      ? 'from-[#52B69A] to-[#76C893]'
-      : completeness >= 50
-        ? 'from-[#F08C00] to-[#FCC419]'
-        : 'from-[#FA5252] to-[#FF8787]';
-  const pctColor =
-    completeness >= 80
-      ? 'text-[#52B69A]'
-      : completeness >= 50
-        ? 'text-[#F08C00]'
-        : 'text-[#FA5252]';
-
+function Greeting({
+  displayName,
+  avatarUrl,
+  pendingCount,
+  nextJob,
+}: {
+  displayName: string;
+  avatarUrl?: string | null;
+  pendingCount: LoadableCount;
+  nextJob?: HomeBooking;
+}) {
+  const firstName = displayName.split(/\s+/)[0];
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
-      <div className="flex justify-between items-center mb-1.5">
-        <span className="text-[13px] font-semibold text-[#1A1A1A]">ความสมบูรณ์ของโปรไฟล์</span>
-        <span className={`text-[13px] font-bold ${pctColor}`}>{completeness}%</span>
-      </div>
-      <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
-        <div
-          className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-500`}
-          style={{ width: `${completeness}%` }}
-        />
-      </div>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <StatusBadge {...kyc} />
-          {profile.kycStatus !== 'verified' && profile.kycStatus !== 'pending' && (
-            <Link
-              to="/kyc"
-              className="text-[13px] font-bold text-[#0D9488] hover:text-[#0b7f74] flex items-center gap-0.5 group"
-            >
-              <span className="underline">เริ่มยืนยันตัวตน</span>
-              <Icon name="arrow_forward" size="small" className="text-[#0D9488] transition-transform duration-200 group-hover:translate-x-1" color="currentColor" />
-            </Link>
+    <header className="flex min-w-0 items-center gap-4 px-1 py-1">
+      <Avatar src={avatarUrl ?? undefined} name={displayName} size={58} fallbackColor="#52B69A" className="!border-2 !shadow-none" />
+      <div className="min-w-0">
+        <h1 className="truncate text-[22px] font-bold leading-tight text-[#202624] sm:text-[26px]">สวัสดี คุณ{firstName}</h1>
+        <p className="mt-1 text-[13px] leading-5 text-[#6F7A76]">
+          {pendingCount === undefined ? (
+            'กำลังตรวจสอบงานของคุณ'
+          ) : pendingCount === null ? (
+            'ข้อมูลคำขอยังโหลดไม่สำเร็จ'
+          ) : (
+            <>
+              วันนี้มี <strong className="text-[#26332E]">{pendingCount.toLocaleString('th-TH')} คำขอรอตอบ</strong>
+              {nextJob ? ` · งานถัดไป ${formatThaiDate(nextJob.bookingDate, false)} ${nextJob.timeRangeText || ''}` : ' · ยังไม่มีงานที่กำลังจะถึง'}
+            </>
           )}
-        </div>
-        <p className="text-[11px] text-[#8A8C8E]">อัปเดตเมื่อ {formatUpdatedAt(profile.updatedAt)}</p>
-      </div>
-    </div>
-  );
-}
-
-interface QuickActionsProps {
-  readonly unreadCount: number;
-  readonly kycStatus: string;
-  readonly actionRequiredCount: number;
-}
-
-function QuickActionsGrid({ unreadCount, kycStatus, actionRequiredCount }: QuickActionsProps) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <Link to="/caregiver/bookings" className={`${cardBase} no-underline text-[#1A1A1A]`}>
-        <div className="w-10 h-10 rounded-xl bg-[#F0F4FF] text-[#3B5BDB] flex items-center justify-center relative">
-          <Icon name="work" size="large" color="currentColor" />
-          {actionRequiredCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
-              {actionRequiredCount > 99 ? '99+' : actionRequiredCount}
-            </span>
-          )}
-        </div>
-        <div>
-          <div className="text-[13px] font-semibold leading-tight">งานของฉัน</div>
-          <div className="text-[11px] text-[#8A8C8E] mt-0.5">
-            {actionRequiredCount > 0 ? `${actionRequiredCount} รายการรอดำเนินการ` : 'ไม่มีรายการรอดำเนินการ'}
-          </div>
-        </div>
-      </Link>
-
-      <Link to="/caregiver/settings/job-reception" className={`${cardBase} no-underline text-[#1A1A1A]`}>
-        <div className="w-10 h-10 rounded-xl bg-[#EEF9F5] text-[#3A9A7E] flex items-center justify-center">
-          <Icon name="tune" size="large" color="currentColor" />
-        </div>
-        <div>
-          <div className="text-[13px] font-semibold leading-tight">ตั้งค่างาน</div>
-          <div className="text-[11px] text-[#8A8C8E] mt-0.5">ตั้งเวลาว่างและอัตราค่าจ้าง</div>
-        </div>
-      </Link>
-
-      <Link to="/caregiver/edit-profile" className={`${cardBase} no-underline text-[#1A1A1A]`}>
-        <div className="w-10 h-10 rounded-xl bg-[#EEF9F5] text-[#3A9A7E] flex items-center justify-center">
-          <Icon name="manage_accounts" size="large" color="currentColor" />
-        </div>
-        <div>
-          <div className="text-[13px] font-semibold leading-tight">แก้ไขโปรไฟล์</div>
-          <div className="text-[11px] text-[#8A8C8E] mt-0.5">แก้ไขข้อมูลส่วนตัว</div>
-        </div>
-      </Link>
-
-      <Link to="/notifications" className={`${cardBase} no-underline text-[#1A1A1A]`}>
-        <div className="w-10 h-10 rounded-xl bg-[#FFF3E0] text-[#F08C00] flex items-center justify-center relative">
-          <Icon name="notifications" size="large" color="currentColor" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
-        </div>
-        <div>
-          <div className="text-[13px] font-semibold leading-tight">การแจ้งเตือน</div>
-          <div className="text-[11px] text-[#8A8C8E] mt-0.5">
-            {unreadCount > 0 ? `${unreadCount} ยังไม่อ่าน` : 'ไม่มีการแจ้งเตือนใหม่'}
-          </div>
-        </div>
-      </Link>
-    </div>
-  );
-}
-
-interface HintsProps {
-  readonly kycStatus: string;
-  readonly isVerified: boolean;
-  readonly isSearchable: boolean;
-  readonly completeness: number;
-  readonly canToggle: boolean;
-  readonly onToggle: () => void;
-}
-
-function ContextualHints({ kycStatus, isVerified, isSearchable, completeness, canToggle, onToggle }: HintsProps) {
-  const hints: React.ReactNode[] = [];
-
-  if (kycStatus === 'none') {
-    hints.push(
-      <div key="kyc-none" className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-4 flex gap-3 items-start">
-        <Icon name="warning" size="large" color="#d97706" />
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-amber-800 mb-1">
-            เริ่มต้นยืนยันตัวตนเพื่อเริ่มรับงาน
-          </p>
-          <Link
-            to="/kyc"
-            className="inline-block mt-1 px-3 py-1.5 bg-amber-600 text-white text-xs font-semibold rounded-lg hover:bg-amber-700 transition-colors no-underline"
-          >
-            เริ่มยืนยันตัวตน
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (kycStatus === 'pending') {
-    hints.push(
-      <div key="kyc-pending" className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-4 flex gap-3 items-start">
-        <Icon name="schedule" size="large" color="#1d4ed8" />
-        <p className="text-sm text-blue-800">
-          กำลังตรวจสอบความถูกต้องของการยืนยันตัวตน โปรดรอประมาณ 1-3 วันทำการ
         </p>
       </div>
-    );
-  }
+    </header>
+  );
+}
 
-  if (isVerified && !isSearchable) {
-    hints.push(
-      <div key="enable-avail" className="bg-[#EEF9F5] border border-[#A7D8C2] rounded-2xl px-4 py-4 flex gap-3 items-start">
-        <Icon name="info" size="large" color="#228B55" />
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-[#1A5C3A] mb-1">
-            เปิดสถานะพร้อมรับงานเพื่อให้ผู้ป่วยค้นหาคุณพบ
-          </p>
-          <button
-            type="button"
-            onClick={onToggle}
-            disabled={!canToggle}
-            className="mt-1 px-3 py-1.5 bg-[#52B69A] text-white text-xs font-semibold rounded-lg hover:bg-[#3A9A7E] transition-colors disabled:opacity-60"
-          >
-            เปิดใช้งานทันที
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (isVerified && isSearchable) {
-    hints.push(
-      <div key="ready" className="bg-[#EEF9F5] border border-[#A7D8C2] rounded-2xl px-4 py-4 flex gap-3 items-center">
-        <Icon name="check_circle" size="large" color="#228B55" />
-        <p className="text-sm font-semibold text-[#1A5C3A]">คุณพร้อมรับงานแล้ว ✓</p>
-      </div>
-    );
-  }
-
-  if (completeness < 80) {
-    hints.push(
-      <div key="complete-profile" className="bg-purple-50 border border-purple-200 rounded-2xl px-4 py-4 flex gap-3 items-start">
-        <Icon name="person_add" size="large" color="#7c3aed" />
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-purple-800 mb-1">
-            กรอกข้อมูลโปรไฟล์ให้สมบูรณ์เพื่อเพิ่มโอกาสในการได้งาน
-          </p>
-          <Link
-            to="/caregiver/edit-profile"
-            className="inline-block mt-1 px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 transition-colors no-underline"
-          >
-            แก้ไขโปรไฟล์
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (hints.length === 0) return null;
-
+function AvailabilityCard({
+  isSearchable,
+  isVerified,
+  toggling,
+  onToggle,
+}: {
+  isSearchable: boolean;
+  isVerified: boolean;
+  toggling: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-[15px] font-bold text-[#1A1A1A]">คำแนะนำ</h2>
-      {hints}
+    <section className="flex min-h-[76px] items-center justify-between gap-5 rounded-[18px] border border-[#E1EAE6] bg-white px-5 py-4 shadow-[0_3px_14px_rgba(27,92,72,0.04)]" aria-labelledby="availability-heading">
+      <div className="min-w-0">
+        <h2 id="availability-heading" className="text-[14px] font-bold text-[#25312D]">
+          {isVerified ? (isSearchable ? 'พร้อมรับงาน' : 'พักรับงาน') : 'ยังเปิดรับงานไม่ได้'}
+        </h2>
+        <p className="mt-0.5 text-[11px] text-[#7A8581]">
+          {toggling ? 'กำลังบันทึกสถานะ...' : isVerified ? (isSearchable ? 'ผู้ใช้สามารถค้นหาและจองคุณได้' : 'โปรไฟล์ไม่แสดงในผลการค้นหา') : 'ยืนยันตัวตนก่อนเปิดรับงาน'}
+        </p>
+      </div>
+      <ToggleSwitch
+        checked={isSearchable}
+        onChange={onToggle}
+        disabled={!isVerified || toggling}
+        ariaLabel={isSearchable ? 'ปิดสถานะพร้อมรับงาน' : 'เปิดสถานะพร้อมรับงาน'}
+        className="shrink-0"
+      />
     </section>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────
+function UrgentRequestCard({ booking }: { booking?: HomeBooking }) {
+  if (!booking) {
+    return (
+      <section className="overflow-hidden rounded-[22px] border border-[#D7E7E0] bg-white">
+        <div className="flex items-center gap-2 bg-[#ECF8F3] px-5 py-4 text-[#1D6B50]">
+          <Icon name="notifications_active" size="small" color="currentColor" />
+          <h2 className="text-[15px] font-bold">สิ่งที่ต้องทำตอนนี้</h2>
+        </div>
+        <div className="flex min-h-[210px] flex-col items-center justify-center px-6 py-10 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EAF7F1] text-[#3A9A7E]">
+            <Icon name="done_all" size="large" color="currentColor" />
+          </span>
+          <h3 className="mt-4 text-[16px] font-bold text-[#26332E]">ไม่มีคำขอใหม่ที่ต้องตอบ</h3>
+          <p className="mt-1 max-w-[360px] text-[12px] leading-5 text-[#7A8581]">เมื่อมีผู้ใช้ส่งคำขอใหม่ รายละเอียดสำคัญจะปรากฏตรงนี้ทันที</p>
+        </div>
+      </section>
+    );
+  }
 
-const CaregiverHome: React.FC = () => {
-  const { data, loading } = useQuery<UserData>(GET_USER);
-  const { data: caregiverData, loading: caregiverLoading } = useQuery<CaregiverData>(GET_CAREGIVER_PROFILE);
-  const { data: unreadData } = useQuery<UnreadCountData>(GET_UNREAD_COUNT, {
-    fetchPolicy: 'cache-and-network',
-    pollInterval: 30_000,
-  });
+  const profileMeta = [booking.gender, booking.age != null ? `${booking.age} ปี` : null, booking.supportLevel].filter(Boolean);
+  const price = formatDisplayPrice(booking.price);
 
-  const { data: pendingBookingsData } = useQuery(GET_CAREGIVER_BOOKINGS, {
-    variables: { input: { status: 'PENDING', limit: 1 } },
-    fetchPolicy: 'cache-and-network',
-    pollInterval: 30_000,
-  });
+  return (
+    <section className="overflow-hidden rounded-[22px] border border-[#96D7BE] bg-white shadow-[0_8px_30px_rgba(27,92,72,0.05)]" aria-labelledby="urgent-request-title">
+      <div className="flex items-center justify-between gap-3 bg-[#ECF8F3] px-5 py-3.5 sm:px-6">
+        <div className="flex items-center gap-2 text-[#176B4A]">
+          <Icon name="notifications_active" size="small" color="currentColor" />
+          <h2 id="urgent-request-title" className="text-[15px] font-bold">สิ่งที่ต้องทำตอนนี้</h2>
+        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E6F0FF] px-2.5 py-1 text-[11px] font-bold text-[#2D67C7]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#4787EA]" /> คำขอใหม่
+        </span>
+      </div>
 
-  const { data: acceptedBookingsData } = useQuery(GET_CAREGIVER_BOOKINGS, {
-    variables: { input: { status: 'ACCEPTED', limit: 1 } },
-    fetchPolicy: 'cache-and-network',
-    pollInterval: 30_000,
-  });
+      <div className="px-5 py-5 sm:px-6 sm:py-6">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <Avatar src={booking.recipientAvatarUrl} name={booking.patientName} size={70} fallbackColor="#E7F5EE" className="!border-0 !text-[#2F8B70] !shadow-none" />
+            <div className="min-w-0">
+              <p className="text-[12px] text-[#7A8581]">{booking.serviceType}</p>
+              <h3 className="mt-0.5 truncate text-[21px] font-bold text-[#202624]">{booking.patientName}</h3>
+              {profileMeta.length > 0 && <p className="mt-1 text-[12px] text-[#68736F]">{profileMeta.join(' · ')}</p>}
+            </div>
+          </div>
+          <div className="shrink-0 rounded-xl bg-[#FFF8E8] px-3.5 py-2.5 sm:text-right">
+            <p className="flex items-center gap-1.5 text-[11px] font-bold text-[#A85F11] sm:justify-end">
+              <Icon name="schedule" className="!text-[15px]" color="currentColor" /> คำขอที่ได้รับ
+            </p>
+            <p className="mt-1 text-[13px] font-bold text-[#5E3A16]">{formatTimeAgo(booking.createdAt)}</p>
+          </div>
+        </div>
 
-  const { data: reviewsData, loading: reviewsLoading } = useQuery<CaregiverReviewsData>(
-    CAREGIVER_REVIEWS,
-    {
-      variables: { input: { caregiverId: caregiverData?.myCaregiverProfile?.id ?? '', limit: 50, page: 1 } },
-      skip: !caregiverData?.myCaregiverProfile?.id,
-    },
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-[14px] bg-[#F7F9F8] px-4 py-3.5">
+            <p className="flex items-center gap-2 text-[11px] text-[#7A8581]"><Icon name="event" className="!text-[17px]" color="#3A9A7E" /> วันและเวลา</p>
+            <strong className="mt-1.5 block text-[14px] text-[#26332E]">{formatThaiDate(booking.bookingDate)}</strong>
+            <span className="mt-0.5 block text-[12px] text-[#68736F]">{booking.timeRangeText || 'ยังไม่มีข้อมูลเวลา'}</span>
+          </div>
+          <div className="rounded-[14px] bg-[#F7F9F8] px-4 py-3.5">
+            <p className="flex items-center gap-2 text-[11px] text-[#7A8581]"><Icon name="location_on" className="!text-[17px]" color="#3A9A7E" /> สถานที่</p>
+            <strong className="mt-1.5 block text-[14px] leading-5 text-[#26332E]">{booking.locationName ?? 'ยังไม่มีข้อมูลสถานที่'}</strong>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-[14px] bg-[#F7F9F8] px-4 py-3.5">
+          <p className="flex items-center gap-2 text-[11px] text-[#7A8581]"><Icon name="payments" className="!text-[17px]" color="#3A9A7E" /> ค่าบริการโดยประมาณ</p>
+          <strong className="mt-1 block text-[18px] text-[#26332E]">{price ?? NO_PRICE_LABEL}</strong>
+        </div>
+
+        {booking.tasks.length > 0 && (
+          <div className="mt-5">
+            <p className="text-[12px] font-bold text-[#45514D]">งานที่ต้องทำ</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {booking.tasks.slice(0, 5).map((task) => <span key={task} className="rounded-full bg-[#EAF7F1] px-3 py-1.5 text-[11px] font-semibold text-[#27775F]">{task}</span>)}
+              {booking.tasks.length > 5 && <span className="rounded-full bg-[#F0F3F2] px-3 py-1.5 text-[11px] font-semibold text-[#68736F]">+{booking.tasks.length - 5}</span>}
+            </div>
+          </div>
+        )}
+
+        {booking.notes && (
+          <div className="mt-4 flex items-start gap-3 rounded-[14px] bg-[#FFF9E9] px-4 py-3.5 text-[#6E4C1C]">
+            <Icon name="speaker_notes" size="small" color="#B66C16" />
+            <p className="text-[12px] leading-5"><strong>หมายเหตุจากผู้จอง:</strong> {booking.notes}</p>
+          </div>
+        )}
+
+        <div className="mt-5 flex flex-col-reverse gap-3 border-t border-[#EEF2F0] pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <Link to="/caregiver/bookings" className="inline-flex min-h-11 items-center justify-center text-[12px] font-bold text-[#2D7B64] no-underline hover:underline">ดูคำขอทั้งหมด</Link>
+          <Link
+            to={`/caregiver/bookings/${booking.id}`}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#52B69A] px-6 text-[14px] font-bold text-white no-underline shadow-[0_5px_16px_rgba(82,182,154,0.24)] transition hover:bg-[#3F9F85] focus-visible:ring-2 focus-visible:ring-[#1B5C48] focus-visible:ring-offset-2"
+          >
+            ดูรายละเอียดและตอบรับ <Icon name="arrow_forward" size="small" color="currentColor" />
+          </Link>
+        </div>
+      </div>
+    </section>
   );
+}
+
+function WorkSummary({
+  pending,
+  accepted,
+  confirmed,
+  unread,
+}: {
+  pending: LoadableCount;
+  accepted: LoadableCount;
+  confirmed: LoadableCount;
+  unread: LoadableCount;
+}) {
+  const rows = [
+    { icon: 'mark_email_unread', label: 'คำขอใหม่', value: pending, color: '#2D67C7', bg: '#EAF2FF' },
+    { icon: 'schedule', label: 'รอผู้ใช้ชำระเงิน', value: accepted, color: '#B76A13', bg: '#FFF4DE' },
+    { icon: 'event_available', label: 'งานที่ยืนยันแล้ว', value: confirmed, color: '#1D8A63', bg: '#E7F7F0' },
+    { icon: 'notifications_none', label: 'แจ้งเตือนที่ยังไม่อ่าน', value: unread, color: '#6C5AA7', bg: '#F1EEFB' },
+  ];
+  return (
+    <section className="rounded-[18px] border border-[#E1EAE6] bg-white px-5 py-5 shadow-[0_3px_14px_rgba(27,92,72,0.04)]" aria-labelledby="summary-title">
+      <h2 id="summary-title" className="text-[16px] font-bold text-[#25312D]">สรุปงานของฉัน</h2>
+      <div className="mt-4 space-y-1">
+        {rows.map((row) => (
+          <div key={row.label} className="flex min-h-12 items-center gap-3 rounded-xl px-1 py-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ color: row.color, backgroundColor: row.bg }}>
+              <Icon name={row.icon} className="!text-[18px]" color="currentColor" />
+            </span>
+            <span className="min-w-0 flex-1 text-[12px] text-[#56615D]">{row.label}</span>
+            <strong className="text-[15px] text-[#25312D]">{row.value === undefined ? '…' : row.value === null ? '—' : row.value.toLocaleString('th-TH')}</strong>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function UpcomingJobs({ jobs }: { jobs: HomeBooking[] }) {
+  return (
+    <section aria-labelledby="upcoming-title">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 id="upcoming-title" className="text-[16px] font-bold text-[#25312D]">งานที่กำลังจะถึง</h2>
+        <Link to="/caregiver/bookings" className="text-[12px] font-bold text-[#2D7B64] no-underline hover:underline">ดูงานทั้งหมด</Link>
+      </div>
+      {jobs.length === 0 ? (
+        <div className="rounded-[18px] border border-[#E1EAE6] bg-white px-5 py-8 text-center">
+          <Icon name="event_busy" size="large" color="#A8B1AD" />
+          <p className="mt-2 text-[13px] font-bold text-[#56615D]">ยังไม่มีงานที่กำลังจะถึง</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {jobs.slice(0, 3).map((job) => (
+            <article key={job.id} className="flex flex-col gap-4 rounded-[18px] border border-[#E1EAE6] bg-white px-4 py-4 shadow-[0_2px_10px_rgba(27,92,72,0.03)] sm:flex-row sm:items-center">
+              <Avatar src={job.recipientAvatarUrl} name={job.patientName} size={52} fallbackColor="#E7F5EE" className="!border-0 !text-[#2F8B70] !shadow-none" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold ${job.status === 'confirmed' ? 'bg-[#E7F7F0] text-[#1D7C5A]' : 'bg-[#FFF4DE] text-[#A85F11]'}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${job.status === 'confirmed' ? 'bg-[#31A87B]' : 'bg-[#E59A35]'}`} />
+                    {job.status === 'confirmed' ? 'ยืนยันแล้ว' : 'รอชำระเงิน'}
+                  </span>
+                  <span className="text-[11px] font-semibold text-[#68736F]">{formatThaiDate(job.bookingDate)} · {job.timeRangeText || 'ยังไม่มีข้อมูลเวลา'}</span>
+                </div>
+                <h3 className="mt-1.5 truncate text-[14px] font-bold text-[#25312D]">{job.patientName} · {job.serviceType}</h3>
+                <p className="mt-0.5 truncate text-[11px] text-[#7A8581]">{job.locationName ?? 'ยังไม่มีข้อมูลสถานที่'}</p>
+              </div>
+              <Link to={`/caregiver/bookings/${job.id}`} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#D9E3DF] px-4 text-[12px] font-bold text-[#44504C] no-underline transition hover:bg-[#F5F9F7]">
+                ดูรายละเอียด <Icon name="chevron_right" size="small" color="currentColor" />
+              </Link>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ProfileCard({ profile }: { profile: CaregiverProfile }) {
+  const readiness = profileReadiness(profile);
+  const translatedSkills = (profile.skills ?? []).map(skillLabel);
+  return (
+    <section className="rounded-[18px] border border-[#E1EAE6] bg-white px-5 py-5 shadow-[0_3px_14px_rgba(27,92,72,0.04)]" aria-labelledby="profile-title">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="profile-title" className="text-[16px] font-bold text-[#25312D]">โปรไฟล์ของฉัน</h2>
+        <StatusBadge {...kycBadgeMeta(profile.kycStatus)} />
+      </div>
+      <div className="mt-4 flex items-center justify-between text-[11px] text-[#7A8581]">
+        <span>ความสมบูรณ์ของโปรไฟล์</span>
+        <strong className="text-[13px] text-[#27775F]">{readiness.percent}%</strong>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#ECF1EF]">
+        <div className="h-full rounded-full bg-[#52B69A]" style={{ width: `${readiness.percent}%` }} />
+      </div>
+      <p className="mt-4 line-clamp-3 text-[12px] leading-5 text-[#68736F]">
+        {profile.bio?.trim() || 'ยังไม่มีคำแนะนำตัว เพิ่มข้อมูลเพื่อให้ผู้ใช้รู้จักประสบการณ์และรูปแบบการดูแลของคุณ'}
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {translatedSkills.slice(0, 4).map((skill) => <span key={skill} className="rounded-full bg-[#EAF7F1] px-2.5 py-1 text-[10px] font-semibold text-[#27775F]">{skill}</span>)}
+        {translatedSkills.length > 4 && <span className="rounded-full bg-[#F0F3F2] px-2.5 py-1 text-[10px] font-semibold text-[#68736F]">+{translatedSkills.length - 4}</span>}
+        {translatedSkills.length === 0 && <span className="text-[11px] text-[#9AA39F]">ยังไม่ได้ระบุทักษะ</span>}
+      </div>
+      <Link to="/caregiver/edit-profile" className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#D9E3DF] text-[12px] font-bold text-[#33413C] no-underline transition hover:bg-[#F5F9F7]">
+        <Icon name="edit" size="small" color="currentColor" />
+        {readiness.percent === 100 ? 'แก้ไขโปรไฟล์' : `เพิ่มข้อมูลให้ครบ ${readiness.total - readiness.completed} รายการ`}
+      </Link>
+    </section>
+  );
+}
+
+function QuickActions() {
+  const actions = [
+    { href: '/caregiver/settings/job-reception', icon: 'tune', title: 'ตั้งค่างาน', detail: 'ตั้งเวลาว่างและพื้นที่รับงาน' },
+    { href: '/caregiver/edit-profile', icon: 'manage_accounts', title: 'แก้ไขโปรไฟล์', detail: 'แก้ไขข้อมูลส่วนตัวและทักษะ' },
+  ];
+  return (
+    <section className="overflow-hidden rounded-[18px] border border-[#E1EAE6] bg-white shadow-[0_3px_14px_rgba(27,92,72,0.04)]" aria-labelledby="quick-title">
+      <h2 id="quick-title" className="px-5 pb-2 pt-5 text-[16px] font-bold text-[#25312D]">ทางลัด</h2>
+      <div className="divide-y divide-[#EEF2F0] px-3 pb-3">
+        {actions.map((action) => (
+          <Link key={action.href} to={action.href} className="group flex items-center gap-3 rounded-xl px-2 py-3.5 text-inherit no-underline transition hover:bg-[#F5F9F7]">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EAF7F1] text-[#2F8B70]"><Icon name={action.icon} size="medium" color="currentColor" /></span>
+            <span className="min-w-0 flex-1"><strong className="block text-[13px] text-[#25312D]">{action.title}</strong><span className="mt-0.5 block truncate text-[10px] text-[#7A8581]">{action.detail}</span></span>
+            <Icon name="chevron_right" size="small" color="#99A39F" className="transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ReviewsSection({ reviews, total, loading, error, onRetry }: { reviews: BackendReview[]; total: number; loading: boolean; error: boolean; onRetry: () => void }) {
+  const avgRating = reviews.length > 0 ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length : null;
+  return (
+    <section aria-labelledby="reviews-title">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 id="reviews-title" className="text-[16px] font-bold text-[#25312D]">รีวิวล่าสุด</h2>
+        {total > 0 && <span className="text-[11px] font-semibold text-[#2D7B64]">ทั้งหมด {total.toLocaleString('th-TH')} รีวิว</span>}
+      </div>
+      <div className="rounded-[18px] border border-[#E1EAE6] bg-white px-5 py-5 shadow-[0_2px_10px_rgba(27,92,72,0.03)] sm:px-6">
+        {loading ? (
+          <div className="space-y-3"><Skeleton height={72} borderRadius={12} /><Skeleton height={72} borderRadius={12} /></div>
+        ) : error ? (
+          <div className="flex min-h-32 flex-col items-center justify-center text-center"><Icon name="error_outline" size="large" color="#B84450" /><p className="mt-2 text-[13px] font-bold text-[#8F303A]">โหลดรีวิวไม่สำเร็จ</p><button type="button" onClick={onRetry} className="mt-2 min-h-10 cursor-pointer px-3 text-[12px] font-bold text-[#9A3641]">ลองอีกครั้ง</button></div>
+        ) : reviews.length === 0 ? (
+          <div className="flex min-h-32 items-center justify-center gap-4 text-center sm:text-left"><span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FFF1D8] text-[#D48621]"><Icon name="star_outline" size="large" color="currentColor" /></span><div><p className="text-[14px] font-bold text-[#33413C]">ยังไม่มีรีวิว</p><p className="mt-1 text-[11px] text-[#7A8581]">รีวิวจะแสดงหลังผู้ใช้รับบริการเสร็จแล้ว</p></div></div>
+        ) : (
+          <div className="grid gap-5 md:grid-cols-[145px_1fr]">
+            <div className="md:border-r md:border-[#EEF2F0] md:pr-5">
+              <strong className="block text-[38px] leading-none text-[#202624]" style={{ fontFamily: "'Inter', sans-serif" }}>{avgRating?.toFixed(1)}</strong>
+              <div className="mt-2 flex gap-0.5">{[1, 2, 3, 4, 5].map((star) => <Icon key={star} name="star" className="!text-[16px]" color={avgRating !== null && star <= Math.round(avgRating) ? '#E9A23B' : '#D7DEDB'} />)}</div>
+              <p className="mt-1 text-[10px] text-[#7A8581]">{total.toLocaleString('th-TH')} รีวิว</p>
+              <div className="mt-4 hidden md:block"><RatingDistribution reviews={reviews} /></div>
+            </div>
+            <div className="divide-y divide-[#EEF2F0]">
+              {reviews.slice(0, 2).map((review) => (
+                <article key={review.id} className="py-3 first:pt-0 last:pb-0">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#62C59E] text-[12px] font-bold text-white">{review.reviewerName.charAt(0) || 'ผ'}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-3"><strong className="truncate text-[12px] text-[#25312D]">{review.reviewerName}</strong><span className="shrink-0 text-[10px] text-[#8A9490]">{formatTimeAgo(review.createdAt)}</span></div>
+                      <div className="mt-0.5 flex gap-0.5">{[1, 2, 3, 4, 5].map((star) => <Icon key={star} name="star" className="!text-[13px]" color={star <= review.rating ? '#E9A23B' : '#D7DEDB'} />)}</div>
+                      <p className="mt-1.5 text-[12px] leading-5 text-[#68736F]">{review.comment || 'ผู้ใช้ไม่ได้เขียนความคิดเห็นเพิ่มเติม'}</p>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function PartialDataError({ retrying, onRetry }: { retrying: boolean; onRetry: () => void }) {
+  return (
+    <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-[#F1D5D8] bg-[#FFF8F8] px-4 py-3 sm:flex-row sm:items-center sm:justify-between" role="status">
+      <div className="flex items-start gap-3"><Icon name="sync_problem" size="medium" color="#B84450" /><div><p className="text-[12px] font-bold text-[#8F303A]">ข้อมูลบางส่วนยังโหลดไม่สำเร็จ</p><p className="mt-0.5 text-[10px] text-[#A15B62]">จำนวนงานหรือการแจ้งเตือนอาจยังไม่เป็นปัจจุบัน</p></div></div>
+      <button type="button" onClick={onRetry} disabled={retrying} className="min-h-10 cursor-pointer self-start rounded-lg px-3 text-[11px] font-bold text-[#9A3641] hover:bg-[#FDE8E8] disabled:opacity-60 sm:self-auto">{retrying ? 'กำลังโหลด...' : 'ลองอีกครั้ง'}</button>
+    </div>
+  );
+}
+
+export default function CaregiverHome() {
+  const userQuery = useQuery<UserData>(GET_USER, { fetchPolicy: 'cache-and-network' });
+  const profileQuery = useQuery<CaregiverData>(GET_CAREGIVER_PROFILE, { fetchPolicy: 'cache-and-network' });
+  const unreadQuery = useQuery<UnreadCountData>(GET_UNREAD_COUNT, { fetchPolicy: 'cache-and-network', pollInterval: 30_000 });
+  const pendingQuery = useQuery<CaregiverBookingsData>(GET_CAREGIVER_BOOKINGS, { variables: { input: { status: 'PENDING', limit: 5 } }, fetchPolicy: 'cache-and-network', pollInterval: 30_000 });
+  const acceptedQuery = useQuery<CaregiverBookingsData>(GET_CAREGIVER_BOOKINGS, { variables: { input: { status: 'ACCEPTED', limit: 5 } }, fetchPolicy: 'cache-and-network', pollInterval: 30_000 });
+  const confirmedQuery = useQuery<CaregiverBookingsData>(GET_CAREGIVER_BOOKINGS, { variables: { input: { status: 'CONFIRMED', limit: 5 } }, fetchPolicy: 'cache-and-network', pollInterval: 30_000 });
+
+  const profile = profileQuery.data?.myCaregiverProfile;
+  const reviewsQuery = useQuery<CaregiverReviewsData>(CAREGIVER_REVIEWS, {
+    variables: { input: { caregiverId: profile?.id ?? '', limit: 50, page: 1 } },
+    skip: !profile?.id,
+    fetchPolicy: 'cache-and-network',
+  });
 
   const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
-
   const [optimisticSearchable, setOptimisticSearchable] = useState<boolean | null>(null);
-  const [togglingAvail, setTogglingAvail] = useState(false);
+  const [togglingAvailability, setTogglingAvailability] = useState(false);
+  const [retryingPrimary, setRetryingPrimary] = useState(false);
+  const [retryingPartial, setRetryingPartial] = useState(false);
   const [setCaregiverSearchable] = useMutation(SET_CAREGIVER_SEARCHABLE);
 
-  const profile = caregiverData?.myCaregiverProfile;
-  const isSearchable = optimisticSearchable ?? profile?.isSearchable ?? false;
-  const kycStatus = profile?.kycStatus ?? 'none';
-  const isVerified = kycStatus === 'verified';
-  const completeness = profile ? calcCompleteness(profile) : 0;
-  const unreadCount = unreadData?.unreadCount ?? 0;
-  const pendingCount = pendingBookingsData?.caregiverBookings?.pagination?.total ?? 0;
-  const acceptedCount = acceptedBookingsData?.caregiverBookings?.pagination?.total ?? 0;
-  const actionRequiredCount = pendingCount + acceptedCount;
-  const canToggle = isVerified && !togglingAvail;
-  const displayName = profile?.fullName || data?.me?.displayName || 'ผู้ดูแล';
-  const isLoading = loading || caregiverLoading;
+  const pendingBookings = useMemo(
+    () => (pendingQuery.data?.caregiverBookings.data ?? []).map(toHomeBooking).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [pendingQuery.data],
+  );
+  const upcomingJobs = useMemo(
+    () => [
+      ...(confirmedQuery.data?.caregiverBookings.data ?? []).map(toHomeBooking),
+      ...(acceptedQuery.data?.caregiverBookings.data ?? []).map(toHomeBooking),
+    ].sort((a, b) => scheduleTimestamp(a) - scheduleTimestamp(b)),
+    [acceptedQuery.data, confirmedQuery.data],
+  );
+  const reviews = useMemo(
+    () => (reviewsQuery.data?.caregiverReviews.data ?? []).filter((review) => review.isVisible),
+    [reviewsQuery.data],
+  );
 
-  const allFetched = reviewsData?.caregiverReviews?.data ?? [];
-  const reviews = allFetched.filter(r => r.isVisible);
-  const reviewTotal = reviewsData?.caregiverReviews?.pagination?.total ?? 0;
-  const avgRating =
-    reviews.length > 0
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-      : null;
-  const translatedSkills = (profile?.skills ?? []).map(s => skillLabel(s));
+  const isInitialLoading = !profile && profileQuery.loading;
+  const profileFailed = !profile && Boolean(profileQuery.error);
+  const pendingCount = pendingQuery.error ? null : pendingQuery.data?.caregiverBookings.pagination.total;
+  const acceptedCount = acceptedQuery.error ? null : acceptedQuery.data?.caregiverBookings.pagination.total;
+  const confirmedCount = confirmedQuery.error ? null : confirmedQuery.data?.caregiverBookings.pagination.total;
+  const unreadCount = unreadQuery.error ? null : unreadQuery.data?.unreadCount;
+  const hasPartialError = Boolean(userQuery.error || unreadQuery.error || pendingQuery.error || acceptedQuery.error || confirmedQuery.error);
+  const isSearchable = optimisticSearchable ?? profile?.isSearchable ?? false;
+
+  const fullName = [userQuery.data?.me?.firstName, userQuery.data?.me?.lastName].filter(Boolean).join(' ').trim();
+  const displayName = profile?.fullName?.trim() || fullName || userQuery.data?.me?.displayName?.trim() || 'ผู้ดูแล';
 
   const handleToggleAvailability = async () => {
-    if (!canToggle) return;
-    const prev = isSearchable;
-    const next = !prev;
+    if (!profile || profile.kycStatus !== 'verified' || togglingAvailability) return;
+    const next = !isSearchable;
     setOptimisticSearchable(next);
-    setTogglingAvail(true);
+    setTogglingAvailability(true);
     try {
-      await setCaregiverSearchable({
-        variables: { isSearchable: next },
-        refetchQueries: [{ query: GET_CAREGIVER_PROFILE }],
-        awaitRefetchQueries: true,
-      });
+      await setCaregiverSearchable({ variables: { isSearchable: next }, refetchQueries: [{ query: GET_CAREGIVER_PROFILE }], awaitRefetchQueries: true });
       setOptimisticSearchable(null);
-      showSuccess(next ? 'เปิดสถานะพร้อมรับงานแล้ว' : 'ปิดสถานะพร้อมรับงานแล้ว');
+      showSuccess(next ? 'เปิดสถานะพร้อมรับงานแล้ว' : 'พักรับงานชั่วคราวแล้ว');
     } catch {
-      setOptimisticSearchable(prev);
-      showError('ไม่สามารถอัปเดตสถานะการรับงานได้ กรุณาลองใหม่อีกครั้ง');
+      setOptimisticSearchable(null);
+      showError('บันทึกสถานะการรับงานไม่สำเร็จ กรุณาลองอีกครั้ง');
     } finally {
-      setTogglingAvail(false);
+      setTogglingAvailability(false);
     }
   };
 
+  const retryPrimary = async () => {
+    setRetryingPrimary(true);
+    try { await Promise.all([profileQuery.refetch(), userQuery.refetch()]); } finally { setRetryingPrimary(false); }
+  };
+
+  const retryPartial = async () => {
+    setRetryingPartial(true);
+    try { await Promise.all([userQuery.refetch(), unreadQuery.refetch(), pendingQuery.refetch(), acceptedQuery.refetch(), confirmedQuery.refetch()]); } finally { setRetryingPartial(false); }
+  };
+
+  if (isInitialLoading) return <PageLoadingState />;
+  if (profileFailed || !profile) return <PageErrorState retrying={retryingPrimary} onRetry={() => void retryPrimary()} />;
+
   return (
     <>
-      <div className="min-h-screen bg-[#F6FAF9] text-[#1A1A1A] antialiased" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-        <main className="max-w-2xl mx-auto px-4 pt-6 pb-24 flex flex-col gap-4">
+      <div className="min-h-[calc(100vh-70px)] bg-[#F5F9F7] text-[#202624] antialiased" style={FONT}>
+        <main className="mx-auto max-w-[1160px] px-4 py-7 sm:px-6 lg:px-8">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
+            <Greeting displayName={displayName} avatarUrl={userQuery.data?.me?.avatarUrl} pendingCount={pendingCount} nextJob={upcomingJobs[0]} />
+            <AvailabilityCard isSearchable={isSearchable} isVerified={profile.kycStatus === 'verified'} toggling={togglingAvailability} onToggle={() => void handleToggleAvailability()} />
+          </div>
 
-          {/* Hero card */}
-          {isLoading ? (
-            <Skeleton height={148} borderRadius={20} />
-          ) : (
-            <HeroCard
-              displayName={displayName}
-              caregiverNumber={profile?.caregiverNumber}
-              isSearchable={isSearchable}
-              canToggle={canToggle}
-              onToggle={handleToggleAvailability}
-            />
-          )}
+          {hasPartialError && <PartialDataError retrying={retryingPartial} onRetry={() => void retryPartial()} />}
 
-          {/* Stats row */}
-          {isLoading ? (
-            <div className="grid grid-cols-3 gap-3">
-              {[0, 1, 2].map((i) => <Skeleton key={i} height={96} borderRadius={16} />)}
+          <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="contents lg:col-start-1 lg:block lg:space-y-5">
+              <div className="order-1 min-w-0"><UrgentRequestCard booking={pendingBookings[0]} /></div>
+              <div className="order-3 min-w-0"><UpcomingJobs jobs={upcomingJobs} /></div>
+              <div className="order-6 min-w-0">
+                <ReviewsSection reviews={reviews} total={reviewsQuery.data?.caregiverReviews.pagination.total ?? reviews.length} loading={reviewsQuery.loading && !reviewsQuery.data} error={Boolean(reviewsQuery.error)} onRetry={() => void reviewsQuery.refetch()} />
+              </div>
             </div>
-          ) : profile && (
-            <StatsRow profile={profile} />
-          )}
 
-          {/* Profile completeness + KYC status */}
-          {isLoading ? (
-            <Skeleton height={90} borderRadius={20} />
-          ) : profile && (
-            <ProfileStatusCard profile={profile} completeness={completeness} />
-          )}
-
-          {/* Public profile section */}
-          {!isLoading && profile && (
-            <section>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-[15px] font-bold text-[#1A1A1A]">โปรไฟล์สาธารณะ</h2>
-                <Link
-                  to="/caregiver/edit-profile"
-                  className="text-[13px] font-semibold text-[#52B69A] hover:opacity-75 transition-opacity no-underline"
-                >
-                  แก้ไข
-                </Link>
-              </div>
-              <div className="flex flex-col gap-3">
-                {/* Card: เกี่ยวกับฉัน */}
-                <div className="bg-white rounded-2xl p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] flex flex-col gap-3">
-                  <div className="flex items-center gap-2">
-                    <Icon name="person" size="small" color="#52B69A" />
-                    <span className="text-[13px] font-bold text-[#1A1A1A]">เกี่ยวกับฉัน</span>
-                  </div>
-                  <p className="text-[13px] text-[#575859] leading-[21px]">
-                    {profile.bio || 'ยังไม่มีข้อมูล'}
-                  </p>
-                  {translatedSkills.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {translatedSkills.map(skill => (
-                        <span
-                          key={skill}
-                          className="text-[12px] font-semibold text-[#3A9A7E] bg-[#E6F5ED] rounded-full px-3 py-1"
-                        >
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Card: คะแนนรีวิว */}
-                {!reviewsLoading && (
-                  <div className="bg-white rounded-2xl p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] flex flex-col gap-4">
-                    <div className="flex items-center gap-2">
-                      <Icon name="star" size="small" color="#52B69A" />
-                      <span className="text-[13px] font-bold text-[#1A1A1A]">คะแนนรีวิว</span>
-                      <span className="text-[11px] text-[#8A8C8E]">จากผู้ป่วยที่ใช้บริการ</span>
-                    </div>
-                    {reviews.length === 0 ? (
-                      <p className="text-[13px] text-[#8A8C8E]">ยังไม่มีรีวิว</p>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-3">
-                          <span className="text-[36px] font-bold text-[#1A1A1A]" style={{ fontFamily: "'Inter', sans-serif" }}>
-                            {avgRating !== null ? avgRating.toFixed(1) : '—'}
-                          </span>
-                          <div className="flex flex-col gap-0.5">
-                            <div className="flex items-center gap-0.5">
-                              {[1, 2, 3, 4, 5].map(s => (
-                                <span
-                                  key={s}
-                                  className="material-icons text-[18px]"
-                                  style={{ color: avgRating !== null && s <= Math.round(avgRating) ? '#F59E0B' : '#D1D5DB' }}
-                                >
-                                  star
-                                </span>
-                              ))}
-                            </div>
-                            <span className="text-[12px] text-[#8A8C8E]">{reviewTotal} รีวิว</span>
-                          </div>
-                        </div>
-                        <RatingDistribution reviews={reviews} />
-                        <div className="flex flex-col gap-4">
-                          {reviews.map((br, idx) => (
-                            <div key={br.id}>
-                              {idx > 0 && <div className="h-px bg-gray-100 mb-4" />}
-                              <div className="flex items-start gap-3">
-                                <div
-                                  className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-[13px]"
-                                  style={{ background: toAvatarGradient(br.reviewerName) }}
-                                >
-                                  {br.reviewerName.charAt(0)}
-                                </div>
-                                <div className="flex-1 flex flex-col gap-1">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[13px] font-bold text-[#1A1A1A]">{br.reviewerName}</span>
-                                    <span className="text-[11px] text-[#8A8C8E]">{formatTimeAgo(br.createdAt)}</span>
-                                  </div>
-                                  <div className="flex items-center gap-0.5">
-                                    {[1, 2, 3, 4, 5].map(s => (
-                                      <span
-                                        key={s}
-                                        className="material-icons text-[13px]"
-                                        style={{ color: s <= br.rating ? '#FFA92C' : '#D1D5DB' }}
-                                      >
-                                        star
-                                      </span>
-                                    ))}
-                                  </div>
-                                  {br.comment && (
-                                    <p className="text-[13px] text-[#575859]">{br.comment}</p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
-
-          {/* Quick actions */}
-          <section>
-            <h2 className="text-[15px] font-bold text-[#1A1A1A] mb-3">ทางลัด</h2>
-            {isLoading ? (
-              <div className="grid grid-cols-2 gap-3">
-                {[0, 1, 2, 3].map((i) => <Skeleton key={i} height={110} borderRadius={16} />)}
-              </div>
-            ) : (
-              <QuickActionsGrid unreadCount={unreadCount} kycStatus={kycStatus} actionRequiredCount={actionRequiredCount} />
-            )}
-          </section>
-
-          {/* Contextual hints */}
-          {!isLoading && profile && (
-            <ContextualHints
-              kycStatus={kycStatus}
-              isVerified={isVerified}
-              isSearchable={isSearchable}
-              completeness={completeness}
-              canToggle={canToggle}
-              onToggle={handleToggleAvailability}
-            />
-          )}
-
+            <aside className="contents lg:col-start-2 lg:block lg:space-y-5" aria-label="ข้อมูลสรุปของผู้ดูแล">
+              <div className="order-2"><WorkSummary pending={pendingCount} accepted={acceptedCount} confirmed={confirmedCount} unread={unreadCount} /></div>
+              <div className="order-4"><ProfileCard profile={profile} /></div>
+              <div className="order-5"><QuickActions /></div>
+            </aside>
+          </div>
         </main>
       </div>
       <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" variant="admin-toast" />
     </>
   );
-};
-
-export default CaregiverHome;
+}
