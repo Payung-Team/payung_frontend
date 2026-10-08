@@ -11,7 +11,7 @@ import { logGraphQLError } from '../../lib/logGraphQLError';
 interface MeResult {
   me: {
     id: string;
-    email: string;
+    email: string | null;
     phone: string | null;
     role: number;
   };

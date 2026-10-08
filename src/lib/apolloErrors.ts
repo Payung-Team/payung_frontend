@@ -28,6 +28,29 @@ export function extractGraphQLErrorCode(err: unknown): string | undefined {
 }
 
 /**
+ * Extracts the first server-sent `extensions` object, for errors that carry data next to
+ * the code (e.g. the phone-auth module's `OTP_RATE_LIMITED` → `resendAfterSeconds`).
+ *
+ * Also reads the raw body of a non-2xx response: a business-rule error answered as HTTP 422
+ * with `content-type: application/json` reaches us as a `ServerError`, not as
+ * `CombinedGraphQLErrors` (see `extractServerErrorBody`), and its code would otherwise be lost.
+ */
+export function extractGraphQLErrorExtensions(err: unknown): Record<string, unknown> | undefined {
+  if (CombinedGraphQLErrors.is(err)) {
+    return err.errors[0]?.extensions as Record<string, unknown> | undefined;
+  }
+  if (ServerError.is(err)) {
+    try {
+      const extensions = JSON.parse(err.bodyText)?.errors?.[0]?.extensions;
+      return extensions && typeof extensions === 'object' ? extensions : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Raw response body of a non-2xx HTTP response, when there is one.
  *
  * Our API answers a *validation* error (asking for a field the schema doesn't have) with

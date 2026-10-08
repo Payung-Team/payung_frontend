@@ -85,7 +85,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
         '/caregiver/settings/billing',
         '/caregiver/availability',
         // PYG-540: สิทธิ์ถอนความยินยอมต้องใช้ได้เสมอ แม้ KYC ยังไม่ผ่าน
-        '/settings/privacy'
+        '/settings/privacy',
+        // PYG-604: ผูกเบอร์ได้ตั้งแต่ยังไม่ผ่าน KYC — เป็นเรื่องของบัญชี ไม่เกี่ยวกับการรับงาน
+        '/settings/phone'
       ];
       
       const isAllowedPath = allowedUnverifiedPaths.some(path => location.pathname.startsWith(path));

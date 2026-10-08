@@ -67,7 +67,7 @@ interface CaregiverData {
 interface UserData {
   me: {
     id: string;
-    email: string;
+    email: string | null;
     displayName?: string;
     phone?: string;
     address?: string;

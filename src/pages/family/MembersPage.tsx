@@ -11,7 +11,7 @@ import {
   type FamilyGroupMember,
   type GroupBookingSummary,
 } from '../../graphql/familyGroup';
-import { formatDate, useStrings } from './familyStrings';
+import { formatDate, memberName, useStrings } from './familyStrings';
 import { formatBookingTimeRange } from '../../lib/bookingTime';
 import { FONT, ConfirmDialog, GroupAvatar, ModalShell } from './components/familyUi';
 import MembersPanel from './components/MembersPanel';
@@ -208,9 +208,9 @@ function MemberBookingsModal({
   return (
     <ModalShell onClose={onClose} maxWidth={520} labelledBy="member-bookings-title" showClose>
       <h2 id="member-bookings-title" className="text-xl font-bold text-[#064E3B]">
-        {s.memberBookingsTitle(member.displayName || member.email)}
+        {s.memberBookingsTitle(memberName(member))}
       </h2>
-      <p className="mt-1 text-sm text-gray-500">{member.email}</p>
+      {member.email && <p className="mt-1 text-sm text-gray-500">{member.email}</p>}
 
       {loading && list.length === 0 ? (
         <div className="mt-5 space-y-2">
