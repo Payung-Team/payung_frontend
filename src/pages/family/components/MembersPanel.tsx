@@ -6,7 +6,7 @@ import {
   type FamilyGroup,
   type FamilyGroupMember,
 } from '../../../graphql/familyGroup';
-import { formatDate, useStrings } from '../familyStrings';
+import { formatDate, memberName, useStrings } from '../familyStrings';
 import { fgErrorMessage } from '../familyErrors';
 import { GroupAvatar, RoleBadge, ConfirmDialog } from './familyUi';
 import { TransferOwnershipModal } from './GroupModals';
@@ -44,7 +44,7 @@ export default function MembersPanel({
         variables: { input: { groupId: group.id, userId: m.userId } },
       });
       setPending(null);
-      onToast(s.toastRemoved(m.displayName || m.email), 'success');
+      onToast(s.toastRemoved(memberName(m)), 'success');
       onChanged();
     } catch (e) {
       setPending(null);
@@ -63,10 +63,10 @@ export default function MembersPanel({
             key={m.id}
             className="flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
           >
-            <GroupAvatar name={m.displayName || m.email} seed={m.userId} src={m.avatarUrl} size={44} />
+            <GroupAvatar name={memberName(m)} seed={m.userId} src={m.avatarUrl} size={44} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
-                {m.displayName || m.email}
+                {memberName(m)}
                 {m.isMe && (
                   <span className="ml-1.5 text-[11px] font-medium text-[#8A8C8E]">
                     {s.you}
@@ -74,7 +74,7 @@ export default function MembersPanel({
                 )}
               </p>
               <p className="truncate text-[12px] text-[#8A8C8E]">
-                {m.email} · {s.joinedOn} {formatDate(m.joinedAt)}
+                {m.email ? `${m.email} · ` : ''}{s.joinedOn} {formatDate(m.joinedAt)}
               </p>
             </div>
             <RoleBadge role={m.role} />
@@ -99,7 +99,7 @@ export default function MembersPanel({
           iconBg="bg-[#DC2626]"
           confirmBg="bg-[#DC2626]"
           confirmHover="hover:bg-[#B91C1C]"
-          title={s.removeTitle(pending.member.displayName || pending.member.email)}
+          title={s.removeTitle(memberName(pending.member))}
           cancelText={s.cancel}
           confirmText={s.removeCta}
           busyText={s.busyRemoving}

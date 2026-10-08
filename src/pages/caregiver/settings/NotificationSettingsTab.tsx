@@ -70,7 +70,7 @@ export const NotificationSettingsTab: React.FC = () => {
   const { data: userData } = useQuery<{
     me: {
       id: string;
-      email: string;
+      email: string | null;
       emailPreferences?: boolean;
     };
   }>(GET_USER);

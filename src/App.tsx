@@ -52,6 +52,8 @@ import AuthCallback from './pages/auth/AuthCallback';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 // PYG-540: หน้าความเป็นส่วนตัว (ดู/ถอน/ให้ความยินยอม PDPA)
 import PrivacySettingsPage from './pages/settings/PrivacySettingsPage';
+import PhoneSettingsPage from './pages/settings/PhoneSettingsPage';
+import { PHONE_AUTH_ENABLED } from './lib/phone';
 import CaregiverProfilePage from './pages/search/CaregiverProfilePage';
 import BookingSuccessPage from './pages/booking/BookingSuccessPage';
 import PaymentPage from './pages/booking/PaymentPage';
@@ -333,6 +335,19 @@ function App() {
               </RoleRoute>
             }
           />
+
+          {/* PYG-604: ผูกเบอร์โทรศัพท์กับบัญชีเดิม — ผู้รับบริการ + ผู้ดูแล
+              แอดมินยังไม่เปิด: story ยังไม่เคาะว่าแอดมินใช้เบอร์ล็อกอินได้หรือไม่ */}
+          {PHONE_AUTH_ENABLED && (
+            <Route
+              path="/settings/phone"
+              element={
+                <RoleRoute requiredRole={[1, 2]}>
+                  <PhoneSettingsPage />
+                </RoleRoute>
+              }
+            />
+          )}
 
           {/* Caregiver settings */}
           <Route

@@ -3,6 +3,7 @@ import { GET_USER } from '../../graphql/queries';
 import Avatar from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
 import Skeleton from '../ui/Skeleton';
+import { accountContact } from '../../lib/phone';
 
 interface ViewProfileModalProps {
   readonly isOpen: boolean;
@@ -77,7 +78,7 @@ export default function ViewProfileModal({
               <p className="text-sm font-semibold text-gray-900 mt-3">
                 {shownName}
               </p>
-              <p className="text-xs text-gray-500 mt-1">{user?.email}</p>
+              <p className="text-xs text-gray-500 mt-1">{accountContact(user)}</p>
             </div>
 
             {/* Profile Information */}

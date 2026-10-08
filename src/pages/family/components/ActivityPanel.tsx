@@ -7,7 +7,7 @@ import {
   type FamilyGroupActivity,
   type FamilyGroupActivityConnection,
 } from '../../../graphql/familyGroup';
-import { formatDayHeading, formatTime, useStrings } from '../familyStrings';
+import { formatDayHeading, formatTime, memberName, useStrings } from '../familyStrings';
 import { FG_ERROR, getFgErrorCode } from '../familyErrors';
 import { describeActivity, TONE_CLASS } from '../activityCopy';
 import {
@@ -153,7 +153,7 @@ export default function ActivityPanel({
     return (userId: string): string | undefined => {
       const member = byUserId.get(userId);
       if (!member) return undefined;
-      return member.isMe ? s.activityActorYou : member.displayName?.trim() || member.email;
+      return member.isMe ? s.activityActorYou : memberName(member);
     };
   }, [group.members, s.activityActorYou]);
 

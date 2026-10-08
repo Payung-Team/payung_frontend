@@ -1,11 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AuthLayout from '../../components/layout/AuthLayout';
 import AuthInput from '../../components/ui/AuthInput';
 import Alert from '../../components/ui/AlertInvalid';
 import OrDivider from '../../components/ui/OrDivider';
 import GoogleAuthButton from '../../components/ui/GoogleAuthButton';
-import { useRegister } from '../../hooks/useRegister';
+import { consentRegisterError, useRegister } from '../../hooks/useRegister';
+import MethodTabs, { type AuthMethod } from '../../components/auth/MethodTabs';
+import PhoneEntryForm from '../../components/auth/PhoneEntryForm';
+import PhoneOtpStep from '../../components/auth/PhoneOtpStep';
+import { PHONE_AUTH_ERROR } from '../../graphql/phoneAuth';
+import { usePhoneAuth } from '../../hooks/usePhoneAuth';
+import { PHONE_AUTH_ENABLED } from '../../lib/phone';
+import { usePhoneAuthStrings } from '../../lib/phoneAuthStrings';
 import { Icon } from '../../components/ui/Icon';
 import { supabase } from '../../lib/supabase';
 import { useQuery } from '@apollo/client/react';
@@ -96,7 +103,8 @@ const ROLE_MAP: Record<Role, number> = { patient: 1, caregiver: 2 };
 
 interface RoleCardProps {
   role: Role;
-  selectedRole: Role;
+  /** null = ยังไม่ได้เลือก (ขั้นเลือกประเภทหลังยืนยันเบอร์ ไม่เลือกให้ล่วงหน้า) */
+  selectedRole: Role | null;
   onClick: (role: Role) => void;
   icon: React.ReactNode;
   title: string;
@@ -113,6 +121,7 @@ function RoleCard({ role, selectedRole, onClick, icon, title, description, id, i
       type="button"
       id={id}
       disabled={disabled}
+      aria-pressed={isSelected}
       onClick={() => !disabled && onClick(role)}
       className={`relative flex w-1/2 flex-col items-center rounded-xl border-2 px-4 py-4 transition-all duration-200 ${
         disabled ? 'cursor-not-allowed opacity-50 bg-[#F5F6F7]' : 'cursor-pointer'
@@ -168,6 +177,36 @@ function PasswordConditions({ password }: { password: string }) {
   );
 }
 
+/** การ์ดเลือกประเภทผู้ใช้ 2 ใบ — ใช้ทั้งฟอร์มอีเมลและขั้นเลือกประเภทหลังยืนยันเบอร์ */
+function RoleCards({ idPrefix, selectedRole, onSelect }: { idPrefix: string; selectedRole: Role | null; onSelect: (role: Role) => void }) {
+  return (
+    <div className="mt-2 flex gap-3">
+      {/* RoleCard: ผู้สูงอายุ */}
+      <RoleCard
+        role="patient"
+        id={`${idPrefix}-patient`}
+        selectedRole={selectedRole}
+        onClick={onSelect}
+        title="ผู้สูงอายุ"
+        description="ค้นหาและจองผู้ดูแล"
+        iconBg="border border-[#E0E2E5] bg-[#F5F6F7]"
+        icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#1A1A1A]"><path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></svg>}
+      />
+      {/* RoleCard: ผู้ดูแล */}
+      <RoleCard
+        role="caregiver"
+        id={`${idPrefix}-caregiver`}
+        selectedRole={selectedRole}
+        onClick={onSelect}
+        title="ผู้ดูแล"
+        description="ให้บริการดูแลผู้สูงอายุ"
+        iconBg="bg-[#FFF3E0]"
+        icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#E09721" /></svg>}
+      />
+    </div>
+  );
+}
+
 // --- Main Component ---
 
 export default function Register() {
@@ -213,6 +252,18 @@ export default function Register() {
   const navigate = useNavigate();
 
   const { registerUser } = useRegister();
+
+  // PYG-604: สมัครด้วยเบอร์โทรศัพท์ — ยืนยันเบอร์ → เลือกประเภท → ยอมรับเงื่อนไข → สร้างบัญชี
+  const s = usePhoneAuthStrings();
+  const phoneAuth = usePhoneAuth();
+  const [method, setMethod] = useState<AuthMethod>(PHONE_AUTH_ENABLED ? 'phone' : 'email');
+  const [phoneDigits, setPhoneDigits] = useState('');
+  const [otp, setOtp] = useState<{ resendAfterSeconds: number } | null>(null);
+  // token ที่ BE ออกให้หลังตรวจรหัสผ่าน — มีค่า = อยู่ขั้นเลือกประเภทผู้ใช้
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
+  const verifiedToken = useRef<string | null>(null);
+  const [phoneRole, setPhoneRole] = useState<Role | null>(null);
+  const [phoneNotice, setPhoneNotice] = useState('');
 
   const validate = useCallback((): FormErrors => {
     const errs: FormErrors = {};
@@ -304,6 +355,63 @@ export default function Register() {
     navigate(selectedRole === 'caregiver' ? '/kyc' : '/onboarding');
   };
 
+  const verifySignupCode = async (code: string) => {
+    const result = await phoneAuth.verifySignupOtp(phoneDigits, code);
+    if (result.ok) verifiedToken.current = result.data.verificationToken;
+    return result;
+  };
+
+  /** เลือกประเภทแล้วกดถัดไป → เปิด pop-up ความยินยอม (บัญชียังไม่ถูกสร้าง) */
+  const openPhoneConsent = () => {
+    if (!phoneRole) return;
+    if (!policy) {
+      setFormError(s.consentLoading);
+      setErrorCount(prev => prev + 1);
+      return;
+    }
+    setFormError('');
+    setConsentError('');
+    setConsentOpen(true);
+  };
+
+  /** ผู้ใช้กดยินยอมใน pop-up → สร้างบัญชีด้วยเบอร์ที่ยืนยันแล้ว */
+  const doPhoneRegister = async () => {
+    if (!policy || !verificationToken || !phoneRole) return;
+
+    setIsSubmitting(true);
+    setConsentError('');
+
+    const result = await phoneAuth.signUp({
+      verificationToken,
+      role: ROLE_MAP[phoneRole],
+      // ★ ส่งคำตอบของทุกข้อที่แสดง รวมข้อที่ไม่ติ๊ก — กติกาเดียวกับ doRegister
+      consents: policy.items.map((item) => ({
+        type: item.type,
+        granted: grantedConsents.has(item.type),
+        policyVersion: policy.version,
+      })),
+    });
+
+    if (result.ok) {
+      // ไม่ setIsSubmitting(false) — เหตุผลเดียวกับ doRegister (GuestRoute redirect ผิดหน้า)
+      navigate(phoneRole === 'caregiver' ? '/kyc' : '/onboarding');
+      return;
+    }
+
+    setIsSubmitting(false);
+    const { failure } = result;
+    if (failure.code === PHONE_AUTH_ERROR.PHONE_VERIFICATION_EXPIRED) {
+      // token หมดอายุระหว่างอ่านเงื่อนไข: กลับไปยืนยันเบอร์ใหม่ เบอร์ที่กรอกยังอยู่
+      setConsentOpen(false);
+      setVerificationToken(null);
+      setOtp(null);
+      setPhoneNotice(failure.message);
+      return;
+    }
+    // ★ แสดง error ในกล่อง ไม่ปิด pop-up — ปิดไปแล้วผู้ใช้ต้องติ๊กใหม่ทั้งหมด
+    setConsentError(consentRegisterError(failure.code) ?? failure.message);
+  };
+
   const handleGoogleSignIn = async () => {
     // เซ็ต flag ก่อน redirect ไป Google เพื่อให้ AuthCallback รู้ว่าเป็น "สมัคร" ไม่ใช่ "เข้าสู่ระบบ"
     // flag จะอยู่ใน localStorage ข้าม redirect ไป Google แล้วกลับมาได้
@@ -329,50 +437,135 @@ export default function Register() {
   const hasErrors = hasValidationError || formError;
   const pwStrength = getPasswordStrength(password);
 
+  const layoutProps = {
+    tagline: 'การดูแลที่ดี เริ่มต้นจากความใส่ใจ',
+    subtitle: 'Payung เชื่อมต่อผู้สูงอายุกับผู้ดูแลที่เหมาะสม เพื่อคุณภาพชีวิตที่ดีขึ้นในทุกวัน',
+    showBackToHome: true,
+  };
+
+  const consentModal = policy && (
+    <ConsentModal
+      open={consentOpen}
+      items={policy.items}
+      granted={grantedConsents}
+      onToggle={toggleConsent}
+      screen={policy.screen}
+      rightsNote={policy.rightsNoteTh}
+      termsOfService={{ th: policy.termsOfServiceTh, en: policy.termsOfServiceEn }}
+      privacyNotice={{ th: policy.privacyNoticeTh, en: policy.privacyNoticeEn }}
+      policyVersion={policy.version}
+      effectiveDate={policy.effectiveDate}
+      submitting={isSubmitting}
+      error={consentError}
+      onCancel={() => setConsentOpen(false)}
+      onAccept={() => void (verificationToken ? doPhoneRegister() : doRegister())}
+    />
+  );
+
+  // ขั้นกรอกรหัสยืนยัน
+  if (otp && !verificationToken) {
+    return (
+      <AuthLayout {...layoutProps}>
+        <PhoneOtpStep
+          digits={phoneDigits}
+          purpose="SIGNUP"
+          resendAfterSeconds={otp.resendAfterSeconds}
+          onVerify={verifySignupCode}
+          onVerified={() => setVerificationToken(verifiedToken.current)}
+          onEditPhone={() => setOtp(null)}
+          successMessage={s.otpVerified}
+        />
+      </AuthLayout>
+    );
+  }
+
+  // ขั้นเลือกประเภทผู้ใช้ — หลังยืนยันเบอร์สำเร็จ
+  if (verificationToken) {
+    return (
+      <AuthLayout {...layoutProps}>
+        <div className="w-full max-w-[420px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+          <h1 id="phone-role-title" className="text-[32px] font-bold leading-10 text-[#1A1A1A]">
+            {s.roleTitle}
+          </h1>
+          <p className="mt-2 text-lg leading-[27px] text-[#8A8C8E]">{s.roleLead}</p>
+
+          <Alert key={errorCount} message={formError} id="register-phone-error-banner" />
+
+          <div className="mt-6" role="group" aria-labelledby="phone-role-title">
+            <RoleCards idPrefix="phone-role" selectedRole={phoneRole} onSelect={setPhoneRole} />
+          </div>
+
+          <button
+            type="button"
+            id="phone-role-next"
+            disabled={!phoneRole}
+            onClick={openPhoneConsent}
+            className={`mt-6 h-[52px] w-full rounded-lg bg-[#52B69A] text-xl font-bold text-white shadow-[0_4px_12px_rgba(82,182,154,0.2)] transition-all duration-200 ${
+              phoneRole
+                ? 'cursor-pointer hover:bg-[#45a085] hover:shadow-[0_6px_20px_rgba(82,182,154,0.35)] active:scale-[0.98]'
+                : 'cursor-not-allowed opacity-60'
+            }`}
+          >
+            {s.next}
+          </button>
+        </div>
+        {consentModal}
+      </AuthLayout>
+    );
+  }
+
   return (
-    <AuthLayout
-      tagline="การดูแลที่ดี เริ่มต้นจากความใส่ใจ"
-      subtitle="Payung เชื่อมต่อผู้สูงอายุกับผู้ดูแลที่เหมาะสม เพื่อคุณภาพชีวิตที่ดีขึ้นในทุกวัน"
-      showBackToHome
-    >
-      <form onSubmit={handleSubmit} className="w-full max-w-[420px]" id="register-form" noValidate>
+    <AuthLayout {...layoutProps}>
+      <div className="w-full max-w-[420px]">
         {/* Heading */}
         <h1 className="text-[32px] font-bold leading-10 text-[#1A1A1A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           สร้างบัญชีผู้ใช้
         </h1>
         <p className="mt-2 text-lg leading-[27px] text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-          กรอกข้อมูลด้านล่างเพื่อเริ่มต้นใช้งาน Payung
+          {PHONE_AUTH_ENABLED ? s.registerLead : 'กรอกข้อมูลด้านล่างเพื่อเริ่มต้นใช้งาน Payung'}
         </p>
 
+        {PHONE_AUTH_ENABLED && (
+          <MethodTabs
+            idPrefix="register"
+            ariaLabel={s.registerMethodsLabel}
+            active={method}
+            onChange={setMethod}
+            disabled={isSubmitting}
+          />
+        )}
+
+        {method === 'phone' ? (
+          <div role="tabpanel" id="register-panel-phone" aria-labelledby="register-tab-phone" className="mt-5">
+            <Alert message={phoneNotice} id="register-phone-notice" className="!mt-0 mb-4" />
+            <PhoneEntryForm
+              purpose="SIGNUP"
+              inputId="register-phone"
+              hint={s.phoneHintSignup}
+              submitLabel={s.requestCode}
+              initialDigits={phoneDigits}
+              onRequested={(digits, resendAfterSeconds) => {
+                setPhoneDigits(digits);
+                setPhoneNotice('');
+                setOtp({ resendAfterSeconds });
+              }}
+              onAlternative={() => navigate('/login')}
+              alternativeLabel={s.goLogin}
+            />
+          </div>
+        ) : (
+      <form
+        onSubmit={handleSubmit}
+        id="register-form"
+        noValidate
+        {...(PHONE_AUTH_ENABLED && { role: 'tabpanel', id: 'register-panel-email', 'aria-labelledby': 'register-tab-email' })}
+      >
         {/* Role Selection */}
         <div className="mt-6">
           <label className="text-sm font-bold leading-6 text-[#575859]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
             ประเภทผู้ใช้
           </label>
-          <div className="mt-2 flex gap-3">
-            {/* RoleCard: ผู้สูงอายุ */}
-            <RoleCard
-              role="patient"
-              id="role-patient"
-              selectedRole={selectedRole}
-              onClick={setSelectedRole}
-              title="ผู้สูงอายุ"
-              description="ค้นหาและจองผู้ดูแล"
-              iconBg="border border-[#E0E2E5] bg-[#F5F6F7]"
-              icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#1A1A1A]"><path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></svg>}
-            />
-            {/* RoleCard: ผู้ดูแล */}
-            <RoleCard
-              role="caregiver"
-              id="role-caregiver"
-              selectedRole={selectedRole}
-              onClick={setSelectedRole}
-              title="ผู้ดูแล"
-              description="ให้บริการดูแลผู้สูงอายุ"
-              iconBg="bg-[#FFF3E0]"
-              icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#E09721" /></svg>}
-            />
-          </div>
+          <RoleCards idPrefix="role" selectedRole={selectedRole} onSelect={setSelectedRole} />
         </div>
 
         {/* Global Error Banner */}
@@ -431,9 +624,13 @@ export default function Register() {
           {isSubmitting ? 'กำลังสมัครสมาชิก...' : 'สมัครสมาชิก'}
         </button>
 
+        {/* PYG-604: สมัครด้วย Google ต้องรู้ประเภทผู้ใช้ก่อน redirect (ดู handleGoogleSignIn)
+            การ์ดประเภทผู้ใช้อยู่ในฟอร์มนี้เท่านั้น ปุ่มจึงอยู่ที่นี่ ไม่แสดงในแท็บเบอร์โทร */}
         <OrDivider />
 
         <GoogleAuthButton label="สมัครด้วย Google" onClick={handleGoogleSignIn} disabled={isSubmitting} />
+      </form>
+        )}
 
         <p className="mt-5 text-center text-base font-bold leading-6 text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           มีบัญชีอยู่แล้ว?{' '}
@@ -452,27 +649,10 @@ export default function Register() {
           <span className="cursor-pointer underline hover:text-[#8A8C8E]">ข้อกำหนดการใช้งาน</span> และ{' '}
           <span className="cursor-pointer underline hover:text-[#8A8C8E]">นโยบายความเป็นส่วนตัว</span>
         </p>
-      </form>
+      </div>
 
       {/* PYG-541: ความยินยอม PDPA เด้งหลังกดสมัคร — บัญชีถูกสร้างหลังกดยินยอมเท่านั้น */}
-      {policy && (
-        <ConsentModal
-          open={consentOpen}
-          items={policy.items}
-          granted={grantedConsents}
-          onToggle={toggleConsent}
-          screen={policy.screen}
-          rightsNote={policy.rightsNoteTh}
-          termsOfService={{ th: policy.termsOfServiceTh, en: policy.termsOfServiceEn }}
-          privacyNotice={{ th: policy.privacyNoticeTh, en: policy.privacyNoticeEn }}
-          policyVersion={policy.version}
-          effectiveDate={policy.effectiveDate}
-          submitting={isSubmitting}
-          error={consentError}
-          onCancel={() => setConsentOpen(false)}
-          onAccept={() => void doRegister()}
-        />
-      )}
+      {consentModal}
     </AuthLayout>
   );
 }

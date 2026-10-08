@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import Avatar from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
+import { PHONE_AUTH_ENABLED, accountContact } from '../../lib/phone';
+import { usePhoneAuthStrings } from '../../lib/phoneAuthStrings';
 
 interface ProfileDropdownProps {
   onViewProfileClick?: () => void;
@@ -25,6 +27,7 @@ export default function ProfileDropdown({
   const isPatient = userRole === 1;
   const { success: showSuccess } = useToast();
   const [isOpen, setIsOpen] = useState(false);
+  const phoneStrings = usePhoneAuthStrings();
 
   const displayUserName = displayName || user?.email?.split('@')[0] || 'User';
   console.log('[ProfileDropdown] avatarUrl:', avatarUrl);
@@ -48,6 +51,12 @@ export default function ProfileDropdown({
   const handlePrivacy = () => {
     setIsOpen(false);
     navigate('/settings/privacy');
+  };
+
+  // PYG-604: ผูกเบอร์โทรศัพท์เพื่อใช้เข้าสู่ระบบ
+  const handlePhone = () => {
+    setIsOpen(false);
+    navigate('/settings/phone');
   };
 
   return (
@@ -80,7 +89,7 @@ export default function ProfileDropdown({
             <p className="text-sm font-semibold text-gray-900">
               {displayUserName}
             </p>
-            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+            <p className="text-xs text-gray-500 truncate">{accountContact(user)}</p>
           </div>
 
           <div className="py-2">
@@ -111,6 +120,21 @@ export default function ProfileDropdown({
                 <p className="text-xs text-gray-500">ความยินยอมและสิทธิ์ของฉัน</p>
               </div>
             </button>
+
+            {PHONE_AUTH_ENABLED && (
+              <button
+                onClick={handlePhone}
+                className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
+                  <Icon name="phone_iphone" size="small" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-medium text-gray-900">{phoneStrings.settingsMenuTitle}</p>
+                  <p className="text-xs text-gray-500">{phoneStrings.settingsMenuSub}</p>
+                </div>
+              </button>
+            )}
 
             {!isPatient && (
             <>
