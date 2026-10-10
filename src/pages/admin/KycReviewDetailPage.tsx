@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { ADMIN_KYC_DETAIL, APPROVE_KYC, REJECT_KYC } from '../../graphql/queries';
@@ -192,50 +192,19 @@ function CaregiverField({ label, value }: { label: string; value?: string | numb
 
 interface RejectReasonRow {
   id: string;
-  title: string;
-  isCustom: boolean;
-  detail: string;
   documentType: string;
-  isChecked: boolean;
-  selectedAt?: number;
+  reason: string;
 }
 
-const DOC_OPTIONS = ['บัตรประชาชน', 'รูปถ่ายคู่บัตรประชาชน', 'ใบรับรองอบรม', 'ข้อมูลส่วนตัว'];
-
-function Dropdown({
-  value,
-  onChange,
-  options,
-  error,
-}: {
-  value: string;
-  onChange: (val: string) => void;
-  options: string[];
-  error?: boolean;
-}) {
-  return (
-    <div className="relative shrink-0 flex items-center">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`appearance-none pl-2 pr-5 w-[93px] h-[22px] border rounded-[6px] bg-white cursor-pointer select-none text-[11px] font-semibold outline-none truncate ${
-          error ? 'border-red-500 text-red-500' : 'border-[#6B7280] text-[#6B7280]'
-        }`}
-        style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-      >
-        <option value="" disabled hidden>เลือกเอกสาร</option>
-        {options.map((option) => (
-          <option key={option} value={option} className="text-xs font-medium text-gray-700 bg-white">
-            {option}
-          </option>
-        ))}
-      </select>
-      <div className="absolute right-[4px] pointer-events-none text-[#757575] flex items-center h-full">
-        <Icon name="expand_more" size="small" />
-      </div>
-    </div>
-  );
-}
+// ค่าต้องตรงกับที่ KycStatusPage / KycResubmitPage ใช้ map ไปหน้าแก้ไข
+const DOC_OPTIONS = [
+  { value: 'บัตรประชาชน', icon: 'badge' },
+  { value: 'รูปถ่ายคู่บัตรประชาชน', icon: 'photo_camera' },
+  { value: 'ใบรับรองอบรม', icon: 'workspace_premium' },
+  { value: 'ข้อมูลส่วนตัว', icon: 'person' },
+];
+const DOC_ICON: Record<string, string> = Object.fromEntries(DOC_OPTIONS.map((o) => [o.value, o.icon]));
+const MAX_REASON_LENGTH = 200;
 
 function RejectModal({
   isOpen,
@@ -250,315 +219,170 @@ function RejectModal({
   onClose: () => void;
   onConfirm: (reasons: Array<{ title: string; detail?: string; documentType?: string }>) => void;
 }) {
+  // state ถูก reset ทุกครั้งที่เปิด เพราะ parent remount ผ่าน key
   const [rows, setRows] = useState<RejectReasonRow[]>([]);
-
-  useEffect(() => {
-    if (isOpen) {
-      setRows([
-        {
-          id: 'unclear',
-          title: 'เอกสารไม่ชัดเจน',
-          isCustom: false,
-          detail: '',
-          documentType: '',
-          isChecked: false,
-        },
-        {
-          id: 'mismatch',
-          title: 'ข้อมูลไม่ตรงกัน',
-          isCustom: false,
-          detail: '',
-          documentType: '',
-          isChecked: false,
-        },
-        {
-          id: 'expired',
-          title: 'เอกสารหมดอายุ',
-          isCustom: false,
-          detail: '',
-          documentType: '',
-          isChecked: false,
-        },
-      ]);
-    }
-  }, [isOpen]);
+  // แถวที่เพิ่งเพิ่ม — ใช้ไฮไลต์ชั่วครู่ให้ admin เห็นว่ากด chip แล้วเกิดแถวใหม่
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const nextIdRef = useRef(0);
 
   if (!isOpen) return null;
 
-  const handleAddRow = () => {
-    const newId = `custom-${Date.now()}`;
-    setRows((prev) => [
-      ...prev,
-      {
-        id: newId,
-        title: '',
-        isCustom: true,
-        detail: '',
-        documentType: '',
-        isChecked: true,
-        selectedAt: Date.now(),
-      },
-    ]);
-  };
-
-  const handleToggleRow = (id: string) => {
-    setRows((prev) =>
-      prev.map((row) =>
-        row.id === id
-          ? {
-              ...row,
-              isChecked: !row.isChecked,
-              selectedAt: !row.isChecked ? Date.now() : undefined,
-            }
-          : row
-      )
-    );
+  const handleAddRow = (documentType: string) => {
+    const id = `${documentType}-${nextIdRef.current++}`;
+    setRows((prev) => [...prev, { id, documentType, reason: '' }]);
+    setHighlightId(id);
+    setTimeout(() => setHighlightId((current) => (current === id ? null : current)), 1200);
   };
 
   const handleRemoveRow = (id: string) => {
-    setRows((prev) => {
-      const row = prev.find((r) => r.id === id);
-      if (row?.isCustom) {
-        return prev.filter((r) => r.id !== id);
-      }
-      return prev.map((r) => (r.id === id ? { ...r, isChecked: false } : r));
-    });
+    setRows((prev) => prev.filter((row) => row.id !== id));
   };
 
-  const handleTitleChange = (id: string, value: string) => {
-    setRows((prev) =>
-      prev.map((row) => {
-        if (row.id === id) {
-          const isChecking = value.trim() !== '' && !row.isChecked;
-          return {
-            ...row,
-            title: value,
-            isChecked: value.trim() !== '' ? true : row.isChecked,
-            selectedAt: isChecking ? Date.now() : row.selectedAt,
-          };
-        }
-        return row;
-      })
-    );
+  const handleReasonChange = (id: string, value: string) => {
+    setRows((prev) => prev.map((row) => (row.id === id ? { ...row, reason: value } : row)));
   };
 
-  const handleDetailChange = (id: string, value: string) => {
-    setRows((prev) =>
-      prev.map((row) => {
-        if (row.id === id) {
-          const isChecking = value.trim() !== '' && !row.isChecked;
-          return {
-            ...row,
-            detail: value,
-            isChecked: value.trim() !== '' ? true : row.isChecked,
-            selectedAt: isChecking ? Date.now() : row.selectedAt,
-          };
-        }
-        return row;
-      })
-    );
-  };
-
-  const handleDocTypeChange = (id: string, value: string) => {
-    setRows((prev) =>
-      prev.map((row) => {
-        if (row.id === id) {
-          const isChecking = !row.isChecked;
-          return {
-            ...row,
-            documentType: value,
-            isChecked: true,
-            selectedAt: isChecking ? Date.now() : row.selectedAt,
-          };
-        }
-        return row;
-      })
-    );
-  };
-
-  const activeReasons = rows
-    .filter((row) => row.isChecked)
-    .sort((a, b) => (a.selectedAt || 0) - (b.selectedAt || 0));
-  const hasActiveReasons = activeReasons.length > 0;
-
-  const combinedReasonString = activeReasons
-    .map((row) => {
-      const titleStr = row.title.trim() || (row.isCustom ? 'เหตุผลอื่นๆ' : '');
-      const detailStr = row.detail.trim() ? `: ${row.detail.trim()}` : '';
-      const docStr = row.documentType ? ` (${row.documentType})` : '';
-      return `${titleStr}${detailStr}${docStr}`;
-    })
-    .filter((str) => str.length > 0)
-    .join('\n');
-
-  const combinedReasonLength = combinedReasonString.length;
-  const allHaveDocType = activeReasons.every((row) => row.documentType !== '');
-  const allHaveDetail = activeReasons.every((row) => row.detail.trim() !== '');
-  const isValid = hasActiveReasons && combinedReasonLength >= 10 && allHaveDocType && allHaveDetail;
-  const showPlusButton = rows.every((row) => !row.isCustom || row.title.trim() !== '');
+  const hasRows = rows.length > 0;
+  const allHaveReason = rows.every((row) => row.reason.trim() !== '');
+  const isValid = hasRows && allHaveReason;
 
   const handleConfirmClick = () => {
-    if (isValid) {
-      const payload = activeReasons.map((row) => {
-        const titleStr = row.title.trim() || (row.isCustom ? 'เหตุผลอื่นๆ' : '');
-        return {
-          title: titleStr,
-          ...(row.detail.trim() ? { detail: row.detail.trim() } : {}),
-          ...(row.documentType ? { documentType: row.documentType } : {}),
-        };
-      });
-      onConfirm(payload);
-    }
+    if (!isValid) return;
+    onConfirm(rows.map((row) => ({ title: row.reason.trim(), documentType: row.documentType })));
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
       <div className="fixed inset-0 -z-10" onClick={onClose} />
 
-      <div className="w-[600px] max-w-[90vw] bg-white rounded-xl shadow-2xl flex flex-col p-8 gap-5 select-none" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+      <div
+        className="w-[520px] max-w-full max-h-full bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden"
+        style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+      >
         {/* Header */}
-        <div className="flex flex-col gap-1 w-full">
-          <h2 className="text-[20px] font-semibold leading-[25px] text-[#A32D2D] text-left">
-            ปฏิเสธ KYC - {caregiverName}
-          </h2>
-          <p className="text-[16px] font-normal leading-[24px] text-[#717182] text-left">
-            กรุณาระบุเหตุผลที่ปฏิเสธ
-          </p>
+        <div className="flex items-start gap-3 px-6 pt-6 pb-4">
+          <span className="w-10 h-10 shrink-0 rounded-full bg-[#FEF2F2] text-[#DC2626] flex items-center justify-center">
+            <Icon name="assignment_return" style={{ fontSize: '20px' }} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[17px] font-semibold leading-6 text-[#111827] truncate">ปฏิเสธ KYC - {caregiverName}</h2>
+            <p className="text-[13px] leading-5 text-[#6B7280]">ส่งกลับให้ผู้ดูแลแก้ไขตามรายการด้านล่าง</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isLoading}
+            aria-label="ปิด"
+            className="w-8 h-8 shrink-0 -mr-1 flex items-center justify-center rounded-full text-[#9CA3AF] hover:bg-[#F3F4F6] hover:text-[#4B5563] transition-colors cursor-pointer"
+          >
+            <Icon name="close" style={{ fontSize: '18px' }} />
+          </button>
         </div>
 
-        {/* Tags Selection */}
-        <div className="w-full flex items-center flex-wrap gap-[10px]">
-          {rows.filter(r => !r.isCustom).map((row) => (
-            <button
-              key={`tag-${row.id}`}
-              type="button"
-              onClick={() => handleToggleRow(row.id)}
-              className={`h-[30px] px-[16px] flex items-center justify-center rounded-full border text-[14px] font-medium transition-all cursor-pointer ${
-                row.isChecked
-                  ? 'bg-[#A32D2D] border-[#A32D2D] text-white'
-                  : 'bg-white border-[#A32D2D] text-[#A32D2D] hover:bg-red-50'
-              }`}
-            >
-              {row.title}
-            </button>
-          ))}
-          {/* + Button Tag */}
-          {showPlusButton && (
-            <button
-              type="button"
-              onClick={handleAddRow}
-              className="h-[30px] px-[14px] flex items-center justify-center rounded-full border border-[#A32D2D] bg-white text-[#A32D2D] hover:bg-red-50 transition-all text-[16px] leading-none cursor-pointer"
-            >
-              +
-            </button>
+        {/* Body — เลื่อนแนวตั้งได้เมื่อรายการยาวเกินจอ */}
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-2 flex flex-col gap-5">
+          {/* Document type quick actions */}
+          <section className="flex flex-col gap-2">
+            <div>
+              <h3 className="text-[14px] font-semibold text-[#111827]">
+                ระบุส่วนที่ต้องการให้แก้ไข <span className="text-[#DC2626]">*</span>
+              </h3>
+              <p className="text-[12px] text-[#9CA3AF]">กดเพื่อเพิ่มรายการ · กดซ้ำได้ถ้ามีหลายเหตุผล</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {DOC_OPTIONS.map((option) => {
+                const count = rows.filter((row) => row.documentType === option.value).length;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => handleAddRow(option.value)}
+                    className="group h-11 pl-3 pr-2 flex items-center gap-2.5 rounded-xl border border-[#E5E7EB] bg-white text-left transition-all cursor-pointer select-none hover:border-[#DC2626] hover:bg-[#FFFBFB] active:scale-[0.98]"
+                  >
+                    <span className="flex text-[#9CA3AF] transition-colors group-hover:text-[#DC2626]">
+                      <Icon name={option.icon} style={{ fontSize: '18px' }} />
+                    </span>
+                    <span className="flex-1 min-w-0 truncate text-[13px] font-medium text-[#374151]">{option.value}</span>
+                    {count > 0 && (
+                      <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#DC2626] text-white text-[11px] font-semibold flex items-center justify-center">
+                        {count}
+                      </span>
+                    )}
+                    <span className="w-7 h-7 shrink-0 rounded-lg bg-[#F3F4F6] text-[#6B7280] flex items-center justify-center transition-colors group-hover:bg-[#DC2626] group-hover:text-white">
+                      <Icon name="add" style={{ fontSize: '18px' }} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Reasons list */}
+          {hasRows && (
+            <section className="flex flex-col gap-2">
+              <h3 className="text-[12px] font-medium text-[#6B7280]">รายการที่ต้องแก้ไข ({rows.length})</h3>
+              {rows.map((row, index) => {
+                // ลำดับของแถวในประเภทเดียวกัน — แสดง #2, #3 เมื่อเพิ่มประเภทซ้ำ
+                const sameTypeIndex = rows.slice(0, index + 1).filter((r) => r.documentType === row.documentType).length;
+                const isEmpty = row.reason.trim() === '';
+                return (
+                  <div
+                    key={row.id}
+                    className={`rounded-xl border p-3 flex flex-col gap-2 transition-colors duration-700 ${
+                      highlightId === row.id ? 'border-[#FCA5A5] bg-[#FEF2F2]' : 'border-[#F3F4F6] bg-[#F9FAFB]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="flex text-[#DC2626]">
+                        <Icon name={DOC_ICON[row.documentType] ?? 'description'} style={{ fontSize: '16px' }} />
+                      </span>
+                      <span className="flex-1 min-w-0 truncate text-[13px] font-semibold text-[#111827]">
+                        {row.documentType}
+                        {sameTypeIndex > 1 && <span className="ml-1 font-normal text-[#9CA3AF]">#{sameTypeIndex}</span>}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRow(row.id)}
+                        aria-label={`ลบรายการ ${row.documentType}`}
+                        className="h-6 px-2 flex items-center gap-1 rounded-md text-[12px] text-[#9CA3AF] hover:bg-white hover:text-[#DC2626] transition-colors cursor-pointer"
+                      >
+                        <Icon name="delete" style={{ fontSize: '14px' }} />
+                        ลบ
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={row.reason}
+                      maxLength={MAX_REASON_LENGTH}
+                      onChange={(e) => handleReasonChange(row.id, e.target.value)}
+                      placeholder="ระบุเหตุผล เช่น รูปไม่ชัด มองไม่เห็นเลขบัตร"
+                      aria-label={`เหตุผลที่ต้องแก้ไข ${row.documentType}`}
+                      className={`w-full h-10 px-3 rounded-lg border bg-white text-[14px] text-[#111827] placeholder-[#9CA3AF] outline-none transition-colors focus:border-[#DC2626] focus:ring-2 focus:ring-[#FEE2E2] ${
+                        isEmpty ? 'border-[#FECACA]' : 'border-[#E5E7EB]'
+                      }`}
+                      style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+                    />
+                  </div>
+                );
+              })}
+            </section>
           )}
         </div>
 
-        {/* Frame 11 - Reasons List */}
-        {hasActiveReasons && (
-          <div className="w-full max-h-[40vh] overflow-x-hidden overflow-y-auto pr-1 flex flex-col gap-[13px]">
-            {activeReasons.map((row) => (
-              <div
-                key={row.id}
-                className="w-full h-[51px] shrink-0 bg-[#F9FAFB] rounded-lg pl-[14px] pr-[14px] flex items-center gap-[7px]"
-              >
-                {row.isCustom ? (
-                  <div className="flex items-center gap-[6px] flex-1 h-[20px]">
-                    {/* Custom Title Input */}
-                    <div className="w-[98px] h-[19px] ] rounded px-1 flex items-center">
-                      <input
-                        type="text"
-                        value={row.title}
-                        onChange={(e) => handleTitleChange(row.id, e.target.value)}
-                        placeholder="หัวข้อ"
-                        className="w-full text-[16px] font-medium leading-[20px] text-[#1F2937] placeholder-[#9CA3AF] bg-transparent border-none outline-none py-0"
-                        style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-                      />
-                    </div>
-                    {/* Separator */}
-                    <span className="text-[16px] font-medium text-[#1F2937] leading-[19px] shrink-0">-</span>
-                    {/* Custom Detail Input */}
-                    <div className="flex-1 h-[19px] ] rounded px-2 flex items-center">
-                      <input
-                        type="text"
-                        value={row.detail}
-                        onChange={(e) => handleDetailChange(row.id, e.target.value)}
-                        placeholder="โปรดระบุรายละเอียด"
-                        className={`w-full text-[14px] font-normal leading-[14px] text-[#1F2937] bg-transparent border-none outline-none py-0 ${row.detail.trim() === '' ? 'placeholder-red-400' : 'placeholder-[#9CA3AF]'}`}
-                        style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-[6px] flex-1 h-[20px]">
-                    {/* Default Title */}
-                    <span className="text-[16px] font-medium text-[#1F2937] leading-[20px] whitespace-nowrap shrink-0">
-                      {row.title} -
-                    </span>
-                    {/* Default Detail Input */}
-                    <div className="flex-1 h-[19px] ] rounded px-2 flex items-center">
-                      <input
-                        type="text"
-                        value={row.detail}
-                        onChange={(e) => handleDetailChange(row.id, e.target.value)}
-                        placeholder="โปรดระบุรายละเอียด"
-                        className={`w-full text-[14px] font-normal leading-[14px] text-[#1F2937] bg-transparent border-none outline-none py-0 ${row.detail.trim() === '' ? 'placeholder-red-400' : 'placeholder-[#9CA3AF]'}`}
-                        style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Dropdown */}
-                <Dropdown
-                  value={row.documentType}
-                  onChange={(val) => handleDocTypeChange(row.id, val)}
-                  options={DOC_OPTIONS}
-                  error={row.documentType === ''}
-                />
-
-                {/* Remove Button (X) */}
-                <button
-                  type="button"
-                  onClick={() => handleRemoveRow(row.id)}
-                  className="w-[26px] h-[26px] shrink-0 flex items-center justify-center text-[#6B7280] hover:text-[#EF4444] transition-colors cursor-pointer"
-                >
-                  <Icon name="close" size="small" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Footer Area (Counter & Buttons) */}
-        <div className="flex flex-col w-full gap-2 mt-2">
-          {/* Validation Messages */}
-          <div className="flex flex-col gap-0.5 min-h-[16px]">
-            {hasActiveReasons && combinedReasonLength < 10 && (
-              <span className="text-xs text-red-500 font-medium">
-                ต้องมีอย่างน้อย 10 ตัวอักษร (ปัจจุบันมี {combinedReasonLength} ตัวอักษร)
-              </span>
-            )}
-            {hasActiveReasons && !allHaveDocType && (
-              <span className="text-xs text-red-500 font-medium">
-                กรุณาเลือกประเภทเอกสารให้ครบทุกเหตุผล
-              </span>
-            )}
-            {hasActiveReasons && !allHaveDetail && (
-              <span className="text-xs text-red-500 font-medium">
-                กรุณาระบุรายละเอียดให้ครบทุกเหตุผล
-              </span>
-            )}
-          </div>
-
-          {/* Action Buttons Container */}
-          <div className="flex items-center justify-end gap-3 w-full">
+        {/* Footer */}
+        <div className="mt-2 px-6 py-4 border-t border-[#F3F4F6] flex items-center justify-between gap-4">
+          <span className={`text-[12px] ${hasRows && !allHaveReason ? 'text-[#DC2626]' : 'text-[#9CA3AF]'}`}>
+            {!hasRows && 'เลือกอย่างน้อย 1 รายการ'}
+            {hasRows && !allHaveReason && 'กรุณาระบุเหตุผลให้ครบทุกรายการ'}
+            {isValid && `พร้อมส่ง ${rows.length} รายการ`}
+          </span>
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="w-[115px] h-[35px] flex items-center justify-center rounded border border-[#000000]/10 bg-white hover:bg-gray-50 text-[14px] font-medium text-[#0A0A0A] active:scale-95 transition-all cursor-pointer"
-              style={{ border: '0.8px solid rgba(0, 0, 0, 0.1)' }}
+              className="h-10 px-4 rounded-lg border border-[#E5E7EB] text-[14px] font-medium text-[#374151] hover:bg-[#F9FAFB] transition-colors cursor-pointer"
             >
               ยกเลิก
             </button>
@@ -566,7 +390,7 @@ function RejectModal({
               type="button"
               onClick={handleConfirmClick}
               disabled={isLoading || !isValid}
-              className="w-[143px] h-[35px] flex items-center justify-center rounded bg-[#DC2626] hover:bg-[#B91C1C] text-[14px] font-medium text-white shadow-[0px_4px_4px_rgba(0,0,0,0.25)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="h-10 px-4 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-[14px] font-medium text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               {isLoading ? 'กำลังบันทึก...' : 'ยืนยันการปฏิเสธ'}
             </button>
@@ -854,6 +678,7 @@ export default function KycReviewDetailPage() {
         onConfirm={handleApprove}
       />
       <RejectModal
+        key={isRejectOpen ? 'reject-open' : 'reject-closed'}
         isOpen={isRejectOpen}
         isLoading={rejecting}
         caregiverName={caregiver?.fullName || ''}
