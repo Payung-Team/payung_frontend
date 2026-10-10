@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Skeleton from './Skeleton';
 import { Icon } from './Icon';
 
@@ -23,6 +23,10 @@ const Avatar: React.FC<AvatarProps> = ({
   loading = false,
   fallbackColor = '#52B69A',
 }) => {
+  // รูปโหลดไม่ขึ้น (signed URL หมดอายุ / ไฟล์ถูกลบ) → ใช้ตัวอักษรแรกแทน ไม่งั้นเบราว์เซอร์โชว์ alt (ชื่อเต็ม) ทับวงกลม
+  const [imgFailed, setImgFailed] = useState(false);
+  useEffect(() => setImgFailed(false), [src]);
+
   const getInitials = (userName?: string) => {
     if (!userName) return '?';
     return userName.charAt(0).toUpperCase();
@@ -44,8 +48,13 @@ const Avatar: React.FC<AvatarProps> = ({
       className={`rounded-full flex items-center justify-center text-white font-bold relative border-[3px] border-white shadow-[0_4px_16px_rgba(82,182,154,0.2)] flex-shrink-0 ${className}`}
       style={containerStyle}
     >
-      {src ? (
-        <img src={src} alt={name || 'avatar'} className="w-full h-full object-cover rounded-full" />
+      {src && !imgFailed ? (
+        <img
+          src={src}
+          alt={name || 'avatar'}
+          className="w-full h-full object-cover rounded-full"
+          onError={() => setImgFailed(true)}
+        />
       ) : (
         <span style={{ fontSize: typeof size === 'number' ? `${size / 3}px` : '1.5rem' }}>
           {getInitials(name)}
