@@ -39,6 +39,8 @@ export function PayoutAccountForm({ mode, onSubmit, onSkip, onCancelEdit }: Payo
     formState: { errors },
   } = useForm<PayoutForm>({
     resolver: zodResolver(payoutSchema),
+    // PYG-545: error ขึ้นเมื่อออกจากช่อง แล้ว validate ใหม่ทุกครั้งที่ค่าเปลี่ยน · ช่องที่ยังไม่แตะไม่แสดง error
+    mode: 'onTouched',
     defaultValues: { bankCode: '', accountNumber: '', accountName: '' },
   });
 

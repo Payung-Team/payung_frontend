@@ -113,6 +113,8 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
     reset,
   } = useForm<Step1Form>({
     resolver: zodResolver(step1Schema),
+    // PYG-545: error ขึ้นเมื่อออกจากช่อง แล้ว validate ใหม่ทุกครั้งที่ค่าเปลี่ยน · ช่องที่ยังไม่แตะไม่แสดง error
+    mode: 'onTouched',
     defaultValues: step1Data
       ? { ...step1Data }
       : {
