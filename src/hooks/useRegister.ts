@@ -30,6 +30,33 @@ export interface RegisterResponse {
   };
 }
 
+/**
+ * เริ่ม session ของบัญชีที่เพิ่งสมัคร — ใช้ร่วมกันทั้งสมัครด้วยอีเมลและเบอร์โทร (PYG-604)
+ * set flag ก่อน setSession เพื่อป้องกัน race condition
+ * (GuestRoute อาจ re-render จาก onAuthStateChange ก่อนที่ flag จะถูก set)
+ */
+export async function startRegisteredSession(
+  registered: { accessToken: string; refreshToken: string; user?: { role: number } | null },
+  setUserRole: (role: number) => void,
+) {
+  const { accessToken, refreshToken, user } = registered;
+  if (!accessToken || !refreshToken) return;
+  if (user) {
+    localStorage.setItem('is_registering', 'true');
+    setUserRole(user.role);
+  }
+  await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+}
+
+/** ข้อความเมื่อ BE ปฏิเสธการสมัครเพราะความยินยอม — undefined เมื่อ code ไม่ใช่เรื่องความยินยอม */
+export function consentRegisterError(code: string | undefined): string | undefined {
+  if (code === CONSENT_ERROR.VERSION_MISMATCH) {
+    return 'นโยบายความเป็นส่วนตัวมีฉบับใหม่แล้ว กรุณารีเฟรชหน้าเว็บแล้วอ่านอีกครั้ง';
+  }
+  if (code && code.startsWith('CONSENT_')) return 'ต้องให้ความยินยอมข้อที่บังคับก่อนจึงจะสมัครได้';
+  return undefined;
+}
+
 export function useRegister() {
   // ระบุให้ useMutation รู้ชัดเจนว่าข้อมูลที่จะได้กลับคืนมาคือ RegisterResponse 
   // และข้อมูลที่จะส่งเข้าไปคือ RegisterData
@@ -44,23 +71,7 @@ export function useRegister() {
 
       // ดึง tokens จาก response และเซ็ต session ใน supabase เพื่อให้ user ล็อกอินทันที
       const registerData = response.data?.register;
-      if (registerData) {
-        const { accessToken, refreshToken, user } = registerData;
-        if (accessToken && refreshToken) {
-          // set flag ก่อน setSession เพื่อป้องกัน race condition
-          // (GuestRoute อาจ re-render จาก onAuthStateChange ก่อนที่ flag จะถูก set)
-          if (user) {
-            localStorage.setItem('is_registering', 'true');
-            setUserRole(user.role);
-          }
-
-          // เซ็ต session ใน Supabase
-          await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          });
-        }
-      }
+      if (registerData) await startRegisteredSession(registerData, setUserRole);
       // ไม่ log response — ในนั้นมี accessToken/refreshToken และข้อมูลผู้ใช้
 
       return { data: response.data, error: null };
@@ -72,20 +83,8 @@ export function useRegister() {
       // PYG-475: BE ส่ง code เรื่องความยินยอมมาใน extensions.code (ConsentError ของ PYG-474)
       //   แปลเป็นสิ่งที่ผู้ใช้ต้องทำต่อ — ข้อความดิบไม่ได้บอกว่าต้องติ๊กอะไรหรือต้องรีเฟรช
       const code = extractGraphQLErrorCode(err);
-      if (code === CONSENT_ERROR.VERSION_MISMATCH) {
-        return {
-          data: null,
-          error: 'นโยบายความเป็นส่วนตัวมีฉบับใหม่แล้ว กรุณารีเฟรชหน้าเว็บแล้วอ่านอีกครั้ง',
-          code,
-        };
-      }
-      if (code && code.startsWith('CONSENT_')) {
-        return {
-          data: null,
-          error: 'ต้องให้ความยินยอมข้อที่บังคับก่อนจึงจะสมัครได้',
-          code,
-        };
-      }
+      const consentError = consentRegisterError(code);
+      if (consentError) return { data: null, error: consentError, code };
 
       if (errorMessage.includes('Email is already in use') || errorMessage.includes('Unique constraint failed') || errorMessage.toLowerCase().includes('already exists')) {
         displayError = 'อีเมลนี้ถูกใช้งานแล้ว';

@@ -497,7 +497,8 @@ export interface FamilyGroupMember {
   id: string;
   userId: string;
   displayName?: string | null;
-  email: string;
+  /** null เมื่อสมาชิกสมัครด้วยเบอร์โทรศัพท์อย่างเดียว (PYG-604) — ใช้ memberName() ตอนแสดงชื่อ */
+  email: string | null;
   avatarUrl?: string | null;
   role: GroupRole;
   joinedAt: string;

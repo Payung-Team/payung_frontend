@@ -25,9 +25,14 @@ import Pagination from '../../components/ui/Pagination';
 type RoleFilterKey = 'all' | 'super_admin' | 'admin' | 'caregiver' | 'patient';
 type ActionType = 'none' | 'user' | 'admin';
 
+/** ชื่อที่ใช้เรียกผู้ใช้ในหน้านี้ — บัญชีที่สมัครด้วยเบอร์โทรไม่มีอีเมล (PYG-604) */
+function userLabel(user: { displayName?: string; email: string | null }): string {
+  return user.displayName || user.email || 'ผู้ใช้ที่ไม่มีอีเมล';
+}
+
 interface UserSummary {
   id: string;
-  email: string;
+  email: string | null;
   displayName?: string;
   role: number;
   isActive: boolean;
@@ -96,7 +101,7 @@ function formatDate(value?: string | null) {
   }).format(d);
 }
 
-function getInitial(displayName?: string, email?: string) {
+function getInitial(displayName?: string, email?: string | null) {
   const name = displayName || email || '';
   return name.charAt(0).toUpperCase() || 'A';
 }
@@ -469,7 +474,7 @@ interface EditAdminModalProps {
 
 function EditAdminModal({ user, onClose, onSuccess }: Readonly<EditAdminModalProps>) {
   const { firstName: initFirst, lastName: initLast } = splitDisplayName(user.displayName);
-  const [form, setForm] = useState({ firstName: initFirst, lastName: initLast, email: user.email, role: String(user.role) });
+  const [form, setForm] = useState({ firstName: initFirst, lastName: initLast, email: user.email ?? '', role: String(user.role) });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState('');
 
@@ -522,7 +527,7 @@ function EditAdminModal({ user, onClose, onSuccess }: Readonly<EditAdminModalPro
           แก้ไขข้อมูลผู้ดูแลระบบ
         </h2>
         <p style={{ fontFamily: 'Bai Jamjuree, sans-serif', fontWeight: 600, fontSize: 13, lineHeight: '20px', color: '#0D9488', margin: '5px 0 20px 0' }}>
-          {user.displayName || user.email}
+          {userLabel(user)}
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -643,7 +648,7 @@ interface ConfirmDeactivateProps {
 
 function ConfirmDeactivateModal({ user, isAdminTarget, onClose, onConfirm, loading }: Readonly<ConfirmDeactivateProps>) {
   const [inputValue, setInputValue] = useState('');
-  const confirmName = user.displayName || user.email;
+  const confirmName = userLabel(user);
   const isMatch = inputValue === confirmName;
 
   return (
@@ -767,7 +772,7 @@ interface ConfirmActivateProps {
 }
 
 function ConfirmActivateModal({ user, onClose, onConfirm, loading }: Readonly<ConfirmActivateProps>) {
-  const name = user.displayName || user.email;
+  const name = userLabel(user);
   return (
     <dialog open className="fixed inset-0 z-50 m-0 flex h-screen w-screen max-w-none items-center justify-center p-0 bg-black/40 backdrop-blur-sm">
       <button type="button" aria-label="ปิด" className="absolute inset-0" onClick={onClose} />

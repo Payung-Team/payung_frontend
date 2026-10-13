@@ -50,6 +50,14 @@ export function initial(name: string | null | undefined, fallback = '?'): string
   return [...trimmed][0] ?? fallback;
 }
 
+/**
+ * Name to show for a group member. Accounts created with a phone number have no email
+ * (PYG-604), so the email fallback can be missing too — never let null reach the screen.
+ */
+export function memberName(member: { displayName?: string | null; email?: string | null }): string {
+  return member.displayName?.trim() || member.email || S.memberNoName;
+}
+
 /** The strings table. A hook-shaped accessor so call sites read `const s = useStrings()`. */
 export function useStrings(): Strings {
   return S;
@@ -135,6 +143,7 @@ export interface Strings {
   backToGroup: string;
   membersListLabel: (n: number) => string;
   you: string;
+  memberNoName: string;
   ownerCannotRemoveSelf: string;
   memberRowMenu: string;
   makeOwner: string;
@@ -387,6 +396,7 @@ const S: Strings = {
   backToGroup: 'กลับไปหน้ากลุ่ม',
   membersListLabel: (n) => `สมาชิก (${n})`,
   you: '(คุณ)',
+  memberNoName: 'สมาชิก',
   ownerCannotRemoveSelf: 'เจ้าของกลุ่มลบตัวเองไม่ได้',
   memberRowMenu: 'ตัวเลือกสมาชิก',
   makeOwner: 'ตั้งเป็นเจ้าของกลุ่ม',

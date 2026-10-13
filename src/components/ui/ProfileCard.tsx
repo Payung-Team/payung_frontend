@@ -2,12 +2,14 @@ import React from 'react';
 import Avatar from './Avatar';
 import Skeleton from './Skeleton';
 import { Icon } from './Icon';
+import { accountContact } from '../../lib/phone';
 
 interface ProfileCardProps {
   user?: {
     displayName?: string;
     fullName?: string;
-    email: string;
+    /** null เมื่อบัญชีสมัครด้วยเบอร์โทรศัพท์อย่างเดียว */
+    email?: string | null;
     phone?: string;
     address?: string;
     bio?: string;
@@ -56,7 +58,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ user, loading, onEditProfile 
       <div className="text-center mb-5 group">
         <Avatar
           src={user.avatarUrl}
-          name={user.fullName || user.displayName || user.email}
+          name={user.fullName || user.displayName || user.email || undefined}
           size={76}
           className="mx-auto mb-3 transition-transform duration-200 cursor-pointer group-hover:scale-105"
           showStatus={true}
@@ -65,7 +67,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ user, loading, onEditProfile 
         <div className="text-[17px] font-bold text-[#1A1A1A] mb-0.5 group-hover:text-[#52B69A] transition-colors">
           {user.fullName || user.displayName || 'ผู้ใช้แอป Payung'}
         </div>
-        <div className="text-xs text-[#8A8C8E] mb-3">{user.email}</div>
+        <div className="text-xs text-[#8A8C8E] mb-3">{accountContact(user)}</div>
 
         <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-xs font-semibold bg-[#E6F5ED] text-[#3A9A7E]">
           <Icon name="person" size="small" color="currentColor" />

@@ -12,6 +12,13 @@ import { supabase } from '../../lib/supabase';
 import { Icon } from '../../components/ui/Icon';
 import { useAuth } from '../../context/AuthContext';
 import { getPostLoginRedirect } from '../../utils/getRedirectPath';
+import MethodTabs, { type AuthMethod } from '../../components/auth/MethodTabs';
+import PhoneEntryForm from '../../components/auth/PhoneEntryForm';
+import PhoneOtpStep from '../../components/auth/PhoneOtpStep';
+import { usePhoneAuth } from '../../hooks/usePhoneAuth';
+import { PHONE_AUTH_ENABLED } from '../../lib/phone';
+import type { PhoneAuthResult } from '../../lib/phoneAuthErrors';
+import { usePhoneAuthStrings } from '../../lib/phoneAuthStrings';
 
 // Icons
 const EmailIcon = <Icon name="email" size="small" color="currentColor" />;
@@ -22,6 +29,15 @@ interface FormErrors {
   email?: string;
   password?: string;
 }
+
+/** ส่วนของ response ที่ใช้เริ่ม session — รูปเดียวกันทั้ง login เดิมและ loginWithPhone (S07-AC5) */
+interface LoginPayload {
+  accessToken?: string | null;
+  refreshToken?: string | null;
+  user?: { role?: number | null; isActive?: boolean | null; mustChangePassword?: boolean | null } | null;
+}
+
+const SUSPENDED_MESSAGE = 'บัญชีของคุณถูกระงับ กรุณาติดต่อผู้ดูแลระบบ';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -40,38 +56,52 @@ export default function Login() {
     return r && r.startsWith('/') && !r.startsWith('//') ? r : null;
   })();
 
-  const [loginMutation, { loading: isSubmitting }] = useMutation(LOGIN_USER, {
+  // PYG-604: ทางเลือกเบอร์โทรศัพท์ — ค่าเริ่มต้นเป็นเบอร์โทร ทางอีเมลยังอยู่ครบ
+  const s = usePhoneAuthStrings();
+  const phoneAuth = usePhoneAuth();
+  const [method, setMethod] = useState<AuthMethod>(PHONE_AUTH_ENABLED ? 'phone' : 'email');
+  const [phoneDigits, setPhoneDigits] = useState('');
+  const [otp, setOtp] = useState<{ resendAfterSeconds: number } | null>(null);
+
+  /**
+   * เริ่ม session แล้วพาไปหน้าแรกของ role — ใช้ร่วมกันทั้งล็อกอินด้วยอีเมลและเบอร์โทร
+   * @returns false เมื่อบัญชีถูกระงับ (ยังไม่ set session)
+   */
+  const finishLogin = async (login: LoginPayload | null | undefined): Promise<boolean> => {
+    const loginUser = login?.user;
+
+    // ตรวจสอบบัญชีถูกระงับก่อน set session
+    if (loginUser?.isActive === false) return false;
+
+    if (login?.accessToken && login?.refreshToken) {
+      await supabase.auth.setSession({
+        access_token: login.accessToken,
+        refresh_token: login.refreshToken,
+      });
+    }
+
+    const role = loginUser?.role ?? 1;
+    const mustChangePassword = loginUser?.mustChangePassword ?? false;
+
+    setUserRole(role);
+    setMustChangePassword(mustChangePassword);
+
+    // Return to a pending invite link (or other internal target) when one was passed,
+    // unless the account still has to change its password first.
+    if (safeRedirect && !mustChangePassword) {
+      navigate(safeRedirect, { replace: true });
+    } else {
+      navigate(getPostLoginRedirect({ role, mustChangePassword }));
+    }
+    return true;
+  };
+
+  const [loginMutation, { loading: isSubmitting }] = useMutation<{ login: LoginPayload }>(LOGIN_USER, {
     onCompleted: async (data) => {
-      const loginUser = data?.login?.user;
-
-      // ตรวจสอบบัญชีถูกระงับก่อน set session
-      if (loginUser?.isActive === false) {
-        setFormError('บัญชีของคุณถูกระงับ กรุณาติดต่อผู้ดูแลระบบ');
-        setErrorCount(prev => prev + 1);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-
-      if (data?.login?.accessToken && data?.login?.refreshToken) {
-        await supabase.auth.setSession({
-          access_token: data.login.accessToken,
-          refresh_token: data.login.refreshToken,
-        });
-      }
-
-      const role = loginUser?.role ?? 1;
-      const mustChangePassword = loginUser?.mustChangePassword ?? false;
-
-      setUserRole(role);
-      setMustChangePassword(mustChangePassword);
-
-      // Return to a pending invite link (or other internal target) when one was passed,
-      // unless the account still has to change its password first.
-      if (safeRedirect && !mustChangePassword) {
-        navigate(safeRedirect, { replace: true });
-      } else {
-        navigate(getPostLoginRedirect({ role, mustChangePassword }));
-      }
+      if (await finishLogin(data?.login)) return;
+      setFormError(SUSPENDED_MESSAGE);
+      setErrorCount(prev => prev + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     },
     onError: (error) => {
       // ห้าม log error object / graphQLErrors — message สะท้อน variables (อีเมล+รหัสผ่าน) กลับมาได้
@@ -137,24 +167,82 @@ export default function Login() {
     }
   };
 
+  /** ตรวจรหัสแล้วเข้าสู่ระบบด้วย session ทางเดียวกับอีเมล */
+  const verifyPhoneLogin = async (code: string): Promise<PhoneAuthResult<unknown>> => {
+    const result = await phoneAuth.login(phoneDigits, code);
+    if (!result.ok) return result;
+    if (await finishLogin(result.data)) return result;
+    return { ok: false, failure: { message: SUSPENDED_MESSAGE } };
+  };
+
   const hasValidationError = submitted && Object.keys(errors).length > 0;
   const hasErrors = hasValidationError || formError;
 
+  const layoutProps = {
+    tagline: 'การดูแลที่ดี เริ่มต้นจากความใส่ใจ',
+    subtitle: 'ยินดีต้อนรับกลับ เข้าสู่ระบบเพื่อจัดการนัดหมาย และบริการดูแลผู้สูงอายุของคุณ',
+    showBackToHome: true,
+  };
+
+  if (otp) {
+    return (
+      <AuthLayout {...layoutProps}>
+        <PhoneOtpStep
+          digits={phoneDigits}
+          purpose="LOGIN"
+          resendAfterSeconds={otp.resendAfterSeconds}
+          onVerify={verifyPhoneLogin}
+          onEditPhone={() => setOtp(null)}
+          successMessage={s.otpLoginSuccess}
+        />
+      </AuthLayout>
+    );
+  }
+
   return (
-    <AuthLayout
-      tagline="การดูแลที่ดี เริ่มต้นจากความใส่ใจ"
-      subtitle="ยินดีต้อนรับกลับ เข้าสู่ระบบเพื่อจัดการนัดหมาย และบริการดูแลผู้สูงอายุของคุณ"
-      showBackToHome
-    >
-      <form onSubmit={handleSubmit} className="w-full max-w-[420px]" id="login-form" noValidate>
+    <AuthLayout {...layoutProps}>
+      <div className="w-full max-w-[420px]">
         {/* Heading */}
         <h1 className="text-[32px] font-bold leading-10 text-[#1A1A1A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           เข้าสู่ระบบ
         </h1>
         <p className="mt-2 text-lg leading-[27px] text-[#8A8C8E]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-          กรอกอีเมลและรหัสผ่านเพื่อเข้าใช้งาน Payung
+          {PHONE_AUTH_ENABLED ? s.loginLead : 'กรอกอีเมลและรหัสผ่านเพื่อเข้าใช้งาน Payung'}
         </p>
 
+        {PHONE_AUTH_ENABLED && (
+          <MethodTabs
+            idPrefix="login"
+            ariaLabel={s.loginMethodsLabel}
+            active={method}
+            onChange={setMethod}
+            disabled={isSubmitting}
+          />
+        )}
+
+        {method === 'phone' ? (
+          <div role="tabpanel" id="login-panel-phone" aria-labelledby="login-tab-phone" className="mt-5">
+            <PhoneEntryForm
+              purpose="LOGIN"
+              inputId="login-phone"
+              hint={s.phoneHintLogin}
+              submitLabel={s.requestCode}
+              initialDigits={phoneDigits}
+              onRequested={(digits, resendAfterSeconds) => {
+                setPhoneDigits(digits);
+                setOtp({ resendAfterSeconds });
+              }}
+              onAlternative={() => navigate('/register')}
+              alternativeLabel={s.goRegister}
+            />
+          </div>
+        ) : (
+      <form
+        onSubmit={handleSubmit}
+        id="login-form"
+        noValidate
+        {...(PHONE_AUTH_ENABLED && { role: 'tabpanel', id: 'login-panel-email', 'aria-labelledby': 'login-tab-email' })}
+      >
         {/* Global Error Banner */}
         <Alert 
           key={errorCount} 
@@ -209,6 +297,8 @@ export default function Login() {
         >
           {isSubmitting ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
         </button>
+      </form>
+        )}
 
         <OrDivider />
 
@@ -237,7 +327,7 @@ export default function Login() {
           <span className="cursor-pointer underline hover:text-[#8A8C8E]">ข้อกำหนดการใช้งาน</span> และ{' '}
           <span className="cursor-pointer underline hover:text-[#8A8C8E]">นโยบายความเป็นส่วนตัว</span>
         </p>
-      </form>
+      </div>
     </AuthLayout>
   );
 }

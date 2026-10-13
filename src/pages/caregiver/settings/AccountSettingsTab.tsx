@@ -50,7 +50,7 @@ export const AccountSettingsTab: React.FC = () => {
   const { data: userData, loading: userLoading } = useQuery<{
     me: {
       id: string;
-      email: string;
+      email: string | null;
       displayName?: string;
       phone?: string;
       address?: string;
