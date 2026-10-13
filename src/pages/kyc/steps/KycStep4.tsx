@@ -12,6 +12,10 @@ import Tooltip from '../../../components/ui/Tooltip';
 import { supabase } from '../../../lib/supabase';
 import { useEffect } from 'react';
 import KycStepper from '../KycStepper';
+import { skillLabel } from '../../../lib/skillLabels';
+import { isProfession } from '../../../lib/professions';
+import { setMockExtras } from '../../../mocks/caregiverExtrasMock';
+import ProfessionBadge from '../../../components/ui/ProfessionBadge';
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
@@ -112,6 +116,21 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
         documentIds: uploadedDocs.map((doc) => doc.docId),
       };
 
+      // PYG-556: field ที่ BE ยังไม่รับ — KycInput ที่มี field เกินจะปฏิเสธทั้ง mutation
+      // TODO(PYG-575): BE พร้อมแล้วให้ Object.assign(kycInput, professionFields) และลบ saveMock ด้านล่าง
+      const professionFields = {
+        profession: step1Data.profession,
+        customSkills: step1Data.customSkills,
+      };
+      // MOCK: เก็บไว้ในเบราว์เซอร์หลังส่งสำเร็จ ให้หน้าอื่นแสดงได้
+      const saveMock = (caregiverId: string | undefined) => {
+        if (!caregiverId) return;
+        setMockExtras(caregiverId, {
+          ...(isProfession(professionFields.profession) ? { profession: professionFields.profession } : {}),
+          customSkills: professionFields.customSkills,
+        });
+      };
+
       // PYG-266: ส่ง payoutAccount เฉพาะตอนที่ผู้ใช้กรอก/แก้ไขจริง (ไม่แตะ = ไม่ส่ง)
       // PYG-307: ปิดไว้ชั่วคราวจนกว่า BE PR #37 จะ merge (ดู payoutAccountFlag.ts)
       if (SEND_PAYOUT_ACCOUNT_WITH_KYC && payoutData) {
@@ -119,9 +138,10 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
       }
 
       if (mode === 'resubmit') {
-        await resubmitKyc({
+        const res = await resubmitKyc({
           variables: { input: kycInput },
         });
+        saveMock((res.data as { resubmitKyc?: { id: string } } | undefined)?.resubmitKyc?.id);
 
         // Delete old docs from storage + DB (permanent cleanup on submit)
         if (pendingDeleteDocs.length > 0) {
@@ -138,9 +158,10 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
 
         navigate('/kyc/status');
       } else {
-        await submitKyc({
+        const res = await submitKyc({
           variables: { input: kycInput },
         });
+        saveMock((res.data as { submitKyc?: { id: string } } | undefined)?.submitKyc?.id);
         navigate('/kyc/success');
       }
     } catch (err) {
@@ -211,22 +232,14 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
             <InfoRow label="เบอร์โทรศัพท์" value={step1Data?.phone || '-'} />
             <InfoRow label="อีเมล" value={user?.email || '-'} />
             <InfoRow label="ประสบการณ์" value={`${step1Data?.experienceYears || 0} ปี`} />
-            <div className="py-2.5 border-b border-[#F1F5F9]">
-              <p className="text-[13px] font-medium text-[#64748B] mb-2" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                ทักษะการดูแล
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {step1Data?.skills && step1Data.skills.length > 0 ? (
-                  step1Data.skills.map((skill, idx) => (
-                    <span key={idx} className="bg-[#F1F5F9] text-[#485569] text-[12px] font-medium px-2.5 py-1 rounded-full" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                      {skill}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-[#94A3B8] text-[13px]">-</span>
-                )}
-              </div>
+            <div className="flex justify-between items-center py-2.5 border-b border-[#F1F5F9]">
+              <span className="text-[13px] font-medium text-[#64748B]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                วิชาชีพ
+              </span>
+              {step1Data?.profession ? <ProfessionBadge profession={step1Data.profession} /> : <span className="text-[#94A3B8] text-[13px]">-</span>}
             </div>
+            <ChipRow label="ทักษะการดูแล" items={(step1Data?.skills ?? []).map(skillLabel)} />
+            <ChipRow label="ทักษะอื่นๆ" items={step1Data?.customSkills ?? []} dashed />
             <div className="py-2.5">
               <p className="text-[13px] font-medium text-[#64748B] mb-1" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
                 แนะนำตัว
@@ -394,6 +407,31 @@ function InfoRow({ label, value, border = true }: { label: string; value: string
       <span className="text-[14px] font-semibold text-[#1E293B]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
         {value}
       </span>
+    </div>
+  );
+}
+
+function ChipRow({ label, items, dashed = false }: { label: string; items: string[]; dashed?: boolean }) {
+  return (
+    <div className="py-2.5 border-b border-[#F1F5F9]">
+      <p className="text-[13px] font-medium text-[#64748B] mb-2" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+        {label}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {items.length > 0 ? (
+          items.map((item) => (
+            <span
+              key={item}
+              className={`text-[#485569] text-[12px] font-medium px-2.5 py-1 rounded-full ${dashed ? 'bg-white border border-dashed border-[#CBD5E1]' : 'bg-[#F1F5F9]'}`}
+              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+            >
+              {item}
+            </span>
+          ))
+        ) : (
+          <span className="text-[#94A3B8] text-[13px]">-</span>
+        )}
+      </div>
     </div>
   );
 }

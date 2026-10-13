@@ -13,6 +13,8 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { getBankLabel } from '../../features/kyc/omiseBanks';
 import { skillLabel } from '../../lib/skillLabels';
+import ProfessionBadge from '../../components/ui/ProfessionBadge';
+import { resolveCustomSkills, resolveProfession, useMockState } from '../../mocks/caregiverExtrasMock';
 
 type KycStatus = 'pending' | 'verified' | 'rejected' | 'none' | string;
 
@@ -28,6 +30,9 @@ interface CaregiverDetail {
   address?: string | null;
   phone: string;
   skills: string[];
+  /** BE ยังไม่ส่ง (ตอนนี้ใช้ mock) */
+  profession?: string | null;
+  customSkills?: string[] | null;
   experienceYears: number;
   hourlyRate: number;
   bio?: string | null;
@@ -416,6 +421,10 @@ export default function KycReviewDetailPage() {
   });
 
   const caregiver = data?.adminKycDetail.caregiver;
+  // ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock
+  const mockState = useMockState();
+  const caregiverProfession = resolveProfession(mockState, caregiver?.id, caregiver?.profession, 'none');
+  const caregiverCustomSkills = resolveCustomSkills(mockState, caregiver?.id, caregiver?.customSkills);
   const documents = data?.adminKycDetail.documents ?? [];
   const reviews = data?.adminKycDetail.reviews ?? [];
   const editHistory = data?.adminKycDetail.editHistory ?? [];
@@ -545,6 +554,12 @@ export default function KycReviewDetailPage() {
                     value={ageText !== '-' ? `${formatThaiDate(caregiver.dateOfBirth)} (${ageText})` : formatThaiDate(caregiver.dateOfBirth)}
                   />
                   <CaregiverField label="ประสบการณ์" value={`${caregiver.experienceYears ?? 0} ปี`} />
+                  {caregiverProfession ? (
+                    <div className="min-w-0">
+                      <dt className="text-[13px] font-medium leading-5 text-[#9CA3AF]">วิชาชีพ</dt>
+                      <dd className="mt-1"><ProfessionBadge profession={caregiverProfession} /></dd>
+                    </div>
+                  ) : null}
                   <CaregiverField label="อีเมล" value={caregiver.email} />
                   <CaregiverField label="เบอร์โทรศัพท์" value={formatPhone(caregiver.phone)} />
                   {caregiver.address ? (
@@ -569,6 +584,19 @@ export default function KycReviewDetailPage() {
                     )}
                   </dd>
                 </div>
+
+                {caregiverCustomSkills.length > 0 ? (
+                  <div className="mt-4">
+                    <dt className="text-[13px] font-medium leading-5 text-[#9CA3AF]">ทักษะอื่นๆ (ผู้ดูแลพิมพ์เอง · แสดงในโปรไฟล์ ไม่ใช้จับคู่งาน)</dt>
+                    <dd className="mt-2 flex flex-wrap gap-2">
+                      {caregiverCustomSkills.map((skill) => (
+                        <span key={skill} className="inline-flex items-center rounded-md border border-dashed border-[#D1D5DB] bg-white px-2.5 py-1 text-[13px] text-[#374151]">
+                          {skill}
+                        </span>
+                      ))}
+                    </dd>
+                  </div>
+                ) : null}
 
                 {caregiver.bio ? (
                   <div className="mt-4">

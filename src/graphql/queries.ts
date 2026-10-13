@@ -1,5 +1,14 @@
 import { gql } from "@apollo/client";
 
+/**
+ * PYG-556: field ที่ BE ยังไม่มี (PYG-573 / PYG-575) — ตอนนี้เป็นค่าว่าง หน้าจอใช้ข้อมูลจาก src/mocks/ แทน
+ * BE deploy แล้ว: เปลี่ยนเป็น "profession" / "customSkills" ตรงนี้ที่เดียว ทุก query ที่ใช้จะได้ค่าจริง
+ * และค่าจริงจะถูกใช้ก่อน mock อัตโนมัติ (ดู resolveProfession / resolveCustomSkills)
+ * ⚠ อย่าเปลี่ยนก่อน BE พร้อม — GraphQL ปฏิเสธทั้ง operation ถ้ามี field ที่ schema ไม่รู้จัก
+ */
+const PROFESSION_FIELD = "";
+const CUSTOM_SKILLS_FIELD = "";
+
 export const LOGIN_USER = gql`
   mutation Login($email: String!, $password: String!) {
     login(input: {
@@ -139,6 +148,8 @@ export const GET_CAREGIVER_PROFILE = gql`
       bio
       hourlyRate
       skills
+      ${PROFESSION_FIELD}
+      ${CUSTOM_SKILLS_FIELD}
       experienceYears
       kycStatus
       kycSubmittedAt
@@ -159,6 +170,7 @@ export const UPDATE_CAREGIVER_PROFILE = gql`
       bio
       hourlyRate
       skills
+      ${CUSTOM_SKILLS_FIELD}
       experienceYears
       phone
       address
@@ -223,6 +235,8 @@ export const GET_KYC_STATUS = gql`
         idCardNumber
         phone
         skills
+        ${PROFESSION_FIELD}
+        ${CUSTOM_SKILLS_FIELD}
         experienceYears
         hourlyRate
         bio
@@ -356,6 +370,8 @@ export const ADMIN_KYC_DETAIL = gql`
         address
         phone
         skills
+        ${PROFESSION_FIELD}
+        ${CUSTOM_SKILLS_FIELD}
         experienceYears
         hourlyRate
         bio
@@ -1064,6 +1080,7 @@ export const SEARCH_CAREGIVERS = gql`
         avgRating
         reviewCount
         skills
+        ${PROFESSION_FIELD}
         province
         district
         gender

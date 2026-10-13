@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,7 +7,11 @@ import { useKyc } from '../../../context/KycContext';
 import Input from '../../../components/ui/Input';
 import Icon from '../../../components/ui/Icon';
 import KycStepper from '../KycStepper';
-import { SKILL_OPTIONS } from '../../../lib/skillLabels';
+import { MAX_CUSTOM_SKILLS, isCareSkill, isSelectableSkill, splitSkillsForProfession } from '../../../lib/skillLabels';
+import { isProfession } from '../../../lib/professions';
+import ProfessionPicker from '../../../features/kyc/ProfessionPicker';
+import CareSkillPicker from '../../../features/kyc/CareSkillPicker';
+import CustomSkillsInput from '../../../features/kyc/CustomSkillsInput';
 
 // ── Validation helpers ────────────────────────────────────────────────────
 function isValidThaiId(id: string): boolean {
@@ -53,13 +57,24 @@ const step1Schema = z.object({
   phone: z
     .string()
     .refine(isValidThaiPhone, 'เบอร์โทรศัพท์ไม่ถูกต้อง (เช่น 081-234-5678)'),
-  skills: z.array(z.string()).min(1, 'กรุณาเลือกทักษะอย่างน้อย 1 รายการ'),
+  // PYG-556: ไม่มีค่าเริ่มต้น — ผู้ดูแลที่กรอกค้างไว้ก่อนมีช่องนี้ต้องเลือกก่อนส่ง (S01-E1)
+  profession: z
+    .string()
+    .refine((val: string): boolean => isProfession(val), 'กรุณาเลือกวิชาชีพ'),
+  // ระดับ field ให้ error ขึ้นพร้อมช่องอื่นตั้งแต่กดครั้งแรก · superRefine ด้านล่างกันกรณีที่เหลือแต่ทักษะเฉพาะของวิชาชีพอื่น
+  skills: z.array(z.string()).refine((val) => val.some(isCareSkill), 'กรุณาเลือกทักษะอย่างน้อย 1 รายการ'),
+  customSkills: z.array(z.string()).max(MAX_CUSTOM_SKILLS),
   experienceYears: z.coerce
     .number({ message: 'กรุณากรอกจำนวนปีประสบการณ์' })
     .int('จำนวนปีต้องเป็นจำนวนเต็ม')
     .min(0, 'จำนวนปีต้องไม่น้อยกว่า 0')
     .max(50, 'จำนวนปีต้องไม่เกิน 50 ปี'),
   bio: z.string().max(500, 'แนะนำตัวต้องไม่เกิน 500 ตัวอักษร').optional(),
+}).superRefine((data, ctx) => {
+  // นับเฉพาะทักษะที่ติ๊กได้จริง — รหัสชุดเก่า / ทักษะเฉพาะของวิชาชีพอื่นที่ค้างอยู่ใช้จับคู่งานไม่ได้
+  if (!data.skills.some((s) => isSelectableSkill(s, data.profession))) {
+    ctx.addIssue({ code: 'custom', path: ['skills'], message: 'กรุณาเลือกทักษะอย่างน้อย 1 รายการ' });
+  }
 });
 
 type Step1Form = z.infer<typeof step1Schema>;
@@ -107,7 +122,9 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
         gender: '' as unknown as string,
         idCardNumber: '',
         phone: '',
+        profession: '',
         skills: [],
+        customSkills: [],
         experienceYears: '' as unknown as number,
         bio: '',
       },
@@ -137,19 +154,39 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
   }, [step1Data, reset]);
 
   const selectedSkills = watch('skills') ?? [];
+  const profession = watch('profession') ?? '';
+  const customSkills = watch('customSkills') ?? [];
+  // ทักษะเฉพาะที่ถูกเอาออกรอบล่าสุดเพราะเปลี่ยนวิชาชีพ — ล้างเมื่อผู้ใช้แก้ทักษะเอง
+  const [droppedSkills, setDroppedSkills] = useState<string[]>([]);
 
-  function toggleSkill(value: string) {
-    if (selectedSkills.includes(value)) {
-      setValue('skills', selectedSkills.filter((s) => s !== value), { shouldValidate: true });
-    } else {
-      setValue('skills', [...selectedSkills, value], { shouldValidate: true });
-    }
+  function changeProfession(next: string) {
+    setValue('profession', next, { shouldValidate: true });
+    const { kept, dropped } = splitSkillsForProfession(selectedSkills, next);
+    if (dropped.length > 0) setValue('skills', kept, { shouldValidate: errors.skills != null });
+    setDroppedSkills(dropped);
+  }
+
+  function changeSkills(next: string[]) {
+    setValue('skills', next, { shouldValidate: true });
+    setDroppedSkills([]);
   }
 
   const onSubmit = (data: Step1Form) => {
     saveStep1({ ...data, bio: data.bio ?? '' });
     goToStep(2);
   };
+
+  // ตัวเลือกวิชาชีพเป็นการ์ด ไม่ใช่ input ที่ RHF focus ให้เองได้ — เลื่อนไปหาและ focus การ์ดแทน
+  const onInvalid = (formErrors: Partial<Record<keyof Step1Form, unknown>>) => {
+    if (!formErrors.profession) return;
+    const group = document.querySelector<HTMLElement>('[role="radiogroup"][aria-labelledby="kyc-profession-label"]');
+    group?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    group?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]')?.focus({ preventScroll: true });
+  };
+
+  // resubmit: สไตล์เทา (ยังไม่แก้) / เขียว (แก้แล้ว) แบบเดียวกับฟิลด์อื่น
+  const toneOf = (fieldName: keyof Step1Form) =>
+    mode !== 'resubmit' ? 'default' : checkEdited(fieldName) ? 'edited' : 'muted';
 
   // Destructure register results so we can override onChange
   const idCardReg = register('idCardNumber');
@@ -176,7 +213,7 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
           กรอกข้อมูลให้ตรงกับบัตรประชาชนของคุณ
         </p>
 
-        <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
+        <form onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate className="flex flex-col gap-5">
           {/* ชื่อจริง - นามสกุล */}
           <div className="grid grid-cols-2 gap-4">
             <Input
@@ -293,47 +330,33 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
             />
           </div>
 
-          {/* ทักษะ */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>ทักษะการดูแล</label>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {SKILL_OPTIONS.map((skill) => {
-                const selected = selectedSkills.includes(skill.value);
-                return (
-                  <button
-                    key={skill.value}
-                    type="button"
-                    onClick={() => toggleSkill(skill.value)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
-                      mode === 'resubmit'
-                        ? checkEdited('skills')
-                          ? selected
-                            ? 'bg-[#10B981] text-white border-[#10B981]'
-                            : 'bg-white text-[#0A0A0A] border-[#E2E8F0] hover:border-[#10B981] hover:text-[#10B981]'
-                          : selected
-                            ? 'bg-gray-200 text-[#9CA3AF] border-transparent'
-                            : 'bg-white text-[#0A0A0A] border-[#E2E8F0]'
-                        : selected
-                          ? 'bg-[#2D6A58] text-white border-[#2D6A58]'
-                          : 'bg-white text-[#0A0A0A] border-[#E2E8F0] hover:border-[#2D6A58] hover:text-[#2D6A58]'
-                      } cursor-pointer`}
-                    style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-                  >
-                    {skill.label}
-                  </button>
-                );
-              })}
-            </div>
-            {errors.skills && (
-              <span className="text-sm text-red-500" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                {errors.skills.message}
-              </span>
-            )}
-          </div>
+          {/* วิชาชีพ (PYG-556) — อยู่ขั้นที่ 1 ก่อนทักษะ และก่อนขั้น "เอกสาร" ที่ต้องแนบใบประกอบฯ */}
+          <ProfessionPicker
+            id="kyc-profession"
+            value={profession}
+            onChange={changeProfession}
+            hint="เลือก 1 อย่างที่ตรงกับคุณที่สุด ผู้ใช้บริการจะเห็นในโปรไฟล์ของคุณ"
+            error={errors.profession?.message}
+            tone={toneOf('profession')}
+          />
+
+          {/* ทักษะกลาง — ใช้จับคู่งาน */}
+          <CareSkillPicker
+            id="kyc-skills"
+            value={selectedSkills}
+            onChange={changeSkills}
+            profession={profession}
+            error={errors.skills?.message}
+            tone={toneOf('skills')}
+            droppedSkills={droppedSkills}
+          />
+
+          {/* ทักษะอื่นๆ — แสดงในโปรไฟล์เท่านั้น */}
+          <CustomSkillsInput
+            id="kyc-custom-skills"
+            value={customSkills}
+            onChange={(next) => setValue('customSkills', next, { shouldValidate: true })}
+          />
 
           {/* แนะนำตัว */}
           {(!(mode === 'resubmit' && !step1Data?.bio)) && (
