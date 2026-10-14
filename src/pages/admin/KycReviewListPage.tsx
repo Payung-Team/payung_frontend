@@ -305,7 +305,7 @@ export default function KycReviewListPage() {
         key: 'email',
         header: 'อีเมล',
         className: 'truncate text-gray-500',
-        render: (item) => item.email || '-',
+        render: (item) => item.email || '—',
       },
       {
         key: 'submittedAt',
@@ -366,7 +366,7 @@ export default function KycReviewListPage() {
         key: 'email',
         header: 'อีเมล',
         className: 'truncate text-gray-500',
-        render: (item) => item.email || '-',
+        render: (item) => item.email || '—',
       },
       {
         key: 'uploadedAt',
