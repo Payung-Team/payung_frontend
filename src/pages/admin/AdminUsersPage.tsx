@@ -487,8 +487,10 @@ function EditAdminModal({ user, onClose, onSuccess }: Readonly<EditAdminModalPro
     const errs: Record<string, string> = {};
     if (!form.firstName.trim()) errs.firstName = 'กรุณากรอกชื่อ';
     if (!form.lastName.trim()) errs.lastName = 'กรุณากรอกนามสกุล';
-    if (!form.email.trim()) errs.email = 'กรุณากรอกอีเมล';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'รูปแบบอีเมลไม่ถูกต้อง';
+    // บัญชีที่สมัครด้วยเบอร์ไม่มีอีเมล (PYG-604) — ปล่อยว่างได้ ส่วนบัญชีที่มีอีเมลอยู่แล้วห้ามลบทิ้ง
+    if (!form.email.trim()) {
+      if (user.email) errs.email = 'กรุณากรอกอีเมล';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'รูปแบบอีเมลไม่ถูกต้อง';
     if (!form.role) errs.role = 'กรุณาเลือกบทบาท';
     return errs;
   }
@@ -504,7 +506,8 @@ function EditAdminModal({ user, onClose, onSuccess }: Readonly<EditAdminModalPro
         adminId: user.id,
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
-        email: form.email.trim(),
+        // ไม่ส่ง email = ไม่เปลี่ยน (BE: editAdminInfo รับ email แบบ optional)
+        email: form.email.trim() || undefined,
         role: Number.parseInt(form.role, 10),
       },
     });
@@ -566,7 +569,7 @@ function EditAdminModal({ user, onClose, onSuccess }: Readonly<EditAdminModalPro
           {/* อีเมล */}
           <div>
             <label htmlFor="edit-email" style={LABEL_STYLE}>
-              {'อีเมล '}<span style={{ color: '#EF4444' }}>*</span>
+              {'อีเมล '}{user.email && <span style={{ color: '#EF4444' }}>*</span>}
             </label>
             <input
               id="edit-email"

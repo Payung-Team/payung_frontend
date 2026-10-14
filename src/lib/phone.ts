@@ -68,8 +68,8 @@ export function isValidThaiMobile(digits: string): boolean {
 
 /**
  * ช่องทางติดต่อที่ใช้แสดงแทนอีเมลของบัญชี — บัญชีที่สมัครด้วยเบอร์ไม่มีอีเมล (E13, E14)
- * คืน '' เมื่อไม่มีทั้งสองอย่าง ห้ามปล่อยให้ null/undefined ไปถึงหน้าจอ
+ * คืน '—' เมื่อไม่มีทั้งสองอย่าง ห้ามปล่อยให้ช่องว่างหรือ null/undefined ไปถึงหน้าจอ
  */
 export function accountContact(account: { email?: string | null; phone?: string | null } | null | undefined): string {
-  return account?.email || formatThaiPhone(account?.phone) || '';
+  return account?.email || formatThaiPhone(account?.phone) || '—';
 }
