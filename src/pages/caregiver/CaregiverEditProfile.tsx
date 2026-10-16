@@ -17,7 +17,12 @@ import ProfileFormFields from '../../components/ui/ProfileFormFields';
 import ThaiAddressSelector from '../../components/ui/ThaiAddressSelector';
 import AlertModal from '../../components/ui/AlertModal';
 import ProfilePhotoUploadCard from '../../components/caregiver/ProfilePhotoUploadCard';
-import { SKILL_OPTIONS, skillLabel } from '../../lib/skillLabels';
+import { MAX_CUSTOM_SKILLS, skillLabel } from '../../lib/skillLabels';
+import { resolveCustomSkills, resolveProfession, setMockExtras, useMockState } from '../../mocks/caregiverExtrasMock';
+import CareSkillPicker from '../../features/kyc/CareSkillPicker';
+import CustomSkillsInput from '../../features/kyc/CustomSkillsInput';
+import ProfessionChangeCard from '../../features/kyc/ProfessionChangeCard';
+import ProfessionBadge from '../../components/ui/ProfessionBadge';
 
 function formatPhone(val?: string | null): string {
   if (!val) return '';
@@ -31,6 +36,7 @@ function formatPhone(val?: string | null): string {
 const CaregiverProfileSchema = z.object({
   bio: z.string().max(500, 'แนะนำตัวต้องไม่เกิน 500 ตัวอักษร').optional().nullable(),
   skills: z.array(z.string()).optional().nullable(),
+  customSkills: z.array(z.string()).max(MAX_CUSTOM_SKILLS).optional().nullable(),
   experienceYears: z.number().min(0, 'ประสบการณ์ต้องเป็นจำนวนไม่ติดลบ').optional().nullable(),
   phone: z
     .string()
@@ -59,6 +65,9 @@ interface CaregiverData {
   address?: string;
   bio?: string;
   skills?: string[];
+  /** BE ยังไม่ส่ง (ตอนนี้ใช้ mock) */
+  profession?: string | null;
+  customSkills?: string[] | null;
   experienceYears?: number;
   kycStatus?: string;
   updatedAt?: string;
@@ -114,6 +123,10 @@ const CaregiverEditProfile: React.FC = () => {
 
   const user = userData?.me;
   const caregiver = caregiverData?.myCaregiverProfile;
+  // ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock (อนุมัติคำขอเปลี่ยนวิชาชีพใน mock แล้วค่านี้เปลี่ยนตาม)
+  const mockState = useMockState();
+  const profession = resolveProfession(mockState, caregiver?.id, caregiver?.profession);
+  const savedCustomSkills = resolveCustomSkills(mockState, caregiver?.id, caregiver?.customSkills);
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
   const isLoading = userLoading || caregiverLoading;
 
@@ -146,6 +159,7 @@ const CaregiverEditProfile: React.FC = () => {
     defaultValues: {
       bio: caregiver?.bio || '',
       skills: caregiver?.skills || [],
+      customSkills: savedCustomSkills,
       experienceYears: caregiver?.experienceYears || 0,
       phone: formatPhone(caregiver?.phone),
       address: caregiver?.address || '',
@@ -164,6 +178,7 @@ const CaregiverEditProfile: React.FC = () => {
     reset({
       bio: caregiver.bio || '',
       skills: caregiver.skills || [],
+      customSkills: savedCustomSkills,
       experienceYears: caregiver.experienceYears || 0,
       phone: formatPhone(caregiver.phone),
       address: caregiver.address || '',
@@ -181,7 +196,8 @@ const CaregiverEditProfile: React.FC = () => {
       watchedValues.experienceYears !== (caregiver?.experienceYears || 0) ||
       watchedValues.phone !== formatPhone(caregiver?.phone) ||
       watchedValues.address !== (caregiver?.address || '') ||
-      JSON.stringify(watchedValues.skills) !== JSON.stringify(caregiver?.skills || []);
+      JSON.stringify(watchedValues.skills) !== JSON.stringify(caregiver?.skills || []) ||
+      JSON.stringify(watchedValues.customSkills || []) !== JSON.stringify(savedCustomSkills);
 
     setIsDirty(isFormDirty);
   }, [watchedValues, caregiver]);
@@ -199,12 +215,16 @@ const CaregiverEditProfile: React.FC = () => {
       const addressParts = [data.address, data.district, data.amphoe, data.province, data.postalCode].filter(Boolean);
       if (addressParts.length > 0) input.address = addressParts.join(' ');
       if (data.skills && data.skills.length > 0) input.skills = data.skills;
+      // TODO(PYG-575): BE รับ customSkills แล้วให้ส่ง (ได้แม้เป็น [] เพื่อลบทั้งหมด) และลบ setMockExtras ด้านล่าง
+      //   input.customSkills = customSkills;
+      const customSkills = data.customSkills ?? [];
 
       const result = await updateCaregiverProfile({
         variables: { input },
       });
 
       if (result.data?.updateCaregiverProfile) {
+        if (caregiver?.id) setMockExtras(caregiver.id, { customSkills }); // MOCK
         setToastMessage({ type: 'success', message: 'บันทึกข้อมูลสำเร็จ' });
         setIsDirty(false);
         // อัปเดต cache ทันที เพื่อให้หน้าอื่นเห็นข้อมูลใหม่
@@ -453,48 +473,32 @@ const CaregiverEditProfile: React.FC = () => {
                   )}
                 </div>
 
-                {/* Skills */}
-                <div>
-                  <p id="skills-label" className="text-[14px] font-semibold text-[#0A0A0A] mb-3">ทักษะการดูแล</p>
-                  {/*
-                    เลือกได้เฉพาะ 8 ทักษะชุดเดียวกับตอนกรอก KYC (บันทึกเป็นรหัส เช่น dementia_care)
-                    ค่าเดิมที่ไม่อยู่ในชุด (เคยพิมพ์เอง / ทักษะแนะนำแบบเก่า) ยังแสดงให้กดเอาออกได้ ไม่หายเงียบ ๆ
-                  */}
-                  <div className="flex flex-wrap gap-2" role="group" aria-labelledby="skills-label">
-                    {[
-                      ...SKILL_OPTIONS,
-                      ...(watchedValues.skills || [])
-                        .filter((skill) => !SKILL_OPTIONS.some((option) => option.value === skill))
-                        .map((skill) => ({ value: skill, label: skillLabel(skill) })),
-                    ].map((option) => {
-                      const selected = (watchedValues.skills || []).includes(option.value);
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          aria-pressed={selected}
-                          onClick={() => {
-                            const current = watchedValues.skills || [];
-                            setValue(
-                              'skills',
-                              selected
-                                ? current.filter((s) => s !== option.value)
-                                : [...current, option.value],
-                              { shouldDirty: true },
-                            );
-                          }}
-                          className={`px-4 py-2 rounded-full text-[14px] font-medium border transition-colors cursor-pointer ${
-                            selected
-                              ? 'bg-[#52B69A] text-white border-[#52B69A] hover:bg-[#409E82]'
-                              : 'bg-white text-[#0A0A0A] border-[#E2E8F0] hover:border-[#52B69A] hover:text-[#52B69A]'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      );
-                    })}
+                {/* วิชาชีพ — เปลี่ยนหลังอนุมัติต้องรอแอดมินตรวจ (PYG-556 · S01-AC6) */}
+                {caregiver?.id && (
+                  <div>
+                    <p className="text-[14px] font-semibold text-[#0A0A0A] mb-3">วิชาชีพ</p>
+                    <ProfessionChangeCard
+                      caregiverId={caregiver.id}
+                      currentProfession={profession}
+                      onNotify={(type, message) => setToastMessage({ type, message })}
+                    />
                   </div>
-                </div>
+                )}
+
+                {/* ทักษะกลาง — ใช้จับคู่งาน · ทักษะเฉพาะขึ้นตามวิชาชีพที่อนุมัติแล้ว */}
+                <CareSkillPicker
+                  id="edit-skills"
+                  value={watchedValues.skills || []}
+                  onChange={(next) => setValue('skills', next, { shouldDirty: true })}
+                  profession={profession}
+                />
+
+                {/* ทักษะอื่นๆ — แสดงในโปรไฟล์เท่านั้น */}
+                <CustomSkillsInput
+                  id="edit-custom-skills"
+                  value={watchedValues.customSkills || []}
+                  onChange={(next) => setValue('customSkills', next, { shouldDirty: true })}
+                />
               </div>
             </div>
 
@@ -551,6 +555,11 @@ const CaregiverEditProfile: React.FC = () => {
                         <h2 className="text-[20px] font-semibold text-[#0A0A0A]">{caregiver?.fullName || displayName}</h2>
                         <KycStatusBadge status={caregiver?.kycStatus} />
                       </div>
+                      {profession && (
+                        <div className="mb-2">
+                          <ProfessionBadge profession={profession} />
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 text-[14px] text-[#717182]">
                         <span>{watchedValues.experienceYears || 0}+ ปีประสบการณ์</span>
                       </div>
@@ -575,6 +584,16 @@ const CaregiverEditProfile: React.FC = () => {
                       </div>
                     ) : (
                       <p className="text-[14px] text-[#BDBDBD]">ยังไม่มีทักษะ</p>
+                    )}
+                    {watchedValues.customSkills && watchedValues.customSkills.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-[12px] text-[#717182] mb-1.5"><span className="font-semibold">ทักษะอื่นๆ</span> · ผู้ดูแลระบุเอง</p>
+                        <div className="flex flex-wrap gap-2">
+                          {watchedValues.customSkills.map((skill) => (
+                            <span key={skill} className="px-3 py-1 bg-white border border-dashed border-[#C6C8CB] text-[#575859] rounded-lg text-[12px] font-medium">{skill}</span>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>

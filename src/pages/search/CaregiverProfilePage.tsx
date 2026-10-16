@@ -22,6 +22,9 @@ import { supabase } from '../../lib/supabase';
 import { buildBookingPayload } from '../../lib/buildBookingPayload';
 import { formatDisplayPrice, hasDisplayPrice, NO_PRICE_LABEL } from '../../lib/displayPrice';
 import { skillLabel } from '../../lib/skillLabels';
+import { PROFESSIONS, isProfession } from '../../lib/professions';
+import ProfessionBadge from '../../components/ui/ProfessionBadge';
+import { resolveCustomSkills, resolveProfession, useMockState } from '../../mocks/caregiverExtrasMock';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -39,6 +42,7 @@ interface CaregiverSummary {
   experience?: number | null;
   gender?: 'male' | 'female' | null;
   verified?: boolean;
+  profession?: string | null;
 }
 
 interface Review {
@@ -276,6 +280,9 @@ const CaregiverProfilePage: React.FC = () => {
   const [publicAvatarUrl, setPublicAvatarUrl] = useState<string | null | undefined>(undefined);
   // ราคาจาก BE (/public → hourly_rate, ราคา catalog) — undefined = ยังโหลดไม่เสร็จ ใช้ค่าจาก location.state ไปก่อน
   const [publicHourlyRate, setPublicHourlyRate] = useState<number | null | undefined>(undefined);
+  // PYG-556: วิชาชีพ / ทักษะอื่นๆ จาก /public — BE ยังไม่ส่งมา ถ้าไม่มี key = ใช้ค่าจาก state หรือซ่อน
+  const [publicProfession, setPublicProfession] = useState<string | null | undefined>(undefined);
+  const [publicCustomSkills, setPublicCustomSkills] = useState<string[] | null>(null);
   const [publicReloadKey, setPublicReloadKey] = useState(0);
   const reloadPublicProfile = useCallback(() => setPublicReloadKey((k) => k + 1), []);
   const refreshPhoto = useSignedUrlRefresh(reloadPublicProfile);
@@ -285,11 +292,13 @@ const CaregiverProfilePage: React.FC = () => {
     const apiBase = import.meta.env.VITE_GRAPHQL_URL?.replace('/graphql', '') ?? '';
     fetch(`${apiBase}/api/v1/caregivers/${caregiverId}/public`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { availability?: { day: number; slots: string[] }[]; completed_booking_count?: number; avatar_url?: string | null; hourly_rate?: number | null } | null) => {
+      .then((data: { availability?: { day: number; slots: string[] }[]; completed_booking_count?: number; avatar_url?: string | null; hourly_rate?: number | null; profession?: string | null; custom_skills?: string[] | null } | null) => {
         if (data?.availability) setAvail(buildAvailMatrix(data.availability));
         if (data && data.hourly_rate !== undefined) setPublicHourlyRate(data.hourly_rate);
         if (data?.completed_booking_count !== undefined) setCompletedBookingCount(data.completed_booking_count);
         if (data && data.avatar_url !== undefined) setPublicAvatarUrl(data.avatar_url);
+        if (data && data.profession !== undefined) setPublicProfession(data.profession);
+        if (Array.isArray(data?.custom_skills)) setPublicCustomSkills(data.custom_skills);
       })
       .catch(() => undefined);
   }, [caregiverId, publicReloadKey]);
@@ -317,6 +326,14 @@ const CaregiverProfilePage: React.FC = () => {
   const avatarUrl = publicAvatarUrl !== undefined ? publicAvatarUrl : (cg?.avatarUrl ?? null);
 
   const translatedSkills = skills.map((s) => skillLabel(s));
+  // ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock
+  const mockState = useMockState();
+  const profession = resolveProfession(
+    mockState,
+    caregiverId ?? cg?.id,
+    publicProfession !== undefined ? publicProfession : (cg?.profession ?? null),
+  );
+  const customSkills = resolveCustomSkills(mockState, caregiverId ?? cg?.id, publicCustomSkills);
 
   const handleConfirmBooking = async () => {
     if (!cg || !bookingDraft) return;
@@ -498,7 +515,7 @@ const CaregiverProfilePage: React.FC = () => {
                       )}
                     </div>
                     <div className="flex items-center gap-1 flex-wrap mt-[7px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: '20px' }}>
-                      <span>ผู้ดูแลผู้สูงอายุ</span>
+                      {isProfession(profession) ? <ProfessionBadge profession={profession} /> : <span>ผู้ดูแลผู้สูงอายุ</span>}
                       {province && (<><span style={{ opacity: 0.5 }}>·</span><span>{province}</span></>)}
                       {experience != null && (<><span style={{ opacity: 0.5 }}>·</span><span>ประสบการณ์ {experience} ปี</span></>)}
                     </div>
@@ -532,6 +549,22 @@ const CaregiverProfilePage: React.FC = () => {
                 </p>
               </div>
 
+              {/* วิชาชีพ (PYG-556 · S01-AC4) */}
+              {isProfession(profession) && (
+                <div className="flex flex-col" style={{ padding: '22px 28px', borderBottom: '0.8px solid #F0F1F3' }}>
+                  <div className="flex items-center gap-2">
+                    <span className="material-icons-outlined" style={{ fontSize: 17, color: '#52B69A' }}>badge</span>
+                    <span className="font-bold text-[#1A1A1A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, lineHeight: '21px' }}>วิชาชีพ</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2.5 mt-3">
+                    <ProfessionBadge profession={profession} size="md" />
+                    <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#575859', lineHeight: '20px' }}>
+                      {PROFESSIONS[profession].fullDescription}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Skills */}
               <div className="flex flex-col" style={{ padding: '22px 28px', borderBottom: '0.8px solid #F0F1F3' }}>
                 <div className="flex items-center gap-2">
@@ -552,6 +585,25 @@ const CaregiverProfilePage: React.FC = () => {
                   </div>
                 ) : (
                   <p className="mt-3" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E' }}>ไม่ระบุ</p>
+                )}
+                {/* ทักษะที่ผู้ดูแลพิมพ์เอง — ไม่ใช้จับคู่งาน · เส้นปะให้ต่างจากทักษะกลาง · ไม่มี = ซ่อนทั้งส่วน */}
+                {customSkills.length > 0 && (
+                  <div className="flex flex-col gap-2 mt-4 pt-3" style={{ borderTop: '0.8px dashed #E0E2E5' }}>
+                    <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#8A8C8E', lineHeight: '18px' }}>
+                      <span className="font-semibold">ทักษะอื่นๆ</span> · ผู้ดูแลระบุเอง
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {customSkills.map((skill) => (
+                        <span
+                          key={skill}
+                          className="inline-flex items-center font-medium"
+                          style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#575859', background: '#FFFFFF', border: '1px dashed #C6C8CB', borderRadius: 9999, height: 30, padding: '0 12px' }}
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
 

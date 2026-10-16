@@ -22,6 +22,8 @@ import {
 } from '../../lib/bookingSubmitError';
 import ThailandAddressSimple from 'thailand-address-simple';
 import { skillLabel } from '../../lib/skillLabels';
+import ProfessionBadge from '../../components/ui/ProfessionBadge';
+import { resolveProfession, useMockState } from '../../mocks/caregiverExtrasMock';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -43,6 +45,8 @@ interface CaregiverSummary {
   gender?: string | null;
   distance?: number | null;         // km
   verified?: boolean;
+  /** PYG-556: general_caregiver | nurse | physiotherapist — BE ยังไม่ส่ง (ตอนนี้ใช้ mock) */
+  profession?: string | null;
 }
 
 interface SearchPagination {
@@ -130,6 +134,7 @@ function CaregiverCard({ cg, onSelect, onViewProfile, onPhotoExpired }: { cg: Ca
   const extraSkills = translatedSkills.length - 3;
   const gender = GENDER_DISPLAY[cg.gender ?? ''] ?? null;
   const hasMeta = gender != null || cg.experience != null;
+  const profession = resolveProfession(useMockState(), cg.id, cg.profession);
 
   return (
     <div
@@ -185,6 +190,13 @@ function CaregiverCard({ cg, onSelect, onViewProfile, onPhotoExpired }: { cg: Ca
               <span className="text-[11px] text-[#C6C8CB] italic">ยังไม่มีรีวิว</span>
             )}
           </div>
+
+          {/* วิชาชีพ (PYG-556 · S01-AC3) — บรรทัดของตัวเอง ไม่เบียดชื่อกับดาวรีวิว */}
+          {profession && (
+            <div className="flex mt-0.5 mb-0.5">
+              <ProfessionBadge profession={profession} />
+            </div>
+          )}
 
           {/* Location (blue) + distance */}
           <div className="flex items-center gap-1.5 flex-wrap text-[12px] font-bold text-[#3B82F6]">

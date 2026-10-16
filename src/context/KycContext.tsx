@@ -7,7 +7,12 @@ export interface KycStep1Data {
   gender: string;
   idCardNumber: string;
   phone: string;
+  /** PYG-556: '' = ยังไม่เลือก (ต้องเลือกก่อนไปขั้นถัดไป) */
+  profession: string;
+  /** ทักษะกลาง (รหัส care_skills) — ใช้จับคู่งาน */
   skills: string[];
+  /** ทักษะที่ผู้ดูแลพิมพ์เอง — แสดงในโปรไฟล์เท่านั้น */
+  customSkills: string[];
   experienceYears: number;
   bio: string;
 }

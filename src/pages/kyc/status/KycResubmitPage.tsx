@@ -8,6 +8,7 @@ import KycStep2 from '../steps/KycStep2';
 import KycStep3 from '../steps/KycStep3';
 import KycStep4 from '../steps/KycStep4';
 import KycRejectionList from '../../../components/ui/KycRejectionList';
+import { getMockState, resolveCustomSkills, resolveProfession } from '../../../mocks/caregiverExtrasMock';
 
 export default function KycResubmitPage() {
   const navigate = useNavigate();
@@ -44,7 +45,10 @@ export default function KycResubmitPage() {
             gender: caregiver.gender || '',
             idCardNumber: caregiver.idCardNumber || '',
             phone: caregiver.phone || '',
+            // ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock (ไม่เดาให้ — ไม่เคยเลือก = ช่องว่าง)
+            profession: resolveProfession(getMockState(), caregiver.id, caregiver.profession, 'none') ?? '',
             skills: caregiver.skills || [],
+            customSkills: resolveCustomSkills(getMockState(), caregiver.id, caregiver.customSkills),
             experienceYears: caregiver.experienceYears || 0,
             bio: caregiver.bio || '',
           },
