@@ -15,10 +15,15 @@ import { getBankLabel } from '../../features/kyc/omiseBanks';
 import { skillLabel } from '../../lib/skillLabels';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
 import { resolveCustomSkills, resolveProfession, useMockState } from '../../mocks/caregiverExtrasMock';
+import AdminCareLevelCard from '../../features/kyc/AdminCareLevelCard';
+import { useCareLevel, type CareLevelApiFields } from '../../features/kyc/useCareLevel';
+import { useCareLevelStrings, type CareLevel } from '../../lib/careLevels';
+import { extractGraphQLErrorExtensions } from '../../lib/apolloErrors';
+import { useAuth } from '../../context/AuthContext';
 
 type KycStatus = 'pending' | 'verified' | 'rejected' | 'none' | string;
 
-interface CaregiverDetail {
+interface CaregiverDetail extends CareLevelApiFields {
   id: string;
   userId: string;
   caregiverNumber?: string | null;
@@ -432,6 +437,36 @@ export default function KycReviewDetailPage() {
   const payoutAccount = data?.adminKycDetail.payoutAccount ?? null;
   const isPending = caregiver?.kycStatus === 'pending';
 
+  // PYG-557 · S02: ระดับผู้ดูแล — ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock (features/kyc/useCareLevel)
+  const { user: authUser } = useAuth();
+  const careLevelStrings = useCareLevelStrings();
+  const careLevel = useCareLevel(caregiver?.id, { kycStatus: caregiver?.kycStatus, api: caregiver });
+  const [pickedLevel, setPickedLevel] = useState<CareLevel | null>(null);
+  const [careLevelError, setCareLevelError] = useState<string | undefined>();
+  const careLevelPickerRef = useRef<HTMLDivElement>(null);
+  // ถูกส่งกลับเข้าตรวจแล้วมีระดับเดิมอยู่ (S02-E8 ยังไม่เคาะ) → เติมระดับเดิมให้ แอดมินเปลี่ยนได้
+  const levelToApprove = pickedLevel ?? (isPending ? careLevel.level : null);
+
+  const pickLevel = (level: CareLevel) => {
+    setPickedLevel(level);
+    setCareLevelError(undefined);
+  };
+
+  const showCareLevelRequired = (message = careLevelStrings.required) => {
+    setCareLevelError(message);
+    careLevelPickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    careLevelPickerRef.current?.querySelector<HTMLButtonElement>('[role="radio"]')?.focus({ preventScroll: true });
+  };
+
+  // S02-E1: ไม่ปิดปุ่มเงียบๆ — กดได้ แล้วบอก error ที่ตัวเลือก
+  const openApprove = () => {
+    if (!levelToApprove) {
+      showCareLevelRequired();
+      return;
+    }
+    setIsApproveOpen(true);
+  };
+
 
   const [approveKyc, { loading: approving }] = useMutation(APPROVE_KYC);
   const [rejectKyc, { loading: rejecting }] = useMutation(REJECT_KYC);
@@ -451,15 +486,25 @@ export default function KycReviewDetailPage() {
   const ageText = getAge(caregiver?.dateOfBirth);
 
   const handleApprove = async () => {
-    if (!caregiverId) return;
+    if (!caregiverId || !levelToApprove) return;
 
     try {
+      // TODO(PYG-582): ตาม contract PYG-579 — ส่ง careLevel ไปกับ APPROVE_KYC หรือเรียก SET_CAREGIVER_CARE_LEVEL ก่อนอนุมัติ
+      //   ตอนนี้ BE ยังไม่รับระดับ จึงอนุมัติก่อนแล้วบันทึกระดับลง mock
       await approveKyc({ variables: { caregiverId } });
+      await careLevel.setLevel(levelToApprove);
       setIsApproveOpen(false);
-      toast.success('อนุมัติ KYC เรียบร้อยแล้ว');
+      setPickedLevel(null);
+      toast.success(careLevelStrings.approvedToast(careLevelStrings.levelLabel[levelToApprove]));
       await refetch();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (mutationError) {
+      const code = extractGraphQLErrorExtensions(mutationError)?.code;
+      if (code === 'CARE_LEVEL_REQUIRED' || code === 'CARE_LEVEL_INVALID') {
+        setIsApproveOpen(false);
+        showCareLevelRequired(code === 'CARE_LEVEL_REQUIRED' ? careLevelStrings.required : careLevelStrings.invalid);
+        return;
+      }
       toast.error(mutationError instanceof Error ? mutationError.message : 'อนุมัติ KYC ไม่สำเร็จ');
     }
   };
@@ -659,7 +704,20 @@ export default function KycReviewDetailPage() {
               ) : null}
 
               <KycDocumentsPreview documents={documents} docTypeLabel={docTypeLabel} />
-              
+
+              {/* PYG-557 · S02: ระดับผู้ดูแล — วางชิดเหนือปุ่มอนุมัติ ให้เห็นว่าต้องเลือกก่อน */}
+              <AdminCareLevelCard
+                ref={careLevelPickerRef}
+                caregiverName={caregiver.fullName}
+                kycStatus={caregiver.kycStatus}
+                data={careLevel}
+                currentAdminEmail={authUser?.email}
+                picked={levelToApprove}
+                onPick={pickLevel}
+                pickerError={careLevelError}
+                onNotify={(type, message) => (type === 'success' ? toast.success(message) : toast.error(message))}
+              />
+
               {/*Action Buttons*/}
               <div className="flex justify-end">
                 <div className="flex w-full gap-3 sm:w-auto">
@@ -673,7 +731,7 @@ export default function KycReviewDetailPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsApproveOpen(true)}
+                    onClick={openApprove}
                     disabled={!isPending}
                     className="inline-flex h-8 w-full items-center justify-center rounded-lg bg-[#059669] px-4 text-[13px] font-semibold leading-4 text-white hover:bg-[#047857] disabled:cursor-not-allowed disabled:bg-gray-300 sm:w-[142px] cursor-pointer"
                   >
@@ -695,11 +753,17 @@ export default function KycReviewDetailPage() {
 
       <ConfirmModal
         isOpen={isApproveOpen}
-        isLoading={approving}
+        isLoading={approving || careLevel.saving}
         title="ยืนยันอนุมัติ KYC?"
         description={
           <>
-            อนุมัติ <strong className="font-bold text-gray-500">{caregiver?.fullName || '-'}</strong> – ผู้ดูแลจะได้รับการแจ้งเตือนทันที
+            {careLevelStrings.approveConfirm.before}
+            <strong className="font-bold text-gray-800">{caregiver?.fullName || '-'}</strong>
+            {careLevelStrings.approveConfirm.between}
+            <strong className="font-bold text-gray-800">
+              {levelToApprove ? careLevelStrings.levelLabel[levelToApprove] : ''}
+            </strong>
+            {careLevelStrings.approveConfirm.after}
           </>
         }
         onClose={() => setIsApproveOpen(false)}

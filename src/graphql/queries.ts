@@ -9,6 +9,15 @@ import { gql } from "@apollo/client";
 const PROFESSION_FIELD = "";
 const CUSTOM_SKILLS_FIELD = "";
 
+/**
+ * PYG-557 · S02: ระดับผู้ดูแล — BE ยังไม่มี (PYG-579 / PYG-581) · ตอนนี้ useCareLevel ใช้ src/mocks/careLevelMock.ts
+ * BE deploy แล้ว: CARE_LEVEL_FIELD = "careLevel" (โปรไฟล์ของผู้ดูแลเอง)
+ *   CARE_LEVEL_ADMIN_FIELDS = "careLevel careLevelSetAt careLevelSetBy { id displayName email }" (หน้า KYC review)
+ * ⚠ เหตุผลเดียวกับข้างบน — อย่าเปลี่ยนก่อน BE พร้อม
+ */
+const CARE_LEVEL_FIELD = "";
+const CARE_LEVEL_ADMIN_FIELDS = "";
+
 export const LOGIN_USER = gql`
   mutation Login($email: String!, $password: String!) {
     login(input: {
@@ -150,6 +159,7 @@ export const GET_CAREGIVER_PROFILE = gql`
       skills
       ${PROFESSION_FIELD}
       ${CUSTOM_SKILLS_FIELD}
+      ${CARE_LEVEL_FIELD}
       experienceYears
       kycStatus
       kycSubmittedAt
@@ -372,6 +382,7 @@ export const ADMIN_KYC_DETAIL = gql`
         skills
         ${PROFESSION_FIELD}
         ${CUSTOM_SKILLS_FIELD}
+        ${CARE_LEVEL_ADMIN_FIELDS}
         experienceYears
         hourlyRate
         bio
