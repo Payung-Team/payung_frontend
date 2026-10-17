@@ -58,6 +58,7 @@ import CaregiverProfilePage from './pages/search/CaregiverProfilePage';
 import BookingSuccessPage from './pages/booking/BookingSuccessPage';
 import PaymentPage from './pages/booking/PaymentPage';
 import OnboardingPage from './pages/auth/OnboardingPage';
+import AssessmentPage from './pages/assessment/AssessmentPage';
 
 function KycFormGuard({ children }: { children: React.ReactNode }) {
   const { data, loading } = useQuery<{ myCaregiverProfile?: { kycStatus: string } }>(GET_CAREGIVER_PROFILE);
@@ -219,6 +220,24 @@ function App() {
                   <OnboardingPage />
                 </OnboardingGuard>
               </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* S08 · PYG-610: แบบประเมิน ADL + เงื่อนไขพิเศษ — ต่อจาก Onboarding / ถูกกันตอนจอง / แก้จากโปรไฟล์
+            ไม่อยู่ใน AppLayout เพราะ Design เป็นหน้าเต็มแบบเดียวกับ Onboarding (แถบขั้นตอนด้านซ้าย)
+            แต่ยังผ่าน PatientOnboardingGuard: ต้องทำขั้นข้อมูลส่วนตัวก่อนเสมอ */}
+        <Route
+          path="/assessment/:careRecipientId"
+          element={
+            <ProtectedRoute>
+              <MustChangePasswordGuard>
+                <PatientOnboardingGuard>
+                  <RoleRoute requiredRole={1}>
+                    <AssessmentPage />
+                  </RoleRoute>
+                </PatientOnboardingGuard>
+              </MustChangePasswordGuard>
             </ProtectedRoute>
           }
         />

@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { useBooking } from '../../../context/BookingContext';
 import { supabase } from '../../../lib/supabase';
-import type { PatientProfile } from '../../../lib/patientProfile';
+import { toPatientProfilePayload, type PatientProfile } from '../../../lib/patientProfile';
+import { createCareRecipient } from '../../../lib/careRecipientsApi';
+import { assessmentPath } from '../../../lib/assessmentNav';
+import { useAssessmentStrings } from '../../../lib/assessmentStrings';
+import BookingAssessmentGate from '../../../components/assessment/BookingAssessmentGate';
 import ConfirmModal from '../../../components/ui/ConfirmModal';
 import {
   MY_FAMILY_GROUPS,
@@ -31,6 +36,11 @@ interface SavedRecipient {
    */
   isSelf?: boolean;
   /**
+   * S08 · PYG-610 — มีแบบประเมิน ADL แล้วหรือยัง (ไม่มี = BE ไม่ให้จอง, R11)
+   * undefined = BE ไม่ได้ส่งมา (เช่น ใบที่ยืมจากโหมดจองแทน) → ไม่กันที่หน้านี้ ปล่อยให้ BE ตัดสิน
+   */
+  hasAssessment?: boolean;
+  /**
    * ข้อมูลสุขภาพที่จะเติมให้อัตโนมัติเมื่อเลือกโปรไฟล์นี้
    *
    * ⚠ อาจไม่มีคีย์นี้เลย (ไม่ใช่ `{}`) ในโปรไฟล์ที่ไม่เคยกรอกข้อมูลสุขภาพ
@@ -45,6 +55,7 @@ function RecipientRow({
   selected,
   title,
   badge,
+  assessed,
   onSelect,
   onDelete,
 }: {
@@ -52,15 +63,21 @@ function RecipientRow({
   title: string;
   /** ป้ายกำกับข้างชื่อ เช่น "ตัวเอง" (PYG-502) */
   badge?: string;
+  /** S08: ป้ายสถานะแบบประเมิน — undefined = ไม่รู้ ไม่แสดงป้าย */
+  assessed?: boolean;
   onSelect: () => void;
   onDelete?: () => void;
 }) {
+  const s = useAssessmentStrings();
+  const blocked = selected && assessed === false;
   return (
     <div
       className={`flex items-center rounded-xl border-2 transition ${
-        selected
-          ? 'border-[#1B5C48] bg-[#F0FAF4]'
-          : 'border-[#E0E2E5] bg-white hover:border-gray-300'
+        blocked
+          ? 'border-[#D97706] bg-[#FFFBEB]'
+          : selected
+            ? 'border-[#1B5C48] bg-[#F0FAF4]'
+            : 'border-[#E0E2E5] bg-white hover:border-gray-300'
       }`}
     >
       <button
@@ -80,6 +97,18 @@ function RecipientRow({
         {badge && (
           <span className="shrink-0 rounded-full bg-[#F0FAF4] px-2.5 py-1 text-xs font-bold text-[#1B5C48]">
             {badge}
+          </span>
+        )}
+        {assessed === true && (
+          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#E3F2EA] px-2.5 py-1 text-xs font-semibold text-[#1F5E43]">
+            <span className="material-icons" style={{ fontSize: 14 }} aria-hidden="true">check</span>
+            {s.assessedBadge}
+          </span>
+        )}
+        {assessed === false && (
+          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#FEF3C7] px-2.5 py-1 text-xs font-semibold text-[#78350F]">
+            <span className="material-icons" style={{ fontSize: 14 }} aria-hidden="true">error_outline</span>
+            {s.notAssessedBadge}
           </span>
         )}
       </button>
@@ -497,8 +526,11 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
   const [error, setError] = useState<Record<string, string>>({});
 
   // โปรไฟล์ผู้รับบริการที่เคยบันทึกไว้ + ใบไหนที่ถูกเลือกอยู่
+  // S08: จองให้ตัวเอง/คนที่บันทึกไว้ → คืนใบที่เลือกจาก draft (กลับมาจากแบบประเมินต้องเลือกคนนี้ไว้ให้)
+  //   ค่าในฟอร์มคืนมาจาก draft อยู่แล้ว (previousPatient) เหลือแค่ใบที่เลือกที่เคยหายไป
   const [selectedRecipientId, setSelectedRecipientId] = useState<string | null>(
-    initialSavedRecipient?.id ?? null,
+    initialSavedRecipient?.id ??
+      (memberContext ? null : bookingDraft?.recipient?.selectedRecipientId ?? null),
   );
   // กรอกเองโดยไม่ได้เลือกจากลิสต์ → ถามว่าจะบันทึกโปรไฟล์ไว้ใช้ครั้งหน้าไหม
   const [saveAsProfile, setSaveAsProfile] = useState(!!memberContext);
@@ -543,6 +575,25 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
   //   เพราะขั้นยิง POST /bookings อยู่คนละหน้า (SearchPage / CaregiverProfilePage)
   //   สองค่านี้เคยตายอยู่ในหน้านี้ ทำให้ติ๊ก "บันทึกไว้" แล้วไม่เกิดอะไรขึ้น
   //   และ booking ไม่เคยผูกกับโปรไฟล์ที่เลือก
+  const buildPatientDetails = () => ({
+    name,
+    // PYG-502: ส่งต่อชื่อเล่นจากโปรไฟล์ — ว่าง = ไม่ส่ง ไม่ใช่ส่งสตริงว่าง
+    nickname: nickname.trim() || undefined,
+    // เดิมเป็น `Number(age) || 0` — ช่องที่ว่างกลายเป็นอายุ 0 ปีซึ่ง BE รับเป็น
+    // ค่าที่ถูกต้อง (0-130 เพราะผู้รับบริการอาจเป็นทารก) แล้วบันทึกไปเงียบ ๆ
+    age: age.trim() ? Number(age) : undefined,
+    gender,
+    weight: weight ? Number(weight) : undefined,
+    height: height ? Number(height) : undefined,
+    supportLevel,
+    conditions,
+    medicines,
+    allergies,
+    bloodGroup,
+    careInstructions,
+    regularHospital,
+  });
+
   useEffect(() => {
     setBookingDraft((prev) => ({
       ...(prev || { serviceLocation: [], serviceTypes: [] }),
@@ -562,24 +613,7 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
         selectedMemberId: memberUserId,
         selectedRecipientId,
         saveAsProfile,
-        patientDetails: {
-          name,
-          // PYG-502: ส่งต่อชื่อเล่นจากโปรไฟล์ — ว่าง = ไม่ส่ง ไม่ใช่ส่งสตริงว่าง
-          nickname: nickname.trim() || undefined,
-          // เดิมเป็น `Number(age) || 0` — ช่องที่ว่างกลายเป็นอายุ 0 ปีซึ่ง BE รับเป็น
-          // ค่าที่ถูกต้อง (0-130 เพราะผู้รับบริการอาจเป็นทารก) แล้วบันทึกไปเงียบ ๆ
-          age: age.trim() ? Number(age) : undefined,
-          gender,
-          weight: weight ? Number(weight) : undefined,
-          height: height ? Number(height) : undefined,
-          supportLevel,
-          conditions,
-          medicines,
-          allergies,
-          bloodGroup,
-          careInstructions,
-          regularHospital,
-        },
+        patientDetails: buildPatientDetails(),
       },
       contactPerson: { name: contactName, phone: contactPhone, relationship: contactRel },
     }));
@@ -698,6 +732,81 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
   // กรอกเอง (ไม่ได้เลือกจากลิสต์) และมีชื่อแล้ว → ค่อยถามเรื่องบันทึกโปรไฟล์
   const isManualEntry = !selectedRecipientId && name.trim().length > 0;
 
+  // ── S08 · PYG-610: กันจองเมื่อผู้รับบริการยังไม่มีแบบประเมิน (AC9, AC10) ──────────
+  // BE กันซ้ำอีกชั้นตอนส่งคำขอ (ASSESSMENT_REQUIRED) — ที่นี่พาไปประเมินก่อนเสียเวลาเลือกผู้ดูแล
+  //   ★ โหมดจองแทน: query ของกลุ่มไม่มี hasAssessment จึงไม่กันที่นี่ (ดู onBehalfBookingErrorMessage)
+  //   ★ กรอกเองโดยไม่เลือกจากลิสต์: BE ไม่ให้จองโดยไม่มีโปรไฟล์ที่ประเมินแล้ว ต้องบันทึกโปรไฟล์ก่อน
+  const navigate = useNavigate();
+  const assessmentText = useAssessmentStrings();
+  const selectedRecipient = savedRecipients.find((r) => r.id === selectedRecipientId);
+  const needsAssessment = !isMemberBooking && selectedRecipient?.hasAssessment === false;
+  const needsNewProfile = !isMemberBooking && isManualEntry;
+  const assessmentBlocked = needsAssessment || needsNewProfile;
+  const [creatingProfile, setCreatingProfile] = useState(false);
+  const [createProfileError, setCreateProfileError] = useState<string | null>(null);
+
+  const startAssessment = (recipientId: string) => {
+    // เขียน draft ทันที ไม่รอ effect — หน้านี้ถูกถอดออกก่อน effect รอบถัดไปจะทำงาน
+    setBookingDraft((prev) =>
+      prev?.recipient
+        ? { ...prev, recipient: { ...prev.recipient, selectedRecipientId: recipientId, saveAsProfile: false } }
+        : prev,
+    );
+    navigate(assessmentPath(recipientId, 'booking'));
+  };
+
+  /**
+   * "เลือกคนอื่น" — ยกเลิกใบที่ยังไม่ประเมินและล้างข้อมูลของคนนั้นออกจากฟอร์ม
+   * ★ ถ้าล้างแค่การเลือก ฟอร์มจะกลายเป็น "กรอกเอง" ด้วยข้อมูลของคนเดิม แล้วกล่องผู้รับบริการรายใหม่
+   *   จะชวนให้บันทึกคนเดิมซ้ำเป็นอีกใบ
+   */
+  const chooseOtherRecipient = () => {
+    setSelectedRecipientId(null);
+    setName('');
+    setNickname('');
+    setAge('');
+    setGender('');
+    setWeight('');
+    setHeight('');
+    setSupportLevel('');
+    setBloodGroup('');
+    setConditions([]);
+    setMedicines('');
+    setAllergies('');
+    setCareInstructions('');
+    setRegularHospital('');
+  };
+
+  const handleCreateAndAssess = async () => {
+    const errs: Record<string, string> = {};
+    if (!name.trim()) errs.name = 'กรุณากรอกชื่อคนไข้';
+    if (!age.trim()) errs.age = 'กรุณากรอกอายุ';
+    if (!gender) errs.gender = 'กรุณาเลือกเพศ';
+    if (!supportLevel) errs.supportLevel = 'กรุณาเลือกระดับการช่วยเหลือตนเอง';
+    if (Object.keys(errs).length > 0) {
+      setError((prev) => ({ ...prev, ...errs }));
+      setCreateProfileError(assessmentText.gateNewFillFirst);
+      return;
+    }
+    setCreatingProfile(true);
+    setCreateProfileError(null);
+    try {
+      const details = buildPatientDetails();
+      const created = await createCareRecipient({
+        name: name.trim(),
+        nickname: details.nickname,
+        details: toPatientProfilePayload(details),
+      });
+      setSavedRecipients((prev) => [...prev, { ...created, hasAssessment: false }]);
+      setSelectedRecipientId(created.id);
+      setSaveAsProfile(false);
+      startAssessment(created.id);
+    } catch {
+      setCreateProfileError(assessmentText.gateNewSaveFailed);
+      setCreatingProfile(false);
+    }
+  };
+
   const handleSubmit = () => {
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = 'กรุณากรอกชื่อคนไข้';
@@ -709,7 +818,7 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
       errs.contactPhone = 'เบอร์โทรต้องมี 10 หลัก';
     if (!contactRel) errs.contactRel = 'กรุณาเลือกความสัมพันธ์';
     setError(errs);
-    if (Object.keys(errs).length === 0) goToStep(5);
+    if (Object.keys(errs).length === 0 && !assessmentBlocked) goToStep(5);
   };
 
   // Report missing required fields so the sticky "Next" button can disable itself
@@ -722,6 +831,7 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
     if (!contactName.trim()) missing.push('ชื่อผู้ติดต่อ');
     if (!contactPhone.trim() || contactPhone.length !== 10) missing.push('เบอร์โทรผู้ติดต่อ');
     if (!contactRel) missing.push('ความสัมพันธ์');
+    if (assessmentBlocked) missing.push(assessmentText.gateMissing);
     setStepMissing(missing);
     return () => setStepMissing([]);
   }, [
@@ -732,6 +842,8 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
     contactName,
     contactPhone,
     contactRel,
+    assessmentBlocked,
+    assessmentText,
     setStepMissing,
   ]);
 
@@ -762,6 +874,7 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
                 // PYG-502: บอกว่าใบไหนคือของตัวเอง ไม่งั้นผู้ใช้ที่มีหลายโปรไฟล์
                 //   แยกไม่ออกจากชื่อเฉย ๆ
                 badge={r.isSelf ? 'ตัวเอง' : undefined}
+                assessed={r.hasAssessment}
                 onSelect={() => handleSelectRecipient(r)}
                 onDelete={
                   // ★ ห้ามลบใบของตัวเอง — เป็นใบเดียวกับที่ Onboarding สร้าง
@@ -779,6 +892,16 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
           </div>
           {deleteError && (
             <p className="mt-3 text-[11px] font-semibold text-red-500">{deleteError}</p>
+          )}
+          {needsAssessment && selectedRecipient && (
+            <div className="mt-4">
+              <BookingAssessmentGate
+                variant="existing"
+                name={selectedRecipient.name}
+                onStart={() => startAssessment(selectedRecipient.id)}
+                onChooseOther={chooseOtherRecipient}
+              />
+            </div>
           )}
         </section>
       )}
@@ -853,24 +976,19 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
           }}
         />
 
-        {/* กรอกเองโดยไม่ได้เลือกจากลิสต์ → ถามว่าจะเก็บโปรไฟล์นี้ไว้ใช้ครั้งหน้าไหม */}
-        {isManualEntry && !isMemberBooking && (
-          <label className="mt-5 flex items-start gap-3 p-4 bg-[#F6FAF9] border border-[#E0E2E5] rounded-xl cursor-pointer">
-            <input
-              type="checkbox"
-              checked={saveAsProfile}
-              onChange={(e) => setSaveAsProfile(e.target.checked)}
-              className="mt-0.5 w-4 h-4 accent-[#52B69A] cursor-pointer shrink-0"
+        {/* S08: กรอกเองโดยไม่ได้เลือกจากลิสต์ — เดิมเป็นช่องติ๊ก "บันทึกผู้รับบริการรายนี้ไว้"
+            ตอนนี้ BE ไม่ให้จองโดยไม่มีโปรไฟล์ที่ประเมินแล้ว การบันทึกจึงไม่ใช่ตัวเลือกอีกต่อไป
+            → บันทึกโปรไฟล์แล้วพาไปทำแบบประเมิน กลับมาแล้วใบนี้ถูกเลือกไว้ให้ */}
+        {needsNewProfile && (
+          <div className="mt-5">
+            <BookingAssessmentGate
+              variant="new"
+              name={name.trim()}
+              busy={creatingProfile}
+              error={createProfileError}
+              onStart={handleCreateAndAssess}
             />
-            <span>
-              <span className="block text-sm font-bold text-[#1A1A1A]">
-                บันทึกผู้รับบริการรายนี้ไว้
-              </span>
-              <span className="block text-xs text-[#8A8C8E] mt-0.5">
-                ครั้งหน้าจะเลือกจากรายชื่อได้เลย ไม่ต้องกรอกใหม่
-              </span>
-            </span>
-          </label>
+          </div>
         )}
         {isManualEntry && isMemberBooking && (
           <div className="mt-5 flex items-start gap-3 rounded-xl border border-[#B7D9CD] bg-[#F0FAF4] p-4">

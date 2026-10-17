@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { Icon } from '../../components/ui/Icon';
@@ -13,7 +13,7 @@ import {
 import { useStrings, type Strings } from './familyStrings';
 import { FONT, GroupAvatar } from './components/familyUi';
 import { fgErrorMessage } from './familyErrors';
-import { setPendingJoinToken, joinPath } from './joinRedirect';
+import { clearPendingJoinToken, setPendingJoinToken, joinPath } from './joinRedirect';
 import { FamilyGroupConsentSection, useFamilyGroupConsent } from './components/FamilyGroupConsent';
 import { MY_CONSENTS } from '../../graphql/consent';
 
@@ -55,6 +55,12 @@ export default function JoinGroupPage() {
 function AuthedJoin({ token }: { token: string }) {
   const s = useStrings();
   const navigate = useNavigate();
+
+  // Signed in on /join = the login/register detour is over. Login returns here via ?redirect=
+  // without reading storage, so clear the stash here or it hijacks a later registration.
+  useEffect(() => {
+    clearPendingJoinToken();
+  }, []);
   const [joined, setJoined] = useState<{ name: string } | null>(null);
 
   const { data, loading, error } = useQuery<{ joinLinkPreview: JoinLinkPreview }>(

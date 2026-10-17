@@ -14,6 +14,19 @@
 
 const KEY = 'payung_pending_join_token';
 
+/**
+ * A stashed token only means "finish the detour you just started". Without an expiry a token
+ * left behind (e.g. the user went via login, which returns through ?redirect= and never reads
+ * storage) sent the *next* registration in this browser — possibly another account — to a
+ * stale /join that shows "ลิงก์คำเชิญไม่ถูกต้อง" instead of home.
+ */
+const MAX_AGE_MS = 60 * 60 * 1000;
+
+interface StoredToken {
+  token: string;
+  savedAt: number;
+}
+
 /** The /join path for a token — also used as the login `redirect` target. */
 export function joinPath(token: string): string {
   return `/join?token=${encodeURIComponent(token)}`;
@@ -21,18 +34,34 @@ export function joinPath(token: string): string {
 
 export function setPendingJoinToken(token: string): void {
   try {
-    localStorage.setItem(KEY, token);
+    localStorage.setItem(KEY, JSON.stringify({ token, savedAt: Date.now() } satisfies StoredToken));
   } catch {
     /* storage disabled — the ?redirect= param still covers the login path */
   }
 }
 
-/** Reads and clears the pending token (one-shot). */
+/** Drops any stashed token — call once the user has reached /join signed in. */
+export function clearPendingJoinToken(): void {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* storage disabled */
+  }
+}
+
+/**
+ * Reads and clears the pending token (one-shot). Expired or unreadable values (including the
+ * old plain-string format) count as no pending join.
+ */
 export function takePendingJoinToken(): string | null {
   try {
-    const token = localStorage.getItem(KEY);
-    if (token) localStorage.removeItem(KEY);
-    return token;
+    const raw = localStorage.getItem(KEY);
+    if (raw === null) return null;
+    localStorage.removeItem(KEY);
+    const stored = JSON.parse(raw) as Partial<StoredToken> | null;
+    if (typeof stored?.token !== 'string' || typeof stored.savedAt !== 'number') return null;
+    if (Date.now() - stored.savedAt > MAX_AGE_MS) return null;
+    return stored.token;
   } catch {
     return null;
   }

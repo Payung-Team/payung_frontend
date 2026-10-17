@@ -31,6 +31,8 @@ interface BookingConfirmModalProps {
   bookingDraft: BookingRequest | null;
   isSubmitting?: boolean;
   errorMessage?: string;
+  /** S08: ปุ่มแก้ปัญหาใต้ข้อความ error เช่น "ทำแบบประเมิน" ตอน BE ตอบ ASSESSMENT_REQUIRED */
+  errorAction?: { label: string; onClick: () => void };
   /** รูปผู้ดูแล (signed URL) โหลดไม่ขึ้น → ให้หน้าแม่โหลดข้อมูลผู้ดูแลใหม่ (PYG-512) */
   onPhotoExpired?: () => void;
 }
@@ -86,6 +88,7 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
   bookingDraft,
   isSubmitting = false,
   errorMessage,
+  errorAction,
   onPhotoExpired,
 }) => {
   if (!isOpen) return null;
@@ -389,9 +392,21 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
             {generalError && (
               <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
                 <span className="material-icons text-red-500 text-base mt-0.5 shrink-0">error_outline</span>
-                <p className="text-xs font-semibold text-red-600 leading-relaxed" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                  {generalError}
-                </p>
+                <div className="flex flex-col items-start gap-2">
+                  <p className="text-xs font-semibold text-red-600 leading-relaxed" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                    {generalError}
+                  </p>
+                  {errorAction && (
+                    <button
+                      type="button"
+                      onClick={errorAction.onClick}
+                      className="min-h-9 cursor-pointer rounded-lg bg-[#2F8466] px-3.5 text-xs font-bold text-white hover:bg-[#28735A]"
+                      style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+                    >
+                      {errorAction.label}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 

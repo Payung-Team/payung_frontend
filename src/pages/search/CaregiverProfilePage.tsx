@@ -14,8 +14,11 @@ import {
   BOOKING_UNCONFIRMED_MESSAGE,
   BOOKING_UNKNOWN_ERROR_MESSAGE,
   bookingHttpErrorMessage,
+  isAssessmentRequiredError,
   onBehalfBookingErrorMessage,
 } from '../../lib/bookingSubmitError';
+import { useAssessmentStrings } from '../../lib/assessmentStrings';
+import { bookingAssessmentRedirect } from '../../lib/assessmentNav';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
 import { supabase } from '../../lib/supabase';
@@ -254,6 +257,9 @@ const CaregiverProfilePage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
+  // S08: BE ตอบ ASSESSMENT_REQUIRED (จองปกติ) → modal แสดงปุ่ม "ทำแบบประเมิน"
+  const [assessmentRequired, setAssessmentRequired] = useState(false);
+  const assessmentText = useAssessmentStrings();
   // PYG-385: family "จองแทน" path — same flow as SearchPage, only the submit call differs
   // (GraphQL createBookingOnBehalf instead of the personal REST create). Without this branch a
   // booking started in a family group and confirmed from the profile page is written with
@@ -339,6 +345,7 @@ const CaregiverProfilePage: React.FC = () => {
     if (!cg || !bookingDraft) return;
     setIsSubmitting(true);
     setBookingError(null);
+    setAssessmentRequired(false);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -416,7 +423,7 @@ const CaregiverProfilePage: React.FC = () => {
           });
         } catch (err) {
           // PYG-540: อ่าน code แบบ Apollo 4 + รองรับ CONSENT_WITHDRAWN (ดู bookingSubmitError.ts)
-          setBookingError(onBehalfBookingErrorMessage(err));
+          setBookingError(onBehalfBookingErrorMessage(err, bookingDraft.onBehalf.recipientName));
         }
         return;
       }
@@ -433,7 +440,10 @@ const CaregiverProfilePage: React.FC = () => {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
-        setBookingError(bookingHttpErrorMessage(res.status, errData));
+        setAssessmentRequired(isAssessmentRequiredError(errData));
+        setBookingError(
+          bookingHttpErrorMessage(res.status, errData, bookingDraft.recipient?.patientDetails?.name),
+        );
         return;
       }
 
@@ -764,6 +774,17 @@ const CaregiverProfilePage: React.FC = () => {
         bookingDraft={bookingDraft}
         isSubmitting={isSubmitting}
         errorMessage={bookingError ?? undefined}
+        errorAction={
+          assessmentRequired
+            ? {
+                label: assessmentText.errorRequiredAction,
+                onClick: () => {
+                  const target = bookingAssessmentRedirect(bookingDraft?.recipient?.selectedRecipientId);
+                  navigate(target.to, { state: target.state });
+                },
+              }
+            : undefined
+        }
         onPhotoExpired={refreshPhoto}
       />
       <ToastContainer

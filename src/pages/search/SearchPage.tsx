@@ -18,8 +18,11 @@ import {
   BOOKING_UNCONFIRMED_MESSAGE,
   BOOKING_UNKNOWN_ERROR_MESSAGE,
   bookingHttpErrorMessage,
+  isAssessmentRequiredError,
   onBehalfBookingErrorMessage,
 } from '../../lib/bookingSubmitError';
+import { useAssessmentStrings } from '../../lib/assessmentStrings';
+import { bookingAssessmentRedirect } from '../../lib/assessmentNav';
 import ThailandAddressSimple from 'thailand-address-simple';
 import { skillLabel } from '../../lib/skillLabels';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
@@ -578,6 +581,9 @@ function SearchPageContent() {
   const [bookingCaregiver, setBookingCaregiver] = useState<CaregiverSummary | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
+  // S08: BE ตอบ ASSESSMENT_REQUIRED (จองปกติ) → modal แสดงปุ่ม "ทำแบบประเมิน"
+  const [assessmentRequired, setAssessmentRequired] = useState(false);
+  const assessmentText = useAssessmentStrings();
 
   // ── Address DB ──
   const [dbReady, setDbReady] = useState(false);
@@ -678,6 +684,7 @@ function SearchPageContent() {
     if (!bookingCaregiver || !bookingDraft) return;
     setIsSubmitting(true);
     setBookingError(null);
+    setAssessmentRequired(false);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -755,7 +762,7 @@ function SearchPageContent() {
           });
         } catch (err) {
           // PYG-540: อ่าน code แบบ Apollo 4 + รองรับ CONSENT_WITHDRAWN (ดู bookingSubmitError.ts)
-          setBookingError(onBehalfBookingErrorMessage(err));
+          setBookingError(onBehalfBookingErrorMessage(err, bookingDraft.onBehalf.recipientName));
         }
         return;
       }
@@ -771,7 +778,10 @@ function SearchPageContent() {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
-        setBookingError(bookingHttpErrorMessage(res.status, errData));
+        setAssessmentRequired(isAssessmentRequiredError(errData));
+        setBookingError(
+          bookingHttpErrorMessage(res.status, errData, bookingDraft.recipient?.patientDetails?.name),
+        );
         return;
       }
       const resData = await res.json().catch(() => null) as { id?: string } | null;
@@ -993,6 +1003,17 @@ function SearchPageContent() {
       bookingDraft={bookingDraft}
       isSubmitting={isSubmitting}
       errorMessage={bookingError ?? undefined}
+      errorAction={
+        assessmentRequired
+          ? {
+              label: assessmentText.errorRequiredAction,
+              onClick: () => {
+                const target = bookingAssessmentRedirect(bookingDraft?.recipient?.selectedRecipientId);
+                navigate(target.to, { state: target.state });
+              },
+            }
+          : undefined
+      }
       onPhotoExpired={refreshPhotos}
     />
     </>

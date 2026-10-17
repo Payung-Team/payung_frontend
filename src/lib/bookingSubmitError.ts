@@ -5,6 +5,8 @@
 
 import { extractGraphQLErrorCode, extractGraphQLErrorMessage } from './apolloErrors';
 import { CONSENT_ERROR } from '../graphql/consent';
+import { ASSESSMENT_ERROR } from '../graphql/assessment';
+import { ASSESSMENT_STRINGS } from './assessmentStrings';
 
 const MY_BOOKINGS_HINT = 'กรุณาตรวจสอบที่หน้า "การจองของฉัน" ก่อนลองใหม่ เพื่อไม่ให้จองซ้ำ';
 
@@ -42,6 +44,14 @@ export function isOnboardingRequiredError(body: unknown): boolean {
 }
 
 /**
+ * S08 · PYG-610 — BE ตอบ 422 ASSESSMENT_REQUIRED เมื่อผู้รับบริการยังไม่มีแบบประเมิน (R11)
+ * หน้าที่ยิงคำขอใช้ค่านี้ตัดสินว่าจะแสดงปุ่ม "ทำแบบประเมิน" ใน modal หรือไม่
+ */
+export function isAssessmentRequiredError(body: unknown): boolean {
+  return (body as { code?: unknown } | null)?.code === ASSESSMENT_ERROR.REQUIRED;
+}
+
+/**
  * PYG-540: BE ตอบ 403 + code นี้เมื่อผู้ใช้ถอนความยินยอมที่จำเป็นต่อการจองไว้
  * (ข้อมูลสุขภาพ / การเปิดเผยแก่ผู้ดูแล) — ค่ามาจาก CONSENT_ERROR ใน graphql/consent.ts
  */
@@ -69,10 +79,14 @@ export function isBookingTimeErrorMessage(message?: string | null): boolean {
   return !!message && TIME_ERROR_FRAGMENTS.some((f) => message.includes(f));
 }
 
-export function bookingHttpErrorMessage(status: number, body: unknown): string {
+export function bookingHttpErrorMessage(status: number, body: unknown, recipientName?: string): string {
   const msg = serverMessage(body);
   // PYG-525: ข้อความเรื่องเวลาจาก BE อ่านเข้าใจอยู่แล้ว — ไม่เติมคำนำ "ข้อมูลการจองไม่ถูกต้อง:"
   if (isBookingTimeErrorMessage(msg)) return msg as string;
+  // S08: ไม่งั้นตกไปที่ "ข้อมูลการจองไม่ถูกต้อง: ..." ของ 4xx ซึ่งไม่บอกว่าต้องไปทำแบบประเมิน
+  if (isAssessmentRequiredError(body)) {
+    return ASSESSMENT_STRINGS.th.errorRequired(recipientName?.trim() || ASSESSMENT_STRINGS.th.thisRecipient);
+  }
   // ★ ตรวจก่อน status เพราะข้อความทั่วไปของ 4xx ไม่ได้บอกว่าต้องไปกรอก Onboarding
   if (isOnboardingRequiredError(body)) {
     return msg ?? 'กรุณากรอกข้อมูลผู้รับบริการให้ครบก่อนจองผู้ดูแล';
@@ -99,10 +113,16 @@ export function bookingHttpErrorMessage(status: number, body: unknown): string {
  *   บน Apollo 4 ค่านี้เป็น undefined เสมอ → ทุก error ตกไปที่ "จองแทนไม่สำเร็จ" แม้แต่
  *   RECIPIENT_NOT_IN_GROUP ที่ตั้งใจแยกไว้ · ตอนนี้อ่านผ่าน apolloErrors.ts แบบเดียวกับทั้งแอป
  */
-export function onBehalfBookingErrorMessage(err: unknown): string {
+export function onBehalfBookingErrorMessage(err: unknown, recipientName?: string): string {
   const code = extractGraphQLErrorCode(err);
   if (code === 'RECIPIENT_NOT_IN_GROUP') {
     return 'ผู้รับบริการนี้ไม่ได้อยู่ในกลุ่มแล้ว ลองเลือกผู้รับบริการใหม่';
+  }
+  // S08: บันทึกแบบประเมินได้เฉพาะเจ้าของโปรไฟล์ — คนจองแทนทำให้ไม่ได้ จึงบอกว่าใครต้องทำ ไม่มีปุ่มพาไป
+  if (code === ASSESSMENT_ERROR.REQUIRED) {
+    return ASSESSMENT_STRINGS.th.errorRequiredOnBehalf(
+      recipientName?.trim() || ASSESSMENT_STRINGS.th.thisRecipient,
+    );
   }
   // PYG-540: เจ้าของข้อมูลถอนความยินยอมไว้ — ข้อความจาก BE บอกเหตุผล/ทางแก้ที่ถูกต้องแล้ว
   //   (จองแทนคนอื่น: บอกกลาง ๆ ไม่เปิดเผยว่าเขาถอนข้อไหน · จองแทนตัวเอง: บอกทางแก้)

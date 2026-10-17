@@ -1,9 +1,16 @@
 import { useQuery } from '@apollo/client/react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { GET_USER } from '../../graphql/queries';
 import Avatar from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
 import Skeleton from '../ui/Skeleton';
 import { accountContact } from '../../lib/phone';
+import { useAuth } from '../../context/AuthContext';
+import { assessmentPath } from '../../lib/assessmentNav';
+import ProfileAssessmentSection from '../assessment/ProfileAssessmentSection';
+
+/** role ผู้สูงอายุ — มีแบบประเมิน ADL ของผู้รับบริการ (S08) */
+const ROLE_ELDER = 1;
 
 interface ViewProfileModalProps {
   readonly isOpen: boolean;
@@ -17,8 +24,17 @@ export default function ViewProfileModal({
   onEditClick,
 }: ViewProfileModalProps) {
   const { data, loading } = useQuery(GET_USER);
+  const { userRole } = useAuth();
+  const navigate = useNavigate();
+  const { pathname, search } = useLocation();
 
   if (!isOpen) return null;
+
+  // S08 · AC8: แก้ไขแบบประเมินจากโปรไฟล์ — บันทึกแล้วกลับมาหน้าเดิมที่เปิดโปรไฟล์
+  const openAssessment = (careRecipientId: string) => {
+    onClose();
+    navigate(assessmentPath(careRecipientId, 'profile', `${pathname}${search}`));
+  };
 
   const user = data?.me;
   // PYG-497 เก็บ firstName/lastName ตอน Onboarding — ผู้ใช้เก่าเกือบทั้งหมดยังไม่มี
@@ -123,6 +139,8 @@ export default function ViewProfileModal({
                 </div>
               </div>
             </div>
+
+            {userRole === ROLE_ELDER && <ProfileAssessmentSection onOpenAssessment={openAssessment} />}
 
             {/* Buttons */}
             <div className="flex gap-3 pt-6 border-t border-gray-100 mt-6">

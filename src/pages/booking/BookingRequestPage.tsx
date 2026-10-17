@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { BOOKING_RESUME_STEP, isBookingResumeState } from '../../lib/assessmentNav';
 import { useBooking } from '../../context/BookingContext';
 import { formatBookingTimeRange } from '../../lib/bookingTime';
 import { estimateBookingCost } from '../../lib/bookingPrice';
@@ -129,6 +130,11 @@ export default function BookingRequestPage() {
     useBooking();
 
   useEffect(() => {
+    // S08 · PYG-610: กลับมาจากแบบประเมิน → จองต่อจาก draft เดิมที่ขั้นผู้รับบริการ (ไม่ล้างข้อมูลที่กรอกไว้)
+    if (isBookingResumeState(location.state) && bookingDraft) {
+      goToStep(BOOKING_RESUME_STEP);
+      return;
+    }
     resetBooking();
     // Launched from a family group's "จองแทนสมาชิก" / "จองแทนสมาชิกรายนี้": carry a lightweight
     // hint so step 4 opens in "book for a member" mode (and preselects the member when given).

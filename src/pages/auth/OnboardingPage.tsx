@@ -31,6 +31,7 @@ import {
   type ConsentPolicyData,
 } from '../../graphql/consent';
 import { extractGraphQLErrorCode } from '../../lib/apolloErrors';
+import { SELF_RECIPIENT_ALIAS, assessmentPath } from '../../lib/assessmentNav';
 
 const PhoneIcon = <Icon name="phone" size="small" color="currentColor" />;
 const LocationIcon = <Icon name="location_on" size="small" color="currentColor" />;
@@ -362,6 +363,14 @@ export default function OnboardingPage() {
             },
           },
         });
+
+        // S08 · PYG-610: ขั้นถัดไปของ Onboarding คือแบบประเมิน ADL ของโปรไฟล์ตัวเอง (AC1)
+        //   ★ ต้อง navigate ทันที ห้าม await อะไรก่อน — completeOnboarding อัปเดต cache แล้ว
+        //     OnboardingGuard จะพาไปหน้าหลักในรอบ render ถัดไป
+        //   ★ ใช้ alias 'self' เพราะยังไม่รู้ id ของโปรไฟล์ — หน้าแบบประเมินหาใบ is_self เอง
+        //     และถ้ามีแบบประเมินอยู่แล้ว (ทำ Onboarding ซ้ำหลังถอนความยินยอม) จะพาไปหน้าหลักเลย
+        navigate(assessmentPath(SELF_RECIPIENT_ALIAS, 'onboarding'), { replace: true });
+        return;
       }
 
       goToHome();
