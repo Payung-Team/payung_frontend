@@ -8,6 +8,9 @@ import Icon from '../../components/ui/Icon';
 import Skeleton from '../../components/ui/Skeleton';
 import Avatar from '../../components/ui/Avatar';
 import KycDocumentsPreview from '../../components/ui/KycDocumentsPreview';
+import AdminLicensePanel from '../../features/kyc/AdminLicensePanel';
+import { LICENSE_DOC_TYPE, LICENSE_KYC_ENABLED, type LicenseInfo } from '../../lib/license';
+import { LICENSE_STRINGS } from '../../lib/licenseStrings';
 import KycHistoryCard from '../../components/ui/KycHistoryCard';
 import StatusBadge from '../../components/ui/StatusBadge';
 import ConfirmModal from '../../components/ui/ConfirmModal';
@@ -90,6 +93,9 @@ interface AdminKycDetailResponse {
     payoutAccount?: AdminPayoutAccountSummary | null;
     /** PYG-511: มีรูปโปรไฟล์รออนุมัติ → แสดงลิงก์ไปหน้าเทียบรูป */
     pendingProfilePhotoDocumentId?: string | null;
+    /** PYG-588 (field จาก PYG-587 — ขอเฉพาะเมื่อเปิด VITE_LICENSE_KYC_ENABLED) */
+    profession?: string | null;
+    license?: LicenseInfo | null;
   };
 }
 
@@ -130,6 +136,7 @@ const docTypeLabel: Record<string, string> = {
   id_card: 'บัตรประชาชน',
   photo: 'รูปถ่าย',
   license: 'ใบอนุญาต',
+  [LICENSE_DOC_TYPE]: LICENSE_STRINGS.th.sectionTitle,
 };
 
 const genderLabel: Record<string, string> = {
@@ -423,7 +430,12 @@ export default function KycReviewDetailPage() {
   const caregiver = data?.adminKycDetail.caregiver;
   // ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock
   const mockState = useMockState();
-  const caregiverProfession = resolveProfession(mockState, caregiver?.id, caregiver?.profession, 'none');
+  const caregiverProfession = resolveProfession(
+    mockState,
+    caregiver?.id,
+    caregiver?.profession ?? data?.adminKycDetail.profession,
+    'none',
+  );
   const caregiverCustomSkills = resolveCustomSkills(mockState, caregiver?.id, caregiver?.customSkills);
   const documents = data?.adminKycDetail.documents ?? [];
   const reviews = data?.adminKycDetail.reviews ?? [];
@@ -605,6 +617,17 @@ export default function KycReviewDetailPage() {
                   </div>
                 ) : null}
               </article>
+
+              {/* PYG-588: ใบประกอบวิชาชีพ — ตรวจรายใบ แยกจากอนุมัติ KYC ทั้งชุด */}
+              {LICENSE_KYC_ENABLED && (
+                <AdminLicensePanel
+                  license={data?.adminKycDetail.license ?? null}
+                  profession={caregiverProfession}
+                  caregiverName={caregiver.fullName}
+                  onChanged={() => refetch()}
+                  notify={{ success: (m) => toast.success(m), error: (m) => toast.error(m) }}
+                />
+              )}
 
               {/*Payout Account (PYG-266)*/}
               <article className="rounded-xl border border-[#E5E7EB] bg-white px-6 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">

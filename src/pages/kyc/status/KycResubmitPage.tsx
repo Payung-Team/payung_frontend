@@ -9,6 +9,8 @@ import KycStep3 from '../steps/KycStep3';
 import KycStep4 from '../steps/KycStep4';
 import KycRejectionList from '../../../components/ui/KycRejectionList';
 import { getMockState, resolveCustomSkills, resolveProfession } from '../../../mocks/caregiverExtrasMock';
+import { licenseDraftFromKycStatus } from '../../../features/kyc/licenseDraft';
+import { LICENSE_KYC_ENABLED } from '../../../lib/license';
 
 export default function KycResubmitPage() {
   const navigate = useNavigate();
@@ -46,7 +48,8 @@ export default function KycResubmitPage() {
             idCardNumber: caregiver.idCardNumber || '',
             phone: caregiver.phone || '',
             // ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock (ไม่เดาให้ — ไม่เคยเลือก = ช่องว่าง)
-            profession: resolveProfession(getMockState(), caregiver.id, caregiver.profession, 'none') ?? '',
+            // PYG-588: kycStatus.profession (PYG-587) ใช้ได้ก่อน caregiver.profession ของ PYG-575
+            profession: resolveProfession(getMockState(), caregiver.id, caregiver.profession ?? kyc.profession, 'none') ?? '',
             skills: caregiver.skills || [],
             customSkills: resolveCustomSkills(getMockState(), caregiver.id, caregiver.customSkills),
             experienceYears: caregiver.experienceYears || 0,
@@ -58,6 +61,8 @@ export default function KycResubmitPage() {
             fileName: d.fileName,
             previewUrl: d.signedUrl ?? '',
           })),
+          // PYG-588: ใบประกอบฯ เดิม — ยังใช้ได้ = เติมให้ · ไม่ผ่าน/หมดอายุ = ฟอร์มว่างพร้อมเหตุผล
+          license: LICENSE_KYC_ENABLED ? licenseDraftFromKycStatus(kyc) : null,
           payout: kyc.payoutAccount
             ? {
                 bankCode: kyc.payoutAccount.bankCode,

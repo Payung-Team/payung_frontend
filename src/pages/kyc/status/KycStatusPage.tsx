@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { GET_KYC_STATUS } from '../../../graphql/queries';
+import LicenseStatusCard from '../../../features/kyc/LicenseStatusCard';
+import { LICENSE_KYC_ENABLED, type LicenseInfo } from '../../../lib/license';
 import Icon from '../../../components/ui/Icon';
 import ImageModal from '../../../components/ui/ImageModal';
 import Skeleton from '../../../components/ui/Skeleton';
@@ -147,6 +149,11 @@ export default function KycStatusPage() {
   const rejectionReasons = data?.kycStatus?.caregiver?.rejectionReasons || [];
   const rawDocuments = data?.kycStatus?.documents || [];
   const payoutAccount: PayoutAccountSummary | null = data?.kycStatus?.payoutAccount ?? null;
+  // PYG-588: ใบประกอบฯ ล่าสุด — มีเฉพาะพยาบาล / นักกายภาพฯ ที่แนบไว้
+  const license: LicenseInfo | null = LICENSE_KYC_ENABLED ? data?.kycStatus?.license ?? null : null;
+  const licenseCard = license ? (
+    <LicenseStatusCard license={license} profession={data?.kycStatus?.profession} kycStatus={status} />
+  ) : null;
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
 
   const [refreshedDocs, setRefreshedDocs] = useState<KycDocument[]>([]);
@@ -345,6 +352,8 @@ export default function KycStatusPage() {
             </div>
           </div>
 
+          {licenseCard}
+
           {/* Payout Account Summary (PYG-266) */}
           {payoutAccount && (
             <PayoutSummaryCard payoutAccount={payoutAccount} onEdit={() => setIsPayoutModalOpen(true)} />
@@ -436,6 +445,8 @@ export default function KycStatusPage() {
             </span>
           </div>
 
+          {licenseCard && <div className="w-full mb-6">{licenseCard}</div>}
+
           {/* Payout Account (PYG-266) — banner ถ้ายังไม่มี, สรุปแบบ mask ถ้ามีแล้ว */}
           <div className="w-full mb-6">
             {payoutAccount ? (
@@ -500,6 +511,8 @@ export default function KycStatusPage() {
               <span className="text-[11.5px] text-[#4B5563]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>คุณแก้ไขเฉพาะรายการที่ต้องอัปเดต ไม่ต้องกรอกทั้งหมดใหม่</span>
             </div>
           </div>
+
+          {licenseCard && <div className="w-full mb-6">{licenseCard}</div>}
 
           {/* Items to fix list */}
           <KycRejectionList 
