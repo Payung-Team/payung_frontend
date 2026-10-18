@@ -7,8 +7,9 @@
 
 /**
  * เปิดทางเลือกเบอร์โทรศัพท์ในหน้า Login / สมัคร / ตั้งค่า
- * ปิดไว้จนกว่า BE (PYG-603) จะ deploy — operation ของเบอร์โทรยังไม่มีใน schema
- * ถ้าเปิดก่อน ผู้ใช้จะเจอแท็บเบอร์โทรเป็นค่าเริ่มต้นแต่กดแล้ว error ทุกครั้ง
+ * BE (PYG-603) merge เข้า dev แล้ว แต่ยังปิดไว้จนกว่าจะพร้อมส่ง SMS จริง:
+ *   deploy BE + เปิด Phone provider ใน Supabase Auth + ตั้ง PHONE_VERIFICATION_TOKEN_SECRET
+ * ถ้าเปิดก่อน ผู้ใช้จะเจอแท็บเบอร์โทรเป็นค่าเริ่มต้นแต่ขอรหัสแล้ว error ทุกครั้ง
  */
 export const PHONE_AUTH_ENABLED = import.meta.env.VITE_PHONE_AUTH_ENABLED === 'true';
 

@@ -1,11 +1,13 @@
 /**
  * สมัคร / ล็อกอิน / ผูกเบอร์ด้วยเบอร์โทรศัพท์ (PYG-604)
  *
- * ★ ไฟล์นี้เขียนตาม "ข้อเสนอ" ใน PYG-601 — contract ยังไม่เคาะ และ BE (PYG-603) ยังไม่มี
- *   operation เหล่านี้ ทุกอย่างที่ FE สมมติเรื่อง API อยู่ในไฟล์นี้ที่เดียว
- *   เมื่อ contract สรุปแล้วให้แก้ที่นี่ + src/hooks/usePhoneAuth.ts
+ * ★ contract: PYG-601 (payung_backend #126) · BE: PYG-603 (payung_backend #127, merge เข้า dev แล้ว)
+ *   ตรวจกับ src/schema.gql ของ BE แล้ว (18 ต.ค. 2026) operation ทั้ง 6 ตัวในไฟล์นี้ผ่านครบ
+ *   BE ใช้ OTP ของ Supabase Auth แต่ FE เรียกผ่าน GraphQL ของ BE เท่านั้น ไม่เรียก Supabase เอง
+ *   error มากับ HTTP 200 + extensions.code (ไม่ใช่ 422) — ดู src/lib/phoneAuthErrors.ts
+ *   ถ้า contract เปลี่ยนให้แก้ที่นี่ + src/hooks/usePhoneAuth.ts
  *
- * จุดที่ต่างจากข้อเสนอเดิมใน PYG-601 (เขียนเหตุผลไว้ในการ์ดแล้ว):
+ * จุดที่ต่างจากข้อเสนอแรกใน PYG-601 (BE รับตามนี้แล้ว):
  *   1. เพิ่ม verifyPhoneOtp แล้วให้ signUpWithPhone รับ verificationToken แทน code
  *      เพราะ flow สมัครคือ ยืนยันเบอร์ → เลือก role → อ่านและยอมรับเงื่อนไข → สร้างบัญชี
  *      ถ้าส่ง code ตอนท้าย รหัสจะหมดอายุระหว่างผู้ใช้อ่านเงื่อนไข และรหัสผิดจะรู้ตอนจบ
@@ -91,8 +93,8 @@ export const LINK_PHONE = gql`
 `;
 
 /**
- * ★ แยกจาก GET_USER โดยตั้งใจ — phoneVerified ยังไม่มีใน schema
- *   ถ้าใส่ใน GET_USER ทั้งแอปจะพังทันที เพราะ query นั้นถูกเรียกแทบทุกหน้า
+ * ★ แยกจาก GET_USER โดยตั้งใจ — User.phoneVerified เป็น lazy field ที่ BE อ่านจาก auth.users ของ Supabase
+ *   ทุกครั้งที่ขอ ถ้าใส่ใน GET_USER ซึ่งถูกเรียกแทบทุกหน้า ทุกหน้าจะช้าลงโดยไม่จำเป็น
  */
 export const MY_PHONE_STATUS = gql`
   query MyPhoneStatus {
