@@ -691,6 +691,7 @@ export const ADMIN_USER_LIST = gql`
       items {
         id
         email
+        phone
         displayName
         role
         isActive

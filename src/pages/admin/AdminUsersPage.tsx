@@ -19,20 +19,23 @@ import DataTableSkeleton from '../../components/ui/DataTableSkeleton';
 import FilterTabs, { type FilterTabItem } from '../../components/ui/FilterTabs';
 import SearchInput from '../../components/ui/SearchInput';
 import Pagination from '../../components/ui/Pagination';
+import { accountContact } from '../../lib/phone';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 type RoleFilterKey = 'all' | 'super_admin' | 'admin' | 'caregiver' | 'patient';
 type ActionType = 'none' | 'user' | 'admin';
 
-/** ชื่อที่ใช้เรียกผู้ใช้ในหน้านี้ — บัญชีที่สมัครด้วยเบอร์โทรไม่มีอีเมล (PYG-604) */
-function userLabel(user: { displayName?: string; email: string | null }): string {
-  return user.displayName || user.email || 'ผู้ใช้ที่ไม่มีอีเมล';
+/** ชื่อที่ใช้เรียกผู้ใช้ในหน้านี้ — บัญชีที่สมัครด้วยเบอร์โทรไม่มีอีเมล ใช้เบอร์แทน ไม่มีทั้งคู่ = "—" (PYG-604) */
+function userLabel(user: { displayName?: string; email: string | null; phone?: string | null }): string {
+  return user.displayName || accountContact(user);
 }
 
 interface UserSummary {
   id: string;
   email: string | null;
+  /** PYG-603: เบอร์ในโปรไฟล์ — ใช้แทนอีเมลของบัญชีที่สมัครด้วยเบอร์ */
+  phone?: string | null;
   displayName?: string;
   role: number;
   isActive: boolean;
@@ -1052,9 +1055,10 @@ export default function AdminUsersPage() {
     },
     {
       key: 'email',
-      header: 'อีเมล',
+      header: 'อีเมล / เบอร์โทร',
       className: 'truncate text-sm text-gray-500',
-      render: (item) => item.email,
+      // บัญชีที่สมัครด้วยเบอร์ไม่มีอีเมล → แสดงเบอร์ · ไม่มีทั้งคู่ → "—" (PYG-604)
+      render: (item) => accountContact(item),
     },
     {
       key: 'role',
@@ -1169,9 +1173,10 @@ export default function AdminUsersPage() {
     },
     {
       key: 'email',
-      header: 'อีเมล',
+      header: 'อีเมล / เบอร์โทร',
       className: 'truncate text-sm text-gray-500',
-      render: (item) => item.email,
+      // บัญชีที่สมัครด้วยเบอร์ไม่มีอีเมล → แสดงเบอร์ · ไม่มีทั้งคู่ → "—" (PYG-604)
+      render: (item) => accountContact(item),
     },
     {
       key: 'role',
@@ -1306,8 +1311,8 @@ export default function AdminUsersPage() {
                 setSearch(value);
                 setPage(1);
               }}
-              placeholder="ค้นหาชื่อ, อีเมล..."
-              ariaLabel="ค้นหาชื่อหรืออีเมล"
+              placeholder="ค้นหาชื่อ, อีเมล, เบอร์โทร..."
+              ariaLabel="ค้นหาชื่อ อีเมล หรือเบอร์โทร"
               className="xl:max-w-102.75"
             />
 
