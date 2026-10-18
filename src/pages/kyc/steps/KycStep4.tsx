@@ -14,7 +14,6 @@ import { useEffect } from 'react';
 import KycStepper from '../KycStepper';
 import { skillLabel } from '../../../lib/skillLabels';
 import { isKycProfessionError, professionErrorMessage } from '../../../lib/professions';
-import { setMockExtras } from '../../../mocks/caregiverExtrasMock';
 import ProfessionBadge from '../../../components/ui/ProfessionBadge';
 import { LICENSE_DOC_TYPE, LICENSE_KYC_ENABLED, licenseErrorCodes, requiresLicense } from '../../../lib/license';
 import { formatLicenseDate, useLicenseStrings } from '../../../lib/licenseStrings';
@@ -133,12 +132,8 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
         documentIds: submitDocs.map((doc) => doc.docId),
         // PYG-556: บังคับ — ไม่ส่ง/ค่าผิด BE ตอบ PROFESSION_REQUIRED / PROFESSION_INVALID (contract PYG-573 §3.2)
         profession: step1Data.profession,
-      };
-
-      // MOCK: customSkills — KycInput ยังไม่มี field นี้ (ส่งไปจะถูกปฏิเสธทั้ง mutation) เก็บในเบราว์เซอร์หลังส่งสำเร็จแทน
-      const saveMock = (caregiverId: string | undefined) => {
-        if (!caregiverId) return;
-        setMockExtras(caregiverId, { customSkills: step1Data.customSkills });
+        // PYG-659: ทักษะอื่นๆ (BE ชื่อ otherSkills) — ส่งเสมอ ส่ง [] = ไม่มี / ล้างของเดิมตอนยื่นซ้ำ
+        otherSkills: step1Data.customSkills ?? [],
       };
 
       // PYG-266: ส่ง payoutAccount เฉพาะตอนที่ผู้ใช้กรอก/แก้ไขจริง (ไม่แตะ = ไม่ส่ง)
@@ -148,10 +143,9 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
       }
 
       if (mode === 'resubmit') {
-        const res = await resubmitKyc({
+        await resubmitKyc({
           variables: { input: kycInput },
         });
-        saveMock((res.data as { resubmitKyc?: { id: string } } | undefined)?.resubmitKyc?.id);
 
         // Delete old docs from storage + DB (permanent cleanup on submit)
         if (pendingDeleteDocs.length > 0) {
@@ -169,10 +163,9 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
 
         navigate('/kyc/status');
       } else {
-        const res = await submitKyc({
+        await submitKyc({
           variables: { input: kycInput },
         });
-        saveMock((res.data as { submitKyc?: { id: string } } | undefined)?.submitKyc?.id);
         navigate('/kyc/success');
       }
     } catch (err) {

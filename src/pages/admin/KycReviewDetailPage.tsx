@@ -17,7 +17,6 @@ import ConfirmModal from '../../components/ui/ConfirmModal';
 import { getBankLabel } from '../../features/kyc/omiseBanks';
 import { skillLabel } from '../../lib/skillLabels';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
-import { resolveCustomSkills, useMockState } from '../../mocks/caregiverExtrasMock';
 
 type KycStatus = 'pending' | 'verified' | 'rejected' | 'none' | string;
 
@@ -429,8 +428,8 @@ export default function KycReviewDetailPage() {
 
   const caregiver = data?.adminKycDetail.caregiver;
   const caregiverProfession = caregiver?.profession ?? data?.adminKycDetail.profession ?? null;
-  // customSkills: ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock
-  const caregiverCustomSkills = resolveCustomSkills(useMockState(), caregiver?.id, caregiver?.customSkills);
+  // PYG-659: ทักษะอื่นๆ จาก BE (otherSkills — alias เป็น customSkills ใน query)
+  const caregiverCustomSkills = caregiver?.customSkills ?? [];
   const documents = data?.adminKycDetail.documents ?? [];
   const reviews = data?.adminKycDetail.reviews ?? [];
   const editHistory = data?.adminKycDetail.editHistory ?? [];
