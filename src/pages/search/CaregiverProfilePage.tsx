@@ -27,7 +27,6 @@ import { formatDisplayPrice, hasDisplayPrice, NO_PRICE_LABEL } from '../../lib/d
 import { skillLabel } from '../../lib/skillLabels';
 import { PROFESSIONS, isProfession } from '../../lib/professions';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
-import { resolveCustomSkills, useMockState } from '../../mocks/caregiverExtrasMock';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -286,7 +285,7 @@ const CaregiverProfilePage: React.FC = () => {
   const [publicAvatarUrl, setPublicAvatarUrl] = useState<string | null | undefined>(undefined);
   // ราคาจาก BE (/public → hourly_rate, ราคา catalog) — undefined = ยังโหลดไม่เสร็จ ใช้ค่าจาก location.state ไปก่อน
   const [publicHourlyRate, setPublicHourlyRate] = useState<number | null | undefined>(undefined);
-  // PYG-556: วิชาชีพจาก /public (PYG-575) · ทักษะอื่นๆ BE ยังไม่ส่ง — ไม่มี key = ใช้ค่าจาก state (หน้า List)
+  // PYG-556: วิชาชีพจาก /public (PYG-575) · PYG-659: ทักษะอื่นๆ จาก /public → other_skills
   const [publicProfession, setPublicProfession] = useState<string | null | undefined>(undefined);
   const [publicCustomSkills, setPublicCustomSkills] = useState<string[] | null>(null);
   const [publicReloadKey, setPublicReloadKey] = useState(0);
@@ -298,13 +297,13 @@ const CaregiverProfilePage: React.FC = () => {
     const apiBase = import.meta.env.VITE_GRAPHQL_URL?.replace('/graphql', '') ?? '';
     fetch(`${apiBase}/api/v1/caregivers/${caregiverId}/public`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { availability?: { day: number; slots: string[] }[]; completed_booking_count?: number; avatar_url?: string | null; hourly_rate?: number | null; profession?: string | null; custom_skills?: string[] | null } | null) => {
+      .then((data: { availability?: { day: number; slots: string[] }[]; completed_booking_count?: number; avatar_url?: string | null; hourly_rate?: number | null; profession?: string | null; other_skills?: string[] | null } | null) => {
         if (data?.availability) setAvail(buildAvailMatrix(data.availability));
         if (data && data.hourly_rate !== undefined) setPublicHourlyRate(data.hourly_rate);
         if (data?.completed_booking_count !== undefined) setCompletedBookingCount(data.completed_booking_count);
         if (data && data.avatar_url !== undefined) setPublicAvatarUrl(data.avatar_url);
         if (data && data.profession !== undefined) setPublicProfession(data.profession);
-        if (Array.isArray(data?.custom_skills)) setPublicCustomSkills(data.custom_skills);
+        if (Array.isArray(data?.other_skills)) setPublicCustomSkills(data.other_skills);
       })
       .catch(() => undefined);
   }, [caregiverId, publicReloadKey]);
@@ -333,8 +332,7 @@ const CaregiverProfilePage: React.FC = () => {
 
   const translatedSkills = skills.map((s) => skillLabel(s));
   const profession = publicProfession !== undefined ? publicProfession : (cg?.profession ?? null);
-  // customSkills: ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock
-  const customSkills = resolveCustomSkills(useMockState(), caregiverId ?? cg?.id, publicCustomSkills);
+  const customSkills = publicCustomSkills ?? [];
 
   const handleConfirmBooking = async () => {
     if (!cg || !bookingDraft) return;

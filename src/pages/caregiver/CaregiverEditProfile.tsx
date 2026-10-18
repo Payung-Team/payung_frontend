@@ -18,7 +18,6 @@ import ThaiAddressSelector from '../../components/ui/ThaiAddressSelector';
 import AlertModal from '../../components/ui/AlertModal';
 import ProfilePhotoUploadCard from '../../components/caregiver/ProfilePhotoUploadCard';
 import { MAX_CUSTOM_SKILLS, skillLabel } from '../../lib/skillLabels';
-import { resolveCustomSkills, setMockExtras, useMockState } from '../../mocks/caregiverExtrasMock';
 import CareSkillPicker from '../../features/kyc/CareSkillPicker';
 import CustomSkillsInput from '../../features/kyc/CustomSkillsInput';
 import ProfessionChangeCard from '../../features/kyc/ProfessionChangeCard';
@@ -127,8 +126,8 @@ const CaregiverEditProfile: React.FC = () => {
   const user = userData?.me;
   const caregiver = caregiverData?.myCaregiverProfile;
   const profession = caregiver?.profession ?? null;
-  // customSkills: ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock
-  const savedCustomSkills = resolveCustomSkills(useMockState(), caregiver?.id, caregiver?.customSkills);
+  // PYG-659: ทักษะอื่นๆ จาก BE (otherSkills — alias เป็น customSkills ใน query)
+  const savedCustomSkills = caregiver?.customSkills ?? [];
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
   const isLoading = userLoading || caregiverLoading;
 
@@ -217,16 +216,14 @@ const CaregiverEditProfile: React.FC = () => {
       const addressParts = [data.address, data.district, data.amphoe, data.province, data.postalCode].filter(Boolean);
       if (addressParts.length > 0) input.address = addressParts.join(' ');
       if (data.skills && data.skills.length > 0) input.skills = data.skills;
-      // TODO(customSkills · contract PYG-573 §9 ข้อ 2): BE รับ customSkills แล้วให้ส่ง (ได้แม้เป็น [] เพื่อลบทั้งหมด) และลบ setMockExtras ด้านล่าง
-      //   input.customSkills = customSkills;
-      const customSkills = data.customSkills ?? [];
+      // PYG-659: ส่งทักษะอื่นๆ เสมอ (BE ชื่อ otherSkills) — ส่ง [] = ลบทั้งหมด · ไม่ส่ง = BE คงค่าเดิม
+      input.otherSkills = data.customSkills ?? [];
 
       const result = await updateCaregiverProfile({
         variables: { input },
       });
 
       if (result.data?.updateCaregiverProfile) {
-        if (caregiver?.id) setMockExtras(caregiver.id, { customSkills }); // MOCK
         setToastMessage({ type: 'success', message: 'บันทึกข้อมูลสำเร็จ' });
         setIsDirty(false);
         // อัปเดต cache ทันที เพื่อให้หน้าอื่นเห็นข้อมูลใหม่

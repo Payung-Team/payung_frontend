@@ -8,7 +8,6 @@ import KycStep2 from '../steps/KycStep2';
 import KycStep3 from '../steps/KycStep3';
 import KycStep4 from '../steps/KycStep4';
 import KycRejectionList from '../../../components/ui/KycRejectionList';
-import { getMockState, resolveCustomSkills } from '../../../mocks/caregiverExtrasMock';
 import { licenseDraftFromKycStatus } from '../../../features/kyc/licenseDraft';
 import { LICENSE_KYC_ENABLED } from '../../../lib/license';
 import { isProfession } from '../../../lib/professions';
@@ -51,7 +50,7 @@ export default function KycResubmitPage() {
             // ค่าจาก BE (PYG-575) · ค่าที่ FE ไม่รู้จัก = ช่องว่าง ให้เลือกใหม่ (ไม่เดาให้)
             profession: isProfession(caregiver.profession ?? kyc.profession) ? (caregiver.profession ?? kyc.profession) : '',
             skills: caregiver.skills || [],
-            customSkills: resolveCustomSkills(getMockState(), caregiver.id, caregiver.customSkills),
+            customSkills: caregiver.customSkills ?? [],
             experienceYears: caregiver.experienceYears || 0,
             bio: caregiver.bio || '',
           },

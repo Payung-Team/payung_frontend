@@ -3,11 +3,12 @@ import { LICENSE_DOCUMENT_FIELDS, LICENSE_INFO_FIELD } from "./license";
 
 /**
  * PYG-556: `profession` มาจาก BE แล้ว (PYG-575 · contract PYG-573 §3.1)
- * `customSkills` BE ยังไม่มีคอลัมน์ (contract §9 ข้อ 2) — ว่างไว้ หน้าจอใช้ src/mocks/caregiverExtrasMock.ts แทน
- * ⚠ อย่าเปิด CUSTOM_SKILLS_FIELD ก่อน BE พร้อม — GraphQL ปฏิเสธทั้ง operation ถ้ามี field ที่ schema ไม่รู้จัก
+ * PYG-659: ทักษะอื่นๆ มาจาก BE แล้ว (PYG-652) — BE ชื่อ `otherSkills` ส่วนฝั่ง FE ใช้ชื่อ `customSkills`
+ *   ทั้งฟอร์มและหน้าแสดงผล จึงใช้ alias ให้ข้อมูลที่ได้กลับมาเป็น `customSkills` ตรงกับโค้ดที่อ่าน
+ *   ตอนบันทึกต้องส่งชื่อของ BE: `otherSkills` (KycInput / UpdateCaregiverInput)
  */
 const PROFESSION_FIELD = "profession";
-const CUSTOM_SKILLS_FIELD = "";
+const CUSTOM_SKILLS_FIELD = "customSkills: otherSkills";
 
 export const LOGIN_USER = gql`
   mutation Login($email: String!, $password: String!) {
