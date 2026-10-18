@@ -10,6 +10,12 @@ import KycStepper from '../KycStepper';
 import { MAX_CUSTOM_SKILLS, isCareSkill, isSelectableSkill, splitSkillsForProfession } from '../../../lib/skillLabels';
 import { isProfession } from '../../../lib/professions';
 import ProfessionPicker from '../../../features/kyc/ProfessionPicker';
+import ConfirmModal from '../../../components/ui/ConfirmModal';
+import { hasLicenseInput } from '../../../features/kyc/licenseDraftState';
+import { useLicenseDraftActions } from '../../../features/kyc/licenseDraft';
+import { LICENSE_KYC_ENABLED, requiresLicense } from '../../../lib/license';
+import { formatLicenseDate, useLicenseStrings } from '../../../lib/licenseStrings';
+import { PROFESSIONS } from '../../../lib/professions';
 import CareSkillPicker from '../../../features/kyc/CareSkillPicker';
 import CustomSkillsInput from '../../../features/kyc/CustomSkillsInput';
 
@@ -88,7 +94,12 @@ const GENDER_OPTIONS = [
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
-  const { goToStep, step1Data, saveStep1, initialStep1Data } = useKyc();
+  const { goToStep, step1Data, saveStep1, initialStep1Data, licenseDraft } = useKyc();
+  const ls = useLicenseStrings();
+  const { discard: discardLicense } = useLicenseDraftActions();
+  /** PYG-588 E1/E2: วิชาชีพที่รอยืนยันเพราะจะทำให้ข้อมูลใบประกอบฯ ที่กรอกไว้ถูกลบ */
+  const [pendingProfession, setPendingProfession] = useState<string | null>(null);
+  const [discarding, setDiscarding] = useState(false);
   const navigate = useNavigate();
 
   const checkEdited = (fieldName: keyof Step1Form) => {
@@ -162,6 +173,26 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
   const [droppedSkills, setDroppedSkills] = useState<string[]>([]);
 
   function changeProfession(next: string) {
+    // PYG-588 E1/E2: ถาม "ก่อน" เปลี่ยน เมื่อกรอกใบประกอบฯ ไว้แล้ว · ยังไม่ได้กรอกอะไร = เปลี่ยนทันที
+    if (LICENSE_KYC_ENABLED && next !== profession && requiresLicense(profession) && hasLicenseInput(licenseDraft)) {
+      setPendingProfession(next);
+      return;
+    }
+    applyProfession(next);
+  }
+
+  async function confirmProfessionChange() {
+    if (!pendingProfession) return;
+    const next = pendingProfession;
+    setDiscarding(true);
+    // E2 (พยาบาล ↔ นักกายภาพฯ): ขั้น 2 แจ้งว่าต้องแนบใบของวิชาชีพใหม่
+    await discardLicense({ clearedForProfession: requiresLicense(next) && isProfession(next) ? next : null });
+    setDiscarding(false);
+    setPendingProfession(null);
+    applyProfession(next);
+  }
+
+  function applyProfession(next: string) {
     setValue('profession', next, { shouldValidate: true });
     const { kept, dropped } = splitSkillsForProfession(selectedSkills, next);
     if (dropped.length > 0) setValue('skills', kept, { shouldValidate: errors.skills != null });
@@ -429,6 +460,36 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
           </div>
         </form>
       </div>
+
+      {/* PYG-588 E1 / E2 — เปลี่ยนวิชาชีพหลังกรอกใบประกอบฯ แล้ว */}
+      <ConfirmModal
+        isOpen={pendingProfession !== null}
+        isLoading={discarding}
+        iconName={pendingProfession && requiresLicense(pendingProfession) ? 'swap_horiz' : 'delete_sweep'}
+        title={
+          pendingProfession && isProfession(pendingProfession) && requiresLicense(pendingProfession)
+            ? ls.e2Title(PROFESSIONS[pendingProfession].label)
+            : ls.e1Title
+        }
+        description={
+          pendingProfession && isProfession(pendingProfession) && requiresLicense(pendingProfession) && isProfession(profession) ? (
+            ls.e2Body(PROFESSIONS[profession].licenseName ?? ls.sectionTitle, PROFESSIONS[pendingProfession].licenseName ?? ls.sectionTitle)
+          ) : (
+            <>
+              {ls.e1Body}
+              <ul className="mt-2 list-disc space-y-0.5 pl-5 text-left">
+                {licenseDraft.licenseNumber.trim() && <li>{ls.draftNumber(licenseDraft.licenseNumber.trim())}</li>}
+                {licenseDraft.file && <li>{ls.draftFile(licenseDraft.file.fileName)}</li>}
+                {licenseDraft.expiresAt && <li>{ls.draftExpiry(formatLicenseDate(licenseDraft.expiresAt))}</li>}
+              </ul>
+            </>
+          )
+        }
+        cancelText={ls.cancel}
+        confirmText={pendingProfession && requiresLicense(pendingProfession) ? ls.e2Confirm : ls.e1Confirm}
+        onClose={() => setPendingProfession(null)}
+        onConfirm={() => void confirmProfessionChange()}
+      />
     </div>
   );
 }

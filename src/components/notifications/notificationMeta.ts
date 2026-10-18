@@ -28,7 +28,11 @@ export type NotificationType =
   | 'dispute_created'
   | 'dispute_resolved'
   | 'profile_photo_approved'
-  | 'profile_photo_rejected';
+  | 'profile_photo_rejected'
+  // PYG-588: ผลตรวจ / หมดอายุของใบประกอบวิชาชีพ (BE PYG-587)
+  | 'license_approved'
+  | 'license_rejected'
+  | 'license_expired';
 
 export interface NotificationItem {
   id: string;
@@ -144,6 +148,14 @@ export function notificationIcon(type: NotificationType): IconStyle {
     case 'profile_photo_rejected':
       return { icon: 'no_photography', ...DANGER };
 
+    // ใบประกอบวิชาชีพ (PYG-588)
+    case 'license_approved':
+      return { icon: 'verified', ...SUCCESS };
+    case 'license_rejected':
+      return { icon: 'cancel', ...DANGER };
+    case 'license_expired':
+      return { icon: 'event_busy', ...WARNING };
+
     default:
       return { icon: 'notifications', ...INFO };
   }
@@ -174,7 +186,8 @@ export function resolveDeepLink(item: NotificationItem): string {
     }
   }
 
-  if (item.type.startsWith('kyc_')) {
+  // ใบประกอบฯ อยู่ในหน้าสถานะ KYC (PYG-588)
+  if (item.type.startsWith('kyc_') || item.type.startsWith('license_')) {
     return '/kyc/status';
   }
 

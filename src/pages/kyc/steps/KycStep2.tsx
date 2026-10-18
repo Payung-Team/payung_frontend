@@ -8,6 +8,16 @@ import AlertModal from '../../../components/ui/AlertModal';
 import ImageModal from '../../../components/ui/ImageModal';
 import Icon from '../../../components/ui/Icon';
 import KycStepper from '../KycStepper';
+import LicenseSection from '../../../features/kyc/LicenseSection';
+import {
+  isDraftRegistered,
+  useLicenseDraftActions,
+  validateLicenseDraft,
+  type LicenseFieldErrors,
+} from '../../../features/kyc/licenseDraft';
+import { LICENSE_KYC_ENABLED, requiresLicense } from '../../../lib/license';
+import { useLicenseStrings } from '../../../lib/licenseStrings';
+import { isProfession } from '../../../lib/professions';
 
 // ── Document type config ──────────────────────────────────────────────────
 const DOC_TYPES = [
@@ -40,6 +50,12 @@ const DOC_TYPES = [
   },
 ];
 
+/** PYG-588: เมื่อเปิดใบประกอบฯ ช่องเดิม "ใบประกอบวิชาชีพ (ถ้ามี)" กลายเป็นใบรับรองการอบรม (ไม่บังคับ) ตามดีไซน์ PYG-584 */
+function docTitle(doc: (typeof DOC_TYPES)[number], ls: ReturnType<typeof useLicenseStrings>) {
+  if (LICENSE_KYC_ENABLED && doc.type === 'certificate') return { title: ls.certificateTitle, desc: ls.certificateHint };
+  return { title: doc.title, desc: doc.desc };
+}
+
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
@@ -58,8 +74,20 @@ function UploadIcon() {
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
-  const { goToStep, saveDoc, removeDoc, uploadedDocs, initialDocs, addPendingDeleteDoc } = useKyc();
+  const { goToStep, saveDoc, removeDoc, uploadedDocs, initialDocs, addPendingDeleteDoc, step1Data, licenseDraft } = useKyc();
   const { user } = useAuth();
+  const ls = useLicenseStrings();
+
+  // ── PYG-588: ใบประกอบวิชาชีพ — เฉพาะพยาบาล / นักกายภาพฯ ──────────────────
+  const profession = step1Data?.profession ?? '';
+  const needsLicense = LICENSE_KYC_ENABLED && requiresLicense(profession);
+  const { register: registerLicense } = useLicenseDraftActions();
+  const [licenseShowAll, setLicenseShowAll] = useState(false);
+  const [licenseServerErrors, setLicenseServerErrors] = useState<LicenseFieldErrors>({});
+  const [licenseMessage, setLicenseMessage] = useState('');
+  const [licenseBusy, setLicenseBusy] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const licenseMissing = needsLicense ? Object.keys(validateLicenseDraft(licenseDraft, ls)).length : 0;
   
   const [docStates, setDocStates] = useState<Record<string, DocState>>(() => {
     const initial: Record<string, DocState> = {};
@@ -352,7 +380,35 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
   const canProceed = displayedDocTypes.every((t) => {
     const state = docStates[t.type];
     return t.required ? state.status === 'success' : true;
-  });
+  }) && !licenseBusy && !registering;
+
+  // "ถัดไป": ใบประกอบฯ ต้องครบ 3 ช่อง (R1) และ register กับ API ก่อนไปขั้นถัดไป
+  async function handleNext() {
+    if (!needsLicense) {
+      goToStep(3);
+      return;
+    }
+    setLicenseMessage('');
+    if (licenseMissing > 0) {
+      setLicenseShowAll(true);
+      document.getElementById('kyc-license-title')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (isDraftRegistered(licenseDraft)) {
+      goToStep(3);
+      return;
+    }
+    setRegistering(true);
+    const result = await registerLicense(licenseDraft, ls);
+    setRegistering(false);
+    if (result.ok) {
+      goToStep(3);
+      return;
+    }
+    setLicenseShowAll(true);
+    setLicenseServerErrors(result.fieldErrors);
+    setLicenseMessage(result.message ?? '');
+  }
 
   return (
     <div className={mode === 'resubmit' ? '' : 'min-h-[calc(100vh-64px)] bg-[#F2F4F6] flex items-center justify-center px-4 py-10'}>
@@ -383,7 +439,10 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
 
         {/* Document Upload Zones */}
         <div className={mode === 'resubmit' ? 'flex flex-col gap-[12px] w-full mb-8' : 'flex flex-col gap-3 mb-8'}>
-          {displayedDocTypes.map((doc) => {
+          {displayedDocTypes.map((doc, index) => {
+            const { title, desc } = docTitle(doc, ls);
+            // PYG-588: ส่วนใบประกอบฯ อยู่ต่อจากเอกสารบังคับ ก่อนเอกสารเพิ่มเติม
+            const firstOptional = !doc.required && displayedDocTypes.findIndex((d) => !d.required) === index;
             const state = docStates[doc.type];
             const isSuccess = state.status === 'success';
             const isUploading = state.status === 'uploading';
@@ -421,6 +480,22 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
 
             return (
               <div key={doc.type}>
+                {firstOptional && needsLicense && isProfession(profession) && (
+                  <div className="mb-3">
+                    <LicenseSection
+                      profession={profession}
+                      showAllErrors={licenseShowAll}
+                      serverErrors={licenseServerErrors}
+                      onEdited={() => { setLicenseServerErrors({}); setLicenseMessage(''); }}
+                      onBusyChange={setLicenseBusy}
+                    />
+                  </div>
+                )}
+                {firstOptional && LICENSE_KYC_ENABLED && (
+                  <p className="mb-2 mt-1 text-[13px] font-semibold text-[#64748B]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                    {ls.extraDocsTitle}
+                  </p>
+                )}
                 <div
                   className={`flex items-center gap-4 px-5 py-4 rounded-[20px] transition-all ${containerClass}`}
                   style={{ height: '72px' }}
@@ -446,7 +521,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                       }`}
                       style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                     >
-                      {doc.title}
+                      {title}
                     </p>
                     <p
                       className={`text-[13px] leading-[16px] truncate ${
@@ -462,7 +537,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                         ? 'กำลังอัปโหลด...'
                         : isError
                         ? state.error
-                        : doc.desc}
+                        : desc}
                     </p>
                   </div>
 
@@ -549,7 +624,24 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
               </div>
             );
           })}
+          {needsLicense && isProfession(profession) && !displayedDocTypes.some((d) => !d.required) && (
+            <LicenseSection
+              profession={profession}
+              showAllErrors={licenseShowAll}
+              serverErrors={licenseServerErrors}
+              onEdited={() => { setLicenseServerErrors({}); setLicenseMessage(''); }}
+              onBusyChange={setLicenseBusy}
+            />
+          )}
         </div>
+
+        {/* PYG-588: กด "ถัดไป" แล้วใบประกอบฯ ยังไม่ครบ / API ไม่รับ */}
+        {needsLicense && licenseShowAll && (licenseMissing > 0 || licenseMessage) && (
+          <p role="alert" className="-mt-4 flex items-start gap-2 rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-[14px] text-[#B91C1C]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+            <Icon name="error" color="currentColor" style={{ fontSize: 18 }} />
+            {licenseMessage || ls.blockedNext(licenseMissing)}
+          </p>
+        )}
 
         {/* Warning Info */}
         {mode === 'resubmit' && (
@@ -576,7 +668,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
           <button
             type="button"
             disabled={!canProceed}
-            onClick={() => goToStep(3)}
+            onClick={() => void handleNext()}
             className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-150 ${
               canProceed
                 ? 'bg-[#2D6A58] text-white hover:bg-[#255a4a] active:scale-[0.98] cursor-pointer'
@@ -587,7 +679,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
               boxShadow: canProceed ? '0px 4px 10px -2px rgba(15, 118, 110, 0.24)' : 'none'
             }}
           >
-            ถัดไป →
+            {registering ? ls.savingLicense : 'ถัดไป →'}
           </button>
         </div>
 

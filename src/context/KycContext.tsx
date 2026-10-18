@@ -1,4 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
+import type { LicenseStatus } from '../lib/license';
+import type { Profession } from '../lib/professions';
+import { EMPTY_LICENSE_DRAFT } from '../features/kyc/licenseDraftState';
 
 export interface KycStep1Data {
   firstName: string;
@@ -42,6 +45,39 @@ export interface InitialPayoutSummary {
   accountNumberLast4: string;
 }
 
+/** ไฟล์ใบประกอบฯ ที่ขึ้น storage แล้ว — ยังไม่ผูกกับเลข/วันหมดอายุจนกว่าจะ register */
+export interface LicenseFileUpload {
+  /** path ใน bucket kyc-documents */
+  storagePath: string;
+  /** ค่าที่ส่งเป็น fileUrl ของ uploadKycDocument (แบบเดียวกับเอกสารอื่นใน KycStep2) */
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  previewUrl: string;
+}
+
+/**
+ * ใบประกอบวิชาชีพที่กำลังกรอก (PYG-588) — อยู่ใน memory เท่านั้น ห้ามเก็บลง storage ของ browser
+ *
+ * BE รับเลข + วันหมดอายุมากับ uploadKycDocument ในครั้งเดียว (PYG-587) จึงแยก 2 ขั้น:
+ *   1) เลือกไฟล์ → ขึ้น storage (`file`)
+ *   2) กด "ถัดไป" ที่ขั้น 2 → uploadKycDocument พร้อมเลข/วันหมดอายุ (`registered`)
+ * แก้เลขหรือวันหมดอายุหลัง register = register ใหม่ด้วยไฟล์เดิม
+ */
+export interface LicenseDraft {
+  licenseNumber: string;
+  /** 'YYYY-MM-DD' ตามปฏิทินไทย */
+  expiresAt: string;
+  file: LicenseFileUpload | null;
+  /** ค่าที่ register กับ API ล่าสุด — null = ยังไม่ register */
+  registered: { docId: string; licenseNumber: string; expiresAt: string; fileUrl: string } | null;
+  /** ใบจากการยื่นครั้งก่อน (แก้ KYC ที่ถูกปฏิเสธ) — แสดงเหตุผลถ้าใบเดิมไม่ผ่าน/หมดอายุ */
+  previous?: { docId: string; status: LicenseStatus; rejectionReason: string | null } | null;
+  /** E2: ล้างข้อมูลเพราะเปลี่ยนวิชาชีพ — ขั้น 2 แจ้งผู้ใช้ว่าต้องแนบใบของวิชาชีพนี้ */
+  clearedForProfession?: Profession | null;
+}
+
 interface KycContextType {
   step: number; // 0 = intro, 1 = step1, 2 = step2 (docs), 3 = step3 (payout), 4 = step4 (review)
   step1Data: KycStep1Data | null;
@@ -51,6 +87,9 @@ interface KycContextType {
   initialDocs: UploadedDoc[];
   initialPayoutData: InitialPayoutSummary | null;
   pendingDeleteDocs: UploadedDoc[];
+  /** PYG-588 */
+  licenseDraft: LicenseDraft;
+  saveLicenseDraft: (draft: LicenseDraft) => void;
   goToStep: (step: number) => void;
   saveStep1: (data: KycStep1Data) => void;
   savePayout: (data: PayoutData | null) => void;
@@ -62,6 +101,7 @@ interface KycContextType {
     step1: KycStep1Data;
     docs: UploadedDoc[];
     payout?: InitialPayoutSummary | null;
+    license?: LicenseDraft | null;
   }) => void;
 }
 
@@ -76,6 +116,7 @@ export function KycProvider({ children }: { children: ReactNode }) {
   const [initialDocs, setInitialDocs] = useState<UploadedDoc[]>([]);
   const [initialPayoutData, setInitialPayoutData] = useState<InitialPayoutSummary | null>(null);
   const [pendingDeleteDocs, setPendingDeleteDocs] = useState<UploadedDoc[]>([]);
+  const [licenseDraft, setLicenseDraft] = useState<LicenseDraft>(EMPTY_LICENSE_DRAFT);
 
   function saveDoc(doc: UploadedDoc) {
     setUploadedDocs((prev) => {
@@ -100,6 +141,7 @@ export function KycProvider({ children }: { children: ReactNode }) {
     step1: KycStep1Data;
     docs: UploadedDoc[];
     payout?: InitialPayoutSummary | null;
+    license?: LicenseDraft | null;
   }) {
     setStep1Data(data.step1);
     setUploadedDocs(data.docs);
@@ -108,6 +150,7 @@ export function KycProvider({ children }: { children: ReactNode }) {
     setInitialPayoutData(data.payout ?? null);
     setPayoutData(null); // เลขบัญชีเข้ารหัสไว้ — ต้องกรอกใหม่เสมอถ้าจะแก้ (ดู key correctness note 5)
     setPendingDeleteDocs([]);
+    setLicenseDraft(data.license ?? EMPTY_LICENSE_DRAFT);
   }
 
   return (
@@ -120,6 +163,8 @@ export function KycProvider({ children }: { children: ReactNode }) {
       initialDocs,
       initialPayoutData,
       pendingDeleteDocs,
+      licenseDraft,
+      saveLicenseDraft: setLicenseDraft,
       goToStep: setStep,
       saveStep1: setStep1Data,
       savePayout: setPayoutData,

@@ -1,4 +1,5 @@
 import { gql } from "@apollo/client";
+import { LICENSE_DOCUMENT_FIELDS, LICENSE_INFO_FIELD } from "./license";
 
 /**
  * PYG-556: field ที่ BE ยังไม่มี (PYG-573 / PYG-575) — ตอนนี้เป็นค่าว่าง หน้าจอใช้ข้อมูลจาก src/mocks/ แทน
@@ -253,7 +254,9 @@ export const GET_KYC_STATUS = gql`
         fileName
         signedUrl
         mimeType
+        ${LICENSE_DOCUMENT_FIELDS}
       }
+      ${LICENSE_INFO_FIELD}
       payoutAccount {
         bankCode
         accountName
@@ -420,6 +423,7 @@ export const ADMIN_KYC_DETAIL = gql`
         hasOmiseRecipient
       }
       pendingProfilePhotoDocumentId
+      ${LICENSE_INFO_FIELD}
     }
   }
 `;
