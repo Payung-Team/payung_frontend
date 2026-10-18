@@ -19,14 +19,14 @@ import { skillLabel } from '../../lib/skillLabels';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
 import { resolveCustomSkills, useMockState } from '../../mocks/caregiverExtrasMock';
 import AdminCareLevelCard from '../../features/kyc/AdminCareLevelCard';
-import { useCareLevel, type CareLevelApiFields } from '../../features/kyc/useCareLevel';
+import { useAdminCareLevel } from '../../features/kyc/useCareLevel';
+import type { CaregiverCareLevelInfo } from '../../graphql/careLevel';
 import { useCareLevelStrings, type CareLevel } from '../../lib/careLevels';
 import { extractGraphQLErrorExtensions } from '../../lib/apolloErrors';
-import { useAuth } from '../../context/AuthContext';
 
 type KycStatus = 'pending' | 'verified' | 'rejected' | 'none' | string;
 
-interface CaregiverDetail extends CareLevelApiFields {
+interface CaregiverDetail {
   id: string;
   userId: string;
   caregiverNumber?: string | null;
@@ -101,6 +101,8 @@ interface AdminKycDetailResponse {
     /** PYG-588 (field จาก PYG-587 — ขอเฉพาะเมื่อเปิด VITE_LICENSE_KYC_ENABLED) */
     profession?: string | null;
     license?: LicenseInfo | null;
+    /** PYG-581: ระดับปัจจุบัน + ผู้กำหนด + เวลา */
+    careLevelInfo?: CaregiverCareLevelInfo | null;
   };
 }
 
@@ -443,14 +445,13 @@ export default function KycReviewDetailPage() {
   const payoutAccount = data?.adminKycDetail.payoutAccount ?? null;
   const isPending = caregiver?.kycStatus === 'pending';
 
-  // PYG-557 · S02: ระดับผู้ดูแล — ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock (features/kyc/useCareLevel)
-  const { user: authUser } = useAuth();
+  // PYG-557 · S02: ระดับผู้ดูแล (BE PYG-581) — ระดับปัจจุบันมากับ adminKycDetail.careLevelInfo
   const careLevelStrings = useCareLevelStrings();
-  const careLevel = useCareLevel(caregiver?.id, { kycStatus: caregiver?.kycStatus, api: caregiver });
+  const careLevel = useAdminCareLevel(caregiver?.id, data?.adminKycDetail.careLevelInfo, { kycStatus: caregiver?.kycStatus });
   const [pickedLevel, setPickedLevel] = useState<CareLevel | null>(null);
   const [careLevelError, setCareLevelError] = useState<string | undefined>();
   const careLevelPickerRef = useRef<HTMLDivElement>(null);
-  // ถูกส่งกลับเข้าตรวจแล้วมีระดับเดิมอยู่ (S02-E8 ยังไม่เคาะ) → เติมระดับเดิมให้ แอดมินเปลี่ยนได้
+  // ถูกส่งกลับเข้าตรวจแล้วมีระดับเดิมอยู่ (S02-E8) → เติมระดับเดิมให้ แอดมินเปลี่ยนได้ (BE ใช้ค่าที่ส่งมา)
   const levelToApprove = pickedLevel ?? (isPending ? careLevel.level : null);
 
   const pickLevel = (level: CareLevel) => {
@@ -495,10 +496,8 @@ export default function KycReviewDetailPage() {
     if (!caregiverId || !levelToApprove) return;
 
     try {
-      // TODO(PYG-582): ตาม contract PYG-579 — ส่ง careLevel ไปกับ APPROVE_KYC หรือเรียก SET_CAREGIVER_CARE_LEVEL ก่อนอนุมัติ
-      //   ตอนนี้ BE ยังไม่รับระดับ จึงอนุมัติก่อนแล้วบันทึกระดับลง mock
-      await approveKyc({ variables: { caregiverId } });
-      await careLevel.setLevel(levelToApprove);
+      // PYG-581: ระดับไปพร้อมคำสั่งอนุมัติ — ระดับ ประวัติ และ kyc_status อยู่ในทรานแซคชันเดียวฝั่ง BE
+      await approveKyc({ variables: { caregiverId, careLevel: levelToApprove } });
       setIsApproveOpen(false);
       setPickedLevel(null);
       toast.success(careLevelStrings.approvedToast(careLevelStrings.levelLabel[levelToApprove]));
@@ -728,7 +727,6 @@ export default function KycReviewDetailPage() {
                 caregiverName={caregiver.fullName}
                 kycStatus={caregiver.kycStatus}
                 data={careLevel}
-                currentAdminEmail={authUser?.email}
                 picked={levelToApprove}
                 onPick={pickLevel}
                 pickerError={careLevelError}
@@ -770,7 +768,7 @@ export default function KycReviewDetailPage() {
 
       <ConfirmModal
         isOpen={isApproveOpen}
-        isLoading={approving || careLevel.saving}
+        isLoading={approving}
         title="ยืนยันอนุมัติ KYC?"
         description={
           <>

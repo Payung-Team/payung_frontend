@@ -25,7 +25,6 @@ import ProfessionChangeCard from '../../features/kyc/ProfessionChangeCard';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
 import CareLevelBadge from '../../components/ui/CareLevelBadge';
 import CaregiverCareLevelSection from '../../features/kyc/CaregiverCareLevelSection';
-import { useCareLevel, type CareLevelApiFields } from '../../features/kyc/useCareLevel';
 
 function formatPhone(val?: string | null): string {
   if (!val) return '';
@@ -58,8 +57,10 @@ const CaregiverProfileSchema = z.object({
 
 type CaregiverProfileFormData = z.infer<typeof CaregiverProfileSchema>;
 
-interface CaregiverData extends CareLevelApiFields {
+interface CaregiverData {
   id: string;
+  /** PYG-581: BASIC | INTERMEDIATE | ADVANCED · null = ยังไม่มีระดับ */
+  careLevel?: string | null;
   caregiverNumber?: string;
   fullName?: string;
   idCardNumber?: string;
@@ -132,8 +133,6 @@ const CaregiverEditProfile: React.FC = () => {
   const profession = caregiver?.profession ?? null;
   // customSkills: ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock
   const savedCustomSkills = resolveCustomSkills(useMockState(), caregiver?.id, caregiver?.customSkills);
-  // PYG-557 · S02-AC5: ระดับของตัวเอง (อ่านอย่างเดียว)
-  const careLevel = useCareLevel(caregiver?.id, { kycStatus: caregiver?.kycStatus?.toLowerCase(), api: caregiver });
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
   const isLoading = userLoading || caregiverLoading;
 
@@ -493,7 +492,7 @@ const CaregiverEditProfile: React.FC = () => {
                 )}
 
                 {/* ระดับผู้ดูแล — แอดมินกำหนด ผู้ดูแลดูได้อย่างเดียว (PYG-557 · S02-AC5) */}
-                {caregiver?.id && <CaregiverCareLevelSection data={careLevel} />}
+                {caregiver?.id && <CaregiverCareLevelSection careLevel={caregiver.careLevel} />}
 
                 {/* ทักษะกลาง — ใช้จับคู่งาน · ทักษะเฉพาะขึ้นตามวิชาชีพที่อนุมัติแล้ว */}
                 <CareSkillPicker
@@ -565,10 +564,10 @@ const CaregiverEditProfile: React.FC = () => {
                         <h2 className="text-[20px] font-semibold text-[#0A0A0A]">{caregiver?.fullName || displayName}</h2>
                         <KycStatusBadge status={caregiver?.kycStatus} />
                       </div>
-                      {(profession || careLevel.level) && (
+                      {(profession || caregiver?.careLevel) && (
                         <div className="mb-2 flex flex-wrap items-center gap-2">
                           <ProfessionBadge profession={profession} />
-                          <CareLevelBadge level={careLevel.level} />
+                          <CareLevelBadge level={caregiver?.careLevel} />
                         </div>
                       )}
                       <div className="flex items-center gap-2 text-[14px] text-[#717182]">

@@ -10,6 +10,10 @@ import FilterTabs, { type FilterTabItem } from '../../components/ui/FilterTabs';
 import Pagination from '../../components/ui/Pagination';
 import SearchInput from '../../components/ui/SearchInput';
 import StatusBadge, { type StatusBadgeMeta } from '../../components/ui/StatusBadge';
+import CareLevelBadge from '../../components/ui/CareLevelBadge';
+import { CARE_LEVEL_STRINGS } from '../../lib/careLevels';
+
+const careLevelStrings = CARE_LEVEL_STRINGS.th;
 
 type KycStatusFilter = 'all' | 'pending' | 'verified' | 'rejected';
 
@@ -80,6 +84,10 @@ interface KycSummary {
   kycStatus: KycStatus;
   submittedAt?: string | null;
   documentCount: number;
+  /** PYG-581: null = ยังไม่มีระดับ */
+  careLevel?: string | null;
+  /** ค่าเริ่มต้นจาก migration ยังไม่ทบทวน (S02-E3) */
+  careLevelNeedsReview?: boolean;
 }
 
 interface AdminKycListResponse {
@@ -96,7 +104,10 @@ interface AdminKycListResponse {
 }
 
 const PAGE_SIZE = 20;
-const TABLE_GRID_COLUMNS = '130px minmax(180px, 1.4fr) 200px 130px 140px 120px 100px';
+// PYG-557: คอลัมน์ "ระดับ" อยู่ระหว่างสถานะกับจำนวนเอกสาร · 3 คอลัมน์ท้ายกว้างใกล้กันและจัดกลาง
+// ชื่อ / อีเมลยืดหดตามจอ (fr) ที่เหลือคงที่ — รวมขั้นต่ำ ~1,075px ให้ "การจัดการ" ไม่ตกขอบบนจอแอดมินทั่วไป
+// เลขประจำตัวคง 130px เท่าเดิม (CG-260926-0004 ต้องไม่ถูกตัด)
+const TABLE_GRID_COLUMNS = '130px minmax(150px, 1.3fr) minmax(140px, 1fr) 105px 120px 105px 85px 96px';
 const PHOTO_TABLE_GRID_COLUMNS = '130px minmax(180px, 1.4fr) 200px 150px 140px 140px 100px';
 const DECIDED_PHOTO_TABLE_GRID_COLUMNS = '130px minmax(160px, 1.1fr) 130px 170px 140px minmax(180px, 1.4fr) 100px';
 
@@ -197,6 +208,7 @@ function KycReviewTableSkeleton() {
         { width: 150, height: 16 },
         { width: 90, height: 16 },
         { width: 92, height: 24, borderRadius: 999 },
+        { width: 84, height: 24, borderRadius: 6 },
         { width: 60, height: 16 },
         { width: 78, height: 28, borderRadius: 6 },
       ]}
@@ -319,14 +331,35 @@ export default function KycReviewListPage() {
         render: (item) => renderKycStatusBadge(item.kycStatus),
       },
       {
+        // PYG-557 · S02-E3: แอดมินแยกได้ว่าใครยังได้ค่าเริ่มต้นจาก migration และยังไม่ทบทวน
+        key: 'careLevel',
+        header: careLevelStrings.listColumn,
+        align: 'center',
+        render: (item) =>
+          item.careLevel ? (
+            <span className="inline-flex flex-col items-center gap-0.5">
+              <CareLevelBadge level={item.careLevel} unreviewed={item.careLevelNeedsReview} />
+              {item.careLevelNeedsReview && (
+                <span className="text-[11px] font-semibold leading-4 text-[#92400E]">
+                  {careLevelStrings.unreviewedShort}
+                </span>
+              )}
+            </span>
+          ) : (
+            <span className="text-gray-400">—</span>
+          ),
+      },
+      {
         key: 'documentCount',
         header: 'จำนวนเอกสาร',
+        align: 'center',
         className: 'text-gray-600',
         render: (item) => `${item.documentCount} ไฟล์`,
       },
       {
         key: 'actions',
         header: 'การจัดการ',
+        align: 'center',
         render: (item) => (
           <button
             type="button"

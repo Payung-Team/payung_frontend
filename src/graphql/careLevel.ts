@@ -1,30 +1,23 @@
 import { gql } from "@apollo/client";
+import { CARE_LEVEL_INFO_FIELDS } from "./queries";
 
 /**
- * PYG-557 · S02 — กำหนด / แก้ / อ่านระดับผู้ดูแล
+ * PYG-557 · S02 — แก้ / อ่านระดับผู้ดูแลฝั่งแอดมิน (BE PYG-581 · contract PYG-579)
  *
- * ⚠ ข้อเสนอ contract ฝั่ง FE ตาม PYG-579 — BE ยังไม่มี operation เหล่านี้ (PYG-579 / PYG-581)
- *   ยังไม่ถูกเรียกใช้ ตอนนี้ useCareLevel เป็น mock · ถ้า BE ตั้งชื่อต่างจากนี้ แก้ที่ไฟล์นี้ที่เดียว
- *
- * enum CareLevel { BASIC INTERMEDIATE ADVANCED } — ใช้ร่วมกับระดับ booking (S16)
- * careLevelSetBy = null แปลว่าได้ค่าเริ่มต้นจาก migration ยังไม่ผ่านการทบทวน (R6 · E3)
- * กำหนดเป็นค่าเดิม: ตอบสำเร็จ ไม่เพิ่มประวัติ (E4)
- * Error code (422): CARE_LEVEL_REQUIRED (อนุมัติโดยยังไม่มีระดับ) · CARE_LEVEL_INVALID (ค่านอกรายการ)
- *
- * ยังไม่เคาะ (PYG-579): ส่งระดับพร้อม approveKyc หรือกำหนดด้วย setCaregiverCareLevel ก่อนอนุมัติ
- *   FE ตอนนี้: อนุมัติก่อนแล้วบันทึกระดับลง mock — เปลี่ยนจุดเดียวที่ useCareLevel.setLevel / KycReviewDetailPage.handleApprove
+ * ระดับแรกของผู้ดูแลใหม่ตั้งตอนอนุมัติ: APPROVE_KYC(careLevel) ใน queries.ts — ไม่ใช่ที่นี่
+ * setCaregiverCareLevel ใช้กับผู้ดูแลที่ KYC อนุมัติแล้วเท่านั้น
+ *   - ค่าเดิมที่แอดมินกำหนดไว้แล้ว → changed: false ไม่เพิ่มประวัติ (E4)
+ *   - ยืนยันค่าเริ่มต้นจาก migration (ค่าเดิม แต่ยังไม่มีผู้กำหนด) → นับเป็นการเปลี่ยน ต้องมีเหตุผล
+ *   - เปลี่ยนจริงต้องมีเหตุผล (มติ 2026-10-18)
+ * Error (extensions.code): CARE_LEVEL_REQUIRED · CARE_LEVEL_INVALID · CARE_LEVEL_REASON_REQUIRED · CARE_LEVEL_KYC_NOT_VERIFIED
  */
 
 export const SET_CAREGIVER_CARE_LEVEL = gql`
-  mutation SetCaregiverCareLevel($caregiverId: ID!, $level: CareLevel!, $reason: String) {
-    setCaregiverCareLevel(caregiverId: $caregiverId, level: $level, reason: $reason) {
-      id
-      careLevel
-      careLevelSetAt
-      careLevelSetBy {
-        id
-        displayName
-        email
+  mutation SetCaregiverCareLevel($input: SetCaregiverCareLevelInput!) {
+    setCaregiverCareLevel(input: $input) {
+      changed
+      careLevel {
+        ${CARE_LEVEL_INFO_FIELDS}
       }
     }
   }
@@ -37,29 +30,37 @@ export const CAREGIVER_CARE_LEVEL_HISTORY = gql`
       id
       oldLevel
       newLevel
+      changedBy
+      changedByName
       reason
+      source
       createdAt
-      changedBy {
-        id
-        displayName
-        email
-      }
     }
   }
 `;
 
-export interface CareLevelActor {
-  id: string;
-  displayName?: string | null;
-  email?: string | null;
+export interface CaregiverCareLevelInfo {
+  caregiverId: string;
+  /** null = ยังไม่มีระดับ */
+  level: string | null;
+  /** มีระดับแต่ยังไม่มีแอดมินทบทวน (ค่าเริ่มต้นจาก migration · E3 / AC6) */
+  needsReview: boolean;
+  setAt: string | null;
+  /** null = ระบบตั้งให้ (migration) */
+  setBy: string | null;
+  setByName: string | null;
 }
 
-export interface CareLevelHistoryEntry {
+export type CareLevelChangeSource = 'MIGRATION_DEFAULT' | 'KYC_APPROVAL' | 'ADMIN_UPDATE';
+
+export interface CareLevelChange {
   id: string;
+  /** null = กำหนดครั้งแรก */
   oldLevel: string | null;
   newLevel: string;
+  changedBy: string | null;
+  changedByName: string | null;
   reason: string | null;
-  createdAt: string | null;
-  /** null = ระบบ (ค่าเริ่มต้นจาก migration) */
-  changedBy: CareLevelActor | null;
+  source: CareLevelChangeSource;
+  createdAt: string;
 }

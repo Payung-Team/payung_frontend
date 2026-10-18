@@ -1,79 +1,83 @@
-import { useRef, useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useRef } from 'react';
+import { useMutation, useQuery } from '@apollo/client/react';
+import { ADMIN_KYC_DETAIL } from '../../graphql/queries';
+import {
+  CAREGIVER_CARE_LEVEL_HISTORY,
+  SET_CAREGIVER_CARE_LEVEL,
+  type CareLevelChange,
+  type CaregiverCareLevelInfo,
+} from '../../graphql/careLevel';
 import { toCareLevel, type CareLevel } from '../../lib/careLevels';
-import type { CareLevelActor, CareLevelHistoryEntry } from '../../graphql/careLevel';
-import { migrationDefault, mockDelay, saveMockCareLevel, useCareLevelMockState } from '../../mocks/careLevelMock';
 
 /**
- * ข้อมูลระดับผู้ดูแล (PYG-557 · S02) — หน้าจอ (KYC review / โปรไฟล์ผู้ดูแล) ใช้ผ่าน interface นี้เท่านั้น
+ * ระดับผู้ดูแลฝั่งแอดมิน (PYG-557 · S02 · BE PYG-581) — ใช้ในหน้า KYC review
  *
- * ตอนนี้เป็น MOCK — เก็บใน localStorage (mocks/careLevelMock.ts)
- * ค่าจริงจาก BE ถูกใช้ก่อน mock เสมอ: ส่ง careLevel ที่ query ได้มาใน `api` (ดู CARE_LEVEL_FIELDS ใน graphql/queries.ts)
- * TODO(PYG-582): เชื่อมแต่ละจุดกับ operation ใน graphql/careLevel.ts ตามที่ระบุไว้ข้างล่าง แล้วไม่ต้องแก้หน้าจอ
+ * ระดับปัจจุบันมากับ ADMIN_KYC_DETAIL (careLevelInfo) — hook นี้รับมาแสดง แล้วดึงประวัติ + แก้ระดับเพิ่ม
+ * แก้ระดับสำเร็จ → refetch ADMIN_KYC_DETAIL + ประวัติ บนหน้าเดิม
+ * ฝั่งผู้ดูแลไม่ใช้ hook นี้ — อ่าน Caregiver.careLevel ตรงๆ (ไม่มีสิทธิ์เห็นผู้กำหนด / ประวัติ)
  */
-
-export interface CareLevelApiFields {
-  careLevel?: string | null;
-  careLevelSetAt?: string | null;
-  careLevelSetBy?: CareLevelActor | null;
-}
 
 export interface CareLevelData {
   level: CareLevel | null;
-  setBy: CareLevelActor | null;
+  setByName: string | null;
   setAt: string | null;
-  /** มีระดับแต่ไม่มีผู้กำหนด = ค่าเริ่มต้นจาก migration ยังไม่ทบทวน (S02-AC6 · E3) */
+  /** ค่าเริ่มต้นจาก migration ยังไม่ทบทวน (S02-AC6 · E3) */
   unreviewed: boolean;
-  /** ใหม่ไปเก่า · ฝั่งแอดมินเท่านั้น */
-  history: CareLevelHistoryEntry[];
+  /** ใหม่ไปเก่า */
+  history: CareLevelChange[];
+  historyLoading: boolean;
   saving: boolean;
-  /** แอดมินเท่านั้น · ค่าเดิมคืน changed = false และไม่เพิ่มประวัติ (E4) · เรียกซ้ำระหว่างบันทึกถูกเมิน */
-  setLevel: (level: CareLevel, reason?: string) => Promise<{ changed: boolean }>;
+  /**
+   * แก้ระดับของผู้ดูแลที่อนุมัติแล้ว · ค่าเดิมคืน changed = false (E4) · เรียกซ้ำระหว่างบันทึกถูกเมิน
+   * โยน error ต่อให้หน้าจอแปลง code (CARE_LEVEL_REASON_REQUIRED ฯลฯ) เป็นข้อความ
+   */
+  setLevel: (level: CareLevel, reason: string) => Promise<{ changed: boolean }>;
 }
 
-export function useCareLevel(
+export function useAdminCareLevel(
   caregiverId: string | null | undefined,
-  options: { kycStatus?: string | null; api?: CareLevelApiFields | null } = {},
+  info: CaregiverCareLevelInfo | null | undefined,
+  options: { kycStatus?: string | null } = {},
 ): CareLevelData {
-  const mock = useCareLevelMockState();
-  const { user } = useAuth();
-  const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
+  const isVerified = options.kycStatus === 'verified';
 
-  const apiLevel = toCareLevel(options.api?.careLevel);
-  // TODO(PYG-582): history = useQuery(CAREGIVER_CARE_LEVEL_HISTORY, { variables: { caregiverId }, skip: !isAdmin })
-  const stored = caregiverId ? mock[caregiverId] ?? null : null;
-  const record = stored ?? (options.kycStatus === 'verified' ? migrationDefault() : null);
+  // ผู้ดูแลที่ยังไม่อนุมัติยังไม่มีประวัติให้ดู (ระดับแรกตั้งตอนกดอนุมัติ)
+  const { data: historyData, loading: historyLoading } = useQuery<{ caregiverCareLevelHistory: CareLevelChange[] }>(
+    CAREGIVER_CARE_LEVEL_HISTORY,
+    { variables: { caregiverId }, skip: !caregiverId || !isVerified, fetchPolicy: 'cache-and-network' },
+  );
 
-  const level = apiLevel ?? record?.level ?? null;
-  const setBy = apiLevel ? options.api?.careLevelSetBy ?? null : record?.setBy ?? null;
-  const setAt = apiLevel ? options.api?.careLevelSetAt ?? null : record?.setAt ?? null;
+  const [setCareLevel, { loading: saving }] = useMutation<{ setCaregiverCareLevel: { changed: boolean } }>(
+    SET_CAREGIVER_CARE_LEVEL,
+    {
+      refetchQueries: [
+        { query: ADMIN_KYC_DETAIL, variables: { caregiverId } },
+        { query: CAREGIVER_CARE_LEVEL_HISTORY, variables: { caregiverId } },
+      ],
+      awaitRefetchQueries: true,
+    },
+  );
 
   return {
-    level,
-    setBy,
-    setAt,
-    unreviewed: !!level && !setBy,
-    history: record?.history ?? [],
+    level: toCareLevel(info?.level),
+    setByName: info?.setByName ?? null,
+    setAt: info?.setAt ?? null,
+    unreviewed: !!info?.needsReview,
+    history: historyData?.caregiverCareLevelHistory ?? [],
+    historyLoading,
     saving,
 
-    // TODO(PYG-582): SET_CAREGIVER_CARE_LEVEL { caregiverId, level, reason } แล้ว refetch ADMIN_KYC_DETAIL + CAREGIVER_CARE_LEVEL_HISTORY
-    //   error: CARE_LEVEL_INVALID → strings.invalid (ดู KycReviewDetailPage.careLevelErrorMessage)
-    async setLevel(next, reason) {
+    async setLevel(level, reason) {
       if (!caregiverId || inFlight.current) return { changed: false };
       inFlight.current = true;
-      setSaving(true);
       try {
-        await mockDelay();
-        const actor: CareLevelActor = {
-          id: user?.id ?? 'admin',
-          email: user?.email ?? null,
-          displayName: (user?.user_metadata?.full_name as string | undefined) ?? null,
-        };
-        return saveMockCareLevel(caregiverId, record, next, actor, reason?.trim() || null);
+        const result = await setCareLevel({
+          variables: { input: { caregiverId, level, reason: reason.trim() } },
+        });
+        return { changed: result.data?.setCaregiverCareLevel.changed ?? false };
       } finally {
         inFlight.current = false;
-        setSaving(false);
       }
     },
   };
