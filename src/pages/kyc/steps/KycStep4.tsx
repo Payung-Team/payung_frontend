@@ -13,7 +13,7 @@ import { supabase } from '../../../lib/supabase';
 import { useEffect } from 'react';
 import KycStepper from '../KycStepper';
 import { skillLabel } from '../../../lib/skillLabels';
-import { isProfession } from '../../../lib/professions';
+import { isKycProfessionError, professionErrorMessage } from '../../../lib/professions';
 import { setMockExtras } from '../../../mocks/caregiverExtrasMock';
 import ProfessionBadge from '../../../components/ui/ProfessionBadge';
 import { LICENSE_DOC_TYPE, LICENSE_KYC_ENABLED, licenseErrorCodes, requiresLicense } from '../../../lib/license';
@@ -39,6 +39,7 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
   const needsLicense = LICENSE_KYC_ENABLED && requiresLicense(step1Data?.profession);
   const submitDocs = uploadedDocs.filter((doc) => doc.docType !== LICENSE_DOC_TYPE || needsLicense);
   const [licenseError, setLicenseError] = useState('');
+  const [professionError, setProfessionError] = useState('');
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isConsented, setIsConsented] = useState(false);
@@ -111,6 +112,7 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
   const handleSubmit = async () => {
     if (!step1Data) return;
     setLicenseError('');
+    setProfessionError('');
     // R1: ใบประกอบฯ ต้องครบและบันทึกแล้วที่ขั้น 2 — กันซ้ำตอนกดส่ง (E3: วันหมดอายุตรวจอีกรอบที่ BE)
     if (needsLicense && !isDraftRegistered(licenseDraft)) {
       setLicenseError(ls.submitLicenseError);
@@ -129,21 +131,14 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
         // ไม่ส่ง hourlyRate แล้ว (PYG-536) — ผู้ดูแลตั้งราคาเองไม่ได้ ราคามาจาก catalog ฝั่ง BE
         bio: step1Data.bio,
         documentIds: submitDocs.map((doc) => doc.docId),
+        // PYG-556: บังคับ — ไม่ส่ง/ค่าผิด BE ตอบ PROFESSION_REQUIRED / PROFESSION_INVALID (contract PYG-573 §3.2)
+        profession: step1Data.profession,
       };
 
-      // PYG-556: field ที่ BE ยังไม่รับ — KycInput ที่มี field เกินจะปฏิเสธทั้ง mutation
-      // TODO(PYG-575): BE พร้อมแล้วให้ Object.assign(kycInput, professionFields) และลบ saveMock ด้านล่าง
-      const professionFields = {
-        profession: step1Data.profession,
-        customSkills: step1Data.customSkills,
-      };
-      // MOCK: เก็บไว้ในเบราว์เซอร์หลังส่งสำเร็จ ให้หน้าอื่นแสดงได้
+      // MOCK: customSkills — KycInput ยังไม่มี field นี้ (ส่งไปจะถูกปฏิเสธทั้ง mutation) เก็บในเบราว์เซอร์หลังส่งสำเร็จแทน
       const saveMock = (caregiverId: string | undefined) => {
         if (!caregiverId) return;
-        setMockExtras(caregiverId, {
-          ...(isProfession(professionFields.profession) ? { profession: professionFields.profession } : {}),
-          customSkills: professionFields.customSkills,
-        });
+        setMockExtras(caregiverId, { customSkills: step1Data.customSkills });
       };
 
       // PYG-266: ส่ง payoutAccount เฉพาะตอนที่ผู้ใช้กรอก/แก้ไขจริง (ไม่แตะ = ไม่ส่ง)
@@ -186,6 +181,11 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
       // PYG-588: BE ตรวจใบประกอบฯ ซ้ำตอนส่ง (เช่น วันหมดอายุผ่านไประหว่างกรอก) → พาไปแก้ที่ขั้น 2
       if (licenseErrorCodes(err).length > 0) {
         setLicenseError(ls.submitLicenseError);
+        return;
+      }
+      // PYG-556: วิชาชีพว่าง/ไม่ถูกต้อง → พาไปเลือกใหม่ที่ขั้น 1
+      if (isKycProfessionError(err)) {
+        setProfessionError(professionErrorMessage(err) ?? '');
         return;
       }
       alert('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง');
@@ -418,6 +418,24 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
             >
               {ls.reviewEdit}
+            </button>
+          </div>
+        )}
+
+        {/* PYG-556: API ไม่รับวิชาชีพ — พากลับไปเลือกที่ขั้น "ข้อมูลส่วนตัว" */}
+        {professionError && (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3">
+            <p className="flex items-start gap-2 text-[14px] text-[#B91C1C]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+              <Icon name="error" color="currentColor" style={{ fontSize: '18px' }} />
+              {professionError}
+            </p>
+            <button
+              type="button"
+              onClick={handleEditPersonalInfo}
+              className="text-[13px] font-semibold text-[#B91C1C] underline cursor-pointer"
+              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+            >
+              แก้ไข
             </button>
           </div>
         )}

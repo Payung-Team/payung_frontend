@@ -17,7 +17,7 @@ import ConfirmModal from '../../components/ui/ConfirmModal';
 import { getBankLabel } from '../../features/kyc/omiseBanks';
 import { skillLabel } from '../../lib/skillLabels';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
-import { resolveCustomSkills, resolveProfession, useMockState } from '../../mocks/caregiverExtrasMock';
+import { resolveCustomSkills, useMockState } from '../../mocks/caregiverExtrasMock';
 
 type KycStatus = 'pending' | 'verified' | 'rejected' | 'none' | string;
 
@@ -33,8 +33,8 @@ interface CaregiverDetail {
   address?: string | null;
   phone: string;
   skills: string[];
-  /** BE ยังไม่ส่ง (ตอนนี้ใช้ mock) */
   profession?: string | null;
+  /** BE ยังไม่ส่ง (ตอนนี้ใช้ mock) */
   customSkills?: string[] | null;
   experienceYears: number;
   hourlyRate: number;
@@ -428,15 +428,9 @@ export default function KycReviewDetailPage() {
   });
 
   const caregiver = data?.adminKycDetail.caregiver;
-  // ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock
-  const mockState = useMockState();
-  const caregiverProfession = resolveProfession(
-    mockState,
-    caregiver?.id,
-    caregiver?.profession ?? data?.adminKycDetail.profession,
-    'none',
-  );
-  const caregiverCustomSkills = resolveCustomSkills(mockState, caregiver?.id, caregiver?.customSkills);
+  const caregiverProfession = caregiver?.profession ?? data?.adminKycDetail.profession ?? null;
+  // customSkills: ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock
+  const caregiverCustomSkills = resolveCustomSkills(useMockState(), caregiver?.id, caregiver?.customSkills);
   const documents = data?.adminKycDetail.documents ?? [];
   const reviews = data?.adminKycDetail.reviews ?? [];
   const editHistory = data?.adminKycDetail.editHistory ?? [];

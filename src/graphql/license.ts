@@ -10,8 +10,8 @@ import { LICENSE_KYC_ENABLED } from '../lib/license';
 
 /**
  * LicenseInfo — kycStatus.license และ adminKycDetail.license
- * `profession` ระดับ payload มาพร้อมกันใน PYG-587 (อ่านจาก caregivers.profession) — คนละตัวกับ
- * caregiver.profession ของ PYG-575 ที่ยังไม่ deploy (PROFESSION_FIELD ใน queries.ts)
+ * `profession` ระดับ payload มาพร้อมกันใน PYG-587 (อ่านจาก caregivers.profession) — ค่าเดียวกับ
+ * caregiver.profession ของ PYG-575 (PROFESSION_FIELD ใน queries.ts)
  */
 export const LICENSE_INFO_FIELD = LICENSE_KYC_ENABLED
   ? `

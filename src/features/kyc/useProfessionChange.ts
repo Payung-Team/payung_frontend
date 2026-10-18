@@ -1,26 +1,28 @@
-import { useState } from 'react';
-import type { ProfessionChangeRequest } from '../../graphql/professionChange';
+import { useMutation, useQuery } from '@apollo/client/react';
 import {
-  getMockRequest,
-  mockDelay,
-  reviewMockRequest,
-  saveMockRequest,
-  useMockState,
-} from '../../mocks/caregiverExtrasMock';
+  CANCEL_PROFESSION_CHANGE_REQUEST,
+  MY_PROFESSION_CHANGE_REQUEST,
+  REQUEST_PROFESSION_CHANGE,
+  type ProfessionChangeRequest,
+} from '../../graphql/professionChange';
 
 /**
- * ข้อมูลของ flow ขอเปลี่ยนวิชาชีพ (PYG-556 · S01-AC6)
- *
- * ตอนนี้เป็น MOCK — เก็บใน localStorage (mocks/caregiverExtrasMock.ts) และไม่อัปโหลดไฟล์จริง
- * TODO(PYG-575): เชื่อมแต่ละจุดกับ operation ใน graphql/professionChange.ts ตามที่ระบุไว้ข้างล่าง
- *   หน้าจอ (ProfessionChangeCard) ใช้ผ่าน interface นี้เท่านั้น เชื่อมแล้วไม่ต้องแก้หน้าจอ
+ * ข้อมูลของ flow ขอเปลี่ยนวิชาชีพ (PYG-556 · S01-AC6) — API ตาม contract PYG-573 §4 (BE: PYG-575)
+ * หน้าจอ (ProfessionChangeCard) ใช้ผ่าน interface นี้เท่านั้น
+ * แอดมินอนุมัติ/ปฏิเสธผ่าน API (ยังไม่มีหน้าแอดมิน · contract §9 ข้อ 4) — ผลเห็นจาก myProfessionChangeRequest
  */
+
+/**
+ * แนบใบประกอบฯ ไปกับคำขอ — ปิดไว้จนกว่า S03 (PYG-558) จะเพิ่ม field ใบประกอบฯ ใน ProfessionChangeInput
+ * ระหว่างนี้เปลี่ยนเป็นพยาบาล / นักกายภาพฯ ได้โดยไม่แนบ (contract §1 · E5)
+ */
+export const PROFESSION_CHANGE_LICENSE_ENABLED = false;
 
 export interface LicenseFile {
   docId: string;
   fileName: string;
   previewUrl: string | null;
-  /** มีเฉพาะไฟล์ที่อัปโหลดรอบนี้ — ใช้ลบทิ้งเมื่อผู้ใช้เปลี่ยนไฟล์ (ของจริง = path ใน bucket kyc-documents) */
+  /** มีเฉพาะไฟล์ที่อัปโหลดรอบนี้ — ใช้ลบทิ้งเมื่อผู้ใช้เปลี่ยนไฟล์ (path ใน bucket kyc-documents) */
   storagePath?: string;
 }
 
@@ -42,86 +44,47 @@ export interface ProfessionChangeData {
   uploadLicense: (file: File) => Promise<LicenseFile>;
   /** ลบไฟล์ที่อัปโหลดรอบนี้ (ไฟล์จากคำขอเดิมไม่ถูกลบ) */
   discardLicense: (file: LicenseFile | null) => Promise<void>;
-  /** MOCK เท่านั้น — จำลองแอดมินตรวจ · ของจริงไม่มี (แอดมินตรวจจากหน้าแอดมิน) */
-  simulateReview?: (action: 'approved' | 'rejected') => void;
 }
 
-// object URL ของไฟล์ที่เลือก — อยู่ในหน่วยความจำเท่านั้น reload แล้วดูไฟล์ไม่ได้ (แต่ชื่อไฟล์ยังอยู่)
-const mockFileUrls = new Map<string, string>();
+export function useProfessionChange(caregiverId: string): ProfessionChangeData {
+  const { data, loading, refetch } = useQuery<{ myProfessionChangeRequest: ProfessionChangeRequest | null }>(
+    MY_PROFESSION_CHANGE_REQUEST,
+    { fetchPolicy: 'network-only', skip: !caregiverId },
+  );
+  const refetchMine = { refetchQueries: [{ query: MY_PROFESSION_CHANGE_REQUEST }], awaitRefetchQueries: true };
+  const [requestChange, { loading: submitting }] = useMutation(REQUEST_PROFESSION_CHANGE, refetchMine);
+  const [cancelRequest, { loading: cancelling }] = useMutation(CANCEL_PROFESSION_CHANGE_REQUEST, refetchMine);
 
-export function useProfessionChange(caregiverId: string, currentProfession: string | null | undefined): ProfessionChangeData {
-  useMockState(); // re-render เมื่อข้อมูล mock เปลี่ยน
-  const [submitting, setSubmitting] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
-
-  // TODO(PYG-575): useQuery(MY_PROFESSION_CHANGE_REQUEST, { fetchPolicy: 'network-only' })
-  const stored = caregiverId ? getMockRequest(caregiverId) : null;
-  const request = stored?.licenseDocument
-    ? { ...stored, licenseDocument: { ...stored.licenseDocument, signedUrl: mockFileUrls.get(stored.licenseDocument.id) ?? null } }
-    : stored;
+  // error เช่น ALREADY_PENDING / NOT_PENDING = ข้อมูลบนจอเก่า (แท็บอื่น/แอดมินเปลี่ยนไปแล้ว) → ดึงใหม่ก่อนโยน error ต่อ
+  async function syncAfterError(err: unknown): Promise<never> {
+    await refetch().catch(() => undefined);
+    throw err;
+  }
 
   return {
-    request,
-    loading: false,
+    request: data?.myProfessionChangeRequest ?? null,
+    loading,
     submitting,
     cancelling,
 
-    // TODO(PYG-575): REQUEST_PROFESSION_CHANGE
-    //   input = { profession, ...(licenseFile ? { licenseNumber, licenseExpiresAt, licenseDocumentId: licenseFile.docId } : {}) }
-    //   แล้ว refetch MY_PROFESSION_CHANGE_REQUEST
-    async submit({ profession, licenseNumber, licenseExpiresAt, licenseFile }) {
-      setSubmitting(true);
-      try {
-        await mockDelay();
-        saveMockRequest(caregiverId, {
-          id: `mock-${Date.now()}`,
-          fromProfession: currentProfession ?? 'general_caregiver',
-          toProfession: profession,
-          status: 'pending',
-          licenseNumber: licenseFile ? licenseNumber ?? null : null,
-          licenseExpiresAt: licenseFile ? licenseExpiresAt ?? null : null,
-          licenseDocument: licenseFile ? { id: licenseFile.docId, fileName: licenseFile.fileName, signedUrl: null } : null,
-          rejectionReason: null,
-          requestedAt: new Date().toISOString(),
-          reviewedAt: null,
-        });
-      } finally {
-        setSubmitting(false);
-      }
+    // TODO(PYG-558 · S03): เพิ่ม licenseNumber, licenseExpiresAt, licenseDocumentId: licenseFile.docId ใน input
+    async submit({ profession }) {
+      await requestChange({ variables: { input: { profession } } }).catch(syncAfterError);
     },
 
-    // TODO(PYG-575): CANCEL_PROFESSION_CHANGE_REQUEST { id } แล้ว refetch
-    async cancel() {
-      setCancelling(true);
-      try {
-        await mockDelay();
-        if (stored) saveMockRequest(caregiverId, { ...stored, status: 'cancelled' });
-      } finally {
-        setCancelling(false);
-      }
+    async cancel(id) {
+      await cancelRequest({ variables: { id } }).catch(syncAfterError);
     },
 
     // TODO(PYG-558 · S03): อัปโหลดแบบเดียวกับ KycStep2.handleFileChange
     //   supabase.storage.from('kyc-documents').upload(`${userId}/${Date.now()}-professional_license.${ext}`)
     //   แล้ว UPLOAD_KYC_DOCUMENT { docType: 'professional_license', fileUrl, fileName, fileSize, mimeType }
-    //   (BE ตอนนี้รับแค่ id_card_front | id_card_selfie | certificate)
-    async uploadLicense(file) {
-      await mockDelay(700);
-      const docId = `mock-doc-${Date.now()}`;
-      mockFileUrls.set(docId, URL.createObjectURL(file));
-      return { docId, fileName: file.name, previewUrl: mockFileUrls.get(docId) ?? null, storagePath: `mock:${docId}` };
+    //   ไม่ถูกเรียกระหว่างที่ PROFESSION_CHANGE_LICENSE_ENABLED = false
+    async uploadLicense() {
+      throw new Error('Professional license upload for profession change is not available yet (PYG-558)');
     },
 
     // TODO(PYG-558 · S03): supabase.storage.remove([storagePath]) + DELETE_KYC_DOCUMENT { documentId: docId }
-    async discardLicense(file) {
-      if (!file?.storagePath) return;
-      const url = mockFileUrls.get(file.docId);
-      if (url) URL.revokeObjectURL(url);
-      mockFileUrls.delete(file.docId);
-    },
-
-    simulateReview(action) {
-      reviewMockRequest(caregiverId, action);
-    },
+    async discardLicense() {},
   };
 }

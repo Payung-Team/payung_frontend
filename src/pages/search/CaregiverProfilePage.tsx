@@ -27,7 +27,7 @@ import { formatDisplayPrice, hasDisplayPrice, NO_PRICE_LABEL } from '../../lib/d
 import { skillLabel } from '../../lib/skillLabels';
 import { PROFESSIONS, isProfession } from '../../lib/professions';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
-import { resolveCustomSkills, resolveProfession, useMockState } from '../../mocks/caregiverExtrasMock';
+import { resolveCustomSkills, useMockState } from '../../mocks/caregiverExtrasMock';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -286,7 +286,7 @@ const CaregiverProfilePage: React.FC = () => {
   const [publicAvatarUrl, setPublicAvatarUrl] = useState<string | null | undefined>(undefined);
   // ราคาจาก BE (/public → hourly_rate, ราคา catalog) — undefined = ยังโหลดไม่เสร็จ ใช้ค่าจาก location.state ไปก่อน
   const [publicHourlyRate, setPublicHourlyRate] = useState<number | null | undefined>(undefined);
-  // PYG-556: วิชาชีพ / ทักษะอื่นๆ จาก /public — BE ยังไม่ส่งมา ถ้าไม่มี key = ใช้ค่าจาก state หรือซ่อน
+  // PYG-556: วิชาชีพจาก /public (PYG-575) · ทักษะอื่นๆ BE ยังไม่ส่ง — ไม่มี key = ใช้ค่าจาก state (หน้า List)
   const [publicProfession, setPublicProfession] = useState<string | null | undefined>(undefined);
   const [publicCustomSkills, setPublicCustomSkills] = useState<string[] | null>(null);
   const [publicReloadKey, setPublicReloadKey] = useState(0);
@@ -332,14 +332,9 @@ const CaregiverProfilePage: React.FC = () => {
   const avatarUrl = publicAvatarUrl !== undefined ? publicAvatarUrl : (cg?.avatarUrl ?? null);
 
   const translatedSkills = skills.map((s) => skillLabel(s));
-  // ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock
-  const mockState = useMockState();
-  const profession = resolveProfession(
-    mockState,
-    caregiverId ?? cg?.id,
-    publicProfession !== undefined ? publicProfession : (cg?.profession ?? null),
-  );
-  const customSkills = resolveCustomSkills(mockState, caregiverId ?? cg?.id, publicCustomSkills);
+  const profession = publicProfession !== undefined ? publicProfession : (cg?.profession ?? null);
+  // customSkills: ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock
+  const customSkills = resolveCustomSkills(useMockState(), caregiverId ?? cg?.id, publicCustomSkills);
 
   const handleConfirmBooking = async () => {
     if (!cg || !bookingDraft) return;
@@ -525,7 +520,7 @@ const CaregiverProfilePage: React.FC = () => {
                       )}
                     </div>
                     <div className="flex items-center gap-1 flex-wrap mt-[7px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: '20px' }}>
-                      {isProfession(profession) ? <ProfessionBadge profession={profession} /> : <span>ผู้ดูแลผู้สูงอายุ</span>}
+                      {profession ? <ProfessionBadge profession={profession} /> : <span>ผู้ดูแลผู้สูงอายุ</span>}
                       {province && (<><span style={{ opacity: 0.5 }}>·</span><span>{province}</span></>)}
                       {experience != null && (<><span style={{ opacity: 0.5 }}>·</span><span>ประสบการณ์ {experience} ปี</span></>)}
                     </div>
@@ -560,7 +555,7 @@ const CaregiverProfilePage: React.FC = () => {
               </div>
 
               {/* วิชาชีพ (PYG-556 · S01-AC4) */}
-              {isProfession(profession) && (
+              {profession && (
                 <div className="flex flex-col" style={{ padding: '22px 28px', borderBottom: '0.8px solid #F0F1F3' }}>
                   <div className="flex items-center gap-2">
                     <span className="material-icons-outlined" style={{ fontSize: 17, color: '#52B69A' }}>badge</span>
@@ -568,9 +563,11 @@ const CaregiverProfilePage: React.FC = () => {
                   </div>
                   <div className="flex flex-wrap items-center gap-2.5 mt-3">
                     <ProfessionBadge profession={profession} size="md" />
-                    <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#575859', lineHeight: '20px' }}>
-                      {PROFESSIONS[profession].fullDescription}
-                    </span>
+                    {isProfession(profession) && (
+                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#575859', lineHeight: '20px' }}>
+                        {PROFESSIONS[profession].fullDescription}
+                      </span>
+                    )}
                   </div>
                 </div>
               )}

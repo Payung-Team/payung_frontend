@@ -3,13 +3,11 @@ import { gql } from "@apollo/client";
 /**
  * PYG-556 · S01-AC6 — ขอเปลี่ยนวิชาชีพหลัง KYC อนุมัติแล้ว (ต้องรอแอดมินตรวจ)
  *
- * ⚠ ข้อเสนอ contract ฝั่ง FE — BE ยังไม่มี operation เหล่านี้ (PYG-573 / PYG-575)
- *   ยังไม่ถูกเรียกใช้ ตอนนี้ useProfessionChange เป็น mock · ถ้า BE ตั้งชื่อต่างจากนี้ แก้ที่ไฟล์นี้ที่เดียว
+ * ตาม contract PYG-573 §4 (BE: PYG-575) — ใช้ใน useProfessionChange
  *
  * status: pending | approved | rejected | cancelled
- * วิชาชีพที่ต้องมีใบประกอบฯ (nurse / physiotherapist) ต้องส่ง licenseDocumentId + licenseNumber + licenseExpiresAt
- * licenseExpiresAt = 'YYYY-MM-DD' — BE แปลงเป็นสิ้นวันเวลาไทยก่อนเก็บลง kyc_documents.expires_at (ตาม PYG-586)
- * เอกสารอัปโหลดผ่าน uploadKycDocument ด้วย docType = professional_license (S03 · PYG-558)
+ * ProfessionChangeInput ตอนนี้รับแค่ { profession } — field ใบประกอบฯ ใน type เป็น null เสมอจนกว่า S03 (PYG-558)
+ *   จะเพิ่ม licenseDocumentId + licenseNumber + licenseExpiresAt ('YYYY-MM-DD') ใน input
  */
 const REQUEST_FIELDS = `
   id

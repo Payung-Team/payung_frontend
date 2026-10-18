@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { logGraphQLError } from '../../lib/logGraphQLError';
 import type { ProfessionChangeRequest } from '../../graphql/professionChange';
-import { PROFESSIONS, isProfession, type Profession } from '../../lib/professions';
-import { useProfessionChange, type LicenseFile } from './useProfessionChange';
+import { PROFESSIONS, isProfession, professionErrorMessage, type Profession } from '../../lib/professions';
+import { PROFESSION_CHANGE_LICENSE_ENABLED, useProfessionChange, type LicenseFile } from './useProfessionChange';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import ProfessionPicker from './ProfessionPicker';
 
 /**
  * ขอเปลี่ยนวิชาชีพหลัง KYC อนุมัติแล้ว (PYG-556 · S01-AC6 · R5)
- * เปลี่ยนเป็นพยาบาล / นักกายภาพฯ ต้องแนบใบประกอบฯ (เลขที่ + วันหมดอายุ + ไฟล์) ทุกครั้ง
+ * เปลี่ยนเป็นพยาบาล / นักกายภาพฯ ต้องแนบใบประกอบฯ (เลขที่ + วันหมดอายุ + ไฟล์) ทุกครั้ง — เมื่อ S03 พร้อม
+ *   (PROFESSION_CHANGE_LICENSE_ENABLED) · ระหว่างนี้ส่งได้โดยไม่แนบ
  * ระหว่างรอตรวจ ฝั่ง Elder ยังเห็นวิชาชีพเดิม · ส่งคำขอได้ทีละ 1 คำขอ
  *
- * ข้อมูลมาจาก useProfessionChange — โหมด api = graphql/professionChange.ts (ข้อเสนอ contract) · โหมด mock = localStorage
+ * ข้อมูลมาจาก useProfessionChange (graphql/professionChange.ts)
  */
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
@@ -109,8 +110,8 @@ export default function ProfessionChangeCard({
 }) {
   const {
     request, loading, submitting, cancelling,
-    submit: submitRequest, cancel: cancelRequest, uploadLicense, discardLicense, simulateReview,
-  } = useProfessionChange(caregiverId, currentProfession);
+    submit: submitRequest, cancel: cancelRequest, uploadLicense, discardLicense,
+  } = useProfessionChange(caregiverId);
 
   const pending = request?.status === 'pending' ? request : null;
   const rejected = request?.status === 'rejected' ? request : null;
@@ -128,7 +129,8 @@ export default function ProfessionChangeCard({
   const pickerRef = useRef<HTMLDivElement>(null);
 
   const targetMeta = isProfession(target) ? PROFESSIONS[target] : null;
-  const needsLicense = !!targetMeta?.requiresLicense;
+  const licenseRequired = (p: Profession) => PROFESSION_CHANGE_LICENSE_ENABLED && PROFESSIONS[p].requiresLicense;
+  const needsLicense = isProfession(target) && licenseRequired(target);
 
   // เปิดฟอร์มแล้ว เลื่อนไปหาตัวเลือก
   useEffect(() => {
@@ -206,7 +208,7 @@ export default function ProfessionChangeCard({
     } catch (err) {
       logGraphQLError('RequestProfessionChange', err);
       setConfirmSubmit(false);
-      onNotify('error', 'ส่งคำขอไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+      onNotify('error', professionErrorMessage(err) ?? 'ส่งคำขอไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
     }
   }
 
@@ -219,7 +221,7 @@ export default function ProfessionChangeCard({
     } catch (err) {
       logGraphQLError('CancelProfessionChangeRequest', err);
       setConfirmCancel(false);
-      onNotify('error', 'ยกเลิกคำขอไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+      onNotify('error', professionErrorMessage(err) ?? 'ยกเลิกคำขอไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
     }
   }
 
@@ -261,20 +263,11 @@ export default function ProfessionChangeCard({
               </span>
             </div>
           )}
-          {/* ★ "ยังรับงานในฐานะเดิมได้" ยังรอเคาะ (ประเด็นที่ 3 ใน PYG-556) — แก้ข้อความนี้ถ้าเคาะว่ารับไม่ได้ */}
+          {/* ระหว่างรอ รับงานด้วยวิชาชีพเดิมได้ (contract PYG-573 §1) */}
           <p className="text-[13px] text-[#334155] leading-relaxed">
             ส่งคำขอเมื่อ {thaiDate(pending.requestedAt, true)} ระหว่างนี้โปรไฟล์ยังแสดง "{PROFESSIONS[pending.fromProfession as Profession]?.label ?? fromLabel}"
             และคุณยังรับงานในฐานะ{PROFESSIONS[pending.fromProfession as Profession]?.label ?? fromLabel}ได้ตามปกติ
           </p>
-          {/* MOCK เท่านั้น — ไม่มีในโหมด api */}
-          {simulateReview && (
-            <div className="flex flex-wrap items-center gap-2 border-t border-dashed border-[#E3C68F] pt-2.5">
-              <span className="text-[11px] font-semibold text-[#7A4F0C] bg-white/70 rounded px-1.5 py-0.5">MOCK</span>
-              <span className="text-[12px] text-[#7A4F0C]">จำลองผลจากแอดมิน:</span>
-              <button type="button" onClick={() => simulateReview('approved')} className="text-[12px] font-semibold text-[#047857] underline cursor-pointer">อนุมัติ</button>
-              <button type="button" onClick={() => simulateReview('rejected')} className="text-[12px] font-semibold text-[#B42318] underline cursor-pointer">ไม่อนุมัติ</button>
-            </div>
-          )}
           <div className="flex justify-end">
             <button type="button" onClick={() => setConfirmCancel(true)} className="text-[13px] font-semibold text-[#B42318] px-1.5 py-1 hover:underline cursor-pointer">
               ยกเลิกคำขอ
@@ -315,7 +308,7 @@ export default function ProfessionChangeCard({
             error={errors.profession}
             renderNote={(p) => (
               <span className="text-[12px] text-[#475569]">
-                {PROFESSIONS[p].requiresLicense ? 'ต้องแนบใบประกอบวิชาชีพ' : 'ไม่ต้องแนบเอกสาร'}
+                {licenseRequired(p) ? 'ต้องแนบใบประกอบวิชาชีพ' : 'ไม่ต้องแนบเอกสาร'}
               </span>
             )}
           />
@@ -323,7 +316,7 @@ export default function ProfessionChangeCard({
           {targetMeta && !needsLicense && (
             <div className="flex gap-2 items-start text-[13.5px] text-[#334155] bg-[#F1F5F9] rounded-xl px-3.5 py-3 leading-normal">
               <span className="material-icons-outlined text-[#64748B]" style={{ fontSize: 18 }} aria-hidden="true">info</span>
-              เปลี่ยนเป็นผู้ดูแลทั่วไปไม่ต้องแนบเอกสาร แต่ยังต้องรอแอดมินตรวจก่อนโปรไฟล์จะเปลี่ยน
+              เปลี่ยนเป็น{targetMeta.label}ไม่ต้องแนบเอกสาร แต่ยังต้องรอแอดมินตรวจก่อนโปรไฟล์จะเปลี่ยน
             </div>
           )}
 

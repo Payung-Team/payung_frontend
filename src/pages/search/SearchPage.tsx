@@ -26,7 +26,6 @@ import { bookingAssessmentRedirect } from '../../lib/assessmentNav';
 import ThailandAddressSimple from 'thailand-address-simple';
 import { skillLabel } from '../../lib/skillLabels';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
-import { resolveProfession, useMockState } from '../../mocks/caregiverExtrasMock';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -48,7 +47,7 @@ interface CaregiverSummary {
   gender?: string | null;
   distance?: number | null;         // km
   verified?: boolean;
-  /** PYG-556: general_caregiver | nurse | physiotherapist — BE ยังไม่ส่ง (ตอนนี้ใช้ mock) */
+  /** PYG-556: general_caregiver | nurse | physiotherapist — CaregiverSummary.profession (PYG-575) */
   profession?: string | null;
 }
 
@@ -137,7 +136,7 @@ function CaregiverCard({ cg, onSelect, onViewProfile, onPhotoExpired }: { cg: Ca
   const extraSkills = translatedSkills.length - 3;
   const gender = GENDER_DISPLAY[cg.gender ?? ''] ?? null;
   const hasMeta = gender != null || cg.experience != null;
-  const profession = resolveProfession(useMockState(), cg.id, cg.profession);
+  const profession = cg.profession;
 
   return (
     <div

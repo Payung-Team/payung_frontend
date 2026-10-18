@@ -1,7 +1,8 @@
 /**
  * วิชาชีพผู้ดูแล (PYG-556 · S01) — ค่าต้องตรงกับ CHECK caregivers_profession_check ใน DB
- * แหล่งเดียวของชื่อ ไอคอน และคำอธิบายวิชาชีพทั้ง FE
+ * แหล่งเดียวของชื่อ ไอคอน คำอธิบาย และข้อความ error ของวิชาชีพทั้ง FE
  */
+import { extractGraphQLErrorCode } from './apolloErrors';
 
 export const PROFESSION_CODES = ['general_caregiver', 'nurse', 'physiotherapist'] as const;
 export type Profession = (typeof PROFESSION_CODES)[number];
@@ -49,4 +50,30 @@ export const LICENSE_NOTICE = 'ต้องแนบใบประกอบว�
 
 export function isProfession(value: unknown): value is Profession {
   return typeof value === 'string' && (PROFESSION_CODES as readonly string[]).includes(value);
+}
+
+/** ป้ายของค่าที่ FE ยังไม่รู้จัก (BE เพิ่มค่าใหม่ก่อน FE · contract PYG-573 §8) */
+export const UNKNOWN_PROFESSION = { label: 'วิชาชีพอื่น', icon: 'badge' };
+
+/** error code จาก API (contract PYG-573 §5.2) → ข้อความที่ผู้ใช้อ่านเข้าใจ */
+export const PROFESSION_ERROR_MESSAGES: Record<string, string> = {
+  PROFESSION_REQUIRED: 'กรุณาเลือกวิชาชีพ',
+  PROFESSION_INVALID: 'วิชาชีพที่เลือกไม่ถูกต้อง กรุณาเลือกใหม่อีกครั้ง',
+  PROFESSION_CHANGE_NOT_ALLOWED: 'ขอเปลี่ยนวิชาชีพได้หลังยืนยันตัวตนผ่านแล้วเท่านั้น',
+  PROFESSION_UNCHANGED: 'วิชาชีพใหม่ต้องไม่ซ้ำกับวิชาชีพปัจจุบัน',
+  PROFESSION_CHANGE_ALREADY_PENDING: 'มีคำขอเปลี่ยนวิชาชีพที่รอตรวจอยู่แล้ว ส่งได้ทีละ 1 คำขอ',
+  PROFESSION_CHANGE_NOT_FOUND: 'ไม่พบคำขอเปลี่ยนวิชาชีพนี้',
+  PROFESSION_CHANGE_NOT_PENDING: 'คำขอนี้ไม่ได้อยู่ระหว่างรอตรวจแล้ว',
+};
+
+/** ข้อความของ error วิชาชีพ — null = ไม่ใช่ error ของวิชาชีพ */
+export function professionErrorMessage(err: unknown): string | null {
+  const code = extractGraphQLErrorCode(err);
+  return (code && PROFESSION_ERROR_MESSAGES[code]) || null;
+}
+
+/** error ที่ต้องกลับไปแก้ช่องวิชาชีพในฟอร์ม KYC */
+export function isKycProfessionError(err: unknown): boolean {
+  const code = extractGraphQLErrorCode(err);
+  return code === 'PROFESSION_REQUIRED' || code === 'PROFESSION_INVALID';
 }

@@ -2,12 +2,11 @@ import { gql } from "@apollo/client";
 import { LICENSE_DOCUMENT_FIELDS, LICENSE_INFO_FIELD } from "./license";
 
 /**
- * PYG-556: field ที่ BE ยังไม่มี (PYG-573 / PYG-575) — ตอนนี้เป็นค่าว่าง หน้าจอใช้ข้อมูลจาก src/mocks/ แทน
- * BE deploy แล้ว: เปลี่ยนเป็น "profession" / "customSkills" ตรงนี้ที่เดียว ทุก query ที่ใช้จะได้ค่าจริง
- * และค่าจริงจะถูกใช้ก่อน mock อัตโนมัติ (ดู resolveProfession / resolveCustomSkills)
- * ⚠ อย่าเปลี่ยนก่อน BE พร้อม — GraphQL ปฏิเสธทั้ง operation ถ้ามี field ที่ schema ไม่รู้จัก
+ * PYG-556: `profession` มาจาก BE แล้ว (PYG-575 · contract PYG-573 §3.1)
+ * `customSkills` BE ยังไม่มีคอลัมน์ (contract §9 ข้อ 2) — ว่างไว้ หน้าจอใช้ src/mocks/caregiverExtrasMock.ts แทน
+ * ⚠ อย่าเปิด CUSTOM_SKILLS_FIELD ก่อน BE พร้อม — GraphQL ปฏิเสธทั้ง operation ถ้ามี field ที่ schema ไม่รู้จัก
  */
-const PROFESSION_FIELD = "";
+const PROFESSION_FIELD = "profession";
 const CUSTOM_SKILLS_FIELD = "";
 
 export const LOGIN_USER = gql`

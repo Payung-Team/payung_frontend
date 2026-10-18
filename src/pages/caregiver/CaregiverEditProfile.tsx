@@ -18,7 +18,7 @@ import ThaiAddressSelector from '../../components/ui/ThaiAddressSelector';
 import AlertModal from '../../components/ui/AlertModal';
 import ProfilePhotoUploadCard from '../../components/caregiver/ProfilePhotoUploadCard';
 import { MAX_CUSTOM_SKILLS, skillLabel } from '../../lib/skillLabels';
-import { resolveCustomSkills, resolveProfession, setMockExtras, useMockState } from '../../mocks/caregiverExtrasMock';
+import { resolveCustomSkills, setMockExtras, useMockState } from '../../mocks/caregiverExtrasMock';
 import CareSkillPicker from '../../features/kyc/CareSkillPicker';
 import CustomSkillsInput from '../../features/kyc/CustomSkillsInput';
 import ProfessionChangeCard from '../../features/kyc/ProfessionChangeCard';
@@ -65,8 +65,8 @@ interface CaregiverData {
   address?: string;
   bio?: string;
   skills?: string[];
-  /** BE ยังไม่ส่ง (ตอนนี้ใช้ mock) */
   profession?: string | null;
+  /** BE ยังไม่ส่ง (ตอนนี้ใช้ mock) */
   customSkills?: string[] | null;
   experienceYears?: number;
   kycStatus?: string;
@@ -97,7 +97,10 @@ const CaregiverEditProfile: React.FC = () => {
   const { data: userData, loading: userLoading } = useQuery<UserData>(GET_USER, {
     fetchPolicy: 'cache-and-network',
   });
-  const { data: caregiverData, loading: caregiverLoading } = useQuery<{ myCaregiverProfile: CaregiverData }>(GET_CAREGIVER_PROFILE);
+  // cache-and-network: แอดมินอนุมัติคำขอเปลี่ยนวิชาชีพแล้ว profession ต้องเปลี่ยนตามเมื่อเปิดหน้านี้
+  const { data: caregiverData, loading: caregiverLoading } = useQuery<{ myCaregiverProfile: CaregiverData }>(GET_CAREGIVER_PROFILE, {
+    fetchPolicy: 'cache-and-network',
+  });
 
   // Mutation สำหรับ update profile
   const [updateCaregiverProfile, { loading: updateLoading }] = useMutation(UPDATE_CAREGIVER_PROFILE, {
@@ -123,10 +126,9 @@ const CaregiverEditProfile: React.FC = () => {
 
   const user = userData?.me;
   const caregiver = caregiverData?.myCaregiverProfile;
-  // ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock (อนุมัติคำขอเปลี่ยนวิชาชีพใน mock แล้วค่านี้เปลี่ยนตาม)
-  const mockState = useMockState();
-  const profession = resolveProfession(mockState, caregiver?.id, caregiver?.profession);
-  const savedCustomSkills = resolveCustomSkills(mockState, caregiver?.id, caregiver?.customSkills);
+  const profession = caregiver?.profession ?? null;
+  // customSkills: ค่าจริงจาก BE ก่อน ไม่มีค่อยใช้ mock
+  const savedCustomSkills = resolveCustomSkills(useMockState(), caregiver?.id, caregiver?.customSkills);
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
   const isLoading = userLoading || caregiverLoading;
 
@@ -215,7 +217,7 @@ const CaregiverEditProfile: React.FC = () => {
       const addressParts = [data.address, data.district, data.amphoe, data.province, data.postalCode].filter(Boolean);
       if (addressParts.length > 0) input.address = addressParts.join(' ');
       if (data.skills && data.skills.length > 0) input.skills = data.skills;
-      // TODO(PYG-575): BE รับ customSkills แล้วให้ส่ง (ได้แม้เป็น [] เพื่อลบทั้งหมด) และลบ setMockExtras ด้านล่าง
+      // TODO(customSkills · contract PYG-573 §9 ข้อ 2): BE รับ customSkills แล้วให้ส่ง (ได้แม้เป็น [] เพื่อลบทั้งหมด) และลบ setMockExtras ด้านล่าง
       //   input.customSkills = customSkills;
       const customSkills = data.customSkills ?? [];
 
