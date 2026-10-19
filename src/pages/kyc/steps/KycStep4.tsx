@@ -12,7 +12,7 @@ import Tooltip from '../../../components/ui/Tooltip';
 import { supabase } from '../../../lib/supabase';
 import { useEffect } from 'react';
 import KycStepper from '../KycStepper';
-import { skillLabel } from '../../../lib/skillLabels';
+import { skillErrorMessage, skillLabel } from '../../../lib/skillLabels';
 import { isKycProfessionError, professionErrorMessage } from '../../../lib/professions';
 import ProfessionBadge from '../../../components/ui/ProfessionBadge';
 import { LICENSE_DOC_TYPE, LICENSE_KYC_ENABLED, licenseErrorCodes, requiresLicense } from '../../../lib/license';
@@ -203,6 +203,12 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
       const dlCode = drivingLicenseErrorCode(err);
       if (dlCode) {
         setDrivingLicenseError(`${ds.apiError[dlCode]} · ${ds.submitError}`);
+        return;
+      }
+      // PYG-655: ทักษะไม่อยู่ในรายการกลาง / เป็นทักษะเฉพาะของวิชาชีพอื่น → แก้ที่ขั้น 1 (แบนเนอร์เดียวกับวิชาชีพ)
+      const skillMessage = skillErrorMessage(err);
+      if (skillMessage) {
+        setProfessionError(skillMessage);
         return;
       }
       // PYG-556: วิชาชีพว่าง/ไม่ถูกต้อง → พาไปเลือกใหม่ที่ขั้น 1

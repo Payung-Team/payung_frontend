@@ -1,14 +1,24 @@
-import type { Profession } from './professions';
+import { PROFESSIONS, isProfession, type Profession } from './professions';
+import { extractGraphQLErrorExtensions } from './apolloErrors';
 
 /**
  * ทักษะผู้ดูแล (caregivers.skills) — แหล่งเดียวของทั้ง FE
  *
  * ทักษะกลาง = รายการเดียวกับตาราง care_skills (PYG-642) ที่ booking ใช้คำนวณทักษะที่งานต้องการ
  * จึงใช้จับคู่งานได้ตรงรหัส · ผู้ดูแลเลือกได้เฉพาะชุดนี้
- * `profession` = ทักษะเฉพาะวิชาชีพ (อนุมานจาก care_activity_professions ของกิจกรรมที่ผูกกับทักษะ)
- * ★ ถ้า BE เพิ่มคอลัมน์วิชาชีพใน care_skills หรือเปิด query รายการทักษะแล้ว ให้ดึงจาก API แทนรายการนี้
+ * `profession` = ทักษะเฉพาะวิชาชีพ
+ *
+ * PYG-655: หน้าที่ให้เลือกทักษะใช้รายการจาก API `careSkills(profession)` (useCareSkillCatalog)
+ *   รายการนี้เป็นค่าตั้งต้นระหว่างโหลด / เมื่อโหลดไม่สำเร็จ และเป็นชื่อไทยของหน้าที่แสดงผลอย่างเดียว
+ *   helper ด้านล่างรับ `catalog` ได้ — ไม่ส่ง = ใช้รายการนี้
  */
-export const CARE_SKILLS: ReadonlyArray<{ value: string; label: string; profession?: Profession }> = [
+export interface CareSkillDef {
+  value: string;
+  label: string;
+  profession?: Profession;
+}
+
+export const CARE_SKILLS: ReadonlyArray<CareSkillDef> = [
   { value: 'transfer_assist', label: 'ย้ายตัว / พยุงตัว' },
   { value: 'wheelchair_push', label: 'เข็นรถเข็น' },
   { value: 'feeding_assist', label: 'ป้อนอาหาร' },
@@ -49,26 +59,59 @@ export function skillLabel(skill: string): string {
   return SKILL_LABELS[skill] ?? skill;
 }
 
-export function isCareSkill(code: string): boolean {
-  return CARE_SKILLS.some((s) => s.value === code);
+/**
+ * ทักษะที่แสดงในหน้าอื่น ๆ (PYG-655): ชื่อไทยของรหัสกลางก่อน แล้วตามด้วยทักษะอื่นๆ ที่ผู้ดูแลพิมพ์เอง
+ * ตัดค่าว่าง / ซ้ำ (เทียบแบบไม่สนตัวพิมพ์) — ใช้ตัวนี้ทุกหน้าที่แสดงทักษะของผู้ดูแล
+ */
+export function displaySkills(
+  skills: ReadonlyArray<string> | null | undefined,
+  otherSkills?: ReadonlyArray<string> | null,
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const label of [...(skills ?? []).map(skillLabel), ...(otherSkills ?? [])]) {
+    const v = label.trim();
+    if (!v || seen.has(v.toLowerCase())) continue;
+    seen.add(v.toLowerCase());
+    out.push(v);
+  }
+  return out;
+}
+
+type Catalog = ReadonlyArray<CareSkillDef>;
+
+export function isCareSkill(code: string, catalog: Catalog = CARE_SKILLS): boolean {
+  return catalog.some((s) => s.value === code);
 }
 
 /** ทักษะเฉพาะที่วิชาชีพนี้ติ๊กไม่ได้ (รวมทักษะเฉพาะทั้งหมดเมื่อยังไม่มีวิชาชีพ) */
-export function isSkillLockedFor(code: string, profession: string | null | undefined): boolean {
-  const skill = CARE_SKILLS.find((s) => s.value === code);
+export function isSkillLockedFor(
+  code: string,
+  profession: string | null | undefined,
+  catalog: Catalog = CARE_SKILLS,
+): boolean {
+  const skill = catalog.find((s) => s.value === code);
   return !!skill?.profession && skill.profession !== profession;
 }
 
 /** ติ๊กได้และใช้จับคู่งานได้จริง = อยู่ในรายการกลาง และไม่ใช่ทักษะเฉพาะของวิชาชีพอื่น */
-export function isSelectableSkill(code: string, profession: string | null | undefined): boolean {
-  return isCareSkill(code) && !isSkillLockedFor(code, profession);
+export function isSelectableSkill(
+  code: string,
+  profession: string | null | undefined,
+  catalog: Catalog = CARE_SKILLS,
+): boolean {
+  return isCareSkill(code, catalog) && !isSkillLockedFor(code, profession, catalog);
 }
 
 /** แยกทักษะเฉพาะที่ไม่ตรงกับวิชาชีพใหม่ออก — ใช้ตอนผู้ดูแลเปลี่ยนวิชาชีพ */
-export function splitSkillsForProfession(skills: string[], profession: string | null | undefined) {
+export function splitSkillsForProfession(
+  skills: string[],
+  profession: string | null | undefined,
+  catalog: Catalog = CARE_SKILLS,
+) {
   return {
-    kept: skills.filter((s) => !isSkillLockedFor(s, profession)),
-    dropped: skills.filter((s) => isSkillLockedFor(s, profession)),
+    kept: skills.filter((s) => !isSkillLockedFor(s, profession, catalog)),
+    dropped: skills.filter((s) => isSkillLockedFor(s, profession, catalog)),
   };
 }
 
@@ -83,14 +126,37 @@ export function normalizeCustomSkill(value: string): string {
 }
 
 /** คืนข้อความ error ถ้าเพิ่มไม่ได้ · null = เพิ่มได้ */
-export function customSkillError(value: string, existing: string[]): string | null {
+export function customSkillError(value: string, existing: string[], catalog: Catalog = CARE_SKILLS): string | null {
   const v = normalizeCustomSkill(value);
   if (!v) return null;
   if (v.length > MAX_CUSTOM_SKILL_LENGTH) return `ทักษะต้องไม่เกิน ${MAX_CUSTOM_SKILL_LENGTH} ตัวอักษร`;
   if (existing.length >= MAX_CUSTOM_SKILLS) return `เพิ่มได้สูงสุด ${MAX_CUSTOM_SKILLS} รายการ`;
   if (existing.some((t) => t.toLowerCase() === v.toLowerCase())) return 'มีทักษะนี้อยู่แล้ว';
-  if (CARE_SKILLS.some((s) => s.label === v)) {
+  if (catalog.some((s) => s.label === v)) {
     return `"${v}" อยู่ในรายการทักษะด้านบนแล้ว ติ๊กจากรายการแทน เพื่อให้ใช้จับคู่งานได้`;
   }
   return null;
+}
+
+// ── error ของทักษะจาก API (BE PYG-652 · care-skill.errors.ts) ───────────────
+
+/**
+ * ข้อความไทยของ SKILL_INVALID / SKILL_NOT_ALLOWED_FOR_PROFESSION — null = ไม่ใช่ error ของทักษะ
+ * extensions.skills = รหัสที่ไม่ผ่าน · extensions.profession = วิชาชีพที่ใช้ตรวจ (เฉพาะ NOT_ALLOWED)
+ */
+export function skillErrorMessage(err: unknown): string | null {
+  const ext = extractGraphQLErrorExtensions(err);
+  const code = ext?.code;
+  if (code !== 'SKILL_INVALID' && code !== 'SKILL_NOT_ALLOWED_FOR_PROFESSION') return null;
+
+  const skills = Array.isArray(ext?.skills)
+    ? ext.skills.filter((s): s is string => typeof s === 'string').map(skillLabel)
+    : [];
+  const list = skills.length > 0 ? ` "${skills.join('", "')}"` : '';
+
+  if (code === 'SKILL_INVALID') {
+    return `ทักษะ${list} เลือกไม่ได้แล้ว กรุณาเอาออกแล้วเลือกจากรายการทักษะอีกครั้ง`;
+  }
+  const profession = isProfession(ext?.profession) ? PROFESSIONS[ext.profession].label : 'วิชาชีพของคุณ';
+  return `ทักษะ${list} เป็นทักษะเฉพาะที่${profession}เลือกไม่ได้ กรุณาเอาออกแล้วบันทึกอีกครั้ง`;
 }

@@ -17,7 +17,7 @@ import ProfileFormFields from '../../components/ui/ProfileFormFields';
 import ThaiAddressSelector from '../../components/ui/ThaiAddressSelector';
 import AlertModal from '../../components/ui/AlertModal';
 import ProfilePhotoUploadCard from '../../components/caregiver/ProfilePhotoUploadCard';
-import { MAX_CUSTOM_SKILLS, skillLabel } from '../../lib/skillLabels';
+import { MAX_CUSTOM_SKILLS, skillErrorMessage, skillLabel } from '../../lib/skillLabels';
 import CareSkillPicker from '../../features/kyc/CareSkillPicker';
 import CustomSkillsInput from '../../features/kyc/CustomSkillsInput';
 import ProfessionChangeCard from '../../features/kyc/ProfessionChangeCard';
@@ -237,7 +237,8 @@ const CaregiverEditProfile: React.FC = () => {
       logGraphQLError('UpdateCaregiverProfile', error);
       setToastMessage({ 
         type: 'error', 
-        message: error?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' 
+        // PYG-655: error ของทักษะเป็นข้อความไทย · อื่น ๆ คงแบบเดิม
+        message: skillErrorMessage(error) ?? (error?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล'),
       });
     }
   };

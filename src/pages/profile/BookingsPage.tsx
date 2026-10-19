@@ -6,7 +6,7 @@ import { GET_MY_BOOKING_HISTORY } from '../../graphql/queries';
 import { mapGqlStatus, ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
 import { formatBookingTimeRange } from '../../lib/bookingTime';
 import { formatDisplayPrice, NO_PRICE_LABEL } from '../../lib/displayPrice';
-import { skillLabel } from '../../lib/skillLabels';
+import { displaySkills } from '../../lib/skillLabels';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -365,7 +365,7 @@ function SavedCaregiversModal({ isOpen, onClose, caregivers, onRemove, onViewPro
             <div style={{ padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               {caregivers.map((cg) => {
                 const initial = cg.fullName.charAt(0);
-                const skillLabels = cg.skills.slice(0, 3).map((s) => skillLabel(s));
+                const skillLabels = displaySkills(cg.skills, cg.customSkills).slice(0, 3);
                 const locationStr = [cg.district, cg.province].filter(Boolean).join(', ') || cg.province;
                 return (
                   <div

@@ -120,6 +120,8 @@ export interface SavedCaregiver {
   hourlyRate: number;
   avgRating?: number | null;
   skills: string[];
+  /** PYG-655: ทักษะอื่นๆ (BE otherSkills · REST other_skills) */
+  customSkills?: string[];
   province: string;
   district?: string;
 }
@@ -194,6 +196,8 @@ interface BackendSavedItem {
     avatarUrl?: string;
     hourlyRate?: number;
     skills: string[];
+    /** PYG-655: ทักษะอื่นๆ (BE saved-caregivers ส่งมาตั้งแต่ PYG-652) */
+    otherSkills?: string[];
     province?: string;
     district?: string;
   };
@@ -207,6 +211,7 @@ function mapBackendToSaved(item: BackendSavedItem): SavedCaregiver {
     hourlyRate: item.caregiver.hourlyRate ?? 0,
     avgRating: null,
     skills: item.caregiver.skills,
+    customSkills: item.caregiver.otherSkills ?? [],
     province: item.caregiver.province || '',
     district: item.caregiver.district,
   };
