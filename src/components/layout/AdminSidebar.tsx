@@ -8,7 +8,7 @@ interface NavLeaf {
   label: string;
   icon: string;
   end: boolean;
-  badgeKey?: 'kyc' | 'dispute';
+  badgeKey?: 'kyc' | 'dispute' | 'profession';
 }
 
 interface NavGroup {
@@ -27,6 +27,8 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 const NAV_MENU: NavEntry[] = [
   { to: '/admin', label: 'Dashboard', icon: 'dashboard', end: true },
   { to: '/admin/kyc', label: 'KYC Review', icon: 'fact_check', end: false, badgeKey: 'kyc' },
+  // PYG-665: คำขอเปลี่ยนวิชาชีพหลัง KYC อนุมัติ (พร้อมใบประกอบฯ)
+  { to: '/admin/profession-changes', label: 'เปลี่ยนวิชาชีพ', icon: 'swap_horiz', end: false, badgeKey: 'profession' },
   { to: '/admin/users', label: 'จัดการผู้ใช้', icon: 'admin_panel_settings', end: false },
   {
     id: 'payment',
@@ -48,6 +50,7 @@ const ROLE_LABELS: Record<number, string> = {
 interface AdminSidebarProps {
   pendingKyc: number;
   pendingDisputes?: number;
+  pendingProfessionChanges?: number;
   displayName: string;
   role?: number | null;
   onLogout: () => void;
@@ -58,6 +61,7 @@ interface AdminSidebarProps {
 export default function AdminSidebar({
   pendingKyc,
   pendingDisputes = 0,
+  pendingProfessionChanges = 0,
   displayName,
   role,
   onLogout,
@@ -71,6 +75,7 @@ export default function AdminSidebar({
   const badgeFor = (key?: NavLeaf['badgeKey']): number | null => {
     if (key === 'kyc') return pendingKyc > 0 ? pendingKyc : null;
     if (key === 'dispute') return pendingDisputes > 0 ? pendingDisputes : null;
+    if (key === 'profession') return pendingProfessionChanges > 0 ? pendingProfessionChanges : null;
     return null;
   };
 

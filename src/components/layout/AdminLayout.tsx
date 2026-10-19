@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate, NavLink } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { useAuth } from '../../context/AuthContext';
 import { GET_USER, ADMIN_PENDING_COUNT, ADMIN_DISPUTE_PENDING_COUNT } from '../../graphql/queries';
+import { ADMIN_PROFESSION_CHANGE_PENDING_COUNT } from '../../graphql/professionChange';
 import AdminSidebar from './AdminSidebar';
 import NotificationBell from './NotificationBell';
 import { ADMIN_NOTIFICATIONS_PATH, adminNotificationLink } from './adminNotifications';
@@ -35,6 +36,7 @@ function getPageInfo(pathname: string): { title: string; breadcrumb: string } {
     return { title: 'ตรวจสอบรูปโปรไฟล์', breadcrumb: 'หน้าหลัก / KYC Review / รูปโปรไฟล์' };
   }
   if (pathname.startsWith('/admin/kyc/')) return { title: 'ตรวจสอบ KYC', breadcrumb: 'หน้าหลัก / KYC Review / ตรวจสอบ' };
+  if (pathname === '/admin/profession-changes') return { title: 'คำขอเปลี่ยนวิชาชีพ', breadcrumb: 'หน้าหลัก / คำขอเปลี่ยนวิชาชีพ' };
   if (pathname === '/admin/users') return { title: 'จัดการผู้ใช้', breadcrumb: 'หน้าหลัก / จัดการผู้ใช้' };
   if (pathname.startsWith('/admin/users/')) return { title: 'รายละเอียดผู้ดูแล', breadcrumb: 'หน้าหลัก / จัดการผู้ใช้ / รายละเอียดผู้ดูแล' };
   if (pathname === '/admin/payments') return { title: 'Payments', breadcrumb: 'หน้าหลัก / Payments' };
@@ -95,6 +97,12 @@ export default function AdminLayout() {
   const displayName = userData?.me?.displayName || 'Admin';
   const pendingKyc = countData?.pendingCount?.total ?? 0;
   const pendingDisputes = disputeCountData?.flaggedCount?.totalCount ?? 0;
+  // PYG-665: BE ที่ยังไม่มี query นี้ → error เฉพาะ query นี้ badge ไม่ขึ้น หน้าอื่นไม่กระทบ
+  const { data: professionCountData } = useQuery<{ adminProfessionChangeRequests: { total: number } }>(
+    ADMIN_PROFESSION_CHANGE_PENDING_COUNT,
+    { fetchPolicy: 'cache-and-network', pollInterval: 60_000 },
+  );
+  const pendingProfessionChanges = professionCountData?.adminProfessionChangeRequests.total ?? 0;
   const { title, breadcrumb } = getPageInfo(pathname);
   const initial = displayName.charAt(0).toUpperCase() || 'A';
   const today = formatThaiDate(new Date());
@@ -121,6 +129,7 @@ export default function AdminLayout() {
         <AdminSidebar
           pendingKyc={pendingKyc}
           pendingDisputes={pendingDisputes}
+          pendingProfessionChanges={pendingProfessionChanges}
           displayName={displayName}
           role={userData?.me?.role ?? userRole}
           onLogout={handleLogout}
