@@ -9,6 +9,9 @@ import Skeleton from '../../components/ui/Skeleton';
 import Avatar from '../../components/ui/Avatar';
 import KycDocumentsPreview from '../../components/ui/KycDocumentsPreview';
 import AdminLicensePanel from '../../features/kyc/AdminLicensePanel';
+import AdminDrivingLicensePanel, { type DrivingLicenseReview } from '../../features/kyc/AdminDrivingLicensePanel';
+import { DRIVING_LICENSE_DOC_TYPE, DRIVING_LICENSE_KYC_ENABLED, type DrivingLicenseInfo } from '../../lib/drivingLicense';
+import { DRIVING_LICENSE_STRINGS } from '../../lib/drivingLicenseStrings';
 import { LICENSE_DOC_TYPE, LICENSE_KYC_ENABLED, type LicenseInfo } from '../../lib/license';
 import { LICENSE_STRINGS } from '../../lib/licenseStrings';
 import KycHistoryCard from '../../components/ui/KycHistoryCard';
@@ -100,6 +103,9 @@ interface AdminKycDetailResponse {
     /** PYG-588 (field จาก PYG-587 — ขอเฉพาะเมื่อเปิด VITE_LICENSE_KYC_ENABLED) */
     profession?: string | null;
     license?: LicenseInfo | null;
+    /** PYG-598 (field จาก PYG-597 — ขอเฉพาะเมื่อเปิด VITE_DRIVING_LICENSE_KYC_ENABLED) */
+    drivingLicense?: DrivingLicenseInfo | null;
+    drivingLicenseReviews?: DrivingLicenseReview[] | null;
     /** PYG-581: ระดับปัจจุบัน + ผู้กำหนด + เวลา */
     careLevelInfo?: CaregiverCareLevelInfo | null;
   };
@@ -143,6 +149,7 @@ const docTypeLabel: Record<string, string> = {
   photo: 'รูปถ่าย',
   license: 'ใบอนุญาต',
   [LICENSE_DOC_TYPE]: LICENSE_STRINGS.th.sectionTitle,
+  [DRIVING_LICENSE_DOC_TYPE]: DRIVING_LICENSE_STRINGS.th.adminTitle,
 };
 
 const genderLabel: Record<string, string> = {
@@ -660,6 +667,17 @@ export default function KycReviewDetailPage() {
                 <AdminLicensePanel
                   license={data?.adminKycDetail.license ?? null}
                   profession={caregiverProfession}
+                  caregiverName={caregiver.fullName}
+                  onChanged={() => refetch()}
+                  notify={{ success: (m) => toast.success(m), error: (m) => toast.error(m) }}
+                />
+              )}
+
+              {/* PYG-598: ใบขับขี่ — ตรวจรายใบ แยกจากอนุมัติ KYC ทั้งชุด */}
+              {DRIVING_LICENSE_KYC_ENABLED && (
+                <AdminDrivingLicensePanel
+                  info={data?.adminKycDetail.drivingLicense ?? null}
+                  reviews={data?.adminKycDetail.drivingLicenseReviews ?? []}
                   caregiverName={caregiver.fullName}
                   onChanged={() => refetch()}
                   notify={{ success: (m) => toast.success(m), error: (m) => toast.error(m) }}

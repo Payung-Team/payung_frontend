@@ -10,6 +10,8 @@ import KycStep4 from '../steps/KycStep4';
 import KycRejectionList from '../../../components/ui/KycRejectionList';
 import { licenseDraftFromKycStatus } from '../../../features/kyc/licenseDraft';
 import { LICENSE_KYC_ENABLED } from '../../../lib/license';
+import { drivingLicenseDraftFromKycStatus } from '../../../features/kyc/drivingLicenseDraft';
+import { DRIVING_LICENSE_KYC_ENABLED } from '../../../lib/drivingLicense';
 import { isProfession } from '../../../lib/professions';
 
 export default function KycResubmitPage() {
@@ -62,6 +64,9 @@ export default function KycResubmitPage() {
           })),
           // PYG-588: ใบประกอบฯ เดิม — ยังใช้ได้ = เติมให้ · ไม่ผ่าน/หมดอายุ = ฟอร์มว่างพร้อมเหตุผล
           license: LICENSE_KYC_ENABLED ? licenseDraftFromKycStatus(kyc) : null,
+          // PYG-598: ใบขับขี่เดิม — ยังใช้ได้ = เติมให้ (เห็นเมื่อเลือก "ขับเอง") · ไม่ผ่าน/หมดอายุ = ฟอร์มว่างพร้อมเหตุผล
+          // คำตอบการรับส่งไม่ถูกเติม: BE ไม่บันทึกคำตอบนี้ ยื่นซ้ำต้องตอบใหม่ (E10 / E11)
+          drivingLicense: DRIVING_LICENSE_KYC_ENABLED ? drivingLicenseDraftFromKycStatus(kyc) : null,
           payout: kyc.payoutAccount
             ? {
                 bankCode: kyc.payoutAccount.bankCode,
