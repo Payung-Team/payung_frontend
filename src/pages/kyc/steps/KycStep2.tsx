@@ -9,6 +9,15 @@ import ImageModal from '../../../components/ui/ImageModal';
 import Icon from '../../../components/ui/Icon';
 import KycStepper from '../KycStepper';
 import LicenseSection from '../../../features/kyc/LicenseSection';
+import DrivingLicenseSection from '../../../features/kyc/DrivingLicenseSection';
+import {
+  isDrivingLicenseRegistered,
+  useDrivingLicenseDraftActions,
+  validateDrivingLicenseDraft,
+  type DrivingLicenseFieldErrors,
+} from '../../../features/kyc/drivingLicenseDraft';
+import { DRIVING_LICENSE_KYC_ENABLED } from '../../../lib/drivingLicense';
+import { useDrivingLicenseStrings } from '../../../lib/drivingLicenseStrings';
 import {
   isDraftRegistered,
   useLicenseDraftActions,
@@ -74,7 +83,10 @@ function UploadIcon() {
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
-  const { goToStep, saveDoc, removeDoc, uploadedDocs, initialDocs, addPendingDeleteDoc, step1Data, licenseDraft } = useKyc();
+  const {
+    goToStep, saveDoc, removeDoc, uploadedDocs, initialDocs, addPendingDeleteDoc, step1Data, licenseDraft,
+    transportChoice, drivingLicenseDraft,
+  } = useKyc();
   const { user } = useAuth();
   const ls = useLicenseStrings();
 
@@ -88,6 +100,19 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
   const [licenseBusy, setLicenseBusy] = useState(false);
   const [registering, setRegistering] = useState(false);
   const licenseMissing = needsLicense ? Object.keys(validateLicenseDraft(licenseDraft, ls)).length : 0;
+
+  // ── PYG-598: การรับส่งผู้รับการดูแล + ใบขับขี่ — ถามทุกวิชาชีพ ─────────────────
+  const ds = useDrivingLicenseStrings();
+  const { register: registerDrivingLicense } = useDrivingLicenseDraftActions();
+  const [dlShowAll, setDlShowAll] = useState(false);
+  const [dlServerErrors, setDlServerErrors] = useState<DrivingLicenseFieldErrors>({});
+  const [dlMessage, setDlMessage] = useState('');
+  const [dlBusy, setDlBusy] = useState(false);
+  const [registeringDl, setRegisteringDl] = useState(false);
+  const dlIncomplete = DRIVING_LICENSE_KYC_ENABLED && (
+    !transportChoice ||
+    (transportChoice === 'self' && Object.keys(validateDrivingLicenseDraft(drivingLicenseDraft, ds)).length > 0)
+  );
   
   const [docStates, setDocStates] = useState<Record<string, DocState>>(() => {
     const initial: Record<string, DocState> = {};
@@ -380,34 +405,52 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
   const canProceed = displayedDocTypes.every((t) => {
     const state = docStates[t.type];
     return t.required ? state.status === 'success' : true;
-  }) && !licenseBusy && !registering;
+  }) && !licenseBusy && !dlBusy && !registering && !registeringDl;
 
-  // "ถัดไป": ใบประกอบฯ ต้องครบ 3 ช่อง (R1) และ register กับ API ก่อนไปขั้นถัดไป
-  async function handleNext() {
-    if (!needsLicense) {
-      goToStep(3);
-      return;
-    }
+  /** "ถัดไป" ของใบประกอบฯ: ต้องครบ 3 ช่อง (R1) และ register กับ API — คืน false = อยู่ขั้นนี้ต่อ */
+  async function passLicense(): Promise<boolean> {
+    if (!needsLicense) return true;
     setLicenseMessage('');
     if (licenseMissing > 0) {
       setLicenseShowAll(true);
       document.getElementById('kyc-license-title')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
+      return false;
     }
-    if (isDraftRegistered(licenseDraft)) {
-      goToStep(3);
-      return;
-    }
+    if (isDraftRegistered(licenseDraft)) return true;
     setRegistering(true);
     const result = await registerLicense(licenseDraft, ls);
     setRegistering(false);
-    if (result.ok) {
-      goToStep(3);
-      return;
-    }
+    if (result.ok) return true;
     setLicenseShowAll(true);
     setLicenseServerErrors(result.fieldErrors);
     setLicenseMessage(result.message ?? '');
+    return false;
+  }
+
+  /** PYG-598: ต้องตอบคำถามการรับส่ง · "ขับเอง" ต้องมีรูป + วันหมดอายุ และ register กับ API */
+  async function passDrivingLicense(): Promise<boolean> {
+    if (!DRIVING_LICENSE_KYC_ENABLED) return true;
+    setDlMessage('');
+    if (dlIncomplete) {
+      setDlShowAll(true);
+      document.getElementById('kyc-transport-title')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
+    }
+    if (transportChoice !== 'self' || isDrivingLicenseRegistered(drivingLicenseDraft)) return true;
+    setRegisteringDl(true);
+    const result = await registerDrivingLicense(drivingLicenseDraft, ds);
+    setRegisteringDl(false);
+    if (result.ok) return true;
+    setDlShowAll(true);
+    setDlServerErrors(result.fieldErrors);
+    setDlMessage(result.message ?? '');
+    return false;
+  }
+
+  async function handleNext() {
+    if (!(await passLicense())) return;
+    if (!(await passDrivingLicense())) return;
+    goToStep(3);
   }
 
   return (
@@ -633,6 +676,15 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
               onBusyChange={setLicenseBusy}
             />
           )}
+          {/* PYG-598: การรับส่งผู้รับการดูแล — ต่อท้ายเอกสารเดิม (ดีไซน์ PYG-595) */}
+          {DRIVING_LICENSE_KYC_ENABLED && (
+            <DrivingLicenseSection
+              showAllErrors={dlShowAll}
+              serverErrors={dlServerErrors}
+              onEdited={() => { setDlServerErrors({}); setDlMessage(''); }}
+              onBusyChange={setDlBusy}
+            />
+          )}
         </div>
 
         {/* PYG-588: กด "ถัดไป" แล้วใบประกอบฯ ยังไม่ครบ / API ไม่รับ */}
@@ -640,6 +692,14 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
           <p role="alert" className="-mt-4 flex items-start gap-2 rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-[14px] text-[#B91C1C]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
             <Icon name="error" color="currentColor" style={{ fontSize: 18 }} />
             {licenseMessage || ls.blockedNext(licenseMissing)}
+          </p>
+        )}
+
+        {/* PYG-598: กด "ถัดไป" แล้วส่วนการรับส่งยังไม่ครบ / API ไม่รับ */}
+        {DRIVING_LICENSE_KYC_ENABLED && dlShowAll && (dlIncomplete || dlMessage) && (
+          <p role="alert" className="-mt-4 flex items-start gap-2 rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-[14px] text-[#B91C1C]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+            <Icon name="error" color="currentColor" style={{ fontSize: 18 }} />
+            {dlMessage || ds.errSummary}
           </p>
         )}
 
@@ -679,7 +739,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
               boxShadow: canProceed ? '0px 4px 10px -2px rgba(15, 118, 110, 0.24)' : 'none'
             }}
           >
-            {registering ? ls.savingLicense : 'ถัดไป →'}
+            {registering ? ls.savingLicense : registeringDl ? ds.savingDrivingLicense : 'ถัดไป →'}
           </button>
         </div>
 

@@ -2,6 +2,8 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { LicenseStatus } from '../lib/license';
 import type { Profession } from '../lib/professions';
 import { EMPTY_LICENSE_DRAFT } from '../features/kyc/licenseDraftState';
+import type { DrivingLicenseStatus, TransportChoice } from '../lib/drivingLicense';
+import { EMPTY_DRIVING_LICENSE_DRAFT } from '../features/kyc/drivingLicenseDraftState';
 
 export interface KycStep1Data {
   firstName: string;
@@ -78,6 +80,19 @@ export interface LicenseDraft {
   clearedForProfession?: Profession | null;
 }
 
+/**
+ * ใบขับขี่ที่กำลังกรอก (PYG-598) — อยู่ใน memory เท่านั้น ห้ามเก็บลง storage ของ browser
+ * ขั้นตอนเดียวกับใบประกอบฯ: เลือกไฟล์ → ขึ้น storage (`file`) · กด "ถัดไป" ที่ขั้น 2 → uploadKycDocument พร้อมวันหมดอายุ (`registered`)
+ */
+export interface DrivingLicenseDraft {
+  /** 'YYYY-MM-DD' ตามปฏิทินไทย */
+  expiresAt: string;
+  file: LicenseFileUpload | null;
+  registered: { docId: string; expiresAt: string; fileUrl: string } | null;
+  /** ใบจากการยื่นครั้งก่อน — แสดงเหตุผลถ้าใบเดิมไม่ผ่าน/หมดอายุ (E7: ต้องแนบใบใหม่) */
+  previous?: { docId: string; status: DrivingLicenseStatus; rejectionReason: string | null } | null;
+}
+
 interface KycContextType {
   step: number; // 0 = intro, 1 = step1, 2 = step2 (docs), 3 = step3 (payout), 4 = step4 (review)
   step1Data: KycStep1Data | null;
@@ -90,6 +105,11 @@ interface KycContextType {
   /** PYG-588 */
   licenseDraft: LicenseDraft;
   saveLicenseDraft: (draft: LicenseDraft) => void;
+  /** PYG-598 · '' = ยังไม่ตอบ (BE ไม่บันทึกคำตอบ — ยื่นซ้ำต้องตอบใหม่) */
+  transportChoice: TransportChoice;
+  saveTransportChoice: (choice: TransportChoice) => void;
+  drivingLicenseDraft: DrivingLicenseDraft;
+  saveDrivingLicenseDraft: (draft: DrivingLicenseDraft) => void;
   goToStep: (step: number) => void;
   saveStep1: (data: KycStep1Data) => void;
   savePayout: (data: PayoutData | null) => void;
@@ -102,6 +122,7 @@ interface KycContextType {
     docs: UploadedDoc[];
     payout?: InitialPayoutSummary | null;
     license?: LicenseDraft | null;
+    drivingLicense?: DrivingLicenseDraft | null;
   }) => void;
 }
 
@@ -117,6 +138,8 @@ export function KycProvider({ children }: { children: ReactNode }) {
   const [initialPayoutData, setInitialPayoutData] = useState<InitialPayoutSummary | null>(null);
   const [pendingDeleteDocs, setPendingDeleteDocs] = useState<UploadedDoc[]>([]);
   const [licenseDraft, setLicenseDraft] = useState<LicenseDraft>(EMPTY_LICENSE_DRAFT);
+  const [transportChoice, setTransportChoice] = useState<TransportChoice>('');
+  const [drivingLicenseDraft, setDrivingLicenseDraft] = useState<DrivingLicenseDraft>(EMPTY_DRIVING_LICENSE_DRAFT);
 
   function saveDoc(doc: UploadedDoc) {
     setUploadedDocs((prev) => {
@@ -142,6 +165,7 @@ export function KycProvider({ children }: { children: ReactNode }) {
     docs: UploadedDoc[];
     payout?: InitialPayoutSummary | null;
     license?: LicenseDraft | null;
+    drivingLicense?: DrivingLicenseDraft | null;
   }) {
     setStep1Data(data.step1);
     setUploadedDocs(data.docs);
@@ -151,6 +175,9 @@ export function KycProvider({ children }: { children: ReactNode }) {
     setPayoutData(null); // เลขบัญชีเข้ารหัสไว้ — ต้องกรอกใหม่เสมอถ้าจะแก้ (ดู key correctness note 5)
     setPendingDeleteDocs([]);
     setLicenseDraft(data.license ?? EMPTY_LICENSE_DRAFT);
+    // E10 / E11: BE ไม่เก็บคำตอบการรับส่ง → ยื่นซ้ำเริ่มจาก "ยังไม่ตอบ" เสมอ ไม่เดาให้
+    setTransportChoice('');
+    setDrivingLicenseDraft(data.drivingLicense ?? EMPTY_DRIVING_LICENSE_DRAFT);
   }
 
   return (
@@ -165,6 +192,10 @@ export function KycProvider({ children }: { children: ReactNode }) {
       pendingDeleteDocs,
       licenseDraft,
       saveLicenseDraft: setLicenseDraft,
+      transportChoice,
+      saveTransportChoice: setTransportChoice,
+      drivingLicenseDraft,
+      saveDrivingLicenseDraft: setDrivingLicenseDraft,
       goToStep: setStep,
       saveStep1: setStep1Data,
       savePayout: setPayoutData,

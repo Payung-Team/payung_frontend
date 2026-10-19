@@ -16,6 +16,13 @@ import { skillLabel } from '../../../lib/skillLabels';
 import { isKycProfessionError, professionErrorMessage } from '../../../lib/professions';
 import ProfessionBadge from '../../../components/ui/ProfessionBadge';
 import { LICENSE_DOC_TYPE, LICENSE_KYC_ENABLED, licenseErrorCodes, requiresLicense } from '../../../lib/license';
+import {
+  DRIVING_LICENSE_DOC_TYPE,
+  DRIVING_LICENSE_KYC_ENABLED,
+  drivingLicenseErrorCode,
+} from '../../../lib/drivingLicense';
+import { useDrivingLicenseStrings } from '../../../lib/drivingLicenseStrings';
+import { isDrivingLicenseRegistered } from '../../../features/kyc/drivingLicenseDraft';
 import { formatLicenseDate, useLicenseStrings } from '../../../lib/licenseStrings';
 import { isDraftRegistered, storagePathFromUrl } from '../../../features/kyc/licenseDraft';
 
@@ -32,11 +39,19 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
     pendingDeleteDocs,
     clearPendingDeleteDocs,
     licenseDraft,
+    transportChoice,
+    drivingLicenseDraft,
   } = useKyc();
   const ls = useLicenseStrings();
   // PYG-588: ใบประกอบฯ เฉพาะพยาบาล / นักกายภาพฯ — วิชาชีพอื่นไม่ส่งใบที่ค้างอยู่ไปกับ KYC (E1)
   const needsLicense = LICENSE_KYC_ENABLED && requiresLicense(step1Data?.profession);
-  const submitDocs = uploadedDocs.filter((doc) => doc.docType !== LICENSE_DOC_TYPE || needsLicense);
+  // PYG-598: ใบขับขี่ส่งไปกับ KYC เฉพาะเมื่อตอบ "ขับเอง" — ตอบอย่างอื่นไม่ส่งใบที่ค้างอยู่
+  const ds = useDrivingLicenseStrings();
+  const selfDrive = DRIVING_LICENSE_KYC_ENABLED && transportChoice === 'self';
+  const submitDocs = uploadedDocs.filter((doc) =>
+    (doc.docType !== LICENSE_DOC_TYPE || needsLicense) &&
+    (doc.docType !== DRIVING_LICENSE_DOC_TYPE || selfDrive));
+  const [drivingLicenseError, setDrivingLicenseError] = useState('');
   const [licenseError, setLicenseError] = useState('');
   const [professionError, setProfessionError] = useState('');
   const { user } = useAuth();
@@ -112,9 +127,15 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
     if (!step1Data) return;
     setLicenseError('');
     setProfessionError('');
+    setDrivingLicenseError('');
     // R1: ใบประกอบฯ ต้องครบและบันทึกแล้วที่ขั้น 2 — กันซ้ำตอนกดส่ง (E3: วันหมดอายุตรวจอีกรอบที่ BE)
     if (needsLicense && !isDraftRegistered(licenseDraft)) {
       setLicenseError(ls.submitLicenseError);
+      return;
+    }
+    // PYG-598: ต้องตอบเรื่องการรับส่ง และ "ขับเอง" ต้องบันทึกใบขับขี่แล้วที่ขั้น 2
+    if (DRIVING_LICENSE_KYC_ENABLED && (!transportChoice || (selfDrive && !isDrivingLicenseRegistered(drivingLicenseDraft)))) {
+      setDrivingLicenseError(ds.submitError);
       return;
     }
 
@@ -135,6 +156,8 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
         // PYG-659: ทักษะอื่นๆ (BE ชื่อ otherSkills) — ส่งเสมอ ส่ง [] = ไม่มี / ล้างของเดิมตอนยื่นซ้ำ
         otherSkills: step1Data.customSkills ?? [],
       };
+      // PYG-598: true → BE บังคับใบขับขี่ใน documentIds รอบนี้ · ⚠ BE ยังไม่บันทึกคำตอบนี้ (S06 ไม่มีการ์ด DB)
+      if (DRIVING_LICENSE_KYC_ENABLED) kycInput.selfDriveTransport = selfDrive;
 
       // PYG-266: ส่ง payoutAccount เฉพาะตอนที่ผู้ใช้กรอก/แก้ไขจริง (ไม่แตะ = ไม่ส่ง)
       // PYG-307: ปิดไว้ชั่วคราวจนกว่า BE PR #37 จะ merge (ดู payoutAccountFlag.ts)
@@ -174,6 +197,12 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
       // PYG-588: BE ตรวจใบประกอบฯ ซ้ำตอนส่ง (เช่น วันหมดอายุผ่านไประหว่างกรอก) → พาไปแก้ที่ขั้น 2
       if (licenseErrorCodes(err).length > 0) {
         setLicenseError(ls.submitLicenseError);
+        return;
+      }
+      // PYG-598: ใบขับขี่ไม่ครบ / หมดอายุระหว่างกรอก → พาไปแก้ที่ขั้น 2
+      const dlCode = drivingLicenseErrorCode(err);
+      if (dlCode) {
+        setDrivingLicenseError(`${ds.apiError[dlCode]} · ${ds.submitError}`);
         return;
       }
       // PYG-556: วิชาชีพว่าง/ไม่ถูกต้อง → พาไปเลือกใหม่ที่ขั้น 1
@@ -329,6 +358,44 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
           </div>
         )}
 
+        {/* PYG-598: การรับส่งผู้รับการดูแล — สรุปก่อนส่ง */}
+        {DRIVING_LICENSE_KYC_ENABLED && (
+          <div className="border border-[#E2E8F0] rounded-xl overflow-hidden">
+            <div className="bg-[#F8FAFC] px-5 py-3.5 flex justify-between items-center border-b border-[#E2E8F0]">
+              <span className="text-[15px] font-semibold text-[#1E293B]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                {ds.reviewTitle}
+              </span>
+              <button
+                onClick={handleChangeFiles}
+                className="text-[13px] font-semibold text-[#0F766E] hover:underline transition-all cursor-pointer"
+                style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+              >
+                {ds.reviewEdit}
+              </button>
+            </div>
+            <div className="px-5 py-2 flex flex-col">
+              <InfoRow
+                label={ds.reviewChoice}
+                value={transportChoice ? ds.transportOption[transportChoice].label : '-'}
+                border={selfDrive}
+              />
+              {selfDrive && (
+                <>
+                  <InfoRow
+                    label={ds.reviewExpiry}
+                    value={drivingLicenseDraft.expiresAt ? formatLicenseDate(drivingLicenseDraft.expiresAt) : '-'}
+                  />
+                  <DocRow
+                    label={ds.reviewFile}
+                    file={refreshedDocs.find(d => d.docType === DRIVING_LICENSE_DOC_TYPE)}
+                    border={false}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Payout Account Card (PYG-266) */}
         <div className="border border-[#E2E8F0] rounded-xl overflow-hidden">
           <div className="bg-[#F8FAFC] px-5 py-3.5 flex justify-between items-center border-b border-[#E2E8F0]">
@@ -398,6 +465,24 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
         )}
 
         {/* PYG-588: ใบประกอบฯ ไม่ครบ / API ไม่รับ — พากลับไปแก้ที่ขั้น "เอกสาร" */}
+        {/* PYG-598: การรับส่ง / ใบขับขี่ไม่ครบ หรือ API ไม่รับ — พากลับไปแก้ที่ขั้น "เอกสาร" */}
+        {drivingLicenseError && (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3">
+            <p className="flex items-start gap-2 text-[14px] text-[#B91C1C]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+              <Icon name="error" color="currentColor" style={{ fontSize: '18px' }} />
+              {drivingLicenseError}
+            </p>
+            <button
+              type="button"
+              onClick={handleChangeFiles}
+              className="text-[13px] font-semibold text-[#B91C1C] underline cursor-pointer"
+              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+            >
+              {ds.reviewEdit}
+            </button>
+          </div>
+        )}
+
         {licenseError && (
           <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3">
             <p className="flex items-start gap-2 text-[14px] text-[#B91C1C]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>

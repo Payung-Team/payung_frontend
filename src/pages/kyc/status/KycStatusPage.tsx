@@ -4,6 +4,9 @@ import { useQuery } from '@apollo/client/react';
 import { GET_KYC_STATUS } from '../../../graphql/queries';
 import LicenseStatusCard from '../../../features/kyc/LicenseStatusCard';
 import { LICENSE_KYC_ENABLED, type LicenseInfo } from '../../../lib/license';
+import DrivingLicenseStatusCard from '../../../features/kyc/DrivingLicenseStatusCard';
+import { shouldShowDrivingLicenseCard } from '../../../features/kyc/drivingLicenseDraft';
+import { DRIVING_LICENSE_KYC_ENABLED, type DrivingLicenseInfo } from '../../../lib/drivingLicense';
 import Icon from '../../../components/ui/Icon';
 import ImageModal from '../../../components/ui/ImageModal';
 import Skeleton from '../../../components/ui/Skeleton';
@@ -153,6 +156,11 @@ export default function KycStatusPage() {
   const license: LicenseInfo | null = LICENSE_KYC_ENABLED ? data?.kycStatus?.license ?? null : null;
   const licenseCard = license ? (
     <LicenseStatusCard license={license} profession={data?.kycStatus?.profession} kycStatus={status} />
+  ) : null;
+  // PYG-598: ใบขับขี่ — แสดงเมื่อมีใบแล้ว หรือ KYC อนุมัติแล้ว (ทางเปลี่ยนเป็นขับรถรับส่งเอง)
+  const drivingLicense: DrivingLicenseInfo | null = DRIVING_LICENSE_KYC_ENABLED ? data?.kycStatus?.drivingLicense ?? null : null;
+  const drivingLicenseCard = DRIVING_LICENSE_KYC_ENABLED && shouldShowDrivingLicenseCard(drivingLicense, status) ? (
+    <DrivingLicenseStatusCard info={drivingLicense} kycStatus={status} onChanged={() => refetch()} />
   ) : null;
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
 
@@ -353,6 +361,7 @@ export default function KycStatusPage() {
           </div>
 
           {licenseCard}
+          {drivingLicenseCard}
 
           {/* Payout Account Summary (PYG-266) */}
           {payoutAccount && (
@@ -446,6 +455,7 @@ export default function KycStatusPage() {
           </div>
 
           {licenseCard && <div className="w-full mb-6">{licenseCard}</div>}
+          {drivingLicenseCard && <div className="w-full mb-6">{drivingLicenseCard}</div>}
 
           {/* Payout Account (PYG-266) — banner ถ้ายังไม่มี, สรุปแบบ mask ถ้ามีแล้ว */}
           <div className="w-full mb-6">
@@ -513,6 +523,7 @@ export default function KycStatusPage() {
           </div>
 
           {licenseCard && <div className="w-full mb-6">{licenseCard}</div>}
+          {drivingLicenseCard && <div className="w-full mb-6">{drivingLicenseCard}</div>}
 
           {/* Items to fix list */}
           <KycRejectionList 

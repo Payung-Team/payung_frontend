@@ -1,5 +1,6 @@
 import { gql } from "@apollo/client";
 import { LICENSE_DOCUMENT_FIELDS, LICENSE_INFO_FIELD } from "./license";
+import { ADMIN_DRIVING_LICENSE_FIELD, DRIVING_LICENSE_STATUS_FIELD } from "./drivingLicense";
 
 /**
  * PYG-556: `profession` มาจาก BE แล้ว (PYG-575 · contract PYG-573 §3.1)
@@ -272,6 +273,7 @@ export const GET_KYC_STATUS = gql`
         ${LICENSE_DOCUMENT_FIELDS}
       }
       ${LICENSE_INFO_FIELD}
+      ${DRIVING_LICENSE_STATUS_FIELD}
       payoutAccount {
         bankCode
         accountName
@@ -441,6 +443,7 @@ export const ADMIN_KYC_DETAIL = gql`
       }
       pendingProfilePhotoDocumentId
       ${LICENSE_INFO_FIELD}
+      ${ADMIN_DRIVING_LICENSE_FIELD}
       careLevelInfo {
         ${CARE_LEVEL_INFO_FIELDS}
       }

@@ -27,6 +27,7 @@ import { formatDisplayPrice, hasDisplayPrice, NO_PRICE_LABEL } from '../../lib/d
 import { skillLabel } from '../../lib/skillLabels';
 import { PROFESSIONS, isProfession } from '../../lib/professions';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
+import { useDrivingLicenseStrings } from '../../lib/drivingLicenseStrings';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -249,6 +250,7 @@ function WeeklySchedule({ avail }: Readonly<{ avail: boolean[][] }>) {
 
 const CaregiverProfilePage: React.FC = () => {
   const navigate = useNavigate();
+  const dl = useDrivingLicenseStrings();
   const location = useLocation();
   const { id: caregiverId } = useParams<{ id: string }>();
   const { bookingDraft, toggleSaveCaregiver, isCaregiverSaved } = useBooking();
@@ -288,6 +290,8 @@ const CaregiverProfilePage: React.FC = () => {
   // PYG-556: วิชาชีพจาก /public (PYG-575) · PYG-659: ทักษะอื่นๆ จาก /public → other_skills
   const [publicProfession, setPublicProfession] = useState<string | null | undefined>(undefined);
   const [publicCustomSkills, setPublicCustomSkills] = useState<string[] | null>(null);
+  // PYG-598 AC6: /public → driving_license_verified (BE คำนวณตาม R5 ณ เวลาที่เรียก) · BE เก่าไม่มี field = ไม่แสดงป้าย
+  const [drivingLicenseVerified, setDrivingLicenseVerified] = useState(false);
   const [publicReloadKey, setPublicReloadKey] = useState(0);
   const reloadPublicProfile = useCallback(() => setPublicReloadKey((k) => k + 1), []);
   const refreshPhoto = useSignedUrlRefresh(reloadPublicProfile);
@@ -297,13 +301,14 @@ const CaregiverProfilePage: React.FC = () => {
     const apiBase = import.meta.env.VITE_GRAPHQL_URL?.replace('/graphql', '') ?? '';
     fetch(`${apiBase}/api/v1/caregivers/${caregiverId}/public`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { availability?: { day: number; slots: string[] }[]; completed_booking_count?: number; avatar_url?: string | null; hourly_rate?: number | null; profession?: string | null; other_skills?: string[] | null } | null) => {
+      .then((data: { availability?: { day: number; slots: string[] }[]; completed_booking_count?: number; avatar_url?: string | null; hourly_rate?: number | null; profession?: string | null; other_skills?: string[] | null; driving_license_verified?: boolean } | null) => {
         if (data?.availability) setAvail(buildAvailMatrix(data.availability));
         if (data && data.hourly_rate !== undefined) setPublicHourlyRate(data.hourly_rate);
         if (data?.completed_booking_count !== undefined) setCompletedBookingCount(data.completed_booking_count);
         if (data && data.avatar_url !== undefined) setPublicAvatarUrl(data.avatar_url);
         if (data && data.profession !== undefined) setPublicProfession(data.profession);
         if (Array.isArray(data?.other_skills)) setPublicCustomSkills(data.other_skills);
+        setDrivingLicenseVerified(data?.driving_license_verified === true);
       })
       .catch(() => undefined);
   }, [caregiverId, publicReloadKey]);
@@ -513,6 +518,18 @@ const CaregiverProfilePage: React.FC = () => {
                           <span className="material-icons" style={{ fontSize: 14, color: '#FFFFFF' }}>verified</span>
                           <span className="text-white font-semibold" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, lineHeight: '18px' }}>
                             ยืนยันตัวตนแล้ว
+                          </span>
+                        </span>
+                      )}
+                      {drivingLicenseVerified && (
+                        <span
+                          className="inline-flex items-center gap-[5px] px-[10px] py-[3px]"
+                          style={{ background: 'rgba(255,255,255,0.2)', border: '0.8px solid rgba(255,255,255,0.35)', borderRadius: 9999, height: 25.6 }}
+                          title={dl.elderBadgeHint}
+                        >
+                          <span className="material-icons" style={{ fontSize: 14, color: '#FFFFFF' }} aria-hidden="true">directions_car</span>
+                          <span className="text-white font-semibold" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, lineHeight: '18px' }}>
+                            {dl.elderBadge}
                           </span>
                         </span>
                       )}
