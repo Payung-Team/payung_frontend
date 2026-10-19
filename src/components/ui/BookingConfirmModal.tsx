@@ -4,7 +4,7 @@ import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import CaregiverPhoto from './CaregiverPhoto';
 import { formatBookingTimeRange } from '../../lib/bookingTime';
 import { isBookingTimeErrorMessage } from '../../lib/bookingSubmitError';
-import { skillLabel } from '../../lib/skillLabels';
+import { displaySkills } from '../../lib/skillLabels';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -16,6 +16,8 @@ interface CaregiverSummary {
   avgRating?: number | null;
   reviewCount: number;
   skills: string[];
+  /** PYG-655: ทักษะอื่นๆ (BE otherSkills) */
+  customSkills?: string[];
   province: string;
   district: string;
   bio?: string | null;
@@ -100,7 +102,7 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
   const province = caregiver?.province ?? '';
   const verified = caregiver?.verified ?? false;
   const avatarUrl = caregiver?.avatarUrl ?? null;
-  const skills = (caregiver?.skills ?? []).map((s) => skillLabel(s));
+  const skills = displaySkills(caregiver?.skills, caregiver?.customSkills);
 
   // Booking details
   const serviceTypes = (bookingDraft?.serviceTypes ?? [])

@@ -1,9 +1,11 @@
-import { CARE_SKILLS, isSelectableSkill, skillLabel } from '../../lib/skillLabels';
+import { isSelectableSkill, skillLabel } from '../../lib/skillLabels';
+import { useCareSkillCatalog } from './useCareSkillCatalog';
 import { isProfession } from '../../lib/professions';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
 
 /**
  * ทักษะกลาง (ใช้จับคู่งาน) — ทักษะพื้นฐานทุกวิชาชีพติ๊กได้ + ทักษะเฉพาะที่ขึ้นตามวิชาชีพที่เลือก
+ * รายการมาจาก API careSkills (PYG-655 · useCareSkillCatalog)
  * ค่าเดิมที่ติ๊กไม่ได้แล้ว (รหัสชุดเก่า หรือทักษะเฉพาะของวิชาชีพอื่น) แสดงแยกให้กดเอาออกได้ ไม่ซ่อนเงียบๆ
  *
  * tone ตามแบบฟิลด์อื่นใน KycStep1 ตอน resubmit: muted = ยังไม่แก้ (เทา) · edited = แก้แล้ว (เขียว)
@@ -22,9 +24,10 @@ interface Props {
 const font = { fontFamily: "'Bai Jamjuree', sans-serif" };
 
 export default function CareSkillPicker({ id, value, onChange, profession, error, tone = 'default', droppedSkills = [] }: Props) {
-  const basic = CARE_SKILLS.filter((s) => !s.profession);
-  const specific = CARE_SKILLS.filter((s) => s.profession && s.profession === profession);
-  const legacy = value.filter((s) => !isSelectableSkill(s, profession));
+  const catalog = useCareSkillCatalog();
+  const basic = catalog.filter((s) => !s.profession);
+  const specific = catalog.filter((s) => s.profession && s.profession === profession);
+  const legacy = value.filter((s) => !isSelectableSkill(s, profession, catalog));
   const count = value.length - legacy.length;
 
   function toggle(code: string) {

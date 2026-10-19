@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useMemo, useState } from 'react';
+import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
@@ -7,7 +7,14 @@ import { useKyc } from '../../../context/KycContext';
 import Input from '../../../components/ui/Input';
 import Icon from '../../../components/ui/Icon';
 import KycStepper from '../KycStepper';
-import { MAX_CUSTOM_SKILLS, isCareSkill, isSelectableSkill, splitSkillsForProfession } from '../../../lib/skillLabels';
+import {
+  MAX_CUSTOM_SKILLS,
+  isCareSkill,
+  isSelectableSkill,
+  splitSkillsForProfession,
+  type CareSkillDef,
+} from '../../../lib/skillLabels';
+import { useCareSkillCatalog } from '../../../features/kyc/useCareSkillCatalog';
 import { isProfession } from '../../../lib/professions';
 import ProfessionPicker from '../../../features/kyc/ProfessionPicker';
 import ConfirmModal from '../../../components/ui/ConfirmModal';
@@ -34,7 +41,9 @@ function isValidThaiPhone(phone: string): boolean {
 }
 
 // ── Zod schema ────────────────────────────────────────────────────────────
-const step1Schema = z.object({
+// PYG-655: ทักษะตรวจกับรายการจาก API careSkills (catalog) — สร้าง schema ตามรายการล่าสุด
+function makeStep1Schema(catalog: ReadonlyArray<CareSkillDef>) {
+  return z.object({
   firstName: z
     .string()
     .min(1, 'กรุณากรอกชื่อจริง')
@@ -68,7 +77,7 @@ const step1Schema = z.object({
     .string()
     .refine((val: string): boolean => isProfession(val), 'กรุณาเลือกวิชาชีพ'),
   // ระดับ field ให้ error ขึ้นพร้อมช่องอื่นตั้งแต่กดครั้งแรก · superRefine ด้านล่างกันกรณีที่เหลือแต่ทักษะเฉพาะของวิชาชีพอื่น
-  skills: z.array(z.string()).refine((val) => val.some(isCareSkill), 'กรุณาเลือกทักษะอย่างน้อย 1 รายการ'),
+  skills: z.array(z.string()).refine((val) => val.some((s) => isCareSkill(s, catalog)), 'กรุณาเลือกทักษะอย่างน้อย 1 รายการ'),
   customSkills: z.array(z.string()).max(MAX_CUSTOM_SKILLS),
   experienceYears: z.coerce
     .number({ message: 'กรุณากรอกจำนวนปีประสบการณ์' })
@@ -78,12 +87,13 @@ const step1Schema = z.object({
   bio: z.string().max(500, 'แนะนำตัวต้องไม่เกิน 500 ตัวอักษร').optional(),
 }).superRefine((data, ctx) => {
   // นับเฉพาะทักษะที่ติ๊กได้จริง — รหัสชุดเก่า / ทักษะเฉพาะของวิชาชีพอื่นที่ค้างอยู่ใช้จับคู่งานไม่ได้
-  if (!data.skills.some((s) => isSelectableSkill(s, data.profession))) {
+  if (!data.skills.some((s) => isSelectableSkill(s, data.profession, catalog))) {
     ctx.addIssue({ code: 'custom', path: ['skills'], message: 'กรุณาเลือกทักษะอย่างน้อย 1 รายการ' });
   }
 });
+}
 
-type Step1Form = z.infer<typeof step1Schema>;
+type Step1Form = z.infer<ReturnType<typeof makeStep1Schema>>;
 
 // ── Options ───────────────────────────────────────────────────────────────
 const GENDER_OPTIONS = [
@@ -115,6 +125,14 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
     };
   };
 
+  const catalog = useCareSkillCatalog();
+  // react-hook-form อ่าน resolver ใหม่ทุก render (control._options = props) — catalog โหลดเสร็จแล้ว validate ตามรายการ API
+  // z.coerce ทำให้ input type ของ experienceYears เป็น unknown — cast แบบเดียวกับที่ resolver เดิมต้องการ
+  const resolver = useMemo(
+    () => zodResolver(makeStep1Schema(catalog)) as unknown as Resolver<Step1Form>,
+    [catalog],
+  );
+
   const {
     register,
     handleSubmit,
@@ -123,7 +141,7 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
     formState: { errors },
     reset,
   } = useForm<Step1Form>({
-    resolver: zodResolver(step1Schema),
+    resolver,
     // PYG-545: error ขึ้นเมื่อออกจากช่อง แล้ว validate ใหม่ทุกครั้งที่ค่าเปลี่ยน · ช่องที่ยังไม่แตะไม่แสดง error
     mode: 'onTouched',
     defaultValues: step1Data
@@ -194,7 +212,7 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
 
   function applyProfession(next: string) {
     setValue('profession', next, { shouldValidate: true });
-    const { kept, dropped } = splitSkillsForProfession(selectedSkills, next);
+    const { kept, dropped } = splitSkillsForProfession(selectedSkills, next, catalog);
     if (dropped.length > 0) setValue('skills', kept, { shouldValidate: errors.skills != null });
     setDroppedSkills(dropped);
   }

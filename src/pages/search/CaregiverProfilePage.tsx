@@ -723,6 +723,7 @@ const CaregiverProfilePage: React.FC = () => {
                         hourlyRate: hasDisplayPrice(hourlyRate) ? hourlyRate : 0,
                         avgRating: cg.avgRating,
                         skills: cg.skills,
+                        customSkills,
                         province: cg.province,
                         district: cg.district,
                       });
@@ -782,7 +783,7 @@ const CaregiverProfilePage: React.FC = () => {
         isOpen={showModal}
         onClose={() => { setShowModal(false); setBookingError(null); }}
         onConfirm={handleConfirmBooking}
-        caregiver={cg ? { ...cg, avatarUrl, hourlyRate: hasDisplayPrice(hourlyRate) ? hourlyRate : 0 } : undefined}
+        caregiver={cg ? { ...cg, avatarUrl, hourlyRate: hasDisplayPrice(hourlyRate) ? hourlyRate : 0, customSkills } : undefined}
         bookingDraft={bookingDraft}
         isSubmitting={isSubmitting}
         errorMessage={bookingError ?? undefined}

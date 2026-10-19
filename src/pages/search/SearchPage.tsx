@@ -24,7 +24,7 @@ import {
 import { useAssessmentStrings } from '../../lib/assessmentStrings';
 import { bookingAssessmentRedirect } from '../../lib/assessmentNav';
 import ThailandAddressSimple from 'thailand-address-simple';
-import { skillLabel } from '../../lib/skillLabels';
+import { displaySkills } from '../../lib/skillLabels';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -37,6 +37,8 @@ interface CaregiverSummary {
   avgRating?: number | null;
   reviewCount: number;
   skills: string[];
+  /** PYG-655: ทักษะอื่นๆ (BE otherSkills) */
+  customSkills?: string[];
   province: string;
   district: string;
   // ── Newly surfaced to match the Patient page CGRow card. ──
@@ -131,7 +133,7 @@ function StarRating({ rating, count, size = 16 }: { rating: number; count?: numb
 function CaregiverCard({ cg, onSelect, onViewProfile, onPhotoExpired }: { cg: CaregiverSummary; onSelect?: (cg: CaregiverSummary) => void; onViewProfile?: (cg: CaregiverSummary) => void; onPhotoExpired?: () => void }) {
   const fullName = cg.fullName;
   const hasRating = cg.avgRating != null && cg.reviewCount > 0;
-  const translatedSkills = cg.skills.map((skill) => skillLabel(skill));
+  const translatedSkills = displaySkills(cg.skills, cg.customSkills);
   const visibleSkills = translatedSkills.slice(0, 3);
   const extraSkills = translatedSkills.length - 3;
   const gender = GENDER_DISPLAY[cg.gender ?? ''] ?? null;
@@ -232,7 +234,7 @@ function CaregiverCard({ cg, onSelect, onViewProfile, onPhotoExpired }: { cg: Ca
           )}
 
           {/* Skill chips (teal) */}
-          {cg.skills.length > 0 && (
+          {translatedSkills.length > 0 && (
             <div className="flex flex-wrap gap-1.5 items-center mt-1">
               {visibleSkills.map((skill) => (
                 <span

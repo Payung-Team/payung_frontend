@@ -20,7 +20,7 @@ import { useToast } from '../../hooks/useToast';
 import { formatBookingTimeRange } from '../../lib/bookingTime';
 import { formatDisplayPrice, NO_PRICE_LABEL } from '../../lib/displayPrice';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
-import { skillLabel } from '../../lib/skillLabels';
+import { displaySkills } from '../../lib/skillLabels';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 
 interface UserData {
@@ -44,6 +44,8 @@ interface CaregiverProfile {
   bio?: string | null;
   hourlyRate?: number | null;
   skills?: string[] | null;
+  /** PYG-655: ทักษะอื่นๆ (GET_CAREGIVER_PROFILE → customSkills: otherSkills) */
+  customSkills?: string[] | null;
   experienceYears?: number | null;
   kycStatus: string;
   isSearchable: boolean;
@@ -488,7 +490,7 @@ function UpcomingJobs({ jobs }: { jobs: HomeBooking[] }) {
 
 function ProfileCard({ profile }: { profile: CaregiverProfile }) {
   const readiness = profileReadiness(profile);
-  const translatedSkills = (profile.skills ?? []).map(skillLabel);
+  const translatedSkills = displaySkills(profile.skills, profile.customSkills);
   return (
     <section className="rounded-[18px] border border-[#E1EAE6] bg-white px-5 py-5 shadow-[0_3px_14px_rgba(27,92,72,0.04)]" aria-labelledby="profile-title">
       <div className="flex flex-wrap items-center justify-between gap-2">

@@ -1113,6 +1113,7 @@ export const SEARCH_CAREGIVERS = gql`
         avgRating
         reviewCount
         skills
+        ${CUSTOM_SKILLS_FIELD}
         ${PROFESSION_FIELD}
         province
         district

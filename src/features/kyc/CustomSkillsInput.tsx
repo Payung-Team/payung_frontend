@@ -5,6 +5,7 @@ import {
   customSkillError,
   normalizeCustomSkill,
 } from '../../lib/skillLabels';
+import { useCareSkillCatalog } from './useCareSkillCatalog';
 
 /**
  * ทักษะอื่นๆ ที่ผู้ดูแลพิมพ์เอง — แสดงในโปรไฟล์เท่านั้น ไม่ใช้จับคู่งาน
@@ -21,12 +22,13 @@ const font = { fontFamily: "'Bai Jamjuree', sans-serif" };
 export default function CustomSkillsInput({ id, value, onChange }: Props) {
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const catalog = useCareSkillCatalog();
   const full = value.length >= MAX_CUSTOM_SKILLS;
 
   function commit() {
     const v = normalizeCustomSkill(draft);
     if (!v) return;
-    const err = customSkillError(v, value);
+    const err = customSkillError(v, value, catalog);
     setError(err);
     if (err) return;
     onChange([...value, v]);
