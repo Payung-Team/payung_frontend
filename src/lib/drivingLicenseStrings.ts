@@ -58,6 +58,9 @@ const TH = {
   // E8: ต่ออายุแล้วอัปโหลดใบใหม่ — ใบเดิมที่อนุมัติและยังไม่หมดอายุยังใช้ได้ระหว่างรอตรวจใบใหม่
   pendingStillVerifiedNote: 'ใบเดิมที่ผ่านการตรวจยังใช้ได้ระหว่างรอตรวจใบใหม่',
   approvedNote: 'รับงานที่ต้องขับรถรับส่งได้ · โปรไฟล์ของคุณแสดงป้าย “ผ่านการตรวจใบขับขี่”',
+  // ป้ายในโปรไฟล์ฝั่ง Elder (AC6) — R8: สื่อแค่ "ผ่านการตรวจ" ไม่สื่อว่ามีรถหรือรับรองความปลอดภัย
+  elderBadge: 'ผ่านการตรวจใบขับขี่',
+  elderBadgeHint: 'ทีมงานตรวจใบขับขี่และวันหมดอายุแล้ว · ไม่ได้รับรองว่ามีรถหรือความปลอดภัยในการขับ',
   rejectedReasonLabel: 'เหตุผลจากทีมงาน',
   expiredBody: (date: string) =>
     `ใบขับขี่หมดอายุเมื่อ ${date} · รับงานที่ต้องขับรถรับส่งไม่ได้จนกว่าใบใหม่จะผ่านการตรวจ`,
@@ -175,6 +178,8 @@ const EN: DrivingLicenseStrings = {
   pendingNote: 'While we review it, you can still accept jobs that don’t need driving',
   pendingStillVerifiedNote: 'Your previously verified license is still valid while we review the new one',
   approvedNote: 'You can accept jobs that need driving · your profile shows a “Driving license verified” badge',
+  elderBadge: 'Driving license verified',
+  elderBadgeHint: 'Our team checked the license and its expiry · this does not confirm a car or driving safety',
   rejectedReasonLabel: 'Reason from our team',
   expiredBody: (date: string) =>
     `Your license expired on ${date} · you can’t accept jobs that need driving until a new one is verified`,
