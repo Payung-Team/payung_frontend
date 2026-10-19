@@ -64,6 +64,8 @@ export const PROFESSION_ERROR_MESSAGES: Record<string, string> = {
   PROFESSION_CHANGE_ALREADY_PENDING: 'มีคำขอเปลี่ยนวิชาชีพที่รอตรวจอยู่แล้ว ส่งได้ทีละ 1 คำขอ',
   PROFESSION_CHANGE_NOT_FOUND: 'ไม่พบคำขอเปลี่ยนวิชาชีพนี้',
   PROFESSION_CHANGE_NOT_PENDING: 'คำขอนี้ไม่ได้อยู่ระหว่างรอตรวจแล้ว',
+  // PYG-663: แอดมินอนุมัติคำขอที่ใบประกอบฯ ใช้ไม่ได้แล้ว / คำขอเก่าที่ไม่มีใบ
+  PROFESSION_CHANGE_LICENSE_UNUSABLE: 'อนุมัติไม่ได้ ใบประกอบวิชาชีพของคำขอนี้ใช้ไม่ได้แล้ว (ไม่มีใบ / ถูกปฏิเสธ / หมดอายุ) · ปฏิเสธคำขอแล้วให้ผู้ดูแลยื่นใหม่พร้อมใบใหม่',
 };
 
 /** ข้อความของ error วิชาชีพ — null = ไม่ใช่ error ของวิชาชีพ */

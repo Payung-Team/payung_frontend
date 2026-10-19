@@ -65,3 +65,79 @@ export interface ProfessionChangeRequest {
   requestedAt: string;
   reviewedAt: string | null;
 }
+
+// ── ฝั่งแอดมิน (PYG-665 · BE PYG-575 / PYG-663) ────────────────────────────
+
+export type ProfessionChangeStatus = ProfessionChangeRequest['status'];
+
+export interface AdminProfessionChangeRequest extends ProfessionChangeRequest {
+  caregiverId: string;
+  caregiverName: string;
+  caregiverNumber: string | null;
+  reviewerName: string | null;
+  licenseDocument: (ProfessionChangeRequest['licenseDocument'] & { reviewStatus: string | null }) | null;
+}
+
+/** คิวตรวจ: pending เรียงยื่นเก่าสุดก่อน · สถานะอื่นเรียงตัดสินล่าสุดก่อน */
+export const ADMIN_PROFESSION_CHANGE_REQUESTS = gql`
+  query AdminProfessionChangeRequests($input: AdminProfessionChangeRequestsInput) {
+    adminProfessionChangeRequests(input: $input) {
+      items {
+        id
+        caregiverId
+        caregiverName
+        caregiverNumber
+        fromProfession
+        toProfession
+        status
+        licenseNumber
+        licenseExpiresAt
+        licenseDocument {
+          id
+          fileName
+          signedUrl
+          reviewStatus
+        }
+        rejectionReason
+        requestedAt
+        reviewedAt
+        reviewerName
+      }
+      total
+      page
+      totalPages
+    }
+  }
+`;
+
+/** จำนวนคำขอรอตรวจ — badge ในเมนูแอดมิน */
+export const ADMIN_PROFESSION_CHANGE_PENDING_COUNT = gql`
+  query AdminProfessionChangePendingCount {
+    adminProfessionChangeRequests(input: { status: pending, limit: 1 }) {
+      total
+    }
+  }
+`;
+
+/** อนุมัติ = เปลี่ยนวิชาชีพ + อนุมัติใบประกอบฯ ที่แนบ ในทรานแซคชันเดียว (PYG-663) */
+export const APPROVE_PROFESSION_CHANGE_REQUEST = gql`
+  mutation ApproveProfessionChangeRequest($id: ID!) {
+    approveProfessionChangeRequest(id: $id) {
+      id
+      status
+      reviewedAt
+    }
+  }
+`;
+
+/** ปฏิเสธ = วิชาชีพคงเดิม + ใบที่ยังรอตรวจถูกปฏิเสธด้วยเหตุผลเดียวกัน */
+export const REJECT_PROFESSION_CHANGE_REQUEST = gql`
+  mutation RejectProfessionChangeRequest($id: ID!, $reason: String!) {
+    rejectProfessionChangeRequest(input: { id: $id, reason: $reason }) {
+      id
+      status
+      rejectionReason
+      reviewedAt
+    }
+  }
+`;
