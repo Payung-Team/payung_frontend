@@ -6,8 +6,9 @@ import { gql } from "@apollo/client";
  * ตาม contract PYG-573 §4 (BE: PYG-575) — ใช้ใน useProfessionChange
  *
  * status: pending | approved | rejected | cancelled
- * ProfessionChangeInput ตอนนี้รับแค่ { profession } — field ใบประกอบฯ ใน type เป็น null เสมอจนกว่า S03 (PYG-558)
- *   จะเพิ่ม licenseDocumentId + licenseNumber + licenseExpiresAt ('YYYY-MM-DD') ใน input
+ * ProfessionChangeInput = { profession, licenseDocumentId? } — licenseDocumentId บังคับเมื่อเป็นพยาบาล/นักกายภาพฯ (BE PYG-663)
+ *   licenseNumber / licenseExpiresAt ('YYYY-MM-DD') / licenseDocument มาจากใบที่แนบ · licenseDocument.signedUrl เป็น null เสมอ
+ *   (ไฟล์ดูที่หน้าสถานะ KYC)
  */
 const REQUEST_FIELDS = `
   id

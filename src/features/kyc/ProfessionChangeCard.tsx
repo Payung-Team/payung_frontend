@@ -2,15 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { logGraphQLError } from '../../lib/logGraphQLError';
 import type { ProfessionChangeRequest } from '../../graphql/professionChange';
 import { PROFESSIONS, isProfession, professionErrorMessage, type Profession } from '../../lib/professions';
-import { PROFESSION_CHANGE_LICENSE_ENABLED, useProfessionChange, type LicenseFile } from './useProfessionChange';
+import { useProfessionChange, type LicenseFile } from './useProfessionChange';
+import { fieldErrorsFromCodes } from './licenseDraft';
+import { LICENSE_NUMBER_MAX_LENGTH, licenseErrorCodes } from '../../lib/license';
+import { useLicenseStrings } from '../../lib/licenseStrings';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import ProfessionPicker from './ProfessionPicker';
 
 /**
  * ขอเปลี่ยนวิชาชีพหลัง KYC อนุมัติแล้ว (PYG-556 · S01-AC6 · R5)
- * เปลี่ยนเป็นพยาบาล / นักกายภาพฯ ต้องแนบใบประกอบฯ (เลขที่ + วันหมดอายุ + ไฟล์) ทุกครั้ง — เมื่อ S03 พร้อม
- *   (PROFESSION_CHANGE_LICENSE_ENABLED) · ระหว่างนี้ส่งได้โดยไม่แนบ
+ * เปลี่ยนเป็นพยาบาล / นักกายภาพฯ ต้องแนบใบประกอบฯ (เลขที่ + วันหมดอายุ + ไฟล์) ทุกครั้ง (PYG-664 · BE PYG-663)
+ *   แอดมินตรวจใบพร้อมคำขอ — อนุมัติคำขอ = อนุมัติใบ · ปฏิเสธคำขอ = ปฏิเสธใบ
  * ระหว่างรอตรวจ ฝั่ง Elder ยังเห็นวิชาชีพเดิม · ส่งคำขอได้ทีละ 1 คำขอ
  *
  * ข้อมูลมาจาก useProfessionChange (graphql/professionChange.ts)
@@ -128,8 +131,9 @@ export default function ProfessionChangeCard({
   const fileInput = useRef<HTMLInputElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
+  const ls = useLicenseStrings();
   const targetMeta = isProfession(target) ? PROFESSIONS[target] : null;
-  const licenseRequired = (p: Profession) => PROFESSION_CHANGE_LICENSE_ENABLED && PROFESSIONS[p].requiresLicense;
+  const licenseRequired = (p: Profession) => PROFESSIONS[p].requiresLicense;
   const needsLicense = isProfession(target) && licenseRequired(target);
 
   // เปิดฟอร์มแล้ว เลื่อนไปหาตัวเลือก
@@ -141,11 +145,8 @@ export default function ProfessionChangeCard({
     setTarget(prefill?.toProfession ?? '');
     setLicenseNumber(prefill?.licenseNumber ?? '');
     setExpiresAt(prefill?.licenseExpiresAt ? prefill.licenseExpiresAt.slice(0, 10) : '');
-    setFile(
-      prefill?.licenseDocument
-        ? { docId: prefill.licenseDocument.id, fileName: prefill.licenseDocument.fileName, previewUrl: prefill.licenseDocument.signedUrl }
-        : null,
-    );
+    // ใบของคำขอที่ถูกปฏิเสธถูกปฏิเสธไปพร้อมกัน ใช้ซ้ำไม่ได้ (BE: LICENSE_FILE_REQUIRED) — ต้องแนบไฟล์ใหม่
+    setFile(null);
     setErrors({});
     setEditing(true);
   }
@@ -208,6 +209,13 @@ export default function ProfessionChangeCard({
     } catch (err) {
       logGraphQLError('RequestProfessionChange', err);
       setConfirmSubmit(false);
+      // error ของใบ (LICENSE_*) → ขึ้นใต้ช่องที่ต้องแก้ ข้อความจากไฟล์ข้อความกลางของใบประกอบฯ
+      const codes = licenseErrorCodes(err);
+      if (codes.length > 0) {
+        setErrors((e) => ({ ...e, ...fieldErrorsFromCodes(codes, ls) }));
+        onNotify('error', ls.apiError[codes[0]] ?? ls.errUnknown);
+        return;
+      }
       onNotify('error', professionErrorMessage(err) ?? 'ส่งคำขอไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
     }
   }
@@ -338,7 +346,7 @@ export default function ProfessionChangeCard({
                     id="license-number"
                     value={licenseNumber}
                     onChange={(e) => { setLicenseNumber(e.target.value); setErrors((er) => ({ ...er, licenseNumber: undefined })); }}
-                    maxLength={30}
+                    maxLength={LICENSE_NUMBER_MAX_LENGTH}
                     placeholder="เช่น 5511223344"
                     aria-invalid={!!errors.licenseNumber || undefined}
                     aria-describedby={errors.licenseNumber ? 'license-number-error' : undefined}
