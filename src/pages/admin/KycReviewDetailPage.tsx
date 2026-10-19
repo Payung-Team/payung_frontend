@@ -725,6 +725,7 @@ export default function KycReviewDetailPage() {
                 ref={careLevelPickerRef}
                 caregiverName={caregiver.fullName}
                 kycStatus={caregiver.kycStatus}
+                profession={caregiverProfession}
                 data={careLevel}
                 picked={levelToApprove}
                 onPick={pickLevel}

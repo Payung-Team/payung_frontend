@@ -2,6 +2,7 @@ import { forwardRef, useState } from 'react';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import CareLevelBadge from '../../components/ui/CareLevelBadge';
 import CareLevelPicker from './CareLevelPicker';
+import CareLevelCriteria from './CareLevelCriteria';
 import { extractGraphQLErrorExtensions, extractGraphQLErrorMessage } from '../../lib/apolloErrors';
 import { careLevelLabel, formatCareLevelTime, useCareLevelStrings, type CareLevel } from '../../lib/careLevels';
 import type { CareLevelChange } from '../../graphql/careLevel';
@@ -19,6 +20,8 @@ import type { CareLevelData } from './useCareLevel';
 interface Props {
   caregiverName: string;
   kycStatus: string;
+  /** วิชาชีพที่ผู้ดูแลเลือก — ใช้แสดงคำแนะนำในเกณฑ์ระดับเท่านั้น */
+  profession?: string | null;
   data: CareLevelData;
   /** โหมดรอตรวจ: ค่าที่เลือก (หน้าแม่ถือ) */
   picked: CareLevel | null;
@@ -30,7 +33,7 @@ interface Props {
 const REASON_MAX_LENGTH = 500;
 
 const AdminCareLevelCard = forwardRef<HTMLDivElement, Props>(function AdminCareLevelCard(
-  { caregiverName, kycStatus, data, picked, onPick, pickerError, onNotify },
+  { caregiverName, kycStatus, profession, data, picked, onPick, pickerError, onNotify },
   pickerRef,
 ) {
   const s = useCareLevelStrings();
@@ -158,18 +161,21 @@ const AdminCareLevelCard = forwardRef<HTMLDivElement, Props>(function AdminCareL
             onChange={onPick}
             error={pickerError}
           />
-          <p className="mt-3 text-[12.5px] text-[#6B7280]">{s.criteriaPending}</p>
+          <CareLevelCriteria level={picked} profession={profession} />
         </div>
       ) : editing ? (
         <div className="mt-4 flex flex-col gap-4">
-          <CareLevelPicker
-            id="edit-care-level"
-            labelledBy="care-level-title"
-            value={draft}
-            onChange={setDraft}
-            currentValue={level}
-            disabled={saving}
-          />
+          <div>
+            <CareLevelPicker
+              id="edit-care-level"
+              labelledBy="care-level-title"
+              value={draft}
+              onChange={setDraft}
+              currentValue={level}
+              disabled={saving}
+            />
+            <CareLevelCriteria level={draft} profession={profession} />
+          </div>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="care-level-reason" className="text-[14px] font-semibold text-[#111827]">
               {s.reason} <span className="text-[#DC2626]" aria-hidden="true">*</span>
