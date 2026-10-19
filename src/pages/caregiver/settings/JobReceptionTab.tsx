@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQuery } from '@apollo/client/react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { GET_CAREGIVER_PROFILE,SET_CAREGIVER_SEARCHABLE,GET_WORK_CONDITION,UPDATE_WORK_CONDITION,UPDATE_CAREGIVER_PROFILE,} from '../../../graphql/queries';
 import { Icon } from '../../../components/ui/Icon';
 import { useToast } from '../../../hooks/useToast';
@@ -8,6 +8,17 @@ import { ToastContainer } from '../../../components/ui/Toast';
 import { ToggleSwitch } from '../../../components/ui/ToggleSwitch';
 import Skeleton from '../../../components/ui/Skeleton';
 import ThailandAddressSimple from 'thailand-address-simple';
+import { GET_MY_JOB_TYPE_OPTIONS } from '../../../graphql/jobTypes';
+import {
+  JOB_TYPE_IDS,
+  blockedJobTypes,
+  blockedReasonLink,
+  isKnownBlockedReason,
+  jobTypeNotAllowedList,
+  type JobTypeId,
+  type JobTypeOption,
+} from '../../../lib/jobTypeEligibility';
+import { useJobTypeStrings } from '../../../lib/jobTypeStrings';
 
 
 type SlotType = 'morning' | 'afternoon' | 'evening';
@@ -50,14 +61,6 @@ const SERVICE_LOCATIONS = [
   { key: 'accompany_outside', title: 'พาออกนอกบ้าน', desc: 'ฉันพาผู้ป่วยออกนอกบ้าน เช่น พบแพทย์ ทำธุระ', icon: 'directions_walk' }
 ];
 
-const SERVICE_TYPES = [
-  { id: 'general_care', label: 'ดูแลทั่วไป', desc: 'พยุง / ทานข้าว / กิจวัตรประจำวัน' },
-  { id: 'bedridden_care', label: 'ดูแลผู้ป่วยติดเตียง', desc: 'ดูแลผู้ป่วยช่วยเหลือตัวเองไม่ได้' },
-  { id: 'physiotherapy', label: 'กายภาพบำบัด', desc: 'ช่วยออกกำลังกาย / กายภาพฟื้นฟู' },
-  { id: 'medication', label: 'ช่วยจัดยา/เวชภัณฑ์', desc: 'ช่วยเตือน / จัดยาตามแพทย์สั่ง' },
-  { id: 'companion', label: 'เป็นเพื่อน/พูดคุย', desc: 'พูดคุยเป็นเพื่อน ดูแลสภาพจิตใจผู้สูงอายุ' }
-];
-
 export const JobReceptionTab: React.FC = () => {
   const navigate = useNavigate();
   const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
@@ -89,6 +92,18 @@ export const JobReceptionTab: React.FC = () => {
 
   const [updateCaregiverProfile] = useMutation(UPDATE_CAREGIVER_PROFILE);
   const [updateWorkCondition] = useMutation(UPDATE_WORK_CONDITION);
+
+  // PYG-593: ประเภทงานที่เลือกได้ + เหตุผล จาก BE (กฎวิชาชีพ/ใบประกอบฯ อยู่ที่ BE ที่เดียว)
+  // โหลดไม่สำเร็จ = ไม่ปิดประเภทไหน แล้วให้ BE ตัดสินตอนบันทึก (JOB_TYPE_NOT_ALLOWED)
+  const jt = useJobTypeStrings();
+  const { data: jobTypeOptionsData, refetch: refetchJobTypeOptions } = useQuery<{
+    myJobTypeOptions: JobTypeOption[];
+  }>(GET_MY_JOB_TYPE_OPTIONS, { fetchPolicy: 'cache-and-network' });
+  const blockedTypes = useMemo(
+    () => blockedJobTypes(jobTypeOptionsData?.myJobTypeOptions),
+    [jobTypeOptionsData],
+  );
+  const jobTypeLabel = (id: string) => jt.jobTypes[id as JobTypeId]?.label ?? id;
 
   const caregiver = caregiverData?.myCaregiverProfile;
   const serverIsSearchable = Boolean(caregiver?.isSearchable);
@@ -380,14 +395,19 @@ export const JobReceptionTab: React.FC = () => {
   };
 
   // Service types togglers
+  // ประเภทที่เลือกไม่ได้: เอาออกได้ (E2/E3 ที่ค้างอยู่) แต่ติ๊กเพิ่มไม่ได้
   const toggleServiceType = (id: string) => {
     setSelectedServiceTypes(prev =>
-      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+      prev.includes(id)
+        ? prev.filter(t => t !== id)
+        : blockedTypes.has(id) ? prev : [...prev, id]
     );
   };
 
   const selectAllServiceTypes = () => {
-    setSelectedServiceTypes(SERVICE_TYPES.map(t => t.id));
+    setSelectedServiceTypes(prev => [
+      ...new Set([...prev, ...JOB_TYPE_IDS.filter(id => !blockedTypes.has(id))]),
+    ]);
   };
 
   const clearAllServiceTypes = () => {
@@ -486,12 +506,21 @@ export const JobReceptionTab: React.FC = () => {
       setIsSaving(false);
       setIsJustSaved(true);
       showSuccess('บันทึกการเปลี่ยนแปลงแล้ว');
+      void refetchJobTypeOptions();
 
       setTimeout(() => {
         setIsJustSaved(false);
       }, 1200);
     } catch (error) {
       setIsSaving(false);
+      // PYG-593: BE ปฏิเสธทั้งคำขอ — ตัวเลือกบนหน้าจอคงไว้ (E4) แล้วโหลดสถานะใหม่
+      // เพราะใบประกอบฯ อาจเปลี่ยนระหว่างที่เปิดหน้าค้างไว้
+      const notAllowed = jobTypeNotAllowedList(error);
+      if (notAllowed) {
+        void refetchJobTypeOptions();
+        showError(jt.saveBlocked(notAllowed.map(jobTypeLabel).join(', ')));
+        return;
+      }
       const fallbackMessage = 'ไม่สามารถบันทึกการตั้งค่าได้';
       const errorMessage = error instanceof Error ? error.message : fallbackMessage;
       showError(errorMessage);
@@ -865,30 +894,82 @@ export const JobReceptionTab: React.FC = () => {
               </div>
             </div>
 
+            {savedSnapshot && selectedServiceTypes.length === 0 && (
+              <p role="status" className="flex items-start gap-1.5 rounded-lg bg-[#FFFBEB] px-3 py-2 text-[12px] leading-snug text-[#92400E]">
+                <Icon name="info" size="small" color="currentColor" />
+                {jt.noneSelected}
+              </p>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {SERVICE_TYPES.map(type => {
-                const active = selectedServiceTypes.includes(type.id);
+              {JOB_TYPE_IDS.map(id => {
+                const copy = jt.jobTypes[id];
+                const active = selectedServiceTypes.includes(id);
+                const blocked = blockedTypes.has(id);
+                const reason = blockedTypes.get(id);
+                const knownReason = isKnownBlockedReason(reason) ? reason : null;
+                const reasonId = `job-type-${id}-reason`;
+                // เลือกไม่ได้และไม่ได้เลือกอยู่ = ปิด · เลือกอยู่แต่เลือกไม่ได้แล้ว = กดเอาออกได้ พร้อมคำเตือน
+                const locked = blocked && !active;
                 return (
-                  <button
-                    type="button"
-                    key={type.id}
-                    onClick={() => toggleServiceType(type.id)}
-                    className={`flex items-start gap-3 p-3.5 rounded-xl border text-left transition-all cursor-pointer ${active
-                        ? 'bg-[#E8F5F1] border-[#3A9A7E] shadow-sm'
-                        : 'bg-white border-[#E0E2E5] hover:bg-gray-50'
+                  <div
+                    key={id}
+                    className={`flex flex-col rounded-xl border transition-all ${active
+                        ? blocked
+                          ? 'bg-[#FFFBEB] border-[#F59E0B]'
+                          : 'bg-[#E8F5F1] border-[#3A9A7E] shadow-sm'
+                        : locked
+                          ? 'bg-[#F9FAFB] border-[#E0E2E5]'
+                          : 'bg-white border-[#E0E2E5] hover:bg-gray-50'
                       }`}
                   >
-                    <div className="mt-0.5 flex-shrink-0">
-                      <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center transition-colors ${active ? 'bg-[#3A9A7E] border-[#3A9A7E] text-white' : 'border-[#CBCED4] bg-white'
-                        }`}>
-                        {active && <span className="text-[10px] font-bold">✓</span>}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-[13px] font-bold text-[#1A1A1A] block">{type.label}</span>
-                      <p className="text-[11px] text-[#8A8C8E] mt-0.5 leading-tight">{type.desc}</p>
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleServiceType(id)}
+                      disabled={locked}
+                      aria-pressed={active}
+                      aria-describedby={blocked ? reasonId : undefined}
+                      className={`flex items-start gap-3 p-3.5 text-left ${locked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <div className="mt-0.5 flex-shrink-0">
+                        {locked ? (
+                          <span className="flex h-4.5 w-4.5 items-center justify-center text-[#8A8C8E]" aria-hidden="true">
+                            <Icon name="lock" size="small" color="currentColor" />
+                          </span>
+                        ) : (
+                          <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center transition-colors ${active
+                              ? blocked ? 'bg-[#F59E0B] border-[#F59E0B] text-white' : 'bg-[#3A9A7E] border-[#3A9A7E] text-white'
+                              : 'border-[#CBCED4] bg-white'
+                            }`}>
+                            {active && <span className="text-[10px] font-bold">✓</span>}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className={`text-[13px] font-bold block ${locked ? 'text-[#8A8C8E]' : 'text-[#1A1A1A]'}`}>
+                          {copy.label}
+                          {locked && <span className="ml-1.5 text-[11px] font-semibold text-[#8A8C8E]">· {jt.lockedLabel}</span>}
+                        </span>
+                        <p className="text-[11px] text-[#8A8C8E] mt-0.5 leading-tight">{copy.desc}</p>
+                      </div>
+                    </button>
+                    {blocked && (
+                      <div id={reasonId} className="flex flex-col gap-1 border-t border-black/5 px-3.5 py-2.5 text-[11.5px] leading-snug">
+                        {active && (
+                          <span className="flex items-start gap-1 font-semibold text-[#B45309]">
+                            <Icon name="warning" size="small" color="currentColor" />
+                            {jt.selectedButBlocked}
+                          </span>
+                        )}
+                        <span className="text-[#575859]">{knownReason ? jt.reason[knownReason] : jt.reasonUnknown}</span>
+                        {knownReason && (
+                          <Link to={blockedReasonLink(knownReason)} className="self-start font-bold text-[#3A9A7E] hover:underline">
+                            {jt.action[knownReason]} →
+                          </Link>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

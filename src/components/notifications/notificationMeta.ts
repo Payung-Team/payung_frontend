@@ -32,7 +32,9 @@ export type NotificationType =
   // PYG-588: ผลตรวจ / หมดอายุของใบประกอบวิชาชีพ (BE PYG-587)
   | 'license_approved'
   | 'license_rejected'
-  | 'license_expired';
+  | 'license_expired'
+  // PYG-593: ประเภทงานเดิมถูกนำออกเพราะไม่ตรงวิชาชีพ/ใบประกอบฯ (BE PYG-592 · data migration PYG-591)
+  | 'job_type_removed';
 
 export interface NotificationItem {
   id: string;
@@ -156,6 +158,10 @@ export function notificationIcon(type: NotificationType): IconStyle {
     case 'license_expired':
       return { icon: 'event_busy', ...WARNING };
 
+    // ประเภทงานถูกนำออก (PYG-593)
+    case 'job_type_removed':
+      return { icon: 'playlist_remove', ...WARNING };
+
     default:
       return { icon: 'notifications', ...INFO };
   }
@@ -189,6 +195,12 @@ export function resolveDeepLink(item: NotificationItem): string {
   // ใบประกอบฯ อยู่ในหน้าสถานะ KYC (PYG-588)
   if (item.type.startsWith('kyc_') || item.type.startsWith('license_')) {
     return '/kyc/status';
+  }
+
+  // ประเภทงานถูกนำออก → หน้าตั้งค่าการรับงาน ที่เห็นว่าประเภทไหนเลือกไม่ได้และต้องทำอะไรต่อ (PYG-593)
+  //   BE ส่ง data.linkPath = '/caregiver/edit-profile' มาด้วย แต่หน้านั้นไม่มีรายการประเภทงาน จึงไม่ใช้
+  if (item.type === 'job_type_removed') {
+    return '/caregiver/settings/job-reception';
   }
 
   if (item.type.startsWith('profile_photo_')) {
