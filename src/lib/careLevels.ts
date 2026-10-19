@@ -50,7 +50,52 @@ const TH = {
   pickerHint: 'ต้องเลือกก่อนอนุมัติ · ไม่ต้องเลือกถ้าปฏิเสธ',
   required: 'กรุณาเลือกระดับผู้ดูแลก่อนอนุมัติ KYC',
   invalid: 'ระดับที่เลือกไม่ถูกต้อง กรุณาเลือกใหม่',
-  criteriaPending: 'เกณฑ์ของแต่ละระดับ: รอทีมเคาะ',
+  /**
+   * เกณฑ์ระดับ — จาก "T-01 ร่างตารางกิจกรรมการดูแลและระดับ" (Sammy อนุมัติใช้ช่วงทดลอง 8 ต.ค. 2026 · รออาจารย์ตรวจ Q9)
+   * ถ้าอาจารย์แก้ ให้แก้ที่นี่ที่เดียว
+   */
+  criteria: {
+    /** บรรทัดสั้นในการ์ดตัวเลือก — ตอบว่า "ผู้ดูแลแบบไหน" */
+    short: {
+      BASIC: 'เคยดูแลผู้สูงอายุ แต่ยังไม่มีใบอบรม',
+      INTERMEDIATE: 'มีใบอบรมผู้ดูแล 70 หรือ 420 ชม.',
+      ADVANCED: 'พยาบาล หรือนักกายภาพ ที่มีใบประกอบวิชาชีพ',
+    } as Record<CareLevel, string>,
+    fit: {
+      BASIC: 'เคยดูแลผู้สูงอายุมาก่อน (ดูแลพ่อแม่หรือญาติที่บ้านก็นับ) แต่ยังไม่ได้อบรม',
+      INTERMEDIATE: 'อบรมผู้ดูแลผู้สูงอายุ 70 ชม. และเคยดูแลคนที่ช่วยตัวเองไม่ค่อยได้ หรืออบรม 420 ชม.',
+      ADVANCED: 'เป็นพยาบาลวิชาชีพ หรือนักกายภาพบำบัด',
+    } as Record<CareLevel, string>,
+    evidence: {
+      BASIC: 'ไม่ต้องมีใบรับรอง ดูประสบการณ์จากประวัติที่ผู้ดูแลกรอก',
+      INTERMEDIATE: 'ใบรับรองอบรม 70 ชม. หรือ 420 ชม.',
+      ADVANCED: 'ใบประกอบวิชาชีพที่ตรวจผ่านแล้ว',
+    } as Record<CareLevel, string>,
+    work: {
+      BASIC: 'เช็ดตัว แต่งตัว ช่วยป้อนข้าว พยุงเดิน เฝ้าดู เป็นเพื่อนคุย · ไม่มีงานทางการแพทย์',
+      INTERMEDIATE: 'ย้ายตัวจากเตียงไปรถเข็น พลิกตัวกันแผลกดทับ ป้อนอาหารคนที่เสี่ยงสำลัก ทำแผลเล็ก',
+      ADVANCED: 'ฉีดยา ให้อาหารทางสายยาง ดูดเสมหะ ดูแลท่อเจาะคอ ทำกายภาพบำบัด',
+    } as Record<CareLevel, string>,
+    elder: {
+      BASIC: 'ยังช่วยตัวเองได้มาก เดินได้ ออกนอกบ้านได้',
+      INTERMEDIATE: 'ช่วยตัวเองได้น้อย อยู่แต่ในบ้าน หรือติดเตียงแต่ไม่มีสายหรือท่อทางการแพทย์',
+      ADVANCED: 'ติดเตียง หรือมีสายหรือท่อติดตัว เช่น สายให้อาหาร สายสวนปัสสาวะ',
+    } as Record<CareLevel, string>,
+    title: (level: string) => `${level} เหมาะกับใคร`,
+    fitLabel: 'เลือกเมื่อผู้ดูแล',
+    evidenceLabel: 'หลักฐานที่ต้องเห็น',
+    workLabel: 'งานที่จะได้รับ',
+    elderLabel: 'ผู้สูงอายุที่ดูแล',
+    draftTag: 'เกณฑ์ช่วงทดลอง · รออาจารย์ยืนยัน',
+    emptyHint: 'เลือกระดับเพื่อดูว่าเหมาะกับใคร',
+    rule: 'ระดับสูงรับงานระดับต้นและกลางได้ด้วย · ไม่แน่ใจให้เลือกระดับที่ต่ำกว่าไว้ก่อน แก้ทีหลังได้',
+    /** คำแนะนำจากวิชาชีพที่ผู้ดูแลเลือก — ไม่บังคับ (ทีมยังไม่เคาะว่าระดับผูกกับวิชาชีพ) */
+    professionHint: {
+      nurse: 'ผู้ดูแลเลือกวิชาชีพ "พยาบาล" → ควรเป็นระดับสูง ถ้าใบประกอบวิชาชีพตรวจผ่าน',
+      physiotherapist: 'ผู้ดูแลเลือกวิชาชีพ "นักกายภาพบำบัด" → ควรเป็นระดับสูง ถ้าใบประกอบวิชาชีพตรวจผ่าน',
+      general_caregiver: 'ผู้ดูแลเลือกวิชาชีพ "ผู้ดูแลทั่วไป" → มีใบอบรมเลือกระดับกลาง ไม่มีเลือกระดับต้น',
+    } as Record<string, string>,
+  },
   /** แยกเป็นส่วนให้หน้าจอทำตัวหนาที่ชื่อและระดับได้: before + ชื่อ + between + ระดับ + after */
   approveConfirm: { before: 'อนุมัติ ', between: ' เป็นผู้ดูแล ', after: ' – ผู้ดูแลจะได้รับการแจ้งเตือนทันที' },
   approvedToast: (level: string) => `อนุมัติ KYC เรียบร้อยแล้ว · ${level}`,
@@ -109,7 +154,46 @@ const EN: CareLevelStrings = {
   pickerHint: 'Required to approve · not needed to reject',
   required: 'Please choose a caregiver level before approving KYC',
   invalid: 'That level isn’t valid. Please choose again',
-  criteriaPending: 'Level criteria: to be confirmed',
+  criteria: {
+    short: {
+      BASIC: 'Has elder-care experience, no training certificate yet',
+      INTERMEDIATE: 'Has a 70- or 420-hour caregiver certificate',
+      ADVANCED: 'Nurse or physiotherapist with a license',
+    },
+    fit: {
+      BASIC: 'Has cared for elders before (looking after parents or relatives counts) but has no training yet',
+      INTERMEDIATE: 'Completed 70-hour caregiver training and has cared for highly dependent people, or completed 420-hour training',
+      ADVANCED: 'Is a registered nurse or a physiotherapist',
+    },
+    evidence: {
+      BASIC: 'No certificate needed; check the experience they entered',
+      INTERMEDIATE: '70-hour or 420-hour training certificate',
+      ADVANCED: 'A professional license that has passed review',
+    },
+    work: {
+      BASIC: 'Bed baths, dressing, help with eating, walking support, supervision, companionship · no medical tasks',
+      INTERMEDIATE: 'Bed-to-wheelchair transfers, turning to prevent pressure sores, feeding people at risk of choking, small wounds',
+      ADVANCED: 'Injections, tube feeding, suctioning, tracheostomy care, physiotherapy',
+    },
+    elder: {
+      BASIC: 'Still fairly independent, can walk and go out',
+      INTERMEDIATE: 'Needs a lot of help, stays at home, or bedbound without medical tubes or lines',
+      ADVANCED: 'Bedbound, or has tubes or lines such as a feeding tube or urinary catheter',
+    },
+    title: (level) => `Who is ${level} for`,
+    fitLabel: 'Choose when the caregiver',
+    evidenceLabel: 'Evidence to check',
+    workLabel: 'Jobs they get',
+    elderLabel: 'Elders they care for',
+    draftTag: 'Pilot criteria · awaiting advisor sign-off',
+    emptyHint: 'Choose a level to see who it’s for',
+    rule: 'Advanced caregivers can also take Basic and Intermediate jobs · if unsure, pick the lower level for now and change it later',
+    professionHint: {
+      nurse: 'Caregiver chose “nurse” → should be Advanced once the license passes review',
+      physiotherapist: 'Caregiver chose “physiotherapist” → should be Advanced once the license passes review',
+      general_caregiver: 'Caregiver chose “general caregiver” → Intermediate with a training certificate, Basic without',
+    },
+  },
   approveConfirm: { before: 'Approve ', between: ' as a ', after: ' caregiver – they’ll be notified right away' },
   approvedToast: (level) => `KYC approved · ${level}`,
 

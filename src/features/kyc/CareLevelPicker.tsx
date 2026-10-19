@@ -73,9 +73,12 @@ const CareLevelPicker = forwardRef<HTMLDivElement, Props>(function CareLevelPick
                 ))}
               </span>
               <span className="text-[15px] font-bold leading-5 text-[#111827]">{s.levelLabel[level]}</span>
-              <span className="text-[12px] leading-4 text-[#6B7280]">
-                {currentValue === level ? s.current : s.levelEn[level]}
-              </span>
+              {currentValue === level && (
+                <span className="rounded bg-[#F3F4F6] px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-[#4B5563]">
+                  {s.current}
+                </span>
+              )}
+              <span className="text-[12px] leading-4 text-[#6B7280]">{s.criteria.short[level]}</span>
             </button>
           );
         })}
