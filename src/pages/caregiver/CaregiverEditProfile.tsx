@@ -22,6 +22,8 @@ import CareSkillPicker from '../../features/kyc/CareSkillPicker';
 import CustomSkillsInput from '../../features/kyc/CustomSkillsInput';
 import ProfessionChangeCard from '../../features/kyc/ProfessionChangeCard';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
+import CareLevelBadge from '../../components/ui/CareLevelBadge';
+import CaregiverCareLevelSection from '../../features/kyc/CaregiverCareLevelSection';
 
 function formatPhone(val?: string | null): string {
   if (!val) return '';
@@ -56,6 +58,8 @@ type CaregiverProfileFormData = z.infer<typeof CaregiverProfileSchema>;
 
 interface CaregiverData {
   id: string;
+  /** PYG-581: BASIC | INTERMEDIATE | ADVANCED · null = ยังไม่มีระดับ */
+  careLevel?: string | null;
   caregiverNumber?: string;
   fullName?: string;
   idCardNumber?: string;
@@ -484,6 +488,9 @@ const CaregiverEditProfile: React.FC = () => {
                   </div>
                 )}
 
+                {/* ระดับผู้ดูแล — แอดมินกำหนด ผู้ดูแลดูได้อย่างเดียว (PYG-557 · S02-AC5) */}
+                {caregiver?.id && <CaregiverCareLevelSection careLevel={caregiver.careLevel} />}
+
                 {/* ทักษะกลาง — ใช้จับคู่งาน · ทักษะเฉพาะขึ้นตามวิชาชีพที่อนุมัติแล้ว */}
                 <CareSkillPicker
                   id="edit-skills"
@@ -554,9 +561,10 @@ const CaregiverEditProfile: React.FC = () => {
                         <h2 className="text-[20px] font-semibold text-[#0A0A0A]">{caregiver?.fullName || displayName}</h2>
                         <KycStatusBadge status={caregiver?.kycStatus} />
                       </div>
-                      {profession && (
-                        <div className="mb-2">
+                      {(profession || caregiver?.careLevel) && (
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
                           <ProfessionBadge profession={profession} />
+                          <CareLevelBadge level={caregiver?.careLevel} />
                         </div>
                       )}
                       <div className="flex items-center gap-2 text-[14px] text-[#717182]">

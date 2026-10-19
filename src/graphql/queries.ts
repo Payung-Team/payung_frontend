@@ -10,6 +10,20 @@ import { LICENSE_DOCUMENT_FIELDS, LICENSE_INFO_FIELD } from "./license";
 const PROFESSION_FIELD = "profession";
 const CUSTOM_SKILLS_FIELD = "customSkills: otherSkills";
 
+/**
+ * PYG-557 · S02: ระดับผู้ดูแล (BE PYG-581)
+ * ผู้ดูแลเห็นแค่ Caregiver.careLevel · ผู้กำหนด / เวลา / ประวัติ เป็นของแอดมิน (adminKycDetail.careLevelInfo)
+ */
+const CARE_LEVEL_FIELD = "careLevel";
+export const CARE_LEVEL_INFO_FIELDS = `
+  caregiverId
+  level
+  needsReview
+  setAt
+  setBy
+  setByName
+`;
+
 export const LOGIN_USER = gql`
   mutation Login($email: String!, $password: String!) {
     login(input: {
@@ -151,6 +165,7 @@ export const GET_CAREGIVER_PROFILE = gql`
       skills
       ${PROFESSION_FIELD}
       ${CUSTOM_SKILLS_FIELD}
+      ${CARE_LEVEL_FIELD}
       experienceYears
       kycStatus
       kycSubmittedAt
@@ -318,6 +333,8 @@ export const ADMIN_KYC_LIST = gql`
         kycStatus
         submittedAt
         documentCount
+        careLevel
+        careLevelNeedsReview
       }
       total
       page
@@ -424,6 +441,9 @@ export const ADMIN_KYC_DETAIL = gql`
       }
       pendingProfilePhotoDocumentId
       ${LICENSE_INFO_FIELD}
+      careLevelInfo {
+        ${CARE_LEVEL_INFO_FIELDS}
+      }
     }
   }
 `;
@@ -551,12 +571,17 @@ export const ADMIN_USER_DETAIL = gql`
   }
 `;
 
+/**
+ * PYG-581: ส่งระดับผู้ดูแลมาพร้อมคำสั่งอนุมัติ — ไม่มีระดับ = CARE_LEVEL_REQUIRED · ค่าผิด = CARE_LEVEL_INVALID
+ * careLevel = "BASIC" | "INTERMEDIATE" | "ADVANCED"
+ */
 export const APPROVE_KYC = gql`
-  mutation ApproveKyc($caregiverId: ID!) {
-    approveKyc(caregiverId: $caregiverId) {
+  mutation ApproveKyc($caregiverId: ID!, $careLevel: String) {
+    approveKyc(caregiverId: $caregiverId, careLevel: $careLevel) {
       id
       kycStatus
       kycVerifiedAt
+      careLevel
       updatedAt
     }
   }
