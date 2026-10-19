@@ -55,6 +55,8 @@ const TH = {
     unknown: 'สถานะไม่ทราบ',
   } satisfies Record<DrivingLicenseStatus, string>,
   pendingNote: 'ระหว่างรอตรวจ ยังรับงานที่ไม่ต้องขับรถรับส่งได้ตามปกติ',
+  // E8: ต่ออายุแล้วอัปโหลดใบใหม่ — ใบเดิมที่อนุมัติและยังไม่หมดอายุยังใช้ได้ระหว่างรอตรวจใบใหม่
+  pendingStillVerifiedNote: 'ใบเดิมที่ผ่านการตรวจยังใช้ได้ระหว่างรอตรวจใบใหม่',
   approvedNote: 'รับงานที่ต้องขับรถรับส่งได้ · โปรไฟล์ของคุณแสดงป้าย “ผ่านการตรวจใบขับขี่”',
   rejectedReasonLabel: 'เหตุผลจากทีมงาน',
   expiredBody: (date: string) =>
@@ -86,10 +88,13 @@ const TH = {
   adminRemaining: (days: number) => `อีก ${days} วัน`,
   adminOverdue: (days: number) => `เลยมา ${days} วัน`,
   adminChecklistTitle: 'ตรวจให้ครบก่อนอนุมัติ',
+  // ประเภทที่รับ (มติ S06 · 19 ต.ค. 2026): ใบขับขี่รถยนต์ไทย ชั่วคราวหรือ 5 ปี
+  // ไม่รับ: รถจักรยานยนต์อย่างเดียว · ใบต่างประเทศ / ใบอนุญาตขับรถระหว่างประเทศ · ตลอดชีพ (ยังไม่รองรับ E6)
   adminChecklist: [
     'ชื่อและรูปหน้าตรงกับบัตรประชาชน',
-    'วันหมดอายุในรูปตรงกับที่กรอก',
-    'เป็นใบขับขี่ ยังไม่หมดอายุ',
+    'วันหมดอายุในรูปตรงกับที่กรอก (ไม่ตรง = ปฏิเสธพร้อมเหตุผล)',
+    'เป็นใบขับขี่รถยนต์ของไทย ชนิดชั่วคราวหรือ 5 ปี และยังไม่หมดอายุ',
+    'ไม่รับใบขับขี่รถจักรยานยนต์อย่างเดียว และไม่รับใบขับขี่ต่างประเทศ',
   ],
   adminApprove: 'อนุมัติใบขับขี่',
   adminReject: 'ปฏิเสธใบขับขี่',
@@ -168,6 +173,7 @@ const EN: DrivingLicenseStrings = {
     unknown: 'Unknown status',
   },
   pendingNote: 'While we review it, you can still accept jobs that don’t need driving',
+  pendingStillVerifiedNote: 'Your previously verified license is still valid while we review the new one',
   approvedNote: 'You can accept jobs that need driving · your profile shows a “Driving license verified” badge',
   rejectedReasonLabel: 'Reason from our team',
   expiredBody: (date: string) =>
@@ -198,8 +204,9 @@ const EN: DrivingLicenseStrings = {
   adminChecklistTitle: 'Check before approving',
   adminChecklist: [
     'Name and photo match the ID card',
-    'Expiry matches the photo',
-    'It’s a valid driving license',
+    'Expiry matches the photo (mismatch = reject with a reason)',
+    'It’s a Thai car driving license, temporary or 5-year, and not expired',
+    'Motorcycle-only and foreign licenses are not accepted',
   ],
   adminApprove: 'Approve license',
   adminReject: 'Reject license',

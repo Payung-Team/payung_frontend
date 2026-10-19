@@ -161,7 +161,9 @@ export default function DrivingLicenseStatusCard({
       {status !== 'none' && status !== 'expired' && info?.expiresAt && (
         <p className="mt-2 text-[13.5px] leading-[20px] text-[#475569]">{s.expiryMeta(expiry)}</p>
       )}
-      {status === 'pending' && <p className="mt-1 text-[13px] text-[#64748B]">{s.pendingNote}</p>}
+      {status === 'pending' && (
+        <p className="mt-1 text-[13px] text-[#64748B]">{info?.verified ? s.pendingStillVerifiedNote : s.pendingNote}</p>
+      )}
       {status === 'approved' && <p className="mt-1 text-[13px] text-[#64748B]">{s.approvedNote}</p>}
       {status === 'rejected' && (
         <div className="mt-3 rounded-[10px] bg-[#FEF2F2] px-3 py-2">
