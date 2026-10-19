@@ -901,7 +901,7 @@ export const JobReceptionTab: React.FC = () => {
               </p>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 items-start gap-3">
               {JOB_TYPE_IDS.map(id => {
                 const copy = jt.jobTypes[id];
                 const active = selectedServiceTypes.includes(id);
