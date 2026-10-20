@@ -123,6 +123,7 @@ interface KycContextType {
     payout?: InitialPayoutSummary | null;
     license?: LicenseDraft | null;
     drivingLicense?: DrivingLicenseDraft | null;
+    transportChoice?: TransportChoice;
   }) => void;
 }
 
@@ -166,6 +167,7 @@ export function KycProvider({ children }: { children: ReactNode }) {
     payout?: InitialPayoutSummary | null;
     license?: LicenseDraft | null;
     drivingLicense?: DrivingLicenseDraft | null;
+    transportChoice?: TransportChoice;
   }) {
     setStep1Data(data.step1);
     setUploadedDocs(data.docs);
@@ -175,8 +177,8 @@ export function KycProvider({ children }: { children: ReactNode }) {
     setPayoutData(null); // เลขบัญชีเข้ารหัสไว้ — ต้องกรอกใหม่เสมอถ้าจะแก้ (ดู key correctness note 5)
     setPendingDeleteDocs([]);
     setLicenseDraft(data.license ?? EMPTY_LICENSE_DRAFT);
-    // E10 / E11: BE ไม่เก็บคำตอบการรับส่ง → ยื่นซ้ำเริ่มจาก "ยังไม่ตอบ" เสมอ ไม่เดาให้
-    setTransportChoice('');
+    // PYG-662: เติมคำตอบที่ BE เก็บไว้ · ไม่เคยตอบ (null · E11) = ว่างให้เลือก ไม่เดาให้ (E10)
+    setTransportChoice(data.transportChoice ?? '');
     setDrivingLicenseDraft(data.drivingLicense ?? EMPTY_DRIVING_LICENSE_DRAFT);
   }
 

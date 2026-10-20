@@ -160,7 +160,12 @@ export default function KycStatusPage() {
   // PYG-598: ใบขับขี่ — แสดงเมื่อมีใบแล้ว หรือ KYC อนุมัติแล้ว (ทางเปลี่ยนเป็นขับรถรับส่งเอง)
   const drivingLicense: DrivingLicenseInfo | null = DRIVING_LICENSE_KYC_ENABLED ? data?.kycStatus?.drivingLicense ?? null : null;
   const drivingLicenseCard = DRIVING_LICENSE_KYC_ENABLED && shouldShowDrivingLicenseCard(drivingLicense, status) ? (
-    <DrivingLicenseStatusCard info={drivingLicense} kycStatus={status} onChanged={() => refetch()} />
+    <DrivingLicenseStatusCard
+      info={drivingLicense}
+      kycStatus={status}
+      transportMode={data?.kycStatus?.transportMode ?? null}
+      onChanged={() => refetch()}
+    />
   ) : null;
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
 
