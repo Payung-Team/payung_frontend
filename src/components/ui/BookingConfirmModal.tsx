@@ -35,6 +35,8 @@ interface BookingConfirmModalProps {
   errorMessage?: string;
   /** S08: ปุ่มแก้ปัญหาใต้ข้อความ error เช่น "ทำแบบประเมิน" ตอน BE ตอบ ASSESSMENT_REQUIRED */
   errorAction?: { label: string; onClick: () => void };
+  /** S18 · E9: ผู้ดูแลไม่ผ่านเงื่อนไขของ booking แล้ว — กดยืนยันซ้ำก็ไม่ผ่าน จึงปิดปุ่มไว้ ให้ใช้ errorAction แทน */
+  confirmDisabled?: boolean;
   /** รูปผู้ดูแล (signed URL) โหลดไม่ขึ้น → ให้หน้าแม่โหลดข้อมูลผู้ดูแลใหม่ (PYG-512) */
   onPhotoExpired?: () => void;
 }
@@ -91,6 +93,7 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
   isSubmitting = false,
   errorMessage,
   errorAction,
+  confirmDisabled = false,
   onPhotoExpired,
 }) => {
   if (!isOpen) return null;
@@ -417,7 +420,7 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
               <button
                 type="button"
                 onClick={onConfirm}
-                disabled={isSubmitting}
+                disabled={isSubmitting || confirmDisabled}
                 className="w-full flex items-center justify-center gap-2 font-bold text-white transition-all duration-150 cursor-pointer hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{
                   fontFamily: "'Bai Jamjuree', sans-serif",

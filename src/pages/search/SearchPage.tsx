@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { NetworkStatus } from '@apollo/client';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { useBooking } from '../../context/BookingContext';
@@ -27,6 +27,19 @@ import { bookingAssessmentRedirect } from '../../lib/assessmentNav';
 import ThailandAddressSimple from 'thailand-address-simple';
 import { displaySkills } from '../../lib/skillLabels';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
+import CareLevelBadge from '../../components/ui/CareLevelBadge';
+import { toCareLevel } from '../../lib/careLevels';
+import {
+  BookingNotMatchableState,
+  NoEligibleCaregiverState,
+  NotEligibleNotice,
+} from '../../components/booking/CaregiverMatchStates';
+import {
+  CAREGIVER_MATCH_LIVE,
+  isBookingNotMatchableError,
+  isCaregiverNotEligibleError,
+} from '../../lib/caregiverMatch';
+import { useCaregiverMatchStrings } from '../../lib/caregiverMatchStrings';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -52,6 +65,8 @@ interface CaregiverSummary {
   verified?: boolean;
   /** PYG-556: general_caregiver | nurse | physiotherapist — CaregiverSummary.profession (PYG-575) */
   profession?: string | null;
+  /** PYG-648 · S18: BASIC | INTERMEDIATE | ADVANCED — มาเมื่อ BE เพิ่ม CaregiverSummary.careLevel (ดู SUMMARY_CARE_LEVEL_FIELD) */
+  careLevel?: string | null;
 }
 
 interface SearchPagination {
@@ -140,6 +155,7 @@ function CaregiverCard({ cg, onSelect, onViewProfile, onPhotoExpired }: { cg: Ca
   const gender = GENDER_DISPLAY[cg.gender ?? ''] ?? null;
   const hasMeta = gender != null || cg.experience != null;
   const profession = cg.profession;
+  const hasCareLevel = toCareLevel(cg.careLevel) != null;
 
   return (
     <div
@@ -196,10 +212,12 @@ function CaregiverCard({ cg, onSelect, onViewProfile, onPhotoExpired }: { cg: Ca
             )}
           </div>
 
-          {/* วิชาชีพ (PYG-556 · S01-AC3) — บรรทัดของตัวเอง ไม่เบียดชื่อกับดาวรีวิว */}
-          {profession && (
-            <div className="flex mt-0.5 mb-0.5">
+          {/* วิชาชีพ (PYG-556 · S01-AC3) + ระดับ (PYG-648 · S18) — บรรทัดของตัวเอง ไม่เบียดชื่อกับดาวรีวิว
+              ลำดับ วิชาชีพ → ระดับ เสมอ · flex-wrap กัน "นักกายภาพบำบัด" + ป้ายระดับล้นที่จอแคบ */}
+          {(profession || hasCareLevel) && (
+            <div className="flex flex-wrap gap-1.5 mt-0.5 mb-0.5">
               <ProfessionBadge profession={profession} />
+              <CareLevelBadge level={cg.careLevel} />
             </div>
           )}
 
@@ -301,6 +319,11 @@ function CaregiverCardSkeleton() {
         <Skeleton circle width={120} height={120} />
         <div className="flex-1 flex flex-col gap-2.5 pt-1">
           <Skeleton height={20} width="45%" borderRadius="6px" />
+          {/* ที่ของป้ายวิชาชีพ (แคปซูล) + ป้ายระดับ (เหลี่ยม) */}
+          <div className="flex gap-1.5">
+            <Skeleton width={112} height={24} borderRadius="9999px" />
+            <Skeleton width={84} height={24} borderRadius="6px" />
+          </div>
           <Skeleton height={13} width="55%" borderRadius="6px" />
           <Skeleton height={12} width="40%" borderRadius="6px" />
           <Skeleton height={36} width="90%" borderRadius="6px" />
@@ -579,6 +602,21 @@ const SearchPage: React.FC = () => {
 function SearchPageContent() {
   const { bookingDraft } = useBooking();
   const navigate = useNavigate();
+  const location = useLocation();
+  const matchText = useCaregiverMatchStrings();
+
+  // S18 · E9: BE ตอบ CAREGIVER_NOT_ELIGIBLE ตอนกดยืนยัน → modal ปิดปุ่มยืนยัน ให้กด "เลือกผู้ดูแลคนอื่น"
+  const [notEligible, setNotEligible] = useState(false);
+  // ชื่อผู้ดูแลที่รับงานไม่ได้แล้ว สำหรับแถบแจ้งเหนือรายชื่อ · มาจาก modal หน้านี้ หรือจาก CaregiverProfilePage (location.state)
+  const [notEligibleName, setNotEligibleName] = useState<string | null>(
+    () => (location.state as { notEligibleName?: string } | null)?.notEligibleName ?? null,
+  );
+  useEffect(() => {
+    // ล้าง state ออกจาก history ไม่ให้แถบแจ้งกลับมาเมื่อรีเฟรช / กดย้อนกลับ
+    if ((location.state as { notEligibleName?: string } | null)?.notEligibleName) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.pathname, location.state, navigate]);
 
   const [bookingCaregiver, setBookingCaregiver] = useState<CaregiverSummary | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -639,6 +677,15 @@ function SearchPageContent() {
     setPage(1);
   }, [initialFilters]);
 
+  // S18: รายชื่อว่างเพราะตัวกรองที่ญาติปรับเอง ≠ ไม่มีใครรับงานนี้ได้ (AC7)
+  // ต่างจากค่าตั้งต้นของ draft → EmptyState เดิม (รีเซ็ตตัวกรอง) · เท่าค่าตั้งต้น → สถานะ AC7
+  const filtersChanged =
+    appliedFilters.province !== initialFilters.province ||
+    appliedFilters.district !== initialFilters.district ||
+    appliedFilters.minPrice !== initialFilters.minPrice ||
+    appliedFilters.maxPrice !== initialFilters.maxPrice ||
+    appliedFilters.minRating !== initialFilters.minRating;
+
   // ── GraphQL Query ──
   const queryInput = useMemo(() => ({
     province: appliedFilters.province || undefined,
@@ -668,6 +715,8 @@ function SearchPageContent() {
   // refetch เพื่อเอารูปใบใหม่ต้องเกิดเงียบ ๆ ข้างหลัง ไม่สลับทั้งรายการเป็น skeleton
   const loading = gqlLoading && networkStatus !== NetworkStatus.refetch;
   const error = gqlError;
+  // S18 · E2: booking ยังกรองไม่ได้ — ไม่ใช่ "โหลดไม่สำเร็จ" ขั้นถัดไปคือกลับไปแก้การจอง
+  const notMatchable = !!error && isBookingNotMatchableError(error);
 
   const handleSortChange = (value: string) => {
     setSortBy(value);
@@ -689,6 +738,7 @@ function SearchPageContent() {
     setIsSubmitting(true);
     setBookingError(null);
     setAssessmentRequired(false);
+    setNotEligible(false);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -766,6 +816,11 @@ function SearchPageContent() {
             },
           });
         } catch (err) {
+          if (isCaregiverNotEligibleError(err)) {
+            setNotEligible(true);
+            setBookingError(matchText.notEligible);
+            return;
+          }
           // PYG-540: อ่าน code แบบ Apollo 4 + รองรับ CONSENT_WITHDRAWN (ดู bookingSubmitError.ts)
           dropRejectedActivities(err);
           setBookingError(onBehalfBookingErrorMessage(err, bookingDraft.onBehalf.recipientName));
@@ -784,6 +839,11 @@ function SearchPageContent() {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
+        if (isCaregiverNotEligibleError(errData)) {
+          setNotEligible(true);
+          setBookingError(matchText.notEligible);
+          return;
+        }
         setAssessmentRequired(isAssessmentRequiredError(errData));
         dropRejectedActivities(errData);
         setBookingError(
@@ -808,7 +868,18 @@ function SearchPageContent() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [bookingCaregiver, bookingDraft, navigate, createOnBehalf, dropRejectedActivities]);
+  }, [bookingCaregiver, bookingDraft, navigate, createOnBehalf, dropRejectedActivities, matchText]);
+
+  // S18 · E9: ปิด modal → โหลดรายชื่อใหม่ (คนเดิมหายเมื่อ BE กรอง) → แถบแจ้งเหนือรายชื่อ
+  // รายชื่อใหม่ว่าง → ตกไปที่สถานะ AC7 เอง
+  const handleChooseAnother = useCallback(() => {
+    if (bookingCaregiver) setNotEligibleName(bookingCaregiver.fullName);
+    setBookingCaregiver(null);
+    setBookingError(null);
+    setNotEligible(false);
+    // ล้มเหลว → hook ตั้ง error ให้หน้าแสดงกล่องโหลดไม่สำเร็จเอง ไม่ต้องจับซ้ำ
+    refetch().catch(() => undefined);
+  }, [bookingCaregiver, refetch]);
 
   const handleViewProfile = useCallback((cg: CaregiverSummary) => {
     navigate(`/caregivers/${cg.id}`, { state: { caregiver: cg } });
@@ -915,9 +986,22 @@ function SearchPageContent() {
                       )}
                     </div>
                    
-                    <span>
-                      {totalResults.toLocaleString()} ผลลัพธ์ที่ตรงกับประเภทงานที่คุณเลือก
-                    </span>
+                    {CAREGIVER_MATCH_LIVE ? (
+                      // S18: จำนวน + เหตุผลที่รายชื่อสั้น · ว่าง → ซ่อนจำนวน เหลือเหตุผล (ไม่บอกจำนวนคนที่ถูกตัด R9)
+                      <span className="text-[#575859]">
+                        {totalResults > 0 && (
+                          <>
+                            <b className="font-semibold text-[#1A1A1A]">{matchText.count(totalResults)}</b>
+                            {' · '}
+                          </>
+                        )}
+                        {matchText.scoped}
+                      </span>
+                    ) : (
+                      <span>
+                        {totalResults.toLocaleString()} ผลลัพธ์ที่ตรงกับประเภทงานที่คุณเลือก
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -941,17 +1025,48 @@ function SearchPageContent() {
               </div>
             </div>
 
-            {/* Error state */}
-            {error && !loading && (
-              <div className="bg-[#FEF2F2] border border-red-200 rounded-2xl p-5 mb-4 flex items-center gap-3">
+            {/* S18 · มือถือไม่มีหัวเรื่อง → หัวรายชื่อ 2 บรรทัด (จำนวน + เหตุผล) */}
+            {CAREGIVER_MATCH_LIVE && !error && (
+              <div className="lg:hidden mb-3 px-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                {!loading && totalResults > 0 && (
+                  <p className="text-[16px] font-bold text-[#1A1A1A]">{matchText.count(totalResults)}</p>
+                )}
+                <p className="text-[13px] text-[#575859] mt-0.5">{matchText.scoped}</p>
+              </div>
+            )}
+
+            {/* S18 · E9: ผู้ดูแลที่เลือกรับงานนี้ไม่ได้แล้ว — แจ้งหลังโหลดรายชื่อใหม่ */}
+            {notEligibleName && (
+              <div className="mb-3">
+                <NotEligibleNotice name={notEligibleName} onDismiss={() => setNotEligibleName(null)} />
+              </div>
+            )}
+
+            {/* S18 · E2: booking ยังกรองไม่ได้ */}
+            {notMatchable && !loading && (
+              <BookingNotMatchableState onBack={() => navigate('/booking/new')} />
+            )}
+
+            {/* Error state — แยกจากรายชื่อว่าง (AC7): สีแดง แนวนอน มีปุ่มลองอีกครั้ง ไม่มีช่องติดต่อแอดมิน */}
+            {error && !loading && !notMatchable && (
+              <div className="bg-[#FEF2F2] border border-red-200 rounded-2xl p-5 mb-4 flex items-start gap-3">
                 <span className="material-icons text-red-400 text-[20px]">error_outline</span>
                 <div>
                   <p className="text-[13px] font-bold text-[#DC2626]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                    เกิดข้อผิดพลาดในการค้นหา
+                    {matchText.errorTitle}
                   </p>
                   <p className="text-[12px] text-[#8A8C8E] mt-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                    กรุณาลองใหม่อีกครั้ง หรือตรวจสอบการเชื่อมต่ออินเทอร์เน็ต
+                    {matchText.errorBody}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => { refetch().catch(() => undefined); }}
+                    className="mt-3 inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-white border border-red-300 text-[#DC2626] text-[13px] font-bold hover:bg-red-50 transition-colors cursor-pointer"
+                    style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+                  >
+                    <span className="material-icons text-[16px]" aria-hidden="true">refresh</span>
+                    {matchText.retry}
+                  </button>
                 </div>
               </div>
             )}
@@ -985,17 +1100,24 @@ function SearchPageContent() {
                   </div>
                 )}
 
-                {/* Result summary */}
-                <p className="text-center text-[12px] text-[#C6C8CB] mt-3"
-                  style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                  แสดง {Math.min((page - 1) * PAGE_LIMIT + 1, totalResults)}–{Math.min(page * PAGE_LIMIT, totalResults)} จาก {totalResults.toLocaleString()} รายการ
-                </p>
+                {/* Result summary — หน้าเดียวไม่ต้องบอก "แสดง 1–1 จาก 1" (รายชื่อ 1 คนต้องดูปกติ ไม่เหมือนโหลดไม่ครบ) */}
+                {totalPages > 1 && (
+                  <p className="text-center text-[12px] text-[#C6C8CB] mt-3"
+                    style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                    แสดง {Math.min((page - 1) * PAGE_LIMIT + 1, totalResults)}–{Math.min(page * PAGE_LIMIT, totalResults)} จาก {totalResults.toLocaleString()} รายการ
+                  </p>
+                )}
               </>
             )}
 
             {/* Empty state */}
             {!loading && !error && caregivers.length === 0 && (
-              <EmptyState onReset={resetFilters} />
+              CAREGIVER_MATCH_LIVE && !filtersChanged ? (
+                // AC7 · adminContact มาจาก response ของ query ที่กรองตาม booking (ดู lib/caregiverMatch.ts ข้อ 3)
+                <NoEligibleCaregiverState contact={null} onEditBooking={() => navigate('/booking/new')} />
+              ) : (
+                <EmptyState onReset={resetFilters} />
+              )
             )}
           </div>
         </div>
@@ -1004,14 +1126,18 @@ function SearchPageContent() {
 
     <BookingConfirmModal
       isOpen={bookingCaregiver !== null}
-      onClose={() => { setBookingCaregiver(null); setBookingError(null); }}
+      // E9: ปิด modal เฉย ๆ ก็ต้องได้รายชื่อชุดใหม่ ไม่ค้างคนเดิมไว้โดยไม่มีคำอธิบาย
+      onClose={notEligible ? handleChooseAnother : () => { setBookingCaregiver(null); setBookingError(null); }}
       onConfirm={handleConfirmBooking}
       caregiver={bookingCaregiver ?? undefined}
       bookingDraft={bookingDraft}
       isSubmitting={isSubmitting}
       errorMessage={bookingError ?? undefined}
+      confirmDisabled={notEligible}
       errorAction={
-        assessmentRequired
+        notEligible
+          ? { label: matchText.notEligibleAction, onClick: handleChooseAnother }
+          : assessmentRequired
           ? {
               label: assessmentText.errorRequiredAction,
               onClick: () => {

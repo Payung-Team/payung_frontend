@@ -28,6 +28,8 @@ import { formatDisplayPrice, hasDisplayPrice, NO_PRICE_LABEL } from '../../lib/d
 import { skillLabel } from '../../lib/skillLabels';
 import { PROFESSIONS, isProfession } from '../../lib/professions';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
+import { isCaregiverNotEligibleError } from '../../lib/caregiverMatch';
+import { useCaregiverMatchStrings } from '../../lib/caregiverMatchStrings';
 import { useDrivingLicenseStrings } from '../../lib/drivingLicenseStrings';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -262,6 +264,9 @@ const CaregiverProfilePage: React.FC = () => {
   // S08: BE ตอบ ASSESSMENT_REQUIRED (จองปกติ) → modal แสดงปุ่ม "ทำแบบประเมิน"
   const [assessmentRequired, setAssessmentRequired] = useState(false);
   const assessmentText = useAssessmentStrings();
+  // S18 · E9: ผู้ดูแลคนนี้ไม่ผ่านเงื่อนไขของ booking แล้ว → ปิดปุ่มยืนยัน พากลับไปเลือกจากรายชื่อใหม่
+  const [notEligible, setNotEligible] = useState(false);
+  const matchText = useCaregiverMatchStrings();
   // PYG-385: family "จองแทน" path — same flow as SearchPage, only the submit call differs
   // (GraphQL createBookingOnBehalf instead of the personal REST create). Without this branch a
   // booking started in a family group and confirmed from the profile page is written with
@@ -347,6 +352,7 @@ const CaregiverProfilePage: React.FC = () => {
     setIsSubmitting(true);
     setBookingError(null);
     setAssessmentRequired(false);
+    setNotEligible(false);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -424,6 +430,11 @@ const CaregiverProfilePage: React.FC = () => {
             },
           });
         } catch (err) {
+          if (isCaregiverNotEligibleError(err)) {
+            setNotEligible(true);
+            setBookingError(matchText.notEligible);
+            return;
+          }
           // PYG-540: อ่าน code แบบ Apollo 4 + รองรับ CONSENT_WITHDRAWN (ดู bookingSubmitError.ts)
           dropRejectedActivities(err);
           setBookingError(onBehalfBookingErrorMessage(err, bookingDraft.onBehalf.recipientName));
@@ -443,6 +454,11 @@ const CaregiverProfilePage: React.FC = () => {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
+        if (isCaregiverNotEligibleError(errData)) {
+          setNotEligible(true);
+          setBookingError(matchText.notEligible);
+          return;
+        }
         setAssessmentRequired(isAssessmentRequiredError(errData));
         dropRejectedActivities(errData);
         setBookingError(
@@ -466,6 +482,14 @@ const CaregiverProfilePage: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // S18 · E9: กลับไปรายชื่อ (โหลดใหม่ตอนเข้า) พร้อมชื่อผู้ดูแลสำหรับแถบแจ้ง — ไม่ใช้ navigate(-1) เพราะต้องส่ง state
+  const backToListAfterNotEligible = () => {
+    setShowModal(false);
+    setBookingError(null);
+    setNotEligible(false);
+    navigate('/search', { state: { notEligibleName: fullName } });
   };
 
   const handleBack = () => {
@@ -787,14 +811,17 @@ const CaregiverProfilePage: React.FC = () => {
       {/* Booking Confirm Modal */}
       <BookingConfirmModal
         isOpen={showModal}
-        onClose={() => { setShowModal(false); setBookingError(null); }}
+        onClose={notEligible ? backToListAfterNotEligible : () => { setShowModal(false); setBookingError(null); }}
         onConfirm={handleConfirmBooking}
         caregiver={cg ? { ...cg, avatarUrl, hourlyRate: hasDisplayPrice(hourlyRate) ? hourlyRate : 0, customSkills } : undefined}
         bookingDraft={bookingDraft}
         isSubmitting={isSubmitting}
         errorMessage={bookingError ?? undefined}
+        confirmDisabled={notEligible}
         errorAction={
-          assessmentRequired
+          notEligible
+            ? { label: matchText.notEligibleAction, onClick: backToListAfterNotEligible }
+            : assessmentRequired
             ? {
                 label: assessmentText.errorRequiredAction,
                 onClick: () => {

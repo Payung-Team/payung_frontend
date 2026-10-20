@@ -16,6 +16,13 @@ const CUSTOM_SKILLS_FIELD = "customSkills: otherSkills";
  * ผู้ดูแลเห็นแค่ Caregiver.careLevel · ผู้กำหนด / เวลา / ประวัติ เป็นของแอดมิน (adminKycDetail.careLevelInfo)
  */
 const CARE_LEVEL_FIELD = "careLevel";
+
+/**
+ * PYG-648 · S18: ระดับผู้ดูแลบนการ์ดในหน้ารายชื่อ (ญาติเห็นได้ · เคาะใน PYG-645)
+ * ★ CaregiverSummary ยังไม่มี careLevel (BE PYG-647 ยังไม่ลง) — ขอ field ที่ไม่มีจะทำให้ query ทั้งก้อนพัง
+ *   จึงเว้นว่างไว้ · BE ขึ้นแล้วเปลี่ยนเป็น "careLevel" ที่เดียว ป้ายระดับบนการ์ดขึ้นเอง
+ */
+const SUMMARY_CARE_LEVEL_FIELD = "";
 export const CARE_LEVEL_INFO_FIELDS = `
   caregiverId
   level
@@ -1115,6 +1122,7 @@ export const SEARCH_CAREGIVERS = gql`
         skills
         ${CUSTOM_SKILLS_FIELD}
         ${PROFESSION_FIELD}
+        ${SUMMARY_CARE_LEVEL_FIELD}
         province
         district
         gender
