@@ -7,6 +7,7 @@ import { extractGraphQLErrorCode, extractGraphQLErrorMessage } from './apolloErr
 import { CONSENT_ERROR } from '../graphql/consent';
 import { ASSESSMENT_ERROR } from '../graphql/assessment';
 import { ASSESSMENT_STRINGS } from './assessmentStrings';
+import { CARE_ACTIVITY_STRINGS, rejectedBookingActivityIds } from './careActivityStrings';
 
 const MY_BOOKINGS_HINT = 'กรุณาตรวจสอบที่หน้า "การจองของฉัน" ก่อนลองใหม่ เพื่อไม่ให้จองซ้ำ';
 
@@ -79,6 +80,12 @@ export function isBookingTimeErrorMessage(message?: string | null): boolean {
   return !!message && TIME_ERROR_FRAGMENTS.some((f) => message.includes(f));
 }
 
+/** PYG-635: กิจกรรมที่เลือกถูกปิดใช้งาน / ไม่มีแล้ว — ผู้เรียกเอา id ออกจาก draft ด้วย useDropRejectedActivities */
+function rejectedActivitiesMessage(source: unknown): string | null {
+  const ids = rejectedBookingActivityIds(source);
+  return ids ? CARE_ACTIVITY_STRINGS.th.bookingRejected(Math.max(ids.length, 1)) : null;
+}
+
 export function bookingHttpErrorMessage(status: number, body: unknown, recipientName?: string): string {
   const msg = serverMessage(body);
   // PYG-525: ข้อความเรื่องเวลาจาก BE อ่านเข้าใจอยู่แล้ว — ไม่เติมคำนำ "ข้อมูลการจองไม่ถูกต้อง:"
@@ -87,6 +94,8 @@ export function bookingHttpErrorMessage(status: number, body: unknown, recipient
   if (isAssessmentRequiredError(body)) {
     return ASSESSMENT_STRINGS.th.errorRequired(recipientName?.trim() || ASSESSMENT_STRINGS.th.thisRecipient);
   }
+  const activityMessage = rejectedActivitiesMessage(body);
+  if (activityMessage) return activityMessage;
   // ★ ตรวจก่อน status เพราะข้อความทั่วไปของ 4xx ไม่ได้บอกว่าต้องไปกรอก Onboarding
   if (isOnboardingRequiredError(body)) {
     return msg ?? 'กรุณากรอกข้อมูลผู้รับบริการให้ครบก่อนจองผู้ดูแล';
@@ -132,6 +141,8 @@ export function onBehalfBookingErrorMessage(err: unknown, recipientName?: string
       'ผู้รับบริการคนนี้ยังไม่ได้ให้ความยินยอมที่จำเป็นสำหรับการจองแทน จึงจองแทนไม่ได้ในตอนนี้'
     );
   }
+  const activityMessage = rejectedActivitiesMessage(err);
+  if (activityMessage) return activityMessage;
   // PYG-525: เวลาผิดกฎ / ผู้ดูแลไม่ว่าง / นัดชน — ใช้ข้อความจาก BE ตรง ๆ ผู้ใช้จะรู้ว่าต้องเปลี่ยนเวลา
   //   (เดิมทุกกรณีตกไปที่ "จองแทนไม่สำเร็จ" ซึ่งไม่บอกว่าต้องแก้อะไร)
   const message = extractGraphQLErrorMessage(err);

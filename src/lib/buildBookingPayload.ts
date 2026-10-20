@@ -40,6 +40,11 @@ export interface BookingPayload {
   careRecipientId?: string;
   patientProfile?: PatientProfile;
   saveAsProfile?: boolean;
+  /**
+   * PYG-635 — id ของกิจกรรมจากรายการกลาง (careActivities) · ไม่เลือก = ไม่ส่ง
+   * BE ตอบ CARE_ACTIVITY_INACTIVE / NOT_FOUND ถ้ามีรายการที่ถูกปิดใช้งาน/ลบไปแล้ว (ดู rejectedBookingActivityIds)
+   */
+  activityIds?: string[];
 }
 
 /**
@@ -89,6 +94,9 @@ export function buildBookingPayload(
     lng: pinLng,
     bookingDate: draft.dateTime?.date ?? new Date().toISOString().slice(0, 10),
     notes: draft.jobDetails?.notes || undefined,
+    activityIds: draft.jobDetails?.activities?.length
+      ? draft.jobDetails.activities.map((a) => a.activityId)
+      : undefined,
     dayOfContactName: draft.contactPerson?.name ?? undefined,
     dayOfContactPhone: draft.contactPerson?.phone ?? undefined,
     dayOfContactRelationship: draft.contactPerson?.relationship ?? undefined,

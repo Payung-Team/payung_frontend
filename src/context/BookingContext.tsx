@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useMemo, useRef, useStat
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import type { BookingStatus } from '../utils/bookingStatus';
+import type { BookingActivity } from '../graphql/careActivities';
 
 export interface BookingRequest {
   serviceLocation: ('at_home' | 'accompany_outside')[];
@@ -77,6 +78,11 @@ export interface BookingRequest {
   jobDetails?: {
     tasks?: { id: string; name: string; timeNote?: string }[];
     customTasks?: { id: string; name: string; timeNote?: string }[];
+    /**
+     * PYG-635 — กิจกรรมที่เลือกจากรายการกลาง · เก็บชื่อ/หมวด/ระดับไว้ด้วยเพื่อแสดงในขั้นตรวจสอบ
+     * (ส่งไป BE แค่ activityId — BE snapshot ชื่อจากตารางเอง)
+     */
+    activities?: BookingActivity[];
     notes?: string;
   };
   estimatedCost?: {

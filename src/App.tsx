@@ -21,6 +21,7 @@ import KycReviewListPage from './pages/admin/KycReviewListPage';
 import KycReviewDetailPage from './pages/admin/KycReviewDetailPage';
 import ProfilePhotoReviewPage from './pages/admin/ProfilePhotoReviewPage';
 import ProfessionChangeRequestsPage from './pages/admin/ProfessionChangeRequestsPage';
+import CareActivitiesPage from './pages/admin/CareActivitiesPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminCaregiverDetailPage from './pages/admin/AdminCaregiverDetailPage';
 import AdminPaymentsPage from './pages/admin/AdminPaymentsPage';
@@ -468,6 +469,7 @@ function App() {
           <Route path="/admin/kyc/:caregiverId" element={<KycReviewDetailPage />} />
           <Route path="/admin/kyc/:caregiverId/profile-photo" element={<ProfilePhotoReviewPage />} />
           <Route path="/admin/profession-changes" element={<ProfessionChangeRequestsPage />} />
+          <Route path="/admin/care-activities" element={<CareActivitiesPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/users/:caregiverId" element={<AdminCaregiverDetailPage />} />
           <Route path="/admin/payments" element={<AdminPaymentsPage />} />

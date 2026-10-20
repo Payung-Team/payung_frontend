@@ -5,6 +5,8 @@ import {
   ESTIMATED_PLATFORM_FEE_PERCENT as PLATFORM_FEE_PERCENT,
   estimateBookingCost,
 } from '../../../lib/bookingPrice';
+import { useCareActivityStrings } from '../../../lib/careActivityStrings';
+import BookingActivitiesList from '../../../components/booking/BookingActivitiesList';
 
 interface Props {
   onStartSearch: () => void;
@@ -125,6 +127,9 @@ export default function BookingStepReview({ onStartSearch }: Props) {
   const hasAllergies =
     !!allergies && allergies.trim().toLowerCase() !== 'ไม่มี' && allergies.trim() !== '';
 
+  const activities = bookingDraft?.jobDetails?.activities ?? [];
+  const cas = useCareActivityStrings();
+
   const tasksCount =
     (bookingDraft?.jobDetails?.tasks?.length || 0) +
     (bookingDraft?.jobDetails?.customTasks?.length || 0);
@@ -217,6 +222,13 @@ export default function BookingStepReview({ onStartSearch }: Props) {
           </div>
         )}
       </ReviewSection>
+
+      {/* PYG-635: กิจกรรมจากรายการกลาง — แยกจากงานย่อยด้านบน */}
+      {activities.length > 0 && (
+        <ReviewSection title={`${cas.reviewTitle} (${activities.length})`} icon="checklist" onEdit={() => goToStep(1)}>
+          <BookingActivitiesList activities={activities} />
+        </ReviewSection>
+      )}
 
       {/* Cost breakdown */}
       <section className="bg-[#F0FAF4] border border-[#BFE0D6] rounded-2xl p-5">

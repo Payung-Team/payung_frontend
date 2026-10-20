@@ -4,6 +4,7 @@ import { NetworkStatus } from '@apollo/client';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { useBooking } from '../../context/BookingContext';
 import { supabase } from '../../lib/supabase';
+import { useDropRejectedActivities } from '../../hooks/useDropRejectedActivities';
 import { buildBookingPayload } from '../../lib/buildBookingPayload';
 import { formatDisplayPrice, NO_PRICE_LABEL } from '../../lib/displayPrice';
 import { SEARCH_CAREGIVERS } from '../../graphql/queries';
@@ -680,6 +681,8 @@ function SearchPageContent() {
   // PYG-385: family "book on behalf" path — reuses this whole search/confirm flow, only the
   // submit call differs (GraphQL createBookingOnBehalf instead of the personal REST create).
   const [createOnBehalf] = useMutation(CREATE_BOOKING_ON_BEHALF);
+  // PYG-635: กิจกรรมถูกปิดใช้งานระหว่างจอง → ตัดออกจาก draft ให้กดยืนยันซ้ำได้เลย
+  const dropRejectedActivities = useDropRejectedActivities();
 
   const handleConfirmBooking = useCallback(async () => {
     if (!bookingCaregiver || !bookingDraft) return;
@@ -729,6 +732,7 @@ function SearchPageContent() {
                 //   ฟีดแบ็กอาจารย์ Sprint 9 ข้อ 6: คนจองพิมพ์ชื่อใครก็ได้ลงใบจองไม่ได้อีก
                 caregiverId: payload.caregiverId,
                 tasks: payload.tasks,
+                activityIds: payload.activityIds,
                 serviceLocations: payload.serviceLocations,
                 serviceType: payload.serviceType,
                 // PYG-525: ส่งเวลาเริ่ม + สิ้นสุด — BE คำนวณ durationHours / timeSlot เอง
@@ -763,6 +767,7 @@ function SearchPageContent() {
           });
         } catch (err) {
           // PYG-540: อ่าน code แบบ Apollo 4 + รองรับ CONSENT_WITHDRAWN (ดู bookingSubmitError.ts)
+          dropRejectedActivities(err);
           setBookingError(onBehalfBookingErrorMessage(err, bookingDraft.onBehalf.recipientName));
         }
         return;
@@ -780,6 +785,7 @@ function SearchPageContent() {
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
         setAssessmentRequired(isAssessmentRequiredError(errData));
+        dropRejectedActivities(errData);
         setBookingError(
           bookingHttpErrorMessage(res.status, errData, bookingDraft.recipient?.patientDetails?.name),
         );
@@ -802,7 +808,7 @@ function SearchPageContent() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [bookingCaregiver, bookingDraft, navigate, createOnBehalf]);
+  }, [bookingCaregiver, bookingDraft, navigate, createOnBehalf, dropRejectedActivities]);
 
   const handleViewProfile = useCallback((cg: CaregiverSummary) => {
     navigate(`/caregivers/${cg.id}`, { state: { caregiver: cg } });

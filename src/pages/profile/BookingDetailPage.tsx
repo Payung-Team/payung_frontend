@@ -23,6 +23,9 @@ import { formatBookingTimeRange, formatDurationHours } from '../../lib/bookingTi
 import { GROUP_BOOKING_DETAIL } from '../../graphql/familyGroup';
 import CaregiverPhoto from '../../components/ui/CaregiverPhoto';
 import { useSignedUrlRefresh } from '../../hooks/useSignedPhoto';
+import BookingActivitiesList from '../../components/booking/BookingActivitiesList';
+import { useBookingActivities } from '../../hooks/useBookingActivities';
+import { useCareActivityStrings } from '../../lib/careActivityStrings';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -174,6 +177,10 @@ export default function BookingDetailPage() {
       fetchPolicy: 'cache-and-network',
     },
   );
+
+  // PYG-635: มุมมองกลุ่มครอบครัวไม่มี myBooking ของคนดู (เป็นการจองของสมาชิกอื่น) → ไม่ดึง
+  const activities = useBookingActivities(id, 'patient', isFamilyView);
+  const cas = useCareActivityStrings();
 
   const queryData = data as {
     myBooking?: Record<string, unknown>;
@@ -784,6 +791,17 @@ export default function BookingDetailPage() {
             )}
 
             <Divider />
+
+            {/* PYG-635: กิจกรรมจากรายการกลาง (snapshot ณ วันจอง) */}
+            {activities.length > 0 && (
+              <>
+                <SectionTitle>{cas.detailTitle}</SectionTitle>
+                <div style={{ background: '#F9FAFB', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                  <BookingActivitiesList activities={activities} />
+                  <p className="mt-3 text-[11px] text-[#8A8C8E]">{cas.detailNote}</p>
+                </div>
+              </>
+            )}
 
             {/* ── Section 4: รายละเอียดภารกิจ ── */}
             <SectionTitle>รายละเอียดภารกิจ</SectionTitle>

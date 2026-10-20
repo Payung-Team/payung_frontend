@@ -30,6 +30,8 @@ const NAV_MENU: NavEntry[] = [
   // PYG-665: คำขอเปลี่ยนวิชาชีพหลัง KYC อนุมัติ (พร้อมใบประกอบฯ)
   { to: '/admin/profession-changes', label: 'เปลี่ยนวิชาชีพ', icon: 'swap_horiz', end: false, badgeKey: 'profession' },
   { to: '/admin/users', label: 'จัดการผู้ใช้', icon: 'admin_panel_settings', end: false },
+  // PYG-635: รายการกิจกรรมการดูแลกลางที่ผู้จองเลือกตอนจอง
+  { to: '/admin/care-activities', label: 'กิจกรรมการดูแล', icon: 'checklist', end: false },
   {
     id: 'payment',
     label: 'Payment',

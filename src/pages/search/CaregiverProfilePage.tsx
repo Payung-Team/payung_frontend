@@ -22,6 +22,7 @@ import { bookingAssessmentRedirect } from '../../lib/assessmentNav';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
 import { supabase } from '../../lib/supabase';
+import { useDropRejectedActivities } from '../../hooks/useDropRejectedActivities';
 import { buildBookingPayload } from '../../lib/buildBookingPayload';
 import { formatDisplayPrice, hasDisplayPrice, NO_PRICE_LABEL } from '../../lib/displayPrice';
 import { skillLabel } from '../../lib/skillLabels';
@@ -266,6 +267,8 @@ const CaregiverProfilePage: React.FC = () => {
   // booking started in a family group and confirmed from the profile page is written with
   // family_group_id = null, so it never appears in the group feed.
   const [createOnBehalf] = useMutation(CREATE_BOOKING_ON_BEHALF);
+  // PYG-635: กิจกรรมถูกปิดใช้งานระหว่างจอง → ตัดออกจาก draft ให้กดยืนยันซ้ำได้เลย
+  const dropRejectedActivities = useDropRejectedActivities();
   const [avail, setAvail] = useState<boolean[][]>(EMPTY_AVAIL);
   const [completedBookingCount, setCompletedBookingCount] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -387,6 +390,7 @@ const CaregiverProfilePage: React.FC = () => {
                 //   BE ปฏิเสธด้วย PATIENT_NAME_NOT_ALLOWED ถ้าส่งมา (PYG-516) · ต้องตรงกับ SearchPage
                 caregiverId: payload.caregiverId,
                 tasks: payload.tasks,
+                activityIds: payload.activityIds,
                 serviceLocations: payload.serviceLocations,
                 serviceType: payload.serviceType,
                 // PYG-525: ส่งเวลาเริ่ม + สิ้นสุด — BE คำนวณ durationHours / timeSlot เอง
@@ -421,6 +425,7 @@ const CaregiverProfilePage: React.FC = () => {
           });
         } catch (err) {
           // PYG-540: อ่าน code แบบ Apollo 4 + รองรับ CONSENT_WITHDRAWN (ดู bookingSubmitError.ts)
+          dropRejectedActivities(err);
           setBookingError(onBehalfBookingErrorMessage(err, bookingDraft.onBehalf.recipientName));
         }
         return;
@@ -439,6 +444,7 @@ const CaregiverProfilePage: React.FC = () => {
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
         setAssessmentRequired(isAssessmentRequiredError(errData));
+        dropRejectedActivities(errData);
         setBookingError(
           bookingHttpErrorMessage(res.status, errData, bookingDraft.recipient?.patientDetails?.name),
         );
