@@ -22,6 +22,9 @@ import type { ProofOfWorkSummary } from '../../lib/monitoring';
 import CheckInView from './checkin/CheckInView';
 import { getPayoutStatusMeta } from '../../lib/payoutStatus';
 import { formatThaiDate } from '../../lib/thaiDate';
+import BookingActivitiesList from '../../components/booking/BookingActivitiesList';
+import { useBookingActivities } from '../../hooks/useBookingActivities';
+import { useCareActivityStrings } from '../../lib/careActivityStrings';
 
 const IN_PROGRESS_STATUSES: ReadonlyArray<Booking['status']> = ['in_progress'];
 
@@ -107,6 +110,8 @@ export default function CaregiverBookingDetailPage() {
   });
   const fetchedBooking = fetchedData?.caregiverBooking ? mapToBooking(fetchedData.caregiverBooking) : undefined;
   const booking = fetchedBooking ?? stateBooking;
+  const activities = useBookingActivities(id, 'caregiver');
+  const cas = useCareActivityStrings();
 
   const showToast = (message: string, isError = false) => {
     if (isError) showError(message, 3000);
@@ -368,6 +373,17 @@ export default function CaregiverBookingDetailPage() {
             )}
 
             <Divider />
+
+            {/* PYG-635: กิจกรรมจากรายการกลาง (snapshot ณ วันจอง) */}
+            {activities.length > 0 && (
+              <>
+                <SectionTitle>{cas.detailTitle}</SectionTitle>
+                <div style={{ background: '#F9FAFB', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                  <BookingActivitiesList activities={activities} />
+                  <p className="mt-3 text-[11px] text-[#8A8C8E]">{cas.detailNote}</p>
+                </div>
+              </>
+            )}
 
             {/* ── Section 5: รายละเอียดภารกิจ ── */}
             <SectionTitle>รายละเอียดภารกิจ</SectionTitle>

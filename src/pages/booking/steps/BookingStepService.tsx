@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBooking } from '../../../context/BookingContext';
+import CareActivityPicker from '../../../components/booking/CareActivityPicker';
+import type { BookingActivity } from '../../../graphql/careActivities';
 
 const LOC_OPTIONS = [
   {
@@ -52,8 +54,22 @@ const TASK_MAP: Record<string, string[]> = {
   'เป็นเพื่อน/พูดคุย': ['พูดคุยเป็นเพื่อน คลายเหงา', 'ทำกิจกรรมยามว่าง เช่น อ่านหนังสือ'],
 };
 
+const EMPTY_ACTIVITIES: BookingActivity[] = [];
+
 export default function BookingStepService() {
   const { bookingDraft, setBookingDraft, goToStep, setStepSubmit, setStepMissing } = useBooking();
+
+  // PYG-635: เขียนลง draft ตรง ๆ (ไม่ผ่าน effect ของ tasks ด้านล่าง ซึ่ง spread jobDetails เดิมไว้แล้ว)
+  const selectedActivities = bookingDraft?.jobDetails?.activities ?? EMPTY_ACTIVITIES;
+  const setSelectedActivities = useCallback(
+    (activities: BookingActivity[]) => {
+      setBookingDraft((prev) => ({
+        ...(prev || { serviceLocation: [], serviceTypes: [] }),
+        jobDetails: { ...(prev?.jobDetails || {}), activities },
+      }));
+    },
+    [setBookingDraft],
+  );
 
   // Derive current "location option" (at_home / accompany_outside / both)
   const initialLocOption: LocOptionId | '' = (() => {
@@ -422,6 +438,9 @@ export default function BookingStepService() {
           </div>
         </section>
       )}
+
+      {/* PYG-635: กิจกรรมจากรายการกลาง — แยกจากงานพิเศษที่พิมพ์เอง · ไม่บังคับ */}
+      <CareActivityPicker value={selectedActivities} onChange={setSelectedActivities} />
     </div>
   );
 }
