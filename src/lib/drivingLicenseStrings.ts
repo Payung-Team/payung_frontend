@@ -74,6 +74,17 @@ const TH = {
   changeSubmit: 'ส่งให้ทีมงานตรวจ',
   changeSent: 'ส่งใบขับขี่ให้ทีมงานตรวจแล้ว',
   changeCancel: 'ยกเลิก',
+  // PYG-662: เปลี่ยนวิธีรับส่งหลัง KYC อนุมัติ (updateTransportMode)
+  transportSectionLabel: 'วิธีรับส่งผู้รับการดูแล',
+  transportUnset: 'ยังไม่ได้ระบุ',
+  transportChange: 'เปลี่ยน',
+  transportSave: 'บันทึก',
+  transportSaving: 'กำลังบันทึก...',
+  transportSaved: 'บันทึกวิธีรับส่งแล้ว',
+  transportSaveFailed: 'บันทึกวิธีรับส่งไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+  transportLeaveSelfNote:
+    'ป้าย "ผ่านการตรวจใบขับขี่" จะไม่แสดงบนโปรไฟล์ของคุณ ใบที่ผ่านการตรวจยังเก็บไว้ ถ้ากลับมาเลือกขับเองและใบยังไม่หมดอายุ ป้ายจะกลับมา',
+  transportSelfNeedsLicense: 'บันทึกแล้ว แนบใบขับขี่ด้านล่างให้ทีมงานตรวจก่อนรับงานที่ต้องขับรถรับส่ง',
 
   // ── สรุปก่อนส่ง (ขั้น 4) ───────────────────────────────────────────────
   reviewTitle: 'การรับส่งผู้รับการดูแล',
@@ -192,6 +203,16 @@ const EN: DrivingLicenseStrings = {
   changeSubmit: 'Send for review',
   changeSent: 'Your driving license was sent for review',
   changeCancel: 'Cancel',
+  transportSectionLabel: 'How you transport care recipients',
+  transportUnset: 'Not set',
+  transportChange: 'Change',
+  transportSave: 'Save',
+  transportSaving: 'Saving...',
+  transportSaved: 'Transport preference saved',
+  transportSaveFailed: 'Couldn’t save your transport preference. Please try again',
+  transportLeaveSelfNote:
+    'The “Driving license verified” badge won’t show on your profile. Your verified license is kept — choose self-drive again while it’s still valid and the badge comes back',
+  transportSelfNeedsLicense: 'Saved. Attach your driving license below for review before accepting jobs that need driving',
 
   reviewTitle: 'Transporting care recipients',
   reviewChoice: 'Transport',

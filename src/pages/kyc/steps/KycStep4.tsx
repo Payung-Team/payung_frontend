@@ -20,6 +20,7 @@ import {
   DRIVING_LICENSE_DOC_TYPE,
   DRIVING_LICENSE_KYC_ENABLED,
   drivingLicenseErrorCode,
+  transportChoiceToMode,
 } from '../../../lib/drivingLicense';
 import { useDrivingLicenseStrings } from '../../../lib/drivingLicenseStrings';
 import { isDrivingLicenseRegistered } from '../../../features/kyc/drivingLicenseDraft';
@@ -156,8 +157,13 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
         // PYG-659: ทักษะอื่นๆ (BE ชื่อ otherSkills) — ส่งเสมอ ส่ง [] = ไม่มี / ล้างของเดิมตอนยื่นซ้ำ
         otherSkills: step1Data.customSkills ?? [],
       };
-      // PYG-598: true → BE บังคับใบขับขี่ใน documentIds รอบนี้ · ⚠ BE ยังไม่บันทึกคำตอบนี้ (S06 ไม่มีการ์ด DB)
-      if (DRIVING_LICENSE_KYC_ENABLED) kycInput.selfDriveTransport = selfDrive;
+      // PYG-662: transportMode = คำตอบ 3 แบบ (BE เก็บไว้ · SELF_DRIVE → บังคับใบขับขี่ในรอบนี้)
+      //   selfDriveTransport ส่งคู่กันเพื่อ BE ที่ยังไม่มี transportMode — BE ใหม่ใช้ transportMode ก่อน
+      if (DRIVING_LICENSE_KYC_ENABLED) {
+        kycInput.selfDriveTransport = selfDrive;
+        const mode = transportChoiceToMode(transportChoice);
+        if (mode) kycInput.transportMode = mode;
+      }
 
       // PYG-266: ส่ง payoutAccount เฉพาะตอนที่ผู้ใช้กรอก/แก้ไขจริง (ไม่แตะ = ไม่ส่ง)
       // PYG-307: ปิดไว้ชั่วคราวจนกว่า BE PR #37 จะ merge (ดู payoutAccountFlag.ts)

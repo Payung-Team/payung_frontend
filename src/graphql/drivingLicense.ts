@@ -19,9 +19,10 @@ const DRIVING_LICENSE_FIELDS = `
       verified
 `;
 
-/** kycStatus.drivingLicense — สถานะของผู้ดูแลเอง */
+/** kycStatus.drivingLicense + transportMode (PYG-662 · คำตอบวิธีรับส่งที่เก็บไว้ null = ไม่เคยตอบ) */
 export const DRIVING_LICENSE_STATUS_FIELD = DRIVING_LICENSE_KYC_ENABLED
-  ? `drivingLicense {${DRIVING_LICENSE_FIELDS}}`
+  ? `drivingLicense {${DRIVING_LICENSE_FIELDS}}
+      transportMode`
   : '';
 
 /** adminKycDetail.drivingLicense + ประวัติการตรวจ */
@@ -55,5 +56,12 @@ export const REJECT_DRIVING_LICENSE = gql`
       status
       reviewedAt
     }
+  }
+`;
+
+/** ผู้ดูแลที่ KYC อนุมัติแล้วเปลี่ยนวิธีรับส่ง (PYG-661) — ไม่บังคับแนบใบตอนนั้น ป้าย/ประตูรับงานอ่านผลตรวจใบเอง */
+export const UPDATE_TRANSPORT_MODE = gql`
+  mutation UpdateTransportMode($mode: TransportMode!) {
+    updateTransportMode(mode: $mode)
   }
 `;

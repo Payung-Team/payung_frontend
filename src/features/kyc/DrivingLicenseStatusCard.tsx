@@ -1,13 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMutation } from '@apollo/client/react';
+import { UPDATE_TRANSPORT_MODE } from '../../graphql/drivingLicense';
+import { logGraphQLError } from '../../lib/logGraphQLError';
 import Icon from '../../components/ui/Icon';
 import type { LicenseFileUpload } from '../../context/KycContext';
 import { toBangkokYmd } from '../../lib/license';
 import { formatLicenseDate, useLicenseStrings } from '../../lib/licenseStrings';
 import {
+  TRANSPORT_OPTIONS,
   drivingLicenseStatus,
+  transportChoiceToMode,
+  transportModeToChoice,
   type DrivingLicenseInfo,
   type DrivingLicenseStatus,
+  type TransportChoice,
 } from '../../lib/drivingLicense';
 import { useDrivingLicenseStrings } from '../../lib/drivingLicenseStrings';
 import {
@@ -48,14 +55,22 @@ export function DrivingLicenseStatusPill({ status }: { status: DrivingLicenseSta
  * ทางอัปโหลดใบใหม่ (ไม่ผ่าน / หมดอายุ) และทาง "เปลี่ยนเป็นขับรถรับส่งเอง":
  *   - KYC อนุมัติแล้ว → อัปโหลดที่การ์ดนี้ได้เลย (uploadKycDocument · BE จับคู่ใบกับผู้ดูแลด้วย user_id)
  *   - KYC ถูกปฏิเสธ → แก้ KYC ที่ขั้น 2 (resubmitKyc ผูกใบใหม่ให้)
+ *
+ * PYG-662: KYC อนุมัติแล้วเปลี่ยนวิธีรับส่งได้ที่การ์ดนี้ (updateTransportMode)
+ *   - เปลี่ยนเป็นขับเองแต่ยังไม่มีใบที่ใช้ได้ → เปิดฟอร์มแนบใบต่อทันที
+ *   - เปลี่ยนจากขับเองเป็นแบบอื่น → แจ้งว่าป้ายบนโปรไฟล์จะซ่อน ใบที่ผ่านแล้วยังเก็บไว้ (E2)
+ *   - แนบใบผ่านปุ่ม "ขับรถรับส่งเอง · แนบใบขับขี่" → บันทึกวิธีรับส่งเป็นขับเองให้ด้วย
  */
 export default function DrivingLicenseStatusCard({
   info,
   kycStatus,
+  transportMode,
   onChanged,
 }: {
   info: DrivingLicenseInfo | null;
   kycStatus: string | null | undefined;
+  /** kycStatus.transportMode — null = ไม่เคยตอบ */
+  transportMode: string | null;
   onChanged: () => Promise<unknown> | void;
 }) {
   const s = useDrivingLicenseStrings();
@@ -79,6 +94,39 @@ export default function DrivingLicenseStatusCard({
   const [sent, setSent] = useState(false);
 
   const clientErrors = validateDrivingLicenseDraft({ file, expiresAt }, s);
+
+  // ── วิธีรับส่ง (PYG-662) ──
+  const currentChoice = transportModeToChoice(transportMode);
+  const [updateTransportMode, { loading: savingTransport }] = useMutation(UPDATE_TRANSPORT_MODE);
+  const [editingTransport, setEditingTransport] = useState(false);
+  const [transportDraft, setTransportDraft] = useState<TransportChoice>(currentChoice);
+  const [transportMessage, setTransportMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const hasUsableLicense = status === 'pending' || status === 'approved';
+  const leavingSelf = currentChoice === 'self' && transportDraft !== '' && transportDraft !== 'self';
+
+  async function saveTransport() {
+    const mode = transportChoiceToMode(transportDraft);
+    if (!mode || transportDraft === currentChoice) {
+      setEditingTransport(false);
+      return;
+    }
+    setTransportMessage(null);
+    try {
+      await updateTransportMode({ variables: { mode } });
+    } catch (err) {
+      logGraphQLError('UpdateTransportMode', err);
+      setTransportMessage({ tone: 'error', text: s.transportSaveFailed });
+      return;
+    }
+    setEditingTransport(false);
+    const needsLicense = transportDraft === 'self' && !hasUsableLicense;
+    setTransportMessage({ tone: 'ok', text: needsLicense ? s.transportSelfNeedsLicense : s.transportSaved });
+    if (needsLicense) {
+      setSent(false);
+      setFormOpen(true);
+    }
+    await onChanged();
+  }
 
   function resetForm() {
     setFormOpen(false);
@@ -131,6 +179,15 @@ export default function DrivingLicenseStatusCard({
     }
     resetForm();
     setSent(true);
+    // แนบใบ = ขับรถรับส่งเอง — บันทึกวิธีรับส่งด้วยถ้ายังไม่ใช่ (ใบส่งไปแล้ว ถ้าบันทึกไม่ได้แจ้งให้ตั้งเองด้านบน)
+    if (currentChoice !== 'self') {
+      try {
+        await updateTransportMode({ variables: { mode: 'SELF_DRIVE' } });
+      } catch (err) {
+        logGraphQLError('UpdateTransportMode(after license upload)', err);
+        setTransportMessage({ tone: 'error', text: s.transportSaveFailed });
+      }
+    }
     await onChanged();
   }
 
@@ -150,6 +207,96 @@ export default function DrivingLicenseStatusCard({
         </h3>
         {status !== 'none' && <DrivingLicenseStatusPill status={status} />}
       </div>
+
+      {/* วิธีรับส่ง (PYG-662) — เปลี่ยนได้เมื่อ KYC อนุมัติแล้ว */}
+      {kycVerified && (
+        <div className="mt-3 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] px-3.5 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-col">
+              <span className="text-[12px] text-[#64748B]">{s.transportSectionLabel}</span>
+              <span className="text-[14px] font-semibold text-[#0F172A]">
+                {currentChoice ? s.transportOption[currentChoice].label : s.transportUnset}
+              </span>
+            </div>
+            {!editingTransport && (
+              <button
+                type="button"
+                onClick={() => { setTransportDraft(currentChoice); setTransportMessage(null); setEditingTransport(true); }}
+                className="h-9 rounded-lg border border-[#2D6A58] px-3.5 text-[13px] font-semibold text-[#2D6A58] hover:bg-[#F2F8F5] cursor-pointer"
+              >
+                {s.transportChange}
+              </button>
+            )}
+          </div>
+
+          {editingTransport && (
+            <div className="mt-3 flex flex-col gap-2">
+              <div role="radiogroup" aria-label={s.transportSectionLabel} className="flex flex-col gap-2">
+                {TRANSPORT_OPTIONS.map((option) => {
+                  const on = transportDraft === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => setTransportDraft(option.id)}
+                      className={`flex items-start gap-2.5 rounded-[10px] border px-3 py-2.5 text-left cursor-pointer ${
+                        on ? 'border-[#2D6A58] bg-white' : 'border-[#E2E8F0] bg-white hover:border-[#94A3B8]'
+                      }`}
+                    >
+                      <Icon name={option.icon} color={on ? '#2D6A58' : '#64748B'} style={{ fontSize: 20 }} />
+                      <span className="flex flex-col">
+                        <span className="text-[14px] font-semibold text-[#0F172A]">{s.transportOption[option.id].label}</span>
+                        <span className="text-[12.5px] text-[#64748B]">{s.transportOption[option.id].desc}</span>
+                      </span>
+                      <Icon
+                        name={on ? 'radio_button_checked' : 'radio_button_unchecked'}
+                        color={on ? '#2D6A58' : '#CBD5E1'}
+                        className="ml-auto"
+                        style={{ fontSize: 20 }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+              {leavingSelf && info?.verified && (
+                <p className="flex items-start gap-1.5 rounded-[10px] bg-[#FFFBEB] px-3 py-2 text-[12.5px] text-[#92400E]">
+                  <Icon name="info" color="currentColor" style={{ fontSize: 16 }} />
+                  {s.transportLeaveSelfNote}
+                </p>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setEditingTransport(false); setTransportMessage(null); }}
+                  className="h-9 rounded-lg border border-[#E2E8F0] px-3.5 text-[13px] font-semibold text-[#334155] hover:bg-white cursor-pointer"
+                >
+                  {s.changeCancel}
+                </button>
+                <button
+                  type="button"
+                  disabled={savingTransport || !transportDraft}
+                  onClick={() => void saveTransport()}
+                  className="h-9 rounded-lg bg-[#2D6A58] px-3.5 text-[13px] font-bold text-white hover:bg-[#255a4a] disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                >
+                  {savingTransport ? s.transportSaving : s.transportSave}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {transportMessage && (
+            <p
+              role={transportMessage.tone === 'error' ? 'alert' : 'status'}
+              className={`mt-2 flex items-start gap-1.5 text-[12.5px] ${transportMessage.tone === 'error' ? 'text-[#B91C1C]' : 'text-[#15803D]'}`}
+            >
+              <Icon name={transportMessage.tone === 'error' ? 'error' : 'check_circle'} color="currentColor" style={{ fontSize: 16 }} />
+              {transportMessage.text}
+            </p>
+          )}
+        </div>
+      )}
 
       {sent && status === 'pending' && (
         <p role="status" className="mt-2 flex items-center gap-1.5 text-[13px] text-[#15803D]">

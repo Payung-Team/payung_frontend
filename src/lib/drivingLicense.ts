@@ -3,8 +3,10 @@
  *
  * contract อ้างอิง src/schema.gql ของ payung_backend `dev` (PYG-596 ยังไม่เคาะ)
  *   - เอกสาร doc_type = 'driving_license' ส่งวันหมดอายุมากับ uploadKycDocument ในครั้งเดียว (ไม่มีเลขใบขับขี่)
- *   - KycInput.selfDriveTransport = true → BE บังคับใบขับขี่ใน documentIds ของรอบนี้ (DRIVING_LICENSE_REQUIRED)
- *     ⚠ BE ยังไม่บันทึกคำตอบนี้ (caregivers ไม่มีคอลัมน์) — ยื่นซ้ำต้องตอบใหม่ทุกครั้ง (E10 / E11)
+ *   - KycInput.transportMode (PYG-661/662) = คำตอบ 3 แบบ BE เก็บที่ caregivers.transport_mode · SELF_DRIVE → บังคับใบขับขี่
+ *     ในรอบนี้ (DRIVING_LICENSE_REQUIRED) · ยังส่ง selfDriveTransport คู่กันเพื่อ BE เก่า
+ *   - kycStatus.transportMode = คำตอบที่เก็บไว้ · null = ไม่เคยตอบ (ผู้ดูแลเดิม · E11) → ฟอร์มว่างให้เลือก
+ *   - updateTransportMode(mode) = เปลี่ยนวิธีรับส่งหลัง KYC อนุมัติ (ป้ายใบขับขี่ฝั่ง Elder ขึ้นเฉพาะ SELF_DRIVE)
  *   - สถานะ "หมดอายุ" และ "ผ่านการตรวจ" BE คำนวณให้ (isExpired / verified) — FE ห้ามคำนวณเอง
  *   - เอกสารจับคู่กับผู้ดูแลด้วย user_id ด้วย → อัปโหลดใบใหม่หลัง KYC อนุมัติแล้วได้ด้วย uploadKycDocument ตรง ๆ
  */
@@ -21,6 +23,25 @@ export const DRIVING_LICENSE_DOC_TYPE = 'driving_license';
 
 /** คำตอบ "คุณขับรถรับส่งผู้รับการดูแลเองหรือไม่" · '' = ยังไม่ตอบ (ไม่มีค่าเริ่มต้น · E10 / E11) */
 export type TransportChoice = '' | 'self' | 'hire' | 'none';
+
+/** enum TransportMode ของ BE (PYG-661) */
+export type TransportMode = 'SELF_DRIVE' | 'HIRED_RIDE' | 'NONE';
+
+const CHOICE_TO_MODE: Record<Exclude<TransportChoice, ''>, TransportMode> = {
+  self: 'SELF_DRIVE',
+  hire: 'HIRED_RIDE',
+  none: 'NONE',
+};
+
+export function transportChoiceToMode(choice: TransportChoice): TransportMode | null {
+  return choice ? CHOICE_TO_MODE[choice] : null;
+}
+
+/** ค่าจาก BE → ตัวเลือกบนจอ · null / ค่าที่ไม่รู้จัก = ยังไม่ตอบ (ไม่เดาให้ · E10 / E11) */
+export function transportModeToChoice(mode: string | null | undefined): TransportChoice {
+  const found = (Object.keys(CHOICE_TO_MODE) as Array<Exclude<TransportChoice, ''>>).find((c) => CHOICE_TO_MODE[c] === mode);
+  return found ?? '';
+}
 
 export const TRANSPORT_OPTIONS: ReadonlyArray<{ id: Exclude<TransportChoice, ''>; icon: string }> = [
   { id: 'self', icon: 'directions_car' },
