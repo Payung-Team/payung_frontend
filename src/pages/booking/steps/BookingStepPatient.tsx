@@ -201,6 +201,9 @@ function toSavedRecipients(member: GroupBookingRecipient): SavedRecipient[] {
 // PYG-500: every other ACTIVE member is bookable. The backend resolves their care-recipient
 // profile by memberUserId: reuse the group profile, copy their personal profile, or create one
 // from the member name and per-booking details when neither exists.
+//
+// PYG-629: the member is now picked in step 1 (BookingMemberPicker) and kept in
+// draft.groupContext — this step only fills in that member's details.
 
 function MemberBookingSection({
   groups,
@@ -209,130 +212,59 @@ function MemberBookingSection({
   groups: FamilyGroup[];
   gc?: { groupId: string; memberUserId?: string };
 }) {
-  const { bookingDraft } = useBooking();
+  const { bookingDraft, goToStep } = useBooking();
 
-  const [groupId, setGroupId] = useState<string>(
-    gc?.groupId ?? bookingDraft?.onBehalf?.familyGroupId ?? groups[0]?.id ?? '',
-  );
+  const groupId = gc?.groupId ?? bookingDraft?.onBehalf?.familyGroupId ?? groups[0]?.id ?? '';
   const group = groups.find((g) => g.id === groupId) ?? groups[0] ?? null;
 
-  // PYG-519: ใช้ query ของ PYG-517 — คืน "คน" ไม่ใช่ "โปรไฟล์" สมาชิกทุกคนได้หนึ่งรายการ
-  //   แม้ยังไม่มีโปรไฟล์ในกลุ่ม จึงมีปุ่มให้กดครบทุกคน
   const { data, loading } = useQuery<{ groupBookingRecipients: GroupBookingRecipient[] }>(
     GROUP_BOOKING_RECIPIENTS,
     { variables: { groupId: group?.id ?? '' }, skip: !group, fetchPolicy: 'cache-and-network' },
   );
-  const members = useMemo(
-    () => data?.groupBookingRecipients ?? [],
-    [data?.groupBookingRecipients],
-  );
-
-  // จองแทน = จองให้ "คนอื่น" — ตัวเองออกจากลิสต์ (จองให้ตัวเองใช้ flow ปกติ)
   const myUserId = (group?.members ?? []).find((m) => m.isMe)?.userId;
-  // groupBookingRecipients ไม่มีรูป — ยืมจากรายชื่อสมาชิกของกลุ่ม (backend sign URL ให้แล้ว)
-  const avatarByUserId = useMemo(
-    () => new Map((group?.members ?? []).map((m) => [m.userId, m.avatarUrl])),
-    [group?.members],
+  const selected = (data?.groupBookingRecipients ?? []).find(
+    (m) => m.memberUserId === gc?.memberUserId && m.memberUserId !== myUserId,
   );
-  const options = useMemo(
-    () => members.filter((m) => m.memberUserId !== myUserId),
-    [members, myUserId],
-  );
-
-  const [selectedUserId, setSelectedUserId] = useState<string>(gc?.memberUserId ?? '');
-  const selected = options.find((o) => o.memberUserId === selectedUserId);
-
-  /**
-   * PYG-519 — สลับไปสมาชิกคนอื่น: ถามยืนยันก่อนถ้ามีค่าที่แก้ไว้
-   *
-   * ★ ข้อมูลที่กรอกค้างเป็นของคนเดิม ถ้าพาไปต่อกับคนใหม่เงียบ ๆ จะกลายเป็นการส่ง
-   *   ข้อมูลสุขภาพของคนหนึ่งไปให้ผู้ดูแลในนามของอีกคน
-   *   ฟอร์มถูก remount ด้วย key อยู่แล้ว (ล้างค่าให้เอง) ที่นี่แค่กันการกดพลาด
-   */
-  const handlePickMember = (nextUserId: string) => {
-    if (nextUserId === selectedUserId) return;
-    const hasEdits =
-      selectedUserId !== '' && !!bookingDraft?.recipient?.patientDetails;
-    if (
-      hasEdits &&
-      !window.confirm('เปลี่ยนสมาชิกแล้วข้อมูลที่กรอกไว้จะถูกล้าง ต้องการเปลี่ยนหรือไม่?')
-    ) {
-      return;
-    }
-    setSelectedUserId(nextUserId);
-  };
 
   return (
     <>
       <section className="bg-white p-6 rounded-2xl border border-gray-100">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-base font-bold text-[#1A1A1A]">เลือกสมาชิกที่จะจองให้</h3>
-          {groups.length > 1 && (
-            <select
-              value={group?.id ?? ''}
-              onChange={(e) => {
-                setGroupId(e.target.value);
-                setSelectedUserId('');
-              }}
-              className="max-w-[200px] p-2 border border-[#E0E2E5] rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A]"
+        {selected ? (
+          <div className="flex items-center gap-3">
+            <GroupAvatar
+              name={selected.name}
+              seed={selected.memberUserId}
+              src={(group?.members ?? []).find((m) => m.userId === selected.memberUserId)?.avatarUrl}
+              size={40}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-[#8A8C8E]">จองแทนสมาชิก</p>
+              <p className="truncate text-base font-bold text-[#1A1A1A]">
+                {selected.name || 'สมาชิกที่ยังไม่ได้กรอกชื่อ'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => goToStep(1)}
+              className="shrink-0 min-h-[44px] px-4 rounded-xl border border-[#1B5C48] text-sm font-bold text-[#1B5C48] hover:bg-[#F0FAF4] transition cursor-pointer"
             >
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {loading && members.length === 0 ? (
-          <div className="mt-4 space-y-2">
-            <div className="h-16 w-full animate-pulse rounded-xl bg-gray-100" />
-            <div className="h-16 w-full animate-pulse rounded-xl bg-gray-100" />
+              เปลี่ยนสมาชิก
+            </button>
           </div>
-        ) : options.length === 0 ? (
-          <p className="mt-4 rounded-xl bg-[#F6FAF9] px-4 py-6 text-center text-[13px] leading-6 text-[#8A8C8E]">
-            กลุ่มนี้ยังไม่มีสมาชิกคนอื่น เชิญสมาชิกเข้ากลุ่มก่อนจึงจะจองแทนได้
-          </p>
+        ) : loading ? (
+          <div className="h-12 w-full animate-pulse rounded-xl bg-gray-100" />
         ) : (
-          <div className="mt-4 space-y-2">
-            {options.map((member) => {
-              const active = selectedUserId === member.memberUserId;
-              return (
-                <label
-                  key={member.memberUserId}
-                  className={`flex items-center gap-3 rounded-xl border p-3 transition ${
-                    active
-                      ? 'border-2 border-[#009265] bg-[#F0FAF4] cursor-pointer'
-                      : 'border-gray-200 hover:bg-gray-50 cursor-pointer'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="book-member"
-                    className="h-4 w-4 accent-[#009265]"
-                    checked={active}
-                    onChange={() => handlePickMember(member.memberUserId)}
-                  />
-                  <GroupAvatar
-                    name={member.name}
-                    seed={member.memberUserId}
-                    src={avatarByUserId.get(member.memberUserId)}
-                    size={40}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14px] font-semibold text-[#1A1A1A]">
-                      {member.name || 'สมาชิกที่ยังไม่ได้กรอกชื่อ'}
-                    </p>
-                    <p className="truncate text-[12px] text-[#8A8C8E]">
-                      {member.hasProfile
-                        ? 'มีข้อมูลผู้รับบริการแล้ว — เลือกแล้วเติมให้อัตโนมัติ'
-                        : 'ยังไม่มีข้อมูลในกลุ่ม — เลือกแล้วกรอกได้เลย'}
-                    </p>
-                  </div>
-                </label>
-              );
-            })}
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="flex-1 min-w-[200px] text-sm text-[#575859]">
+              ยังไม่ได้เลือกสมาชิกที่จะจองให้ — เลือกได้ที่ขั้นแรก
+            </p>
+            <button
+              type="button"
+              onClick={() => goToStep(1)}
+              className="shrink-0 min-h-[44px] px-4 rounded-xl border border-[#1B5C48] text-sm font-bold text-[#1B5C48] hover:bg-[#F0FAF4] transition cursor-pointer"
+            >
+              ไปเลือกสมาชิก
+            </button>
           </div>
         )}
       </section>
