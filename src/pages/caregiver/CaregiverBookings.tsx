@@ -9,12 +9,10 @@ import { useToast } from '../../hooks/useToast';
 import { BookingCard } from '../../components/ui/BookingCard';
 import { DeclineModal } from '../../components/ui/DeclineModal';
 import { CancelAcceptanceModal } from '../../components/ui/CancelAcceptanceModal';
-import { AcceptBookingModal } from '../../components/ui/AcceptBookingModal';
 import Skeleton from '../../components/ui/Skeleton';
 import {
   GET_CAREGIVER_BOOKINGS,
   GET_CAREGIVER_BOOKING_HISTORY,
-  ACCEPT_BOOKING,
   DECLINE_BOOKING,
   CANCEL_ACCEPTANCE,
 } from '../../graphql/queries';
@@ -206,7 +204,6 @@ export const CaregiverBookings: React.FC = () => {
   const [historySortBy, setHistorySortBy] = useState<string>('newest');
 
   // Accept Booking Modal state
-  const [acceptModalBooking, setAcceptModalBooking] = useState<Booking | null>(null);
 
   const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
 
@@ -280,7 +277,6 @@ export const CaregiverBookings: React.FC = () => {
   });
 
   // Apollo Mutations
-  const [acceptBooking] = useMutation(ACCEPT_BOOKING);
   const [declineBooking] = useMutation(DECLINE_BOOKING);
   const [cancelAcceptance] = useMutation(CANCEL_ACCEPTANCE);
 
@@ -308,43 +304,12 @@ export const CaregiverBookings: React.FC = () => {
 
   const handleAccept = (id: string) => {
     const booking = findBookingById(id);
-    if (booking) {
-      setAcceptModalBooking(booking);
-    }
+    if (!booking) return;
+    // S10 · PYG-620: ต้องเห็นและรับทราบข้อมูลโรคติดเชื้อก่อนรับงาน แต่หน้า List ห้ามแสดงข้อมูลนี้
+    //   → พาไปหน้ารายละเอียดคำขอ ซึ่งมีส่วนรับทราบอยู่เหนือปุ่มตอบรับ
+    navigate(`/caregiver/bookings/${booking.id}`, { state: { booking } });
   };
 
-  const handleConfirmAccept = async () => {
-    if (!acceptModalBooking) return;
-    const booking = acceptModalBooking;
-    setAcceptModalBooking(null);
-
-    try {
-      await acceptBooking({
-        variables: { bookingId: booking.id },
-        refetchQueries: [
-          { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'PENDING', limit: 50 } } },
-          { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'ACCEPTED', limit: 50 } } },
-          { query: GET_CAREGIVER_BOOKINGS, variables: { input: { status: 'CONFIRMED', limit: 50 } } },
-        ],
-        awaitRefetchQueries: true,
-      });
-
-      const msg = (
-        <>
-          ยอมรับคำขอของ <strong className="font-bold text-[#1A1A1A]">{getPatientDisplayName(booking)}</strong> แล้ว{"\n"}
-          รอผู้ป่วยชำระเงินเพื่อยืนยันการจอง
-        </>
-      );
-      showSuccess(msg, 4000, 'booking-toast');
-    } catch (err: unknown) {
-      const gqlMsg = (err as any)?.graphQLErrors?.[0]?.message ?? '';
-      if (gqlMsg.includes('ซ้อนทับ')) {
-        showError('ช่วงเวลาของงานนี้ซ้อนทับกับงานที่คุณยืนยันไปแล้ว');
-      } else {
-        showError('ไม่สามารถยอมรับการจองได้ กรุณาลองใหม่อีกครั้ง');
-      }
-    }
-  };
 
   const handleDeclineClick = (id: string) => {
     setDeclineModalId(id);
@@ -910,13 +875,6 @@ export const CaregiverBookings: React.FC = () => {
         </div>
       </div>
 
-      <AcceptBookingModal
-        isOpen={!!acceptModalBooking}
-        booking={acceptModalBooking}
-        onClose={() => setAcceptModalBooking(null)}
-        onConfirm={handleConfirmAccept}
-        formatThaiDate={formatThaiDate}
-      />
 
       <DeclineModal
         isOpen={!!declineModalId}

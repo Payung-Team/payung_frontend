@@ -3,7 +3,6 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { mapToBooking, type Booking } from './CaregiverBookings';
 import {
-  ACCEPT_BOOKING,
   DECLINE_BOOKING,
   CANCEL_ACCEPTANCE,
   GET_CAREGIVER_BOOKING,
@@ -25,6 +24,15 @@ import { formatThaiDate } from '../../lib/thaiDate';
 import BookingActivitiesList from '../../components/booking/BookingActivitiesList';
 import { useBookingActivities } from '../../hooks/useBookingActivities';
 import { useCareActivityStrings } from '../../lib/careActivityStrings';
+import {
+  ACCEPT_BOOKING_WITH_INFECTION_ACK,
+  INFECTION_ACK_REQUIRED,
+} from '../../graphql/infectionDisclosure';
+import CaregiverInfectionSection from '../../components/infection/CaregiverInfectionSection';
+import { useCaregiverInfection } from '../../components/infection/useCaregiverInfection';
+import { infectionKey } from '../../lib/infectionDisclosure';
+import { useInfectionStrings } from '../../lib/infectionStrings';
+import { extractGraphQLErrorExtensions } from '../../lib/apolloErrors';
 
 const IN_PROGRESS_STATUSES: ReadonlyArray<Booking['status']> = ['in_progress'];
 
@@ -93,7 +101,6 @@ export default function CaregiverBookingDetailPage() {
   const [justCheckedIn, setJustCheckedIn] = useState(false);
 
   const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
-  const [acceptBooking] = useMutation(ACCEPT_BOOKING);
   const [declineBooking] = useMutation(DECLINE_BOOKING);
   const [cancelAcceptance] = useMutation(CANCEL_ACCEPTANCE);
 
@@ -112,6 +119,25 @@ export default function CaregiverBookingDetailPage() {
   const booking = fetchedBooking ?? stateBooking;
   const activities = useBookingActivities(id, 'caregiver');
   const cas = useCareActivityStrings();
+
+  // ── S10 · PYG-620: โรคติดเชื้อ — ต้องรับทราบก่อนตอบรับ ─────────────────────────
+  // ปุ่มที่ปิดไว้เป็นแค่ความสะดวก ตัวบังคับจริงคือ BE (INFECTION_ACK_REQUIRED · PYG-619)
+  const infection = useCaregiverInfection(booking?.id);
+  const infectionText = useInfectionStrings();
+  const [acceptWithInfectionAck] = useMutation(ACCEPT_BOOKING_WITH_INFECTION_ACK);
+  // เก็บ "ค่าที่รับทราบ" ไม่ใช่ boolean — โหลดใหม่แล้วค่าเปลี่ยน การรับทราบเดิมหลุดเองโดยไม่ต้องมี effect
+  const [ackedKey, setAckedKey] = useState<string | null>(null);
+  const [infectionChanged, setInfectionChanged] = useState(false);
+  const [accepting, setAccepting] = useState(false);
+  const infectionValueKey = infection.disclosure
+    ? infectionKey(infection.disclosure.hasInfectiousDisease)
+    : null;
+  const infectionAck = ackedKey !== null && ackedKey === infectionValueKey;
+  const isPendingRequest = booking?.status === 'pending';
+  // โหลดไม่เสร็จ / โหลดไม่ได้ ก็ยังรับงานไม่ได้ — ห้ามรับโดยที่ยังไม่เห็นข้อมูล
+  const needsInfectionAck =
+    isPendingRequest && (infection.disclosure !== null || infection.loading || infection.error);
+  const acceptBlocked = (needsInfectionAck && !infectionAck) || accepting;
 
   const showToast = (message: string, isError = false) => {
     if (isError) showError(message, 3000);
@@ -220,12 +246,29 @@ export default function CaregiverBookingDetailPage() {
         formatThaiDate={formatThaiDate}
         onConfirm={async () => {
           setShowAcceptModal(false);
+          if (accepting) return;
+          setAccepting(true);
           try {
-            await acceptBooking({ variables: { bookingId: booking.id }, refetchQueries: refetchActive, awaitRefetchQueries: true });
+            await acceptWithInfectionAck({
+              variables: { bookingId: booking.id, infectionAcknowledged: infectionAck },
+              refetchQueries: refetchActive,
+              awaitRefetchQueries: true,
+            });
             showToast('ตอบรับการจองเรียบร้อยแล้ว');
           } catch (err: unknown) {
+            // E2: ญาติแก้ค่าระหว่างที่เปิดค้าง — โหลดค่าใหม่ ล้างการรับทราบ อยู่หน้าเดิมให้รับทราบใหม่
+            //   (422 มาเป็น ServerError จึงอ่านผ่าน extractGraphQLErrorExtensions ที่อ่าน body ด้วย)
+            if (extractGraphQLErrorExtensions(err)?.code === INFECTION_ACK_REQUIRED) {
+              setAckedKey(null);
+              setInfectionChanged(true);
+              await infection.refetch();
+              showError(infectionText.cgAckRequiredToast, 4000);
+              return;
+            }
             const msg = (err as any)?.graphQLErrors?.[0]?.message ?? '';
             showToast(msg.includes('ซ้อนทับ') ? 'ช่วงเวลาซ้อนทับกับงานที่ยืนยันไปแล้ว' : 'ไม่สามารถตอบรับได้ กรุณาลองใหม่', true);
+          } finally {
+            setAccepting(false);
           }
         }}
       />
@@ -431,16 +474,40 @@ export default function CaregiverBookingDetailPage() {
           </div>
           )}
 
+          {/* ── S10 · PYG-620: โรคติดเชื้อ — เหนือปุ่มตอบรับ เห็นก่อนกดรับงานเสมอ (R4) ── */}
+          {(infection.disclosure || infection.loading || infection.error) && (
+            <div style={{ marginTop: 24 }}>
+              <CaregiverInfectionSection
+                disclosure={infection.disclosure}
+                loading={infection.loading}
+                error={infection.error}
+                onRetry={() => void infection.refetch()}
+                showAck={isPendingRequest}
+                ack={infectionAck}
+                onAckChange={(checked) => setAckedKey(checked ? infectionValueKey : null)}
+                changed={infectionChanged}
+                ackedAt={infection.disclosure?.acknowledgedAt ?? null}
+              />
+            </div>
+          )}
+
           {/* ── Action buttons ── */}
           <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
 
             {booking.status === 'pending' && (
               <>
                 <button type="button" onClick={() => setShowAcceptModal(true)}
-                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 50, padding: '0 40px', background: '#009265', border: 'none', boxShadow: '0px 4px 14px rgba(0,146,101,0.3)', borderRadius: 12, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 15, fontWeight: 700, color: '#FFFFFF', cursor: 'pointer' }}>
+                  disabled={acceptBlocked}
+                  aria-describedby={needsInfectionAck && !infectionAck ? 'accept-infection-hint' : undefined}
+                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 50, padding: '0 40px', background: acceptBlocked ? '#E4E9E7' : '#009265', border: 'none', boxShadow: acceptBlocked ? 'none' : '0px 4px 14px rgba(0,146,101,0.3)', borderRadius: 12, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 15, fontWeight: 700, color: acceptBlocked ? '#5F6662' : '#FFFFFF', cursor: acceptBlocked ? 'not-allowed' : 'pointer' }}>
                   <span className="material-icons" style={{ fontSize: 18 }}>check_circle</span>
                   ตอบรับการจอง
                 </button>
+                {needsInfectionAck && !infectionAck && (
+                  <p id="accept-infection-hint" style={{ margin: 0, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#33453D', textAlign: 'center' }}>
+                    {infectionText.cgAcceptHint}
+                  </p>
+                )}
                 <button type="button" onClick={() => setShowDeclineModal(true)}
                   style={{ height: 37, padding: '0 28px', background: '#FFFFFF', border: '0.8px solid #FCA5A5', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#DC2626', cursor: 'pointer' }}>
                   ปฏิเสธการจอง

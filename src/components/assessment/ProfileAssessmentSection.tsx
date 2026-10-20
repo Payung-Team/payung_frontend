@@ -4,6 +4,8 @@ import { CARE_RECIPIENT_ASSESSMENT, type CareRecipientAssessmentData } from '../
 import { chosenFlagLabels, formatAssessedAt, useAssessmentStrings } from '../../lib/assessmentStrings';
 import { fetchCareRecipients, type CareRecipientSummary } from '../../lib/careRecipientsApi';
 import Skeleton from '../ui/Skeleton';
+import InfectionDisclosureEditor from '../infection/InfectionDisclosureEditor';
+import { readRecipientInfection, type InfectionValue } from '../../lib/infectionDisclosure';
 import { AlertIcon, PencilIcon, QuestionMarkIcon } from './assessmentIcons';
 
 /**
@@ -52,13 +54,34 @@ export default function ProfileAssessmentSection({ onOpenAssessment }: { onOpenA
           <p className="rounded-xl bg-[#F6FAF9] px-4 py-3 text-xs text-[#8A8C8E]">{s.profileEmpty}</p>
         )}
         {state.status === 'ready' &&
-          state.list.map((r) => <RecipientAssessmentCard key={r.id} recipient={r} onOpen={() => onOpenAssessment(r.id)} />)}
+          state.list.map((r) => (
+            <RecipientAssessmentCard
+              key={r.id}
+              recipient={r}
+              onOpen={() => onOpenAssessment(r.id)}
+              onInfectionSaved={(value) =>
+                setState((prev) =>
+                  prev.status === 'ready'
+                    ? { ...prev, list: prev.list.map((x) => (x.id === r.id ? { ...x, hasInfectiousDisease: value } : x)) }
+                    : prev,
+                )
+              }
+            />
+          ))}
       </div>
     </section>
   );
 }
 
-function RecipientAssessmentCard({ recipient, onOpen }: { recipient: CareRecipientSummary; onOpen: () => void }) {
+function RecipientAssessmentCard({
+  recipient,
+  onOpen,
+  onInfectionSaved,
+}: {
+  recipient: CareRecipientSummary;
+  onOpen: () => void;
+  onInfectionSaved: (value: InfectionValue) => void;
+}) {
   const s = useAssessmentStrings();
   // hasAssessment = false → ไม่ต้องยิง query (รู้คำตอบแล้วว่าเป็น null)
   const { data, loading, error } = useQuery<CareRecipientAssessmentData>(CARE_RECIPIENT_ASSESSMENT, {
@@ -120,6 +143,16 @@ function RecipientAssessmentCard({ recipient, onOpen }: { recipient: CareRecipie
           )}
         </div>
       )}
+      {/* S10 · PYG-620: โรคติดเชื้อ — ค่าปัจจุบัน + แก้ไขพร้อมข้อความแจ้งการเปิดเผยทุกครั้ง (R3) */}
+      <div className="mt-3 border-t border-gray-100 pt-3">
+        <InfectionDisclosureEditor
+          recipientId={recipient.id}
+          recipientName={recipient.name}
+          value={readRecipientInfection(recipient)}
+          variant="profile"
+          onSaved={onInfectionSaved}
+        />
+      </div>
     </div>
   );
 }

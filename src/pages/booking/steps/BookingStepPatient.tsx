@@ -8,6 +8,9 @@ import { createCareRecipient } from '../../../lib/careRecipientsApi';
 import { assessmentPath } from '../../../lib/assessmentNav';
 import { useAssessmentStrings } from '../../../lib/assessmentStrings';
 import BookingAssessmentGate from '../../../components/assessment/BookingAssessmentGate';
+import InfectionDisclosureEditor from '../../../components/infection/InfectionDisclosureEditor';
+import { readRecipientInfection } from '../../../lib/infectionDisclosure';
+import { useInfectionStrings } from '../../../lib/infectionStrings';
 import ConfirmModal from '../../../components/ui/ConfirmModal';
 import {
   MY_FAMILY_GROUPS,
@@ -40,6 +43,8 @@ interface SavedRecipient {
    * undefined = BE ไม่ได้ส่งมา (เช่น ใบที่ยืมจากโหมดจองแทน) → ไม่กันที่หน้านี้ ปล่อยให้ BE ตัดสิน
    */
   hasAssessment?: boolean;
+  /** S10 · PYG-620 — อ่านผ่าน readRecipientInfection เท่านั้น · ห้ามคัดลอกลง draft (sessionStorage) */
+  hasInfectiousDisease?: boolean | null;
   /**
    * ข้อมูลสุขภาพที่จะเติมให้อัตโนมัติเมื่อเลือกโปรไฟล์นี้
    *
@@ -742,6 +747,14 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
   const needsAssessment = !isMemberBooking && selectedRecipient?.hasAssessment === false;
   const needsNewProfile = !isMemberBooking && isManualEntry;
   const assessmentBlocked = needsAssessment || needsNewProfile;
+
+  // ── S10 · PYG-620: โรคติดเชื้อที่ผู้ดูแลควรรู้ ────────────────────────────────
+  // แก้ได้เฉพาะโปรไฟล์ที่ผู้ใช้เป็นเจ้าของ (BE ตรวจ patientId) → จองแทนสมาชิกไม่มีช่องนี้
+  // ยังไม่ได้ระบุ = ไปขั้นถัดไปไม่ได้ (Design PYG-616) · ค่าถูกบันทึกตรงไป BE ไม่ผ่าน draft
+  const infectionText = useInfectionStrings();
+  const showInfection = !isMemberBooking && !!selectedRecipient && !assessmentBlocked;
+  const infectionMissing =
+    showInfection && !!selectedRecipient && readRecipientInfection(selectedRecipient) === null;
   const [creatingProfile, setCreatingProfile] = useState(false);
   const [createProfileError, setCreateProfileError] = useState<string | null>(null);
 
@@ -818,7 +831,7 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
       errs.contactPhone = 'เบอร์โทรต้องมี 10 หลัก';
     if (!contactRel) errs.contactRel = 'กรุณาเลือกความสัมพันธ์';
     setError(errs);
-    if (Object.keys(errs).length === 0 && !assessmentBlocked) goToStep(5);
+    if (Object.keys(errs).length === 0 && !assessmentBlocked && !infectionMissing) goToStep(5);
   };
 
   // Report missing required fields so the sticky "Next" button can disable itself
@@ -832,9 +845,12 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
     if (!contactPhone.trim() || contactPhone.length !== 10) missing.push('เบอร์โทรผู้ติดต่อ');
     if (!contactRel) missing.push('ความสัมพันธ์');
     if (assessmentBlocked) missing.push(assessmentText.gateMissing);
+    if (infectionMissing) missing.push(infectionText.bookingMissing);
     setStepMissing(missing);
     return () => setStepMissing([]);
   }, [
+    infectionMissing,
+    infectionText,
     name,
     age,
     gender,
@@ -1006,6 +1022,24 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
           </div>
         )}
       </section>
+
+      {showInfection && selectedRecipient && (
+        <section className="bg-white p-6 rounded-2xl border border-gray-100">
+          <InfectionDisclosureEditor
+            // เปลี่ยนคน = เริ่มใหม่ทั้งช่อง (ไม่พาตัวเลือก/การรับทราบของคนเดิมไป)
+            key={selectedRecipient.id}
+            recipientId={selectedRecipient.id}
+            recipientName={selectedRecipient.name}
+            value={readRecipientInfection(selectedRecipient)}
+            variant="booking"
+            onSaved={(value) =>
+              setSavedRecipients((prev) =>
+                prev.map((r) => (r.id === selectedRecipient.id ? { ...r, hasInfectiousDisease: value } : r)),
+              )
+            }
+          />
+        </section>
+      )}
 
       <ContactPersonForm
         name={contactName}
