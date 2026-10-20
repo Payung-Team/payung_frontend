@@ -15,12 +15,15 @@ export default function AdlStep({
   onAnswer,
   onBack,
   onNext,
+  backLabel,
 }: {
   answers: AdlAnswers;
   showErrors: boolean;
   onAnswer: (code: AdlCode, value: number | null) => void;
   onBack: () => void;
   onNext: () => void;
+  /** Onboarding: ปุ่มซ้ายเป็น "ออกจากระบบ" เพราะไม่มีหน้าก่อนหน้าให้ย้อนกลับไป */
+  backLabel?: string;
 }) {
   const s = useAssessmentStrings();
   const total = ADL_ITEMS.length;
@@ -198,7 +201,7 @@ export default function AdlStep({
       })}
 
       <StepActions
-        backLabel={s.back}
+        backLabel={backLabel ?? s.back}
         onBack={onBack}
         primary={
           <button type="button" onClick={onNext} className={PRIMARY_BUTTON_CLASS}>

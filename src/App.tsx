@@ -1,8 +1,10 @@
 import { Routes, Route, Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { GET_CAREGIVER_PROFILE } from './graphql/queries';
 import { GET_ONBOARDING_STATUS, type OnboardingStatusData } from './graphql/onboarding';
+import { fetchCareRecipients } from './lib/careRecipientsApi';
+import { SELF_RECIPIENT_ALIAS, assessmentPath } from './lib/assessmentNav';
 import PageSkeleton from './components/ui/PageSkeleton';
 import { useAuth } from './context/AuthContext';
 import { getPostLoginRedirect } from './utils/getRedirectPath';
@@ -100,6 +102,41 @@ function useNeedsOnboarding() {
   return {
     loading,
     needsOnboarding: !!me && me.role === 1 && !me.onboardingCompleted,
+    onboarded: !!me && me.role === 1 && me.onboardingCompleted,
+  };
+}
+
+/**
+ * S08 · PYG-610 — ผ่านขั้นข้อมูลส่วนตัวแล้วแต่ยังไม่ได้ทำแบบประเมิน ADL ของตัวเอง = สมัครยังไม่เสร็จ
+ * login ครั้งถัดไปก็ต้องกลับมาทำแบบประเมินจนบันทึกสำเร็จ ถึงจะเข้าหน้าในแอปได้
+ *
+ * ★ กันเฉพาะ hasAssessment === false — ดึงไม่ได้ / ไม่พบโปรไฟล์ is_self / BE ยังไม่ส่งฟิลด์นี้ → ปล่อยผ่าน
+ *   เหตุผลเดียวกับ useNeedsOnboarding: ถ้ากันตอน error ผู้ใช้จะวนอยู่หน้าแบบประเมินไม่รู้จบ
+ *   ด่านจริงอยู่ที่ BE (ASSESSMENT_REQUIRED ตอนจอง)
+ * ★ ดึงใหม่ทุกครั้งที่ guard mount — หลังบันทึกแบบประเมิน หน้า /assessment พาไปหน้าในแอป
+ *   ซึ่งเป็น route คนละชุด guard จึง mount ใหม่และเห็น hasAssessment ล่าสุด
+ */
+function useNeedsSelfAssessment(enabled: boolean) {
+  const [needs, setNeeds] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    fetchCareRecipients()
+      .then((list) => {
+        if (!cancelled) setNeeds(list.find((r) => r.isSelf)?.hasAssessment === false);
+      })
+      .catch(() => {
+        if (!cancelled) setNeeds(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+
+  return {
+    loading: enabled && needs === null,
+    needsAssessment: enabled && needs === true,
   };
 }
 
@@ -127,16 +164,25 @@ const ONBOARDING_EXEMPT_PATHS = ['/settings/privacy'];
  * ผู้สูงอายุที่ยังไม่ทำ Onboarding ห้ามเข้าหน้าในแอป — ส่งกลับไป /onboarding เสมอ
  * ครอบทุกช่องทาง login (Email/Password, Google, ?redirect=) เพราะทุกทางต้องผ่าน layout นี้
  * กันทั้งพิมพ์ URL เอง และกด back จากหน้า Onboarding (/register → GuestRoute → /patient-home)
+ *
+ * S08 · PYG-610: ทำ Onboarding แล้วแต่ยังไม่ได้ทำแบบประเมินของตัวเอง → ส่งไปหน้าแบบประเมินเสมอ
+ *   ยกเว้นตอนอยู่ที่หน้าแบบประเมินเอง (route นั้นก็ผ่าน guard นี้ ไม่งั้นจะเด้งวน)
  */
 function PatientOnboardingGuard({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
-  const { loading, needsOnboarding } = useNeedsOnboarding();
-
-  if (loading) return <PageSkeleton />;
-
+  const { loading, needsOnboarding, onboarded } = useNeedsOnboarding();
   const isExempt = ONBOARDING_EXEMPT_PATHS.some((path) => pathname.startsWith(path));
+  const { loading: assessmentLoading, needsAssessment } = useNeedsSelfAssessment(
+    onboarded && !isExempt && !pathname.startsWith('/assessment/'),
+  );
+
+  if (loading || assessmentLoading) return <PageSkeleton />;
+
   if (needsOnboarding && !isExempt) {
     return <Navigate to="/onboarding" replace />;
+  }
+  if (needsAssessment) {
+    return <Navigate to={assessmentPath(SELF_RECIPIENT_ALIAS, 'onboarding')} replace />;
   }
 
   return <>{children}</>;

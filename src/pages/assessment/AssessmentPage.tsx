@@ -38,6 +38,7 @@ import {
 } from '../../lib/assessmentNav';
 import { fetchCareRecipients, type CareRecipientSummary } from '../../lib/careRecipientsApi';
 import { takePendingJoinPath } from '../family/joinRedirect';
+import { useAuth } from '../../context/AuthContext';
 
 type FormStep = Exclude<AssessmentStepKey, 'done'>;
 
@@ -224,6 +225,8 @@ function AssessmentFlow({
   onExit: () => void;
 }) {
   const s = useAssessmentStrings();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // แก้ไขจากโปรไฟล์ = เปิดพร้อมคำตอบเดิม (AC8)
@@ -275,7 +278,16 @@ function AssessmentFlow({
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [dirty, result]);
 
-  const leave = () => {
+  const leave = async () => {
+    // Onboarding: ยังไม่ทำแบบประเมิน = สมัครไม่เสร็จ ไปหน้าหลักไม่ได้ (PatientOnboardingGuard เด้งกลับมา)
+    //   ทางออกเดียวคือ logout — เหมือนปุ่มกลับไปหน้าสมัครของหน้า Onboarding ไม่งั้น GuestRoute เห็น session แล้วเด้ง
+    if (entry === 'onboarding') {
+      if (!window.confirm(s.leaveConfirmOnboarding)) return;
+      setDirty(false);
+      await logout();
+      navigate('/login', { replace: true });
+      return;
+    }
     if (dirty && !window.confirm(s.leaveConfirm)) return;
     onExit();
   };
@@ -341,7 +353,14 @@ function AssessmentFlow({
       {result ? (
         <SuccessView entry={entry} name={recipient.name} result={result} onContinue={onExit} />
       ) : step === 'adl' ? (
-        <AdlStep answers={answers} showErrors={adlTried} onAnswer={handleAnswer} onBack={leave} onNext={handleAdlNext} />
+        <AdlStep
+          answers={answers}
+          showErrors={adlTried}
+          onAnswer={handleAnswer}
+          onBack={leave}
+          onNext={handleAdlNext}
+          backLabel={entry === 'onboarding' ? s.logoutOnboarding : undefined}
+        />
       ) : step === 'flags' ? (
         <FlagsStep value={flags} onChange={handleFlags} onBack={() => goStep('adl')} onNext={() => goStep('summary')} />
       ) : (

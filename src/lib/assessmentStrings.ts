@@ -85,6 +85,10 @@ const TH = {
   disclaimerSummaryBody: 'คะแนนนี้ใช้เพื่อหาผู้ดูแลที่เหมาะสม ไม่ได้บอกโรคหรืออาการทางการแพทย์',
   leaveWarning: 'ถ้าออกจากหน้านี้ก่อนบันทึก คำตอบจะไม่ถูกเก็บไว้',
   leaveConfirm: 'ออกจากแบบประเมินตอนนี้ คำตอบที่กรอกไว้จะหายไป ต้องการออกหรือไม่?',
+  // Onboarding: ต้องทำแบบประเมินก่อนถึงจะเข้าแอปได้ — ทางออกเดียวคือออกจากระบบ แล้วกลับมาทำต่อตอน login
+  logoutOnboarding: 'ออกจากระบบ',
+  leaveConfirmOnboarding:
+    'ต้องทำแบบประเมินให้เสร็จก่อนจึงจะเริ่มใช้งานได้ ออกจากระบบตอนนี้ คำตอบที่กรอกไว้จะหายไป และต้องทำใหม่เมื่อเข้าสู่ระบบครั้งถัดไป ต้องการออกจากระบบหรือไม่?',
   back: 'ย้อนกลับ',
   edit: 'แก้ไข',
   loading: 'กำลังโหลดแบบประเมิน...',
@@ -350,6 +354,9 @@ const EN: AssessmentStrings = {
   disclaimerSummaryBody: 'This score helps us match a caregiver. It is not a medical diagnosis.',
   leaveWarning: "If you leave before saving, your answers won't be kept.",
   leaveConfirm: 'Leave the assessment now? Your answers will be lost.',
+  logoutOnboarding: 'Log out',
+  leaveConfirmOnboarding:
+    "You need to finish the assessment before using Payung. Log out now? Your answers will be lost and you'll start again next time you log in.",
   back: 'Back',
   edit: 'Edit',
   loading: 'Loading assessment...',
