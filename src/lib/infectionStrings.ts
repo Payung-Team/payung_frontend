@@ -2,8 +2,8 @@
  * แจ้งโรคติดเชื้อ (S10 · PYG-620) — ข้อความไทย/อังกฤษทั้งหมด ตาม Design PYG-616
  *
  * ข้อความทุกจุดของฟีเจอร์นี้อยู่ที่นี่ที่เดียว (DoD: ไม่มีข้อความ hardcode นอกไฟล์ข้อความกลาง)
- * ★ ข้อความแจ้งการเปิดเผย (notice*) และตัวอย่างโรค (help) ยังเป็นข้อความตัวอย่าง
- *   รอผู้รับผิดชอบ PDPA และอาจารย์เทคนิคการแพทย์ยืนยัน — แก้ที่นี่ที่เดียว
+ * ★ ข้อความแจ้งการเปิดเผย (notice*) ยังเป็นข้อความตัวอย่าง รอผู้รับผิดชอบ PDPA ยืนยัน
+ * ★ ตัวอย่างโรค (help) ทีมใส่เอง ยังไม่ผ่านอาจารย์เทคนิคการแพทย์ — แก้ที่นี่ที่เดียว
  *
  * แอปยังไม่มีตัวสลับภาษา useInfectionStrings จึงคืนภาษาไทยเสมอ (แบบเดียวกับ assessmentStrings)
  */
@@ -21,10 +21,8 @@ interface InfectionStrings {
   valueYes: string;
   valueUnset: string;
   unsetProfileHint: string;
-  noticeTitle: string;
-  noticeBody: (name: string) => string;
-  noticePending: string;
-  noticeAck: string;
+  /** ข้อความของ checkbox รับทราบ — เป็นข้อความแจ้งการเปิดเผยในตัว (AC5) */
+  noticeAck: (name: string) => string;
   missingChoice: string;
   missingAck: string;
   save: string;
@@ -57,7 +55,7 @@ interface InfectionStrings {
 
 const TH: InfectionStrings = {
   fieldTitle: 'โรคติดเชื้อที่ผู้ดูแลควรรู้',
-  help: 'โรคที่ติดต่อถึงผู้ดูแลได้ระหว่างดูแลใกล้ชิด เช่น [ตัวอย่างรอยืนยันจากอาจารย์เทคนิคการแพทย์]',
+  help: 'โรคที่ติดต่อถึงผู้ดูแลได้ระหว่างดูแลใกล้ชิด เช่น วัณโรค ไวรัสตับอักเสบบีหรือซี ไข้หวัดใหญ่หรือโควิด-19',
   reassure: 'การแจ้งช่วยให้ผู้ดูแลเตรียมตัวได้ถูกต้อง และไม่ได้ทำให้จองไม่ได้',
   optionNo: 'ไม่มี',
   optionNoDesc: 'ไม่มีโรคติดเชื้อที่ผู้ดูแลควรรู้',
@@ -67,11 +65,8 @@ const TH: InfectionStrings = {
   valueYes: 'มี',
   valueUnset: 'ยังไม่ได้ระบุ',
   unsetProfileHint: 'ผู้ดูแลจะเห็นว่า “ญาติยังไม่ได้ระบุ” จนกว่าจะเลือก มี หรือ ไม่มี',
-  noticeTitle: 'ข้อมูลนี้จะถูกเปิดเผยกับผู้ดูแล',
-  noticeBody: (name) =>
-    `คำตอบในช่องนี้จะแสดงเฉพาะผู้ดูแลที่ได้รับคำขอจองของ ${name} ก่อนกดรับงาน ไม่แสดงในหน้าโปรไฟล์ที่คนอื่นเห็น การแจ้งเตือน หรืออีเมล`,
-  noticePending: 'ข้อความรอผู้รับผิดชอบ PDPA ยืนยัน',
-  noticeAck: 'ฉันรับทราบว่าข้อมูลนี้จะถูกเปิดเผยกับผู้ดูแลที่ได้รับคำขอจอง',
+  noticeAck: (name) =>
+    `ฉันรับทราบว่าข้อมูลนี้จะแสดงเฉพาะผู้ดูแลที่ได้รับคำขอจองของ ${name} ก่อนกดรับงาน ไม่แสดงในหน้าโปรไฟล์ที่คนอื่นเห็น การแจ้งเตือน หรืออีเมล`,
   missingChoice: 'เลือก มี หรือ ไม่มี',
   missingAck: 'กดรับทราบข้อความแจ้งด้านบน',
   save: 'บันทึก',
@@ -103,7 +98,7 @@ const TH: InfectionStrings = {
 
 const EN: InfectionStrings = {
   fieldTitle: 'Infectious diseases your caregiver should know about',
-  help: 'Conditions that can pass to a caregiver during close care, such as [examples pending review]',
+  help: 'Conditions that can pass to a caregiver during close care, such as tuberculosis, hepatitis B or C, scabies, or flu or COVID-19 that is still contagious',
   reassure: 'Telling us helps the caregiver prepare properly. It won’t stop you from booking.',
   optionNo: 'No',
   optionNoDesc: 'No infectious disease the caregiver should know about',
@@ -113,11 +108,8 @@ const EN: InfectionStrings = {
   valueYes: 'Yes',
   valueUnset: 'Not provided',
   unsetProfileHint: 'Caregivers will see “Not provided yet” until you choose Yes or No',
-  noticeTitle: 'This will be shared with the caregiver',
-  noticeBody: (name) =>
-    `Your answer is shown only to caregivers who receive a booking request for ${name}, before they accept. It never appears on profiles others can see, in notifications or in email.`,
-  noticePending: 'Wording pending PDPA review',
-  noticeAck: 'I understand this will be shared with caregivers who receive the booking request',
+  noticeAck: (name) =>
+    `I understand this is shown only to caregivers who receive a booking request for ${name}, before they accept. It never appears on profiles others can see, in notifications or in email.`,
   missingChoice: 'Choose Yes or No',
   missingAck: 'Confirm the notice above',
   save: 'Save',

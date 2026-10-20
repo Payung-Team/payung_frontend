@@ -144,27 +144,16 @@ export default function InfectionDisclosureEditor({
         </div>
       </fieldset>
 
-      <div className="rounded-2xl border-[1.5px] border-[#C6D4EA] bg-[#F1F5FB] p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="material-icons text-[#2C4A7A]" style={{ fontSize: 20 }} aria-hidden="true">
-            visibility
-          </span>
-          <span className="text-base font-bold text-[#22385E]">{s.noticeTitle}</span>
-          <span className="rounded-full border border-[#C6D4EA] bg-white px-2 py-0.5 text-[11px] font-bold text-[#22385E]">
-            {s.noticePending}
-          </span>
-        </div>
-        <p className="mt-2 text-sm leading-relaxed text-[#22385E]">{s.noticeBody(recipientName)}</p>
-        <label className="mt-3 flex min-h-[44px] cursor-pointer items-start gap-3">
-          <input
-            type="checkbox"
-            checked={ack}
-            onChange={(e) => setAck(e.target.checked)}
-            className="mt-0.5 h-6 w-6 shrink-0 cursor-pointer accent-[#1B5C48]"
-          />
-          <span className="text-[15px] font-semibold leading-relaxed text-[#1A1A1A]">{s.noticeAck}</span>
-        </label>
-      </div>
+      {/* ข้อความแจ้งการเปิดเผยอยู่ในข้อความของ checkbox เอง — เห็นก่อนปุ่มบันทึกเสมอ (AC5) */}
+      <label className="flex min-h-[44px] cursor-pointer items-start gap-3 rounded-xl bg-[#F1F5FB] px-4 py-3">
+        <input
+          type="checkbox"
+          checked={ack}
+          onChange={(e) => setAck(e.target.checked)}
+          className="mt-0.5 h-6 w-6 shrink-0 cursor-pointer accent-[#1B5C48]"
+        />
+        <span className="text-sm leading-relaxed text-[#1A1A1A]">{s.noticeAck(recipientName)}</span>
+      </label>
 
       {error && (
         <p role="alert" className="flex items-center gap-1.5 text-sm font-bold text-[#8E2A1B]">
