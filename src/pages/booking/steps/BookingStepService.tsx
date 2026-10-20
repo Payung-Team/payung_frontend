@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useBooking } from '../../../context/BookingContext';
+import { useQuery } from '@apollo/client/react';
+import { useBooking, type BookingRequest } from '../../../context/BookingContext';
 import CareActivityPicker from '../../../components/booking/CareActivityPicker';
 import type { BookingActivity } from '../../../graphql/careActivities';
+import { MY_FAMILY_GROUPS, type FamilyGroup } from '../../../graphql/familyGroup';
+import type { ServicePackage } from '../../../graphql/servicePackages';
+import RecommendedPackages from '../../../components/booking/RecommendedPackages';
+import { usePackageTarget } from '../../../components/booking/usePackageTarget';
+import BookingMemberPicker from './BookingMemberPicker';
 
 const LOC_OPTIONS = [
   {
@@ -26,17 +32,23 @@ const LOC_OPTIONS = [
 
 type LocOptionId = (typeof LOC_OPTIONS)[number]['id'];
 
+// code = รหัส bookings.service_type (ชุดเดียวกับ SERVICE_TYPE_MAP ใน buildBookingPayload)
+//   ใช้แปลงบริการในชุดที่แนะนำ (S14) ซึ่ง BE ส่งมาเป็นรหัส ให้ตรงกับตัวเลือกของหน้านี้
 const SERVICE_OPTIONS = [
-  { id: 'ดูแลทั่วไป', desc: 'อาบน้ำ แต่งตัว ป้อนอาหาร พยุงเดิน' },
+  { id: 'ดูแลทั่วไป', code: 'general_care', desc: 'อาบน้ำ แต่งตัว ป้อนอาหาร พยุงเดิน' },
   {
     id: 'ดูแลผู้ป่วยติดเตียง',
+    code: 'bedridden_care',
     desc: 'พลิกตัว ป้องกันแผลกดทับ ดูแลสายให้อาหาร',
     homeOnly: true,
   },
-  { id: 'กายภาพบำบัด', desc: 'พาเดิน ออกกำลังกายฟื้นฟูกล้ามเนื้อ' },
-  { id: 'ช่วยจัดการยา', desc: 'จัดยา เตือนเวลาทานตามแพทย์สั่ง' },
-  { id: 'เป็นเพื่อน/พูดคุย', desc: 'พูดคุย ทำกิจกรรม ลดความเหงา' },
+  { id: 'กายภาพบำบัด', code: 'physiotherapy', desc: 'พาเดิน ออกกำลังกายฟื้นฟูกล้ามเนื้อ' },
+  { id: 'ช่วยจัดการยา', code: 'medication', desc: 'จัดยา เตือนเวลาทานตามแพทย์สั่ง' },
+  { id: 'เป็นเพื่อน/พูดคุย', code: 'companion', desc: 'พูดคุย ทำกิจกรรม ลดความเหงา' },
 ];
+
+const OPTION_ID_BY_CODE = new Map(SERVICE_OPTIONS.map((o) => [o.code, o.id]));
+const CODE_BY_OPTION_ID = new Map(SERVICE_OPTIONS.map((o) => [o.id, o.code]));
 
 const TASK_MAP: Record<string, string[]> = {
   'ดูแลทั่วไป': [
@@ -101,6 +113,40 @@ export default function BookingStepService() {
   const [notes, setNotes] = useState(bookingDraft?.jobDetails?.notes || '');
   const [error, setError] = useState<string>('');
 
+  // ── จองแทนสมาชิกกลุ่ม: เลือกคนตั้งแต่ขั้นนี้ (PYG-629) ───────────────────────────
+  // เงื่อนไขเดียวกับขั้นผู้รับบริการ — มาจากปุ่ม "จองแทนสมาชิก" และยังอยู่ในกลุ่มอย่างน้อยหนึ่งกลุ่ม
+  const gc = bookingDraft?.groupContext;
+  const fromGroup = !!(gc || bookingDraft?.onBehalf);
+  const { data: groupsData, loading: groupsLoading } = useQuery<{ myFamilyGroups: FamilyGroup[] }>(
+    MY_FAMILY_GROUPS,
+    { skip: !fromGroup, fetchPolicy: 'cache-and-network' },
+  );
+  const groups = groupsData?.myFamilyGroups ?? [];
+  const memberMode = fromGroup && groups.length > 0;
+  // ระหว่างโหลดกลุ่มยังไม่ให้ผ่าน ไม่งั้นกดถัดไปได้ก่อนเห็นรายชื่อสมาชิก
+  const needsMember =
+    fromGroup && (memberMode || (groupsLoading && groups.length === 0)) && !gc?.memberUserId;
+
+  // ── ชุดบริการที่แนะนำ (S14 · PYG-629) ───────────────────────────────────────
+  // ไม่อยู่กลุ่มไหนแล้ว → ขั้นผู้รับบริการกลับไปเป็นฟอร์มจองเอง ส่วนนี้ก็ต้องตามไปด้วย
+  const bookingForMember = memberMode || (fromGroup && groupsLoading);
+  const packageTarget = usePackageTarget({
+    memberMode: bookingForMember,
+    memberUserId: gc?.memberUserId,
+    // โหมดจองแทน selectedRecipientId คือ memberUserId ที่ยืมมาเป็น key ไม่ใช่ id โปรไฟล์
+    preferredRecipientId: bookingForMember ? undefined : bookingDraft?.recipient?.selectedRecipientId,
+  });
+  const [pickedPackage, setPickedPackage] = useState<BookingRequest['servicePackage']>(
+    bookingDraft?.servicePackage,
+  );
+  // ชุดที่เลือกไว้ของผู้สูงอายุคนเดิมต้องไม่ติดมาเมื่อเปลี่ยนคน (E3)
+  //   ยังหาคนไม่เสร็จ (ไม่มี key) → ยังไม่ตัดสิน คงค่าเดิมไว้
+  const targetKey = 'key' in packageTarget ? packageTarget.key : null;
+  const activePackage =
+    pickedPackage && targetKey && pickedPackage.recipientKey !== targetKey
+      ? undefined
+      : pickedPackage;
+
   const isAccompanyOnly = locOption === 'accompany_outside';
 
   // Auto-remove bedridden if location becomes accompany-only
@@ -160,12 +206,17 @@ export default function BookingStepService() {
         customTasks,
         notes,
       },
+      servicePackage: activePackage,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locOption, selectedServices, tasksOff, customTasks, notes]);
+  }, [locOption, selectedServices, tasksOff, customTasks, notes, activePackage]);
 
   // Submit → validate → goToStep(2)
   const handleSubmit = () => {
+    if (needsMember) {
+      setError('กรุณาเลือกสมาชิกที่จะจองให้');
+      return;
+    }
     if (!locOption) {
       setError('กรุณาเลือกสถานที่ให้บริการ');
       return;
@@ -185,12 +236,13 @@ export default function BookingStepService() {
   // Report missing required fields so the sticky "Next" button can disable itself
   useEffect(() => {
     const missing: string[] = [];
+    if (needsMember) missing.push('สมาชิกที่จะจองให้');
     if (!locOption) missing.push('สถานที่ให้บริการ');
     if (selectedServices.length === 0) missing.push('งานที่ต้องการ');
     else if (activeTasksCount === 0) missing.push('งานย่อยอย่างน้อย 1 งาน');
     setStepMissing(missing);
     return () => setStepMissing([]);
-  }, [locOption, selectedServices, activeTasksCount, setStepMissing]);
+  }, [needsMember, locOption, selectedServices, activeTasksCount, setStepMissing]);
 
   // Register submit for sticky bottom nav
   const submitRef = useRef<() => void>(() => {});
@@ -223,6 +275,32 @@ export default function BookingStepService() {
     setCustomTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
+  /**
+   * เลือกชุด = เติมบริการของชุดแทนที่บริการที่เลือกอยู่ (ทางลัด ไม่ใช่การล็อก)
+   * หลังจากนี้เพิ่ม/เอาบริการออกเองได้ตามปกติ (E5) การ์ดชุดจะขึ้นว่า "ปรับบริการเอง"
+   * ★ รหัสที่หน้านี้ไม่รู้จักถูกข้าม — BE เพิ่มประเภทใหม่ทีหลังต้องไม่ทำให้หน้าพัง
+   */
+  const pickPackage = (pkg: ServicePackage) => {
+    if (!targetKey) return;
+    const ids = pkg.items
+      .map((item) => OPTION_ID_BY_CODE.get(item.serviceType))
+      .filter((id): id is string => !!id);
+    setSelectedServices(ids);
+    setPickedPackage({
+      id: pkg.id,
+      serviceTypes: pkg.items.map((item) => item.serviceType),
+      recipientKey: targetKey,
+    });
+    setError('');
+  };
+
+  const selectedCodes = selectedServices
+    .map((id) => CODE_BY_OPTION_ID.get(id))
+    .filter((code): code is string => !!code);
+  // มติ E6: ส่งประเภทที่เลือกให้ BE คำนวณป้ายของแต่ละชุด — ตอนนี้ยังเลือกได้หลายบริการ
+  //   จึงส่งเฉพาะตอนเลือกอยู่บริการเดียว (หลายบริการ = ไม่มี "ประเภทที่เลือก" ค่าเดียว → flag เป็น null)
+  const singleSelected = selectedServices.length === 1 ? selectedServices[0] : null;
+
   return (
     <div className="space-y-4">
       {/* Error banner */}
@@ -235,6 +313,20 @@ export default function BookingStepService() {
           <div className="text-sm font-semibold text-red-700">{error}</div>
         </div>
       )}
+
+      {/* จองแทนสมาชิก: เลือกคนก่อน — ข้อมูลของคนนั้นกรอกที่ขั้นผู้รับบริการ */}
+      {memberMode && <BookingMemberPicker groups={groups} />}
+
+      {/* S14: ชุดบริการที่แนะนำตามกลุ่มของผู้สูงอายุ — คำแนะนำเท่านั้น ไม่กันการไปขั้นถัดไป */}
+      <RecommendedPackages
+        target={packageTarget}
+        selectedServiceType={singleSelected ? CODE_BY_OPTION_ID.get(singleSelected) ?? null : null}
+        selectedServiceName={singleSelected}
+        selectedCodes={selectedCodes}
+        picked={activePackage}
+        onPick={pickPackage}
+        onUnpick={() => setPickedPackage(undefined)}
+      />
 
       {/* Card 1: Service Location */}
       <section className="bg-white p-6 rounded-2xl border border-gray-100">

@@ -85,6 +85,18 @@ export interface BookingRequest {
     activities?: BookingActivity[];
     notes?: string;
   };
+  /**
+   * S14 · PYG-629 — ชุดที่แนะนำที่ผู้ใช้กดเลือกในขั้นบริการ
+   * เป็นแค่ทางลัดเติมบริการ: buildBookingPayload ไม่ส่งค่านี้ (contract PYG-626 §8)
+   * เก็บไว้เพื่อให้การ์ดชุดคงสถานะ "เลือกแล้ว / ปรับบริการเอง" เมื่อย้อนกลับมาขั้นนี้
+   */
+  servicePackage?: {
+    id: string;
+    /** รหัสบริการในชุด ณ ตอนเลือก — ใช้เทียบว่าผู้ใช้ปรับบริการเองหรือยัง */
+    serviceTypes: string[];
+    /** ชุดเป็นของผู้สูงอายุคนนี้ — เปลี่ยนคนแล้วต้องไม่ติดไป (E3) */
+    recipientKey: string;
+  };
   estimatedCost?: {
     hourlyRate: number;
     hours: number;
