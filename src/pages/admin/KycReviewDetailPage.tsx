@@ -2,114 +2,34 @@ import { useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { ADMIN_KYC_DETAIL, APPROVE_KYC, REJECT_KYC } from '../../graphql/queries';
+import { APPROVE_LICENSE, REJECT_LICENSE } from '../../graphql/license';
+import { APPROVE_DRIVING_LICENSE, REJECT_DRIVING_LICENSE } from '../../graphql/drivingLicense';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast, type ToastMessage } from '../../hooks/useToast';
 import Icon from '../../components/ui/Icon';
 import Skeleton from '../../components/ui/Skeleton';
 import Avatar from '../../components/ui/Avatar';
-import KycDocumentsPreview from '../../components/ui/KycDocumentsPreview';
-import AdminLicensePanel from '../../features/kyc/AdminLicensePanel';
-import AdminDrivingLicensePanel, { type DrivingLicenseReview } from '../../features/kyc/AdminDrivingLicensePanel';
-import { DRIVING_LICENSE_DOC_TYPE, DRIVING_LICENSE_KYC_ENABLED, type DrivingLicenseInfo } from '../../lib/drivingLicense';
-import { DRIVING_LICENSE_STRINGS } from '../../lib/drivingLicenseStrings';
-import { LICENSE_DOC_TYPE, LICENSE_KYC_ENABLED, type LicenseInfo } from '../../lib/license';
-import { LICENSE_STRINGS } from '../../lib/licenseStrings';
 import KycHistoryCard from '../../components/ui/KycHistoryCard';
-import StatusBadge from '../../components/ui/StatusBadge';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { getBankLabel } from '../../features/kyc/omiseBanks';
 import { skillLabel } from '../../lib/skillLabels';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
 import AdminCareLevelCard from '../../features/kyc/AdminCareLevelCard';
 import { useAdminCareLevel } from '../../features/kyc/useCareLevel';
-import type { CaregiverCareLevelInfo } from '../../graphql/careLevel';
 import { useCareLevelStrings, type CareLevel } from '../../lib/careLevels';
-import { extractGraphQLErrorExtensions } from '../../lib/apolloErrors';
-
-type KycStatus = 'pending' | 'verified' | 'rejected' | 'none' | string;
-
-interface CaregiverDetail {
-  id: string;
-  userId: string;
-  caregiverNumber?: string | null;
-  fullName: string;
-  email?: string | null;
-  idCardNumber: string;
-  gender?: string | null;
-  dateOfBirth?: string | null;
-  address?: string | null;
-  phone: string;
-  skills: string[];
-  profession?: string | null;
-  /** BE ยังไม่ส่ง (ตอนนี้ใช้ mock) */
-  customSkills?: string[] | null;
-  experienceYears: number;
-  hourlyRate: number;
-  bio?: string | null;
-  kycStatus: KycStatus;
-  kycSubmittedAt?: string | null;
-  kycVerifiedAt?: string | null;
-  resubmitCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface KycDocument {
-  id: string;
-  docType: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  /** BE PR #39: ใช้ signedUrl เท่านั้น (fileUrl เป็นสตริงว่างเสมอ) — อายุ 15 นาที */
-  signedUrl?: string | null;
-  uploadedAt: string;
-}
-
-interface KycReview {
-  id: string;
-  action: string;
-  reason?: string | null;
-  reviewedBy: string;
-  reviewedAt: string;
-}
-
-interface CaregiverEditLog {
-  id: string;
-  action: string;
-  editorName?: string | null;
-  createdAt: string;
-  fieldChanges?: Array<{ field: string; oldValue?: string; newValue?: string }> | null;
-}
-
-interface AdminPayoutAccountSummary {
-  bankCode: string;
-  accountName: string;
-  accountNumberLast4: string;
-  status: string;
-  recipientStatus: string;
-  hasOmiseRecipient: boolean;
-}
-
-interface AdminKycDetailResponse {
-  adminKycDetail: {
-    caregiver: CaregiverDetail;
-    documents: KycDocument[];
-    resubmitCount: number;
-    reviews: KycReview[];
-    editHistory: CaregiverEditLog[];
-    payoutAccount?: AdminPayoutAccountSummary | null;
-    /** PYG-511: มีรูปโปรไฟล์รออนุมัติ → แสดงลิงก์ไปหน้าเทียบรูป */
-    pendingProfilePhotoDocumentId?: string | null;
-    /** PYG-588 (field จาก PYG-587 — ขอเฉพาะเมื่อเปิด VITE_LICENSE_KYC_ENABLED) */
-    profession?: string | null;
-    license?: LicenseInfo | null;
-    /** PYG-598 (field จาก PYG-597 — ขอเฉพาะเมื่อเปิด VITE_DRIVING_LICENSE_KYC_ENABLED) */
-    drivingLicense?: DrivingLicenseInfo | null;
-    drivingLicenseReviews?: DrivingLicenseReview[] | null;
-    /** PYG-581: ระดับปัจจุบัน + ผู้กำหนด + เวลา */
-    careLevelInfo?: CaregiverCareLevelInfo | null;
-  };
-}
+import { extractGraphQLErrorCode, extractGraphQLErrorExtensions } from '../../lib/apolloErrors';
+import { logGraphQLError } from '../../lib/logGraphQLError';
+import { licenseErrorCodes } from '../../lib/license';
+import { useLicenseStrings } from '../../lib/licenseStrings';
+import { drivingLicenseErrorCode } from '../../lib/drivingLicense';
+import { useDrivingLicenseStrings } from '../../lib/drivingLicenseStrings';
+import KycChecklistCard from '../../features/kyc/adminReview/KycChecklistCard';
+import KycDecisionFooter from '../../features/kyc/adminReview/KycDecisionFooter';
+import KycRejectConfirmModal from '../../features/kyc/adminReview/KycRejectConfirmModal';
+import { buildReviewItems, initialResults, type ReviewItem } from '../../features/kyc/adminReview/kycReviewItems';
+import { useKycChecklist } from '../../features/kyc/adminReview/useKycChecklist';
+import { formatBirthDate, formatIdCard, formatPhone, formatThaiDateTime, genderLabel, splitName } from '../../features/kyc/adminReview/format';
+import type { AdminKycDetailResponse } from '../../features/kyc/adminReview/types';
 
 const RECIPIENT_STATUS_META: Record<string, { label: string; className: string }> = {
   unverified: { label: 'รอตรวจสอบ', className: 'bg-[#FFF7ED] text-[#C2410C]' },
@@ -117,322 +37,33 @@ const RECIPIENT_STATUS_META: Record<string, { label: string; className: string }
   failed: { label: 'ตรวจสอบไม่ผ่าน', className: 'bg-[#FEF2F2] text-[#DC2626]' },
 };
 
-
-const statusMeta: Record<string, { label: string; badge: string; dot: string }> = {
-  pending: {
-    label: 'รอตรวจสอบ',
-    badge: 'bg-[#FFFBEB] text-[#92400E]',
-    dot: 'bg-[#F59E0B]',
-  },
-  verified: {
-    label: 'อนุมัติแล้ว',
-    badge: 'bg-[#ECFDF5] text-[#047857]',
-    dot: 'bg-[#059669]',
-  },
-  rejected: {
-    label: 'ปฏิเสธแล้ว',
-    badge: 'bg-[#FEF2F2] text-[#DC2626]',
-    dot: 'bg-[#EF4444]',
-  },
-  none: {
-    label: 'ยังไม่ส่ง',
-    badge: 'bg-gray-100 text-gray-600',
-    dot: 'bg-gray-400',
-  },
+const STATUS_PILL: Record<string, { label: string; className: string; icon: string }> = {
+  pending: { label: 'รอตรวจสอบ', className: 'bg-[#FFF7ED] text-[#C2410C]', icon: 'schedule' },
+  verified: { label: 'อนุมัติแล้ว', className: 'bg-[#D1FAE5] text-[#047857]', icon: 'check' },
+  rejected: { label: 'ปฏิเสธแล้ว · รอผู้ดูแลแก้ไข', className: 'bg-[#FEE2E2] text-[#B91C1C]', icon: 'close' },
+  none: { label: 'ยังไม่ส่ง', className: 'bg-[#F3F4F6] text-[#4B5563]', icon: 'remove' },
 };
-
-const docTypeLabel: Record<string, string> = {
-  id_card_front: 'บัตรประชาชน (ด้านหน้า)',
-  id_card_selfie: 'รูปถ่ายคู่บัตรประชาชน',
-  certificate: 'ใบรับรองอบรม',
-  id_card: 'บัตรประชาชน',
-  photo: 'รูปถ่าย',
-  license: 'ใบอนุญาต',
-  [LICENSE_DOC_TYPE]: LICENSE_STRINGS.th.sectionTitle,
-  [DRIVING_LICENSE_DOC_TYPE]: DRIVING_LICENSE_STRINGS.th.adminTitle,
-};
-
-const genderLabel: Record<string, string> = {
-  male: 'ชาย',
-  female: 'หญิง',
-  other: 'อื่นๆ',
-};
-
-/** 1509966392215 → 1-5099-66392-21-5 (รูปแบบเดียวกับบนบัตร ช่วยให้เทียบกับเอกสารง่าย) */
-function formatIdCard(value?: string | null) {
-  if (!value) return '-';
-  const digits = value.replace(/\D/g, '');
-  if (digits.length !== 13) return value;
-  return `${digits[0]}-${digits.slice(1, 5)}-${digits.slice(5, 10)}-${digits.slice(10, 12)}-${digits[12]}`;
-}
-
-function formatPhone(value?: string | null) {
-  if (!value) return '-';
-  const digits = value.replace(/\D/g, '');
-  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  if (digits.length === 9) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
-  return value;
-}
-
-function formatThaiDate(value?: string | null, options?: Intl.DateTimeFormatOptions) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-
-  return new Intl.DateTimeFormat('th-TH-u-ca-gregory', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    ...options,
-  }).format(date);
-}
-
-function getAge(dateOfBirth?: string | null) {
-  if (!dateOfBirth) return '-';
-  const birthDate = new Date(dateOfBirth);
-  if (Number.isNaN(birthDate.getTime())) return '-';
-
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age -= 1;
-  }
-
-  return `${age} ปี`;
-}
-
-function statusLabel(status: KycStatus) {
-  return statusMeta[status]?.label ?? status;
-}
 
 function CaregiverField({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[13px] font-medium leading-5 text-[#9CA3AF]">{label}</dt>
+      <dt className="text-[13px] font-medium leading-5 text-[#6B7280]">{label}</dt>
       <dd className="mt-1 truncate text-[15px] leading-6 text-[#1F2937]">{value || '-'}</dd>
     </div>
   );
 }
 
-interface RejectReasonRow {
-  id: string;
-  documentType: string;
-  reason: string;
-}
-
-// ค่าต้องตรงกับที่ KycStatusPage / KycResubmitPage ใช้ map ไปหน้าแก้ไข
-const DOC_OPTIONS = [
-  { value: 'บัตรประชาชน', icon: 'badge' },
-  { value: 'รูปถ่ายคู่บัตรประชาชน', icon: 'photo_camera' },
-  { value: 'ใบรับรองอบรม', icon: 'workspace_premium' },
-  { value: 'ข้อมูลส่วนตัว', icon: 'person' },
-];
-const DOC_ICON: Record<string, string> = Object.fromEntries(DOC_OPTIONS.map((o) => [o.value, o.icon]));
-const MAX_REASON_LENGTH = 200;
-
-function RejectModal({
-  isOpen,
-  isLoading,
-  caregiverName,
-  onClose,
-  onConfirm,
-}: {
-  isOpen: boolean;
-  isLoading: boolean;
-  caregiverName: string;
-  onClose: () => void;
-  onConfirm: (reasons: Array<{ title: string; detail?: string; documentType?: string }>) => void;
-}) {
-  // state ถูก reset ทุกครั้งที่เปิด เพราะ parent remount ผ่าน key
-  const [rows, setRows] = useState<RejectReasonRow[]>([]);
-  // แถวที่เพิ่งเพิ่ม — ใช้ไฮไลต์ชั่วครู่ให้ admin เห็นว่ากด chip แล้วเกิดแถวใหม่
-  const [highlightId, setHighlightId] = useState<string | null>(null);
-  const nextIdRef = useRef(0);
-
-  if (!isOpen) return null;
-
-  const handleAddRow = (documentType: string) => {
-    const id = `${documentType}-${nextIdRef.current++}`;
-    setRows((prev) => [...prev, { id, documentType, reason: '' }]);
-    setHighlightId(id);
-    setTimeout(() => setHighlightId((current) => (current === id ? null : current)), 1200);
-  };
-
-  const handleRemoveRow = (id: string) => {
-    setRows((prev) => prev.filter((row) => row.id !== id));
-  };
-
-  const handleReasonChange = (id: string, value: string) => {
-    setRows((prev) => prev.map((row) => (row.id === id ? { ...row, reason: value } : row)));
-  };
-
-  const hasRows = rows.length > 0;
-  const allHaveReason = rows.every((row) => row.reason.trim() !== '');
-  const isValid = hasRows && allHaveReason;
-
-  const handleConfirmClick = () => {
-    if (!isValid) return;
-    onConfirm(rows.map((row) => ({ title: row.reason.trim(), documentType: row.documentType })));
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-      <div className="fixed inset-0 -z-10" onClick={onClose} />
-
-      <div
-        className="w-[520px] max-w-full max-h-full bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden"
-        style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-      >
-        {/* Header */}
-        <div className="flex items-start gap-3 px-6 pt-6 pb-4">
-          <span className="w-10 h-10 shrink-0 rounded-full bg-[#FEF2F2] text-[#DC2626] flex items-center justify-center">
-            <Icon name="assignment_return" style={{ fontSize: '20px' }} />
-          </span>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-[17px] font-semibold leading-6 text-[#111827] truncate">ปฏิเสธ KYC - {caregiverName}</h2>
-            <p className="text-[13px] leading-5 text-[#6B7280]">ส่งกลับให้ผู้ดูแลแก้ไขตามรายการด้านล่าง</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isLoading}
-            aria-label="ปิด"
-            className="w-8 h-8 shrink-0 -mr-1 flex items-center justify-center rounded-full text-[#9CA3AF] hover:bg-[#F3F4F6] hover:text-[#4B5563] transition-colors cursor-pointer"
-          >
-            <Icon name="close" style={{ fontSize: '18px' }} />
-          </button>
-        </div>
-
-        {/* Body — เลื่อนแนวตั้งได้เมื่อรายการยาวเกินจอ */}
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-2 flex flex-col gap-5">
-          {/* Document type quick actions */}
-          <section className="flex flex-col gap-2">
-            <div>
-              <h3 className="text-[14px] font-semibold text-[#111827]">
-                ระบุส่วนที่ต้องการให้แก้ไข <span className="text-[#DC2626]">*</span>
-              </h3>
-              <p className="text-[12px] text-[#9CA3AF]">กดเพื่อเพิ่มรายการ · กดซ้ำได้ถ้ามีหลายเหตุผล</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {DOC_OPTIONS.map((option) => {
-                const count = rows.filter((row) => row.documentType === option.value).length;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => handleAddRow(option.value)}
-                    className="group h-11 pl-3 pr-2 flex items-center gap-2.5 rounded-xl border border-[#E5E7EB] bg-white text-left transition-all cursor-pointer select-none hover:border-[#DC2626] hover:bg-[#FFFBFB] active:scale-[0.98]"
-                  >
-                    <span className="flex text-[#9CA3AF] transition-colors group-hover:text-[#DC2626]">
-                      <Icon name={option.icon} style={{ fontSize: '18px' }} />
-                    </span>
-                    <span className="flex-1 min-w-0 truncate text-[13px] font-medium text-[#374151]">{option.value}</span>
-                    {count > 0 && (
-                      <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#DC2626] text-white text-[11px] font-semibold flex items-center justify-center">
-                        {count}
-                      </span>
-                    )}
-                    <span className="w-7 h-7 shrink-0 rounded-lg bg-[#F3F4F6] text-[#6B7280] flex items-center justify-center transition-colors group-hover:bg-[#DC2626] group-hover:text-white">
-                      <Icon name="add" style={{ fontSize: '18px' }} />
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Reasons list */}
-          {hasRows && (
-            <section className="flex flex-col gap-2">
-              <h3 className="text-[12px] font-medium text-[#6B7280]">รายการที่ต้องแก้ไข ({rows.length})</h3>
-              {rows.map((row, index) => {
-                // ลำดับของแถวในประเภทเดียวกัน — แสดง #2, #3 เมื่อเพิ่มประเภทซ้ำ
-                const sameTypeIndex = rows.slice(0, index + 1).filter((r) => r.documentType === row.documentType).length;
-                const isEmpty = row.reason.trim() === '';
-                return (
-                  <div
-                    key={row.id}
-                    className={`rounded-xl border p-3 flex flex-col gap-2 transition-colors duration-700 ${
-                      highlightId === row.id ? 'border-[#FCA5A5] bg-[#FEF2F2]' : 'border-[#F3F4F6] bg-[#F9FAFB]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="flex text-[#DC2626]">
-                        <Icon name={DOC_ICON[row.documentType] ?? 'description'} style={{ fontSize: '16px' }} />
-                      </span>
-                      <span className="flex-1 min-w-0 truncate text-[13px] font-semibold text-[#111827]">
-                        {row.documentType}
-                        {sameTypeIndex > 1 && <span className="ml-1 font-normal text-[#9CA3AF]">#{sameTypeIndex}</span>}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveRow(row.id)}
-                        aria-label={`ลบรายการ ${row.documentType}`}
-                        className="h-6 px-2 flex items-center gap-1 rounded-md text-[12px] text-[#9CA3AF] hover:bg-white hover:text-[#DC2626] transition-colors cursor-pointer"
-                      >
-                        <Icon name="delete" style={{ fontSize: '14px' }} />
-                        ลบ
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      autoFocus
-                      value={row.reason}
-                      maxLength={MAX_REASON_LENGTH}
-                      onChange={(e) => handleReasonChange(row.id, e.target.value)}
-                      placeholder="ระบุเหตุผล เช่น รูปไม่ชัด มองไม่เห็นเลขบัตร"
-                      aria-label={`เหตุผลที่ต้องแก้ไข ${row.documentType}`}
-                      className={`w-full h-10 px-3 rounded-lg border bg-white text-[14px] text-[#111827] placeholder-[#9CA3AF] outline-none transition-colors focus:border-[#DC2626] focus:ring-2 focus:ring-[#FEE2E2] ${
-                        isEmpty ? 'border-[#FECACA]' : 'border-[#E5E7EB]'
-                      }`}
-                      style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
-                    />
-                  </div>
-                );
-              })}
-            </section>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="mt-2 px-6 py-4 border-t border-[#F3F4F6] flex items-center justify-between gap-4">
-          <span className={`text-[12px] ${hasRows && !allHaveReason ? 'text-[#DC2626]' : 'text-[#9CA3AF]'}`}>
-            {!hasRows && 'เลือกอย่างน้อย 1 รายการ'}
-            {hasRows && !allHaveReason && 'กรุณาระบุเหตุผลให้ครบทุกรายการ'}
-            {isValid && `พร้อมส่ง ${rows.length} รายการ`}
-          </span>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isLoading}
-              className="h-10 px-4 rounded-lg border border-[#E5E7EB] text-[14px] font-medium text-[#374151] hover:bg-[#F9FAFB] transition-colors cursor-pointer"
-            >
-              ยกเลิก
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmClick}
-              disabled={isLoading || !isValid}
-              className="h-10 px-4 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-[14px] font-medium text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              {isLoading ? 'กำลังบันทึก...' : 'ยืนยันการปฏิเสธ'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+const cardClass = 'rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] sm:px-6 sm:py-5';
 
 export default function KycReviewDetailPage() {
   const { caregiverId } = useParams<{ caregiverId: string }>();
   const navigate = useNavigate();
   const toast = useToast();
+  const ls = useLicenseStrings();
+  const ds = useDrivingLicenseStrings();
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [isRejectOpen, setIsRejectOpen] = useState(false);
+  const [deciding, setDeciding] = useState(false);
 
   const { data, loading, error, refetch } = useQuery<AdminKycDetailResponse>(ADMIN_KYC_DETAIL, {
     variables: { caregiverId },
@@ -440,20 +71,32 @@ export default function KycReviewDetailPage() {
     fetchPolicy: 'cache-and-network',
   });
 
-  const caregiver = data?.adminKycDetail.caregiver;
-  const caregiverProfession = caregiver?.profession ?? data?.adminKycDetail.profession ?? null;
+  const detail = data?.adminKycDetail;
+  const caregiver = detail?.caregiver;
+  const caregiverProfession = caregiver?.profession ?? detail?.profession ?? null;
   // PYG-659: ทักษะอื่นๆ จาก BE (otherSkills — alias เป็น customSkills ใน query)
   const caregiverCustomSkills = caregiver?.customSkills ?? [];
-  const documents = data?.adminKycDetail.documents ?? [];
-  const reviews = data?.adminKycDetail.reviews ?? [];
-  const editHistory = data?.adminKycDetail.editHistory ?? [];
-  const resubmitCount = data?.adminKycDetail.resubmitCount ?? caregiver?.resubmitCount ?? 0;
-  const payoutAccount = data?.adminKycDetail.payoutAccount ?? null;
-  const isPending = caregiver?.kycStatus === 'pending';
+  const reviews = detail?.reviews ?? [];
+  const editHistory = detail?.editHistory ?? [];
+  const resubmitCount = detail?.resubmitCount ?? caregiver?.resubmitCount ?? 0;
+  const payoutAccount = detail?.payoutAccount ?? null;
+  const kycStatus = caregiver?.kycStatus ?? 'none';
+  const isPending = kycStatus === 'pending';
+  const readOnly = !isPending;
+
+  // ── รายการตรวจ ────────────────────────────────────────────────────────────
+  const items = useMemo(() => (detail ? buildReviewItems(detail) : []), [detail]);
+  const initial = useMemo(
+    () => initialResults(items, kycStatus, caregiver?.rejectionReasons),
+    [items, kycStatus, caregiver?.rejectionReasons],
+  );
+  // สถานะ KYC เปลี่ยน / ผู้ดูแลส่งใหม่ → เริ่มผลตรวจใหม่ · refetch ธรรมดา (เช่น ขอ signedUrl ใหม่) ไม่ล้างผลตรวจ
+  const resetKey = `${caregiverId}|${detail ? 'loaded' : 'loading'}|${kycStatus}|${resubmitCount}|${caregiver?.kycSubmittedAt ?? ''}`;
+  const checklist = useKycChecklist(items, initial, resetKey, readOnly);
 
   // PYG-557 · S02: ระดับผู้ดูแล (BE PYG-581) — ระดับปัจจุบันมากับ adminKycDetail.careLevelInfo
   const careLevelStrings = useCareLevelStrings();
-  const careLevel = useAdminCareLevel(caregiver?.id, data?.adminKycDetail.careLevelInfo, { kycStatus: caregiver?.kycStatus });
+  const careLevel = useAdminCareLevel(caregiver?.id, detail?.careLevelInfo, { kycStatus: caregiver?.kycStatus });
   const [pickedLevel, setPickedLevel] = useState<CareLevel | null>(null);
   const [careLevelError, setCareLevelError] = useState<string | undefined>();
   const careLevelPickerRef = useRef<HTMLDivElement>(null);
@@ -471,8 +114,9 @@ export default function KycReviewDetailPage() {
     careLevelPickerRef.current?.querySelector<HTMLButtonElement>('[role="radio"]')?.focus({ preventScroll: true });
   };
 
-  // S02-E1: ไม่ปิดปุ่มเงียบๆ — กดได้ แล้วบอก error ที่ตัวเลือก
+  // S02-E1: ผ่านครบแล้วแต่ยังไม่เลือกระดับ → ไม่ปิดปุ่มเงียบๆ — กดได้ แล้วบอก error ที่ตัวเลือก
   const openApprove = () => {
+    if (!checklist.allPass) return;
     if (!levelToApprove) {
       showCareLevelRequired();
       return;
@@ -480,28 +124,54 @@ export default function KycReviewDetailPage() {
     setIsApproveOpen(true);
   };
 
+  const [approveKyc] = useMutation(APPROVE_KYC);
+  const [rejectKyc] = useMutation(REJECT_KYC);
+  const [approveLicense] = useMutation(APPROVE_LICENSE);
+  const [rejectLicense] = useMutation(REJECT_LICENSE);
+  const [approveDrivingLicense] = useMutation(APPROVE_DRIVING_LICENSE);
+  const [rejectDrivingLicense] = useMutation(REJECT_DRIVING_LICENSE);
 
-  const [approveKyc, { loading: approving }] = useMutation(APPROVE_KYC);
-  const [rejectKyc, { loading: rejecting }] = useMutation(REJECT_KYC);
-
-  const currentStatusMeta = statusMeta[caregiver?.kycStatus || 'none'] ?? statusMeta.none;
-
-  const nameParts = useMemo(() => {
-    if (!caregiver?.fullName) return { firstName: '-', lastName: '-' };
-    const parts = caregiver.fullName.trim().split(/\s+/);
-    return {
-      firstName: parts[0] || '-',
-      lastName: parts.slice(1).join(' ') || '-',
-    };
-  }, [caregiver?.fullName]);
-
-  const genderText = caregiver?.gender ? genderLabel[caregiver.gender] ?? caregiver.gender : '-';
-  const ageText = getAge(caregiver?.dateOfBirth);
+  /**
+   * ใบประกอบฯ / ใบขับขี่ตัดสินรายใบผ่าน mutation ของตัวเอง — ยิงก่อนคำสั่ง KYC ทั้งชุด
+   * พังกลางทาง → แจ้ง error, โหลดสถานะล่าสุด (ใบที่ตัดสินแล้วจะถูกล็อก) แล้วหยุด ไม่ไปต่อที่ KYC
+   */
+  const decideItem = async (item: ReviewItem, op: 'approve' | 'reject', reason?: string): Promise<boolean> => {
+    if (!item.pendingInBe || !item.documentId) return true;
+    const isLicense = item.kind === 'license';
+    try {
+      const variables = op === 'approve' ? { documentId: item.documentId } : { documentId: item.documentId, reason };
+      if (isLicense) await (op === 'approve' ? approveLicense : rejectLicense)({ variables });
+      else await (op === 'approve' ? approveDrivingLicense : rejectDrivingLicense)({ variables });
+      return true;
+    } catch (err) {
+      logGraphQLError(`${op === 'approve' ? 'Approve' : 'Reject'}${isLicense ? 'License' : 'DrivingLicense'}`, err);
+      let message: string;
+      if (extractGraphQLErrorCode(err) === 'CONFLICT') {
+        message = isLicense ? ls.adminAlreadyDecided : ds.adminAlreadyDecided;
+      } else if (isLicense) {
+        const [code] = licenseErrorCodes(err);
+        message = code ? ls.apiError[code] : ls.adminActionFailed;
+      } else {
+        const code = drivingLicenseErrorCode(err);
+        message = code ? ds.apiError[code] : ds.adminActionFailed;
+      }
+      toast.error(`${item.name}: ${message}`);
+      await refetch();
+      return false;
+    }
+  };
 
   const handleApprove = async () => {
-    if (!caregiverId || !levelToApprove) return;
-
+    if (!caregiverId || !levelToApprove || !checklist.allPass) return;
+    setDeciding(true);
     try {
+      for (const item of items) {
+        if (item.kind !== 'license' && item.kind !== 'driving') continue;
+        if (!(await decideItem(item, 'approve'))) {
+          setIsApproveOpen(false);
+          return;
+        }
+      }
       // PYG-581: ระดับไปพร้อมคำสั่งอนุมัติ — ระดับ ประวัติ และ kyc_status อยู่ในทรานแซคชันเดียวฝั่ง BE
       await approveKyc({ variables: { caregiverId, careLevel: levelToApprove } });
       setIsApproveOpen(false);
@@ -517,50 +187,100 @@ export default function KycReviewDetailPage() {
         return;
       }
       toast.error(mutationError instanceof Error ? mutationError.message : 'อนุมัติ KYC ไม่สำเร็จ');
+    } finally {
+      setDeciding(false);
     }
   };
 
-  const handleReject = async (reasons: Array<{ title: string; detail?: string; documentType?: string }>) => {
-    if (!caregiverId || reasons.length === 0) return;
-
+  const handleReject = async () => {
+    const fails = checklist.failRows;
+    if (!caregiverId || fails.length === 0 || checklist.emptyRows.length > 0) return;
+    setDeciding(true);
     try {
-      await rejectKyc({ variables: { caregiverId, reasons } });
+      for (const row of fails) {
+        if (row.item.kind !== 'license' && row.item.kind !== 'driving') continue;
+        if (!(await decideItem(row.item, 'reject', row.result.remark.trim()))) {
+          setIsRejectOpen(false);
+          return;
+        }
+      }
+      await rejectKyc({
+        variables: {
+          caregiverId,
+          reasons: fails.map((row) => ({ title: row.result.remark.trim(), documentType: row.item.documentType })),
+        },
+      });
       setIsRejectOpen(false);
       toast.success('ปฏิเสธ KYC เรียบร้อยแล้ว');
       await refetch();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (mutationError) {
       toast.error(mutationError instanceof Error ? mutationError.message : 'ปฏิเสธ KYC ไม่สำเร็จ');
+    } finally {
+      setDeciding(false);
     }
   };
 
-  return (
-    <div className="bg-[#F9FAFB] text-gray-900" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-      <main>
-        <section className="mx-auto max-w-[1312px] px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => navigate('/admin/kyc')}
-                className="inline-flex h-7 items-center rounded-md bg-[#F3F4F6] px-2.5 text-[13px] font-medium leading-4 text-[#374151] hover:bg-gray-200 cursor-pointer"
-              >
-                ← กลับ
-              </button>
-              <h2 className="text-base font-medium leading-5 text-[#064E3B]">อนุมัติเอกสาร KYC</h2>
-            </div>
+  const nameParts = splitName(caregiver?.fullName);
+  const statusPill = STATUS_PILL[kycStatus] ?? STATUS_PILL.none;
+  const caregiverNumber = caregiver ? caregiver.caregiverNumber || caregiver.id.slice(0, 8) : '-';
+  const latestDecision = [...reviews]
+    .filter((r) => r.action === (kycStatus === 'verified' ? 'approved' : 'rejected'))
+    .sort((a, b) => new Date(b.reviewedAt).getTime() - new Date(a.reviewedAt).getTime())[0];
+  const decisionMeta = latestDecision
+    ? `${formatThaiDateTime(latestDecision.reviewedAt)}${latestDecision.reviewerName ? ` · โดย ${latestDecision.reviewerName}` : ''}`
+    : '';
+  const rejectedCount = caregiver?.rejectionReasons?.length || checklist.failRows.length;
+  const levelName = levelToApprove ? careLevelStrings.levelLabel[levelToApprove] : '';
+  const approvedLevelName = careLevel.level ? careLevelStrings.levelLabel[careLevel.level] : '';
 
-            <div className="flex items-center gap-2">
-              <span className="text-base font-semibold leading-5 text-[#064E3B]">สถานะปัจจุบัน:</span>
-              <StatusBadge
-                label={caregiver ? currentStatusMeta.label : '-'}
-                badgeClass={currentStatusMeta.badge}
-                dotClass={`${currentStatusMeta.dot} h-2.5 w-2.5`}
-                className="h-10 rounded-lg px-4 text-[15px]"
-              />
+  return (
+    <div className="bg-[#F7F8FA] text-[#1F2937]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+      <main>
+        <header className="mx-auto flex max-w-[1312px] flex-wrap items-end justify-between gap-3 px-4 pb-4 pt-4 sm:px-6 sm:pb-5 sm:pt-6 lg:px-8">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={() => navigate('/admin/kyc')}
+              className="inline-flex cursor-pointer items-center gap-1 self-start text-[13px] font-medium text-[#047857] hover:underline"
+            >
+              <Icon name="chevron_left" style={{ fontSize: 16 }} />
+              คำขอ KYC ทั้งหมด
+            </button>
+            <h1 className="text-2xl font-bold leading-8 text-[#064E3B]">อนุมัติเอกสาร KYC</h1>
+          </div>
+          {caregiver && (
+            <span className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold ${statusPill.className}`}>
+              <Icon name={statusPill.icon} style={{ fontSize: 14 }} />
+              {statusPill.label}
+            </span>
+          )}
+        </header>
+
+        {caregiver && kycStatus === 'rejected' && (
+          <div className="mx-auto mb-5 max-w-[1312px] px-4 sm:px-6 lg:px-8">
+            <div role="status" className="flex items-start gap-3 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3.5">
+              <Icon name="cancel" color="#DC2626" style={{ fontSize: 22 }} />
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <p className="text-[15px] font-semibold leading-[22px] text-[#991B1B]">ปฏิเสธแล้ว — ส่งกลับให้ผู้ดูแลแก้ไข {rejectedCount} รายการ</p>
+                <p className="text-[13px] leading-5 text-[#7F1D1D]">
+                  {decisionMeta ? `${decisionMeta} · ` : ''}ผลตรวจด้านล่างเป็นของครั้งล่าสุด แก้ไขไม่ได้
+                </p>
+              </div>
             </div>
           </div>
-        </section>
+        )}
+        {caregiver && kycStatus === 'verified' && (
+          <div className="mx-auto mb-5 max-w-[1312px] px-4 sm:px-6 lg:px-8">
+            <div role="status" className="flex items-start gap-3 rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3.5">
+              <Icon name="check_circle" color="#059669" style={{ fontSize: 22 }} />
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <p className="text-[15px] font-semibold leading-[22px] text-[#065F46]">อนุมัติแล้ว{approvedLevelName ? ` · ${approvedLevelName}` : ''}</p>
+                <p className="text-[13px] leading-5 text-[#065F46]">{decisionMeta ? `${decisionMeta} · ` : ''}ผลตรวจด้านล่างแก้ไขไม่ได้</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {loading && !data ? (
           <section className="mx-auto grid max-w-[1312px] gap-7 px-4 pb-8 sm:px-6 lg:grid-cols-[minmax(0,691px)_minmax(360px,592px)] lg:px-8">
@@ -568,7 +288,7 @@ export default function KycReviewDetailPage() {
             <Skeleton height={761} borderRadius={12} />
             <Skeleton height={283} borderRadius={12} />
           </section>
-        ) : error || !caregiver ? (
+        ) : error || !caregiver || !detail ? (
           <section className="mx-auto max-w-[1312px] px-4 pb-8 sm:px-6 lg:px-8">
             <div className="rounded-xl border border-red-100 bg-white p-8 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
@@ -579,56 +299,50 @@ export default function KycReviewDetailPage() {
             </div>
           </section>
         ) : (
-          <section className="mx-auto grid max-w-[1312px] gap-7 px-4 pb-20 sm:px-6 lg:grid-cols-[minmax(0,691px)_minmax(360px,592px)] lg:px-8">
-            <div className="space-y-7">
-              <article className="rounded-xl border border-[#E5E7EB] bg-white px-6 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <section className="mx-auto grid max-w-[1312px] items-start gap-4 px-4 pb-10 sm:gap-7 sm:px-6 sm:pb-20 lg:grid-cols-[minmax(0,691px)_minmax(360px,592px)] lg:px-8">
+            {/* ซ้าย: ข้อมูลผู้ดูแล — บนมือถืออยู่ใต้การ์ดตรวจ */}
+            <div className="order-2 flex min-w-0 flex-col gap-4 sm:gap-7 lg:order-1">
+              <article className={cardClass}>
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-base font-semibold leading-5 text-[#064E3B]">ข้อมูลส่วนตัว</h3>
-                  <span className="inline-flex items-center rounded-full bg-[#D1FAE5] px-3 py-1 text-xs font-semibold text-[#047857]">
+                  <span className="inline-flex h-6 items-center rounded-full bg-[#D1FAE5] px-3 text-xs font-semibold text-[#047857]">
                     ส่งใหม่ {resubmitCount} ครั้ง
                   </span>
                 </div>
-                {/*Profile header*/}
                 <div className="mt-4 flex items-center gap-4">
                   <Avatar name={caregiver.fullName} size={56} className="shrink-0" />
                   <div className="min-w-0">
                     <p className="truncate text-base font-semibold leading-6 text-[#111827]">{caregiver.fullName || '-'}</p>
-                    <p className="text-[13px] leading-5 text-[#6B7280]">
-                      {caregiver.caregiverNumber || caregiver.id.slice(0, 8)}
-                    </p>
+                    <p className="text-[13px] leading-5 text-[#6B7280]">{caregiverNumber}</p>
                   </div>
                 </div>
 
-                {/*Personal Information*/}
                 <dl className="mt-5 grid gap-x-6 gap-y-4 border-t border-[#F3F4F6] pt-5 sm:grid-cols-2">
                   <CaregiverField label="ชื่อ" value={nameParts.firstName} />
                   <CaregiverField label="นามสกุล" value={nameParts.lastName} />
                   <CaregiverField label="เลขบัตรประชาชน" value={formatIdCard(caregiver.idCardNumber)} />
-                  <CaregiverField label="เพศ" value={genderText} />
-                  <CaregiverField
-                    label="วันเกิด"
-                    value={ageText !== '-' ? `${formatThaiDate(caregiver.dateOfBirth)} (${ageText})` : formatThaiDate(caregiver.dateOfBirth)}
-                  />
+                  <CaregiverField label="เพศ" value={caregiver.gender ? genderLabel[caregiver.gender] ?? caregiver.gender : '-'} />
+                  <CaregiverField label="วันเกิด" value={formatBirthDate(caregiver.dateOfBirth)} />
                   <CaregiverField label="ประสบการณ์" value={`${caregiver.experienceYears ?? 0} ปี`} />
+                  <CaregiverField label="อีเมล" value={caregiver.email} />
+                  <CaregiverField label="เบอร์โทรศัพท์" value={formatPhone(caregiver.phone)} />
                   {caregiverProfession ? (
                     <div className="min-w-0">
-                      <dt className="text-[13px] font-medium leading-5 text-[#9CA3AF]">วิชาชีพ</dt>
+                      <dt className="text-[13px] font-medium leading-5 text-[#6B7280]">วิชาชีพ</dt>
                       <dd className="mt-1"><ProfessionBadge profession={caregiverProfession} /></dd>
                     </div>
                   ) : null}
-                  <CaregiverField label="อีเมล" value={caregiver.email} />
-                  <CaregiverField label="เบอร์โทรศัพท์" value={formatPhone(caregiver.phone)} />
                   {caregiver.address ? (
                     <div className="min-w-0 sm:col-span-2">
-                      <dt className="text-[13px] font-medium leading-5 text-[#9CA3AF]">ที่อยู่</dt>
+                      <dt className="text-[13px] font-medium leading-5 text-[#6B7280]">ที่อยู่</dt>
                       <dd className="mt-1 text-[15px] leading-6 text-[#1F2937]">{caregiver.address}</dd>
                     </div>
                   ) : null}
                 </dl>
 
                 <div className="mt-5 border-t border-[#F3F4F6] pt-5">
-                  <dt className="text-[13px] font-medium leading-5 text-[#9CA3AF]">ทักษะการดูแล</dt>
-                  <dd className="mt-2 flex flex-wrap gap-2">
+                  <p className="text-[13px] font-medium leading-5 text-[#6B7280]">ทักษะการดูแล</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
                     {caregiver.skills.length > 0 ? (
                       caregiver.skills.map((skill) => (
                         <span key={skill} className="inline-flex items-center rounded-md bg-[#F3F4F6] px-2.5 py-1 text-[13px] text-[#374151]">
@@ -638,54 +352,30 @@ export default function KycReviewDetailPage() {
                     ) : (
                       <span className="text-[15px] text-[#1F2937]">-</span>
                     )}
-                  </dd>
+                  </div>
+                  {caregiverCustomSkills.length > 0 ? (
+                    <>
+                      <p className="mt-4 text-[13px] font-medium leading-5 text-[#6B7280]">ทักษะอื่นๆ (ผู้ดูแลพิมพ์เอง · แสดงในโปรไฟล์ ไม่ใช้จับคู่งาน)</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {caregiverCustomSkills.map((skill) => (
+                          <span key={skill} className="inline-flex items-center rounded-md border border-dashed border-[#D1D5DB] bg-white px-2.5 py-1 text-[13px] text-[#374151]">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+                  {caregiver.bio ? (
+                    <>
+                      <p className="mt-4 text-[13px] font-medium leading-5 text-[#6B7280]">ประวัติโดยย่อ</p>
+                      <p className="mt-1.5 text-[15px] leading-6 text-[#1F2937]">{caregiver.bio}</p>
+                    </>
+                  ) : null}
                 </div>
-
-                {caregiverCustomSkills.length > 0 ? (
-                  <div className="mt-4">
-                    <dt className="text-[13px] font-medium leading-5 text-[#9CA3AF]">ทักษะอื่นๆ (ผู้ดูแลพิมพ์เอง · แสดงในโปรไฟล์ ไม่ใช้จับคู่งาน)</dt>
-                    <dd className="mt-2 flex flex-wrap gap-2">
-                      {caregiverCustomSkills.map((skill) => (
-                        <span key={skill} className="inline-flex items-center rounded-md border border-dashed border-[#D1D5DB] bg-white px-2.5 py-1 text-[13px] text-[#374151]">
-                          {skill}
-                        </span>
-                      ))}
-                    </dd>
-                  </div>
-                ) : null}
-
-                {caregiver.bio ? (
-                  <div className="mt-4">
-                    <dt className="text-[13px] font-medium leading-5 text-[#9CA3AF]">ประวัติโดยย่อ</dt>
-                    <dd className="mt-1.5 text-[15px] leading-6 text-[#1F2937]">{caregiver.bio}</dd>
-                  </div>
-                ) : null}
               </article>
 
-              {/* PYG-588: ใบประกอบวิชาชีพ — ตรวจรายใบ แยกจากอนุมัติ KYC ทั้งชุด */}
-              {LICENSE_KYC_ENABLED && (
-                <AdminLicensePanel
-                  license={data?.adminKycDetail.license ?? null}
-                  profession={caregiverProfession}
-                  caregiverName={caregiver.fullName}
-                  onChanged={() => refetch()}
-                  notify={{ success: (m) => toast.success(m), error: (m) => toast.error(m) }}
-                />
-              )}
-
-              {/* PYG-598: ใบขับขี่ — ตรวจรายใบ แยกจากอนุมัติ KYC ทั้งชุด */}
-              {DRIVING_LICENSE_KYC_ENABLED && (
-                <AdminDrivingLicensePanel
-                  info={data?.adminKycDetail.drivingLicense ?? null}
-                  reviews={data?.adminKycDetail.drivingLicenseReviews ?? []}
-                  caregiverName={caregiver.fullName}
-                  onChanged={() => refetch()}
-                  notify={{ success: (m) => toast.success(m), error: (m) => toast.error(m) }}
-                />
-              )}
-
               {/*Payout Account (PYG-266)*/}
-              <article className="rounded-xl border border-[#E5E7EB] bg-white px-6 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+              <article className={cardClass}>
                 <h3 className="text-base font-semibold leading-5 text-[#064E3B]">บัญชีธนาคาร/ข้อมูลรับเงิน</h3>
                 {payoutAccount ? (
                   <dl className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2">
@@ -693,7 +383,7 @@ export default function KycReviewDetailPage() {
                     <CaregiverField label="ชื่อบัญชี (เทียบกับชื่อในบัตร)" value={payoutAccount.accountName} />
                     <CaregiverField label="เลขบัญชี" value={`•••• ${payoutAccount.accountNumberLast4}`} />
                     <div className="min-w-0">
-                      <dt className="text-[13px] font-medium leading-5 text-[#9CA3AF]">สถานะการยืนยันกับ Omise</dt>
+                      <dt className="text-[13px] font-medium leading-5 text-[#6B7280]">สถานะการยืนยันกับ Omise</dt>
                       <dd className="mt-1">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                           (RECIPIENT_STATUS_META[payoutAccount.recipientStatus] ?? RECIPIENT_STATUS_META.unverified).className
@@ -708,19 +398,13 @@ export default function KycReviewDetailPage() {
                 )}
               </article>
 
-              {/*KYC History*/}
-              <KycHistoryCard
-                caregiver={caregiver}
-                reviews={reviews}
-                editHistory={editHistory}
-                onlyKycLogs={true}
-              />
+              <KycHistoryCard caregiver={caregiver} reviews={reviews} editHistory={editHistory} onlyKycLogs={true} />
             </div>
-            
-            {/*Right Column: Documents Preview + Action Buttons*/}
-            <div className="space-y-6 self-start">
+
+            {/* ขวา: ตรวจเอกสารทีละรายการ + ระดับผู้ดูแล + ตัดสิน */}
+            <div className="order-1 flex min-w-0 flex-col gap-4 sm:gap-6 lg:order-2">
               {/* PYG-511: อนุมัติ KYC ไม่อนุมัติรูปโปรไฟล์ให้ — ต้องเทียบหน้าแยกอีกหน้า */}
-              {data?.adminKycDetail.pendingProfilePhotoDocumentId ? (
+              {detail.pendingProfilePhotoDocumentId ? (
                 <div className="flex flex-col gap-3 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-start gap-3 text-sm text-[#92400E]">
                     <Icon name="face" />
@@ -736,49 +420,41 @@ export default function KycReviewDetailPage() {
                 </div>
               ) : null}
 
-              <KycDocumentsPreview documents={documents} docTypeLabel={docTypeLabel} />
+              <KycChecklistCard checklist={checklist} detail={detail} readOnly={readOnly} onRetry={() => refetch()} />
 
-              {/* PYG-557 · S02: ระดับผู้ดูแล — วางชิดเหนือปุ่มอนุมัติ ให้เห็นว่าต้องเลือกก่อน */}
-              <AdminCareLevelCard
-                ref={careLevelPickerRef}
-                caregiverName={caregiver.fullName}
-                kycStatus={caregiver.kycStatus}
-                profession={caregiverProfession}
-                data={careLevel}
-                picked={levelToApprove}
-                onPick={pickLevel}
-                pickerError={careLevelError}
-                onNotify={(type, message) => (type === 'success' ? toast.success(message) : toast.error(message))}
-              />
+              {/* PYG-557 · S02: ระดับผู้ดูแล — วางชิดเหนือปุ่มอนุมัติ · ปฏิเสธแล้วไม่ต้องแสดง */}
+              {kycStatus !== 'rejected' && (
+                <AdminCareLevelCard
+                  ref={careLevelPickerRef}
+                  caregiverName={caregiver.fullName}
+                  kycStatus={caregiver.kycStatus}
+                  profession={caregiverProfession}
+                  data={careLevel}
+                  picked={levelToApprove}
+                  onPick={pickLevel}
+                  pickerError={careLevelError}
+                  onNotify={(type, message) => (type === 'success' ? toast.success(message) : toast.error(message))}
+                />
+              )}
 
-              {/*Action Buttons*/}
-              <div className="flex justify-end">
-                <div className="flex w-full gap-3 sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={() => setIsRejectOpen(true)}
-                    disabled={!isPending}
-                    className="inline-flex h-8 w-full items-center justify-center rounded-lg border-[1.5px] border-[#EF4444] px-4 text-[13px] font-semibold leading-4 text-[#DC2626] hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-transparent sm:w-[114px] cursor-pointer"
-                  >
-                    ปฏิเสธ
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openApprove}
-                    disabled={!isPending}
-                    className="inline-flex h-8 w-full items-center justify-center rounded-lg bg-[#059669] px-4 text-[13px] font-semibold leading-4 text-white hover:bg-[#047857] disabled:cursor-not-allowed disabled:bg-gray-300 sm:w-[142px] cursor-pointer"
-                  >
-                    อนุมัติ
-                  </button>
-                </div>
-              </div>
-
-              {/*Pending Status*/}
-              {!isPending ? (
-                <p className="text-right text-sm text-gray-500">
-                  เอกสารนี้อยู่ในสถานะ {statusLabel(caregiver.kycStatus)} จึงไม่สามารถอนุมัติหรือปฏิเสธซ้ำได้
+              {isPending ? (
+                <KycDecisionFooter
+                  checklist={checklist}
+                  levelName={levelName}
+                  busy={deciding}
+                  onReject={() => setIsRejectOpen(true)}
+                  onApprove={openApprove}
+                />
+              ) : (
+                <p className="flex items-start gap-2 rounded-[10px] bg-[#F3F4F6] px-3.5 py-3 text-[13px] leading-5 text-[#374151]">
+                  <Icon name="lock" style={{ fontSize: 16 }} />
+                  {kycStatus === 'rejected'
+                    ? 'ตัดสินแล้ว — แก้ผลตรวจไม่ได้ · ผู้ดูแลส่งใหม่ได้เฉพาะรายการที่ไม่ผ่าน แล้วคำขอจะกลับมารอตรวจอีกครั้ง'
+                    : kycStatus === 'verified'
+                      ? 'อนุมัติแล้ว — แก้ผลตรวจไม่ได้ · เปลี่ยนระดับผู้ดูแลได้จากการ์ดระดับผู้ดูแลด้านบน'
+                      : 'ผู้ดูแลยังไม่ได้ส่ง KYC — ยังตรวจไม่ได้'}
                 </p>
-              ) : null}
+              )}
             </div>
           </section>
         )}
@@ -786,29 +462,28 @@ export default function KycReviewDetailPage() {
 
       <ConfirmModal
         isOpen={isApproveOpen}
-        isLoading={approving}
+        isLoading={deciding}
         title="ยืนยันอนุมัติ KYC?"
         description={
           <>
             {careLevelStrings.approveConfirm.before}
             <strong className="font-bold text-gray-800">{caregiver?.fullName || '-'}</strong>
             {careLevelStrings.approveConfirm.between}
-            <strong className="font-bold text-gray-800">
-              {levelToApprove ? careLevelStrings.levelLabel[levelToApprove] : ''}
-            </strong>
+            <strong className="font-bold text-gray-800">{levelName}</strong>
             {careLevelStrings.approveConfirm.after}
           </>
         }
         onClose={() => setIsApproveOpen(false)}
-        onConfirm={handleApprove}
+        onConfirm={() => void handleApprove()}
       />
-      <RejectModal
-        key={isRejectOpen ? 'reject-open' : 'reject-closed'}
+      <KycRejectConfirmModal
         isOpen={isRejectOpen}
-        isLoading={rejecting}
+        isLoading={deciding}
         caregiverName={caregiver?.fullName || ''}
+        caregiverNumber={caregiverNumber}
+        checklist={checklist}
         onClose={() => setIsRejectOpen(false)}
-        onConfirm={handleReject}
+        onConfirm={() => void handleReject()}
       />
       <ToastContainer
         toasts={toast.toasts as (ToastMessage & { id: string })[]}
