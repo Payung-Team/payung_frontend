@@ -1,29 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { NetworkStatus } from '@apollo/client';
-import { useQuery, useMutation } from '@apollo/client/react';
+import { useQuery } from '@apollo/client/react';
 import { useBooking } from '../../context/BookingContext';
-import { supabase } from '../../lib/supabase';
-import { useDropRejectedActivities } from '../../hooks/useDropRejectedActivities';
-import { buildBookingPayload } from '../../lib/buildBookingPayload';
+import { useMatchingBooking } from '../../hooks/useMatchingBooking';
 import { formatDisplayPrice, NO_PRICE_LABEL } from '../../lib/displayPrice';
-import { SEARCH_CAREGIVERS } from '../../graphql/queries';
-import { CREATE_BOOKING_ON_BEHALF } from '../../graphql/familyGroup';
+import { ELIGIBLE_CAREGIVERS } from '../../graphql/queries';
 import Pagination from '../../components/ui/Pagination';
 import Skeleton from '../../components/ui/Skeleton';
 import CaregiverPhoto from '../../components/ui/CaregiverPhoto';
 import BookingConfirmModal from '../../components/ui/BookingConfirmModal';
 import { useSignedUrlRefresh } from '../../hooks/useSignedPhoto';
-import {
-  BOOKING_SESSION_EXPIRED_MESSAGE,
-  BOOKING_UNCONFIRMED_MESSAGE,
-  BOOKING_UNKNOWN_ERROR_MESSAGE,
-  bookingHttpErrorMessage,
-  isAssessmentRequiredError,
-  onBehalfBookingErrorMessage,
-} from '../../lib/bookingSubmitError';
-import { useAssessmentStrings } from '../../lib/assessmentStrings';
-import { bookingAssessmentRedirect } from '../../lib/assessmentNav';
+import { BOOKING_REVIEW_STEP } from '../../lib/assessmentNav';
 import ThailandAddressSimple from 'thailand-address-simple';
 import { displaySkills } from '../../lib/skillLabels';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
@@ -34,11 +22,7 @@ import {
   NoEligibleCaregiverState,
   NotEligibleNotice,
 } from '../../components/booking/CaregiverMatchStates';
-import {
-  CAREGIVER_MATCH_LIVE,
-  isBookingNotMatchableError,
-  isCaregiverNotEligibleError,
-} from '../../lib/caregiverMatch';
+import { isBookingNotMatchableError, type AdminContact } from '../../lib/caregiverMatch';
 import { useCaregiverMatchStrings } from '../../lib/caregiverMatchStrings';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -65,42 +49,27 @@ interface CaregiverSummary {
   verified?: boolean;
   /** PYG-556: general_caregiver | nurse | physiotherapist — CaregiverSummary.profession (PYG-575) */
   profession?: string | null;
-  /** PYG-648 · S18: BASIC | INTERMEDIATE | ADVANCED — มาเมื่อ BE เพิ่ม CaregiverSummary.careLevel (ดู SUMMARY_CARE_LEVEL_FIELD) */
+  /** PYG-648 · S18: BASIC | INTERMEDIATE | ADVANCED — ทุกคนใน eligibleCaregivers มีระดับเสมอ */
   careLevel?: string | null;
 }
 
-interface SearchPagination {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
-
-interface SearchResult {
-  searchCaregivers: {
-    data: CaregiverSummary[];
-    pagination: SearchPagination;
+interface EligibleResult {
+  eligibleCaregivers: {
+    caregivers: CaregiverSummary[];
+    emptyMessage: string | null;
+    adminContact: AdminContact | null;
   };
 }
 
 interface FilterState {
   province: string;
   district: string;
-  jobTypes: string[];
   minPrice: number;
   maxPrice: number;
   minRating: number | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-
-const SERVICE_TYPE_MAP: Record<string, string> = {
-  'ดูแลทั่วไป': 'general_care',
-  'กายภาพบำบัด': 'physiotherapy',
-  'ดูแลผู้ป่วยติดเตียง': 'bedridden_care',
-  'ช่วยจัดการยา': 'medication',
-  'เป็นเพื่อน/พูดคุย': 'companion',
-};
 
 // ค่าที่ไม่รู้จัก (หรือยังไม่ได้กรอก) → ไม่แสดงทั้งไอคอนและบรรทัดเพศ ดีกว่าเดาเป็นชาย/หญิง
 // ไอคอนมี title/aria-label กำกับเสมอ — สีอย่างเดียวสื่อความหมายไม่ได้สำหรับคนตาบอดสี
@@ -594,12 +563,17 @@ const SearchPage: React.FC = () => {
   if (!bookingDraft) {
     return <Navigate to="/booking/new" replace />;
   }
+  // PYG-648: รายชื่อกรองตาม booking ที่สร้างตอนกด "เริ่มต้นค้นหาผู้ดูแล" — ยังไม่มี (เช่น draft จากก่อนอัปเดต)
+  // → กลับไปหน้าการจองโดยไม่ล้าง draft (resume state) ให้กดค้นหาใหม่
+  if (!bookingDraft.matchingBooking?.id) {
+    return <Navigate to="/booking/new" replace state={{ resumeStep: BOOKING_REVIEW_STEP }} />;
+  }
 
-  return <SearchPageContent />;
+  return <SearchPageContent bookingId={bookingDraft.matchingBooking.id} />;
 };
 
 // Separate inner component so hooks always run after the guard check
-function SearchPageContent() {
+function SearchPageContent({ bookingId }: { bookingId: string }) {
   const { bookingDraft } = useBooking();
   const navigate = useNavigate();
   const location = useLocation();
@@ -621,9 +595,8 @@ function SearchPageContent() {
   const [bookingCaregiver, setBookingCaregiver] = useState<CaregiverSummary | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
-  // S08: BE ตอบ ASSESSMENT_REQUIRED (จองปกติ) → modal แสดงปุ่ม "ทำแบบประเมิน"
-  const [assessmentRequired, setAssessmentRequired] = useState(false);
-  const assessmentText = useAssessmentStrings();
+  // S08 / แบบประเมิน / ความยินยอม / เวลา ถูกตรวจตอนสร้าง booking ที่ขั้นตรวจสอบแล้ว — หน้านี้เหลือแค่การเลือกผู้ดูแล
+  const { select } = useMatchingBooking();
 
   // ── Address DB ──
   const [dbReady, setDbReady] = useState(false);
@@ -646,19 +619,13 @@ function SearchPageContent() {
   }, [dbReady]);
 
   // ── Initial filters pre-filled from booking draft ──
-  const initialFilters: FilterState = useMemo(() => {
-    const draftJobTypes = bookingDraft?.serviceTypes
-      ? bookingDraft.serviceTypes.map(st => SERVICE_TYPE_MAP[st]).filter(Boolean)
-      : [];
-    return {
-      province: bookingDraft?.locationDetails?.province ?? '',
-      district: bookingDraft?.locationDetails?.district ?? '',
-      jobTypes: draftJobTypes,
-      minPrice: PRICE_MIN,
-      maxPrice: PRICE_MAX,
-      minRating: null,
-    };
-  }, [bookingDraft]);
+  const initialFilters: FilterState = useMemo(() => ({
+    province: bookingDraft?.locationDetails?.province ?? '',
+    district: bookingDraft?.locationDetails?.district ?? '',
+    minPrice: PRICE_MIN,
+    maxPrice: PRICE_MAX,
+    minRating: null,
+  }), [bookingDraft]);
 
   const [pendingFilters, setPendingFilters] = useState<FilterState>(initialFilters);
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(initialFilters);
@@ -677,41 +644,59 @@ function SearchPageContent() {
     setPage(1);
   }, [initialFilters]);
 
-  // S18: รายชื่อว่างเพราะตัวกรองที่ญาติปรับเอง ≠ ไม่มีใครรับงานนี้ได้ (AC7)
-  // ต่างจากค่าตั้งต้นของ draft → EmptyState เดิม (รีเซ็ตตัวกรอง) · เท่าค่าตั้งต้น → สถานะ AC7
-  const filtersChanged =
-    appliedFilters.province !== initialFilters.province ||
-    appliedFilters.district !== initialFilters.district ||
-    appliedFilters.minPrice !== initialFilters.minPrice ||
-    appliedFilters.maxPrice !== initialFilters.maxPrice ||
-    appliedFilters.minRating !== initialFilters.minRating;
-
   // ── GraphQL Query ──
-  const queryInput = useMemo(() => ({
-    province: appliedFilters.province || undefined,
-    district: appliedFilters.district || undefined,
-    jobType: appliedFilters.jobTypes.length > 0 ? appliedFilters.jobTypes.join(',') : undefined,
-    minPrice: appliedFilters.minPrice > PRICE_MIN ? appliedFilters.minPrice : undefined,
-    maxPrice: appliedFilters.maxPrice < PRICE_MAX ? appliedFilters.maxPrice : undefined,
-    minRating: appliedFilters.minRating ?? undefined,
-    sortBy,
-    page,
-    limit: PAGE_LIMIT,
-  }), [appliedFilters, sortBy, page]);
-
-  const { data, loading: gqlLoading, error: gqlError, refetch, networkStatus } = useQuery<SearchResult>(SEARCH_CAREGIVERS, {
-    variables: { input: queryInput },
-    fetchPolicy: 'cache-and-network',
+  // PYG-648 · S18: BE คืนผู้ดูแลที่ผ่านเงื่อนไขของ booking ทั้งหมดในครั้งเดียว (ไม่มีตัวกรอง/แบ่งหน้า)
+  // network-only: ผลขึ้นกับข้อมูลล่าสุดของผู้ดูแล — E9 ต้องได้รายชื่อใหม่จริงหลังเลือกคนที่ไม่ผ่าน
+  const { data, loading: gqlLoading, error: gqlError, refetch, networkStatus } = useQuery<EligibleResult>(ELIGIBLE_CAREGIVERS, {
+    variables: { bookingId },
+    fetchPolicy: 'network-only',
     notifyOnNetworkStatusChange: true,
   });
 
   // PYG-512: รูปผู้ดูแลเป็น signed URL อายุ 1 ชม. — โหลดไม่ขึ้นเมื่อไหร่ค่อยขอผลค้นหาชุดใหม่
   const refreshPhotos = useSignedUrlRefresh(refetch);
 
-  const caregivers = data?.searchCaregivers.data ?? [];
-  const pagination = data?.searchCaregivers.pagination;
-  const totalPages = pagination?.totalPages ?? 1;
-  const totalResults = pagination?.total ?? 0;
+  const eligible = data?.eligibleCaregivers;
+  const allEligible = useMemo(() => eligible?.caregivers ?? [], [eligible]);
+
+  // ตัวกรอง/เรียงลำดับเดิมของหน้า List ทำฝั่ง FE บนรายชื่อที่ผ่านแล้ว — กติกาเดียวกับ SearchService
+  const filtered = useMemo(() => {
+    const f = appliedFilters;
+    // ไม่มีราคา (0) = ไม่ผ่านตัวกรองราคา เหมือน SQL ที่ NULL เทียบแล้วเป็นเท็จ
+    const priceOf = (cg: CaregiverSummary) => (cg.hourlyRate > 0 ? cg.hourlyRate : null);
+    const list = allEligible.filter((cg) => {
+      if (f.province && cg.province !== f.province) return false;
+      // service_area_district เก็บได้หลายเขตคั่นด้วย ","
+      if (f.district && cg.district !== f.district && !(cg.district ?? '').split(',').includes(f.district)) return false;
+      const price = priceOf(cg);
+      if (f.minPrice > PRICE_MIN && (price == null || price < f.minPrice)) return false;
+      if (f.maxPrice < PRICE_MAX && (price == null || price > f.maxPrice)) return false;
+      if (f.minRating != null && (cg.avgRating ?? 0) < f.minRating) return false;
+      return true;
+    });
+    // sort ของ JS เป็น stable → คะแนนเท่ากันคงลำดับจาก BE (List เดิม + id เป็นตัวตัดสิน)
+    if (sortBy === 'PRICE_ASC' || sortBy === 'PRICE_DESC') {
+      const dir = sortBy === 'PRICE_ASC' ? 1 : -1;
+      return [...list].sort((a, b) => {
+        const pa = priceOf(a);
+        const pb = priceOf(b);
+        if (pa == null || pb == null) return pa == null ? (pb == null ? 0 : 1) : -1; // NULLS LAST
+        return (pa - pb) * dir;
+      });
+    }
+    return [...list].sort((a, b) => {
+      if (a.avgRating == null || b.avgRating == null) {
+        return a.avgRating == null ? (b.avgRating == null ? 0 : 1) : -1; // NULLS LAST
+      }
+      return b.avgRating - a.avgRating;
+    });
+  }, [allEligible, appliedFilters, sortBy]);
+
+  const totalResults = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalResults / PAGE_LIMIT));
+  // รายชื่อหดหลังโหลดใหม่ (E9) → หน้าที่อยู่อาจเกินจำนวนหน้า ไม่ให้เห็นหน้าว่าง
+  const currentPage = Math.min(page, totalPages);
+  const caregivers = filtered.slice((currentPage - 1) * PAGE_LIMIT, currentPage * PAGE_LIMIT);
   // refetch เพื่อเอารูปใบใหม่ต้องเกิดเงียบ ๆ ข้างหลัง ไม่สลับทั้งรายการเป็น skeleton
   const loading = gqlLoading && networkStatus !== NetworkStatus.refetch;
   const error = gqlError;
@@ -727,148 +712,32 @@ function SearchPageContent() {
     setBookingCaregiver(cg);
   }, []);
 
-  // PYG-385: family "book on behalf" path — reuses this whole search/confirm flow, only the
-  // submit call differs (GraphQL createBookingOnBehalf instead of the personal REST create).
-  const [createOnBehalf] = useMutation(CREATE_BOOKING_ON_BEHALF);
-  // PYG-635: กิจกรรมถูกปิดใช้งานระหว่างจอง → ตัดออกจาก draft ให้กดยืนยันซ้ำได้เลย
-  const dropRejectedActivities = useDropRejectedActivities();
-
+  // PYG-648 · S18: booking ถูกสร้างไว้แล้วตอนกดค้นหา (ทั้งจองเอง และ PYG-385 จองแทนในกลุ่ม)
+  // ตรงนี้แค่ผูกผู้ดูแล — BE ตรวจเงื่อนไข + ตารางว่างซ้ำ ไม่ผ่าน = E9
   const handleConfirmBooking = useCallback(async () => {
     if (!bookingCaregiver || !bookingDraft) return;
     setIsSubmitting(true);
     setBookingError(null);
-    setAssessmentRequired(false);
     setNotEligible(false);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) {
-        setBookingError(BOOKING_SESSION_EXPIRED_MESSAGE);
+      const result = await select(bookingDraft, bookingCaregiver.id);
+      if (!result.ok) {
+        setNotEligible(result.notEligible);
+        setBookingError(result.message);
         return;
       }
-
-      // PYG-460 — payload สร้างที่ buildBookingPayload ที่เดียว ใช้ร่วมกับ
-      // CaregiverProfilePage ซึ่งเคยมีโค้ดชุดเดียวกันคัดลอกไว้อีกชุด
-      const payload = buildBookingPayload(bookingDraft, bookingCaregiver.id);
-      // ── PYG-385: booking on behalf of a family-group member ──────────────────────
-      // Same payload, different endpoint: createBookingOnBehalf persists family_group_id +
-      // care_recipient_id + memberDetails, then the booker pays via the unchanged flow.
-      if (bookingDraft.onBehalf) {
-        const pd = bookingDraft.recipient?.patientDetails;
-        const memberDetails = {
-          age: pd?.age,
-          gender: pd?.gender || undefined,
-          weight: pd?.weight,
-          height: pd?.height,
-          supportLevel: pd?.supportLevel || undefined,
-          bloodGroup: pd?.bloodGroup || undefined,
-          conditions: pd?.conditions?.length ? pd.conditions : undefined,
-          medicines: pd?.medicines || undefined,
-          allergies: pd?.allergies || undefined,
-          careInstructions: pd?.careInstructions || undefined,
-          regularHospital: pd?.regularHospital || undefined,
-        };
-        const hasDetails = Object.values(memberDetails).some((v) => v != null);
-        try {
-          const { data } = await createOnBehalf({
-            variables: {
-              input: {
-                groupId: bookingDraft.onBehalf.familyGroupId,
-                // PYG-500: โมเดล "สมาชิก = patient" — ส่ง memberUserId (backend หา/สร้างโปรไฟล์ให้)
-                memberUserId: bookingDraft.onBehalf.memberUserId,
-                careRecipientId: bookingDraft.onBehalf.careRecipientId,
-                // ★ PYG-519: ไม่ส่ง patientName อีกแล้ว — ชื่อ-นามสกุลมาจากบัญชีของสมาชิกเสมอ
-                //   BE ปฏิเสธด้วย 400 PATIENT_NAME_NOT_ALLOWED ถ้าส่งมา (PYG-516)
-                //   ฟีดแบ็กอาจารย์ Sprint 9 ข้อ 6: คนจองพิมพ์ชื่อใครก็ได้ลงใบจองไม่ได้อีก
-                caregiverId: payload.caregiverId,
-                tasks: payload.tasks,
-                activityIds: payload.activityIds,
-                serviceLocations: payload.serviceLocations,
-                serviceType: payload.serviceType,
-                // PYG-525: ส่งเวลาเริ่ม + สิ้นสุด — BE คำนวณ durationHours / timeSlot เอง
-                startTime: payload.startTime,
-                endTime: payload.endTime,
-                locationAddress: payload.locationAddress,
-                lat: payload.lat,
-                lng: payload.lng,
-                bookingDate: payload.bookingDate,
-                notes: payload.notes,
-                dayOfContactName: payload.dayOfContactName,
-                dayOfContactPhone: payload.dayOfContactPhone,
-                dayOfContactRelationship: payload.dayOfContactRelationship,
-                ...(hasDetails ? { memberDetails } : {}),
-              },
-            },
-          });
-          const created = (data as { createBookingOnBehalf?: { id: string } } | null)
-            ?.createBookingOnBehalf;
-          if (!created?.id) {
-            setBookingError(BOOKING_UNCONFIRMED_MESSAGE);
-            return;
-          }
-          setBookingError(null);
-          setBookingCaregiver(null);
-          navigate('/booking/success', {
-            state: {
-              ref: created?.id,
-              caregiverName: bookingCaregiver.fullName,
-              onBehalfOf: bookingDraft.onBehalf.recipientName,
-            },
-          });
-        } catch (err) {
-          if (isCaregiverNotEligibleError(err)) {
-            setNotEligible(true);
-            setBookingError(matchText.notEligible);
-            return;
-          }
-          // PYG-540: อ่าน code แบบ Apollo 4 + รองรับ CONSENT_WITHDRAWN (ดู bookingSubmitError.ts)
-          dropRejectedActivities(err);
-          setBookingError(onBehalfBookingErrorMessage(err, bookingDraft.onBehalf.recipientName));
-        }
-        return;
-      }
-
-      const apiBase = import.meta.env.VITE_GRAPHQL_URL?.replace('/graphql', '') ?? '';
-      const res = await fetch(`${apiBase}/api/v1/bookings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => null);
-        if (isCaregiverNotEligibleError(errData)) {
-          setNotEligible(true);
-          setBookingError(matchText.notEligible);
-          return;
-        }
-        setAssessmentRequired(isAssessmentRequiredError(errData));
-        dropRejectedActivities(errData);
-        setBookingError(
-          bookingHttpErrorMessage(res.status, errData, bookingDraft.recipient?.patientDetails?.name),
-        );
-        return;
-      }
-      const resData = await res.json().catch(() => null) as { id?: string } | null;
-      if (!resData?.id) {
-        setBookingError(BOOKING_UNCONFIRMED_MESSAGE);
-        return;
-      }
-      setBookingError(null);
       setBookingCaregiver(null);
       navigate('/booking/success', {
-        state: { ref: resData.id, caregiverName: bookingCaregiver.fullName },
+        state: {
+          ref: result.bookingId,
+          caregiverName: bookingCaregiver.fullName,
+          ...(bookingDraft.onBehalf ? { onBehalfOf: bookingDraft.onBehalf.recipientName } : {}),
+        },
       });
-    } catch (err) {
-      // ห้ามพาไปหน้าสำเร็จ — ไม่มีการยืนยันว่าจองได้จริง
-      console.error('Failed to create booking:', err);
-      setBookingError(BOOKING_UNKNOWN_ERROR_MESSAGE);
     } finally {
       setIsSubmitting(false);
     }
-  }, [bookingCaregiver, bookingDraft, navigate, createOnBehalf, dropRejectedActivities, matchText]);
+  }, [bookingCaregiver, bookingDraft, navigate, select]);
 
   // S18 · E9: ปิด modal → โหลดรายชื่อใหม่ (คนเดิมหายเมื่อ BE กรอง) → แถบแจ้งเหนือรายชื่อ
   // รายชื่อใหม่ว่าง → ตกไปที่สถานะ AC7 เอง
@@ -883,6 +752,12 @@ function SearchPageContent() {
 
   const handleViewProfile = useCallback((cg: CaregiverSummary) => {
     navigate(`/caregivers/${cg.id}`, { state: { caregiver: cg } });
+  }, [navigate]);
+
+  // กลับไปขั้นตรวจสอบโดยไม่ล้าง draft — แก้แล้วกดค้นหาใหม่ ขั้นนั้นยกเลิก booking ใบเดิมให้เอง
+  // history.back() หลุดออกนอกแอปไปหน้าว่างได้ ถ้า /search เป็น entry แรกของ tab → สั่ง router ตรง ๆ
+  const backToBooking = useCallback(() => {
+    navigate('/booking/new', { state: { resumeStep: BOOKING_REVIEW_STEP } });
   }, [navigate]);
 
   // Active filter count badge
@@ -907,9 +782,7 @@ function SearchPageContent() {
             <span className="material-icons text-[18px] text-[#52B69A]">arrow_back</span>
             <button
               type="button"
-              // history.back() หลุดออกนอกแอปไปหน้าว่างได้ ถ้า /search เป็น entry แรกของ tab
-              // (เช่นเปิดลิงก์ตรง ๆ หรือ redirect มา) → สั่ง router ไปหน้าจองตรง ๆ แทน
-              onClick={() => navigate('/booking/new')}
+              onClick={backToBooking}
               className="text-[13px] text-[#52B69A] font-semibold hover:text-[#469e85] transition-colors cursor-pointer"
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
             >
@@ -986,22 +859,16 @@ function SearchPageContent() {
                       )}
                     </div>
                    
-                    {CAREGIVER_MATCH_LIVE ? (
-                      // S18: จำนวน + เหตุผลที่รายชื่อสั้น · ว่าง → ซ่อนจำนวน เหลือเหตุผล (ไม่บอกจำนวนคนที่ถูกตัด R9)
-                      <span className="text-[#575859]">
-                        {totalResults > 0 && (
-                          <>
-                            <b className="font-semibold text-[#1A1A1A]">{matchText.count(totalResults)}</b>
-                            {' · '}
-                          </>
-                        )}
-                        {matchText.scoped}
-                      </span>
-                    ) : (
-                      <span>
-                        {totalResults.toLocaleString()} ผลลัพธ์ที่ตรงกับประเภทงานที่คุณเลือก
-                      </span>
-                    )}
+                    {/* S18: จำนวน + เหตุผลที่รายชื่อสั้น · ว่าง → ซ่อนจำนวน เหลือเหตุผล (ไม่บอกจำนวนคนที่ถูกตัด R9) */}
+                    <span className="text-[#575859]">
+                      {totalResults > 0 && (
+                        <>
+                          <b className="font-semibold text-[#1A1A1A]">{matchText.count(totalResults)}</b>
+                          {' · '}
+                        </>
+                      )}
+                      {matchText.scoped}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1026,7 +893,7 @@ function SearchPageContent() {
             </div>
 
             {/* S18 · มือถือไม่มีหัวเรื่อง → หัวรายชื่อ 2 บรรทัด (จำนวน + เหตุผล) */}
-            {CAREGIVER_MATCH_LIVE && !error && (
+            {!error && (
               <div className="lg:hidden mb-3 px-0.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
                 {!loading && totalResults > 0 && (
                   <p className="text-[16px] font-bold text-[#1A1A1A]">{matchText.count(totalResults)}</p>
@@ -1044,7 +911,7 @@ function SearchPageContent() {
 
             {/* S18 · E2: booking ยังกรองไม่ได้ */}
             {notMatchable && !loading && (
-              <BookingNotMatchableState onBack={() => navigate('/booking/new')} />
+              <BookingNotMatchableState onBack={backToBooking} />
             )}
 
             {/* Error state — แยกจากรายชื่อว่าง (AC7): สีแดง แนวนอน มีปุ่มลองอีกครั้ง ไม่มีช่องติดต่อแอดมิน */}
@@ -1093,7 +960,7 @@ function SearchPageContent() {
                 {totalPages > 1 && (
                   <div className="mt-8 flex items-center justify-center">
                     <Pagination
-                      page={page}
+                      page={currentPage}
                       totalPages={totalPages}
                       onPageChange={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                     />
@@ -1104,7 +971,7 @@ function SearchPageContent() {
                 {totalPages > 1 && (
                   <p className="text-center text-[12px] text-[#C6C8CB] mt-3"
                     style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-                    แสดง {Math.min((page - 1) * PAGE_LIMIT + 1, totalResults)}–{Math.min(page * PAGE_LIMIT, totalResults)} จาก {totalResults.toLocaleString()} รายการ
+                    แสดง {Math.min((currentPage - 1) * PAGE_LIMIT + 1, totalResults)}–{Math.min(currentPage * PAGE_LIMIT, totalResults)} จาก {totalResults.toLocaleString()} รายการ
                   </p>
                 )}
               </>
@@ -1112,9 +979,9 @@ function SearchPageContent() {
 
             {/* Empty state */}
             {!loading && !error && caregivers.length === 0 && (
-              CAREGIVER_MATCH_LIVE && !filtersChanged ? (
-                // AC7 · adminContact มาจาก response ของ query ที่กรองตาม booking (ดู lib/caregiverMatch.ts ข้อ 3)
-                <NoEligibleCaregiverState contact={null} onEditBooking={() => navigate('/booking/new')} />
+              // AC7: ไม่มีใครผ่านเงื่อนไขของ booking เลย ≠ ตัวกรองที่ญาติปรับเองตัดจนหมด (รีเซ็ตตัวกรอง)
+              allEligible.length === 0 ? (
+                <NoEligibleCaregiverState contact={eligible?.adminContact} onEditBooking={backToBooking} />
               ) : (
                 <EmptyState onReset={resetFilters} />
               )
@@ -1134,19 +1001,7 @@ function SearchPageContent() {
       isSubmitting={isSubmitting}
       errorMessage={bookingError ?? undefined}
       confirmDisabled={notEligible}
-      errorAction={
-        notEligible
-          ? { label: matchText.notEligibleAction, onClick: handleChooseAnother }
-          : assessmentRequired
-          ? {
-              label: assessmentText.errorRequiredAction,
-              onClick: () => {
-                const target = bookingAssessmentRedirect(bookingDraft?.recipient?.selectedRecipientId);
-                navigate(target.to, { state: target.state });
-              },
-            }
-          : undefined
-      }
+      errorAction={notEligible ? { label: matchText.notEligibleAction, onClick: handleChooseAnother } : undefined}
       onPhotoExpired={refreshPhotos}
     />
     </>

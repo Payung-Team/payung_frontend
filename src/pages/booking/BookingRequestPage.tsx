@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { BOOKING_RESUME_STEP, isBookingResumeState } from '../../lib/assessmentNav';
+import { bookingAssessmentRedirect, isBookingResumeState } from '../../lib/assessmentNav';
 import { useBooking } from '../../context/BookingContext';
+import { useMatchingBooking } from '../../hooks/useMatchingBooking';
+import { useAssessmentStrings } from '../../lib/assessmentStrings';
 import { formatBookingTimeRange } from '../../lib/bookingTime';
 import { estimateBookingCost } from '../../lib/bookingPrice';
 import BookingStepService from './steps/BookingStepService';
@@ -128,13 +130,20 @@ export default function BookingRequestPage() {
   const location = useLocation();
   const { step, goToStep, bookingDraft, resetBooking, setBookingDraft, stepSubmit, stepMissing } =
     useBooking();
+  const { prepare, cancelMatchingBooking } = useMatchingBooking();
+  const assessmentText = useAssessmentStrings();
+  // PYG-648: error ตอนสร้าง booking (แบบประเมิน / ความยินยอม / เวลา / กิจกรรม) — เดิมขึ้นใน modal ยืนยันผู้ดูแล
+  const [searchError, setSearchError] = useState<{ message: string; assessmentRequired: boolean } | null>(null);
 
   useEffect(() => {
     // S08 · PYG-610: กลับมาจากแบบประเมิน → จองต่อจาก draft เดิมที่ขั้นผู้รับบริการ (ไม่ล้างข้อมูลที่กรอกไว้)
+    // PYG-648: กลับจากหน้ารายชื่อผู้ดูแล → ขั้นตรวจสอบ ด้วย draft เดิม
     if (isBookingResumeState(location.state) && bookingDraft) {
-      goToStep(BOOKING_RESUME_STEP);
+      goToStep(location.state.resumeStep);
       return;
     }
+    // เริ่มจองใหม่ทับ draft ที่มี booking รอเลือกผู้ดูแลค้างอยู่ → ยกเลิกใบนั้น (เฉพาะถ้ายัง unmatched)
+    if (bookingDraft?.matchingBooking) void cancelMatchingBooking(bookingDraft.matchingBooking.id);
     resetBooking();
     // Launched from a family group's "จองแทนสมาชิก" / "จองแทนสมาชิกรายนี้": carry a lightweight
     // hint so step 4 opens in "book for a member" mode (and preselects the member when given).
@@ -150,6 +159,8 @@ export default function BookingRequestPage() {
   // เปลี่ยนขั้นแล้วเลื่อนกลับขึ้นบนสุดเสมอ (ทั้งปุ่มถัดไป ย้อนกลับ และแท็บขั้นตอน)
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    // ย้ายขั้นไปแก้แล้ว error ของการค้นหารอบก่อนไม่เกี่ยวแล้ว
+    setSearchError(null);
   }, [step]);
 
   const [isSearching, setIsSearching] = useState(false);
@@ -220,11 +231,21 @@ export default function BookingRequestPage() {
       (location.state as { groupBooking?: { groupId?: string } } | null)?.groupBooking?.groupId,
   );
 
+  // PYG-648 · S18: สร้าง booking แบบ unmatched ก่อน — รายชื่อผู้ดูแลกรองตามระดับ/ทักษะของ booking นั้น
+  // หน้าจอค้นหาแสดงอย่างน้อยเท่าเดิม (2.5 วิ) ระหว่างรอ BE
   const handleStartSearch = async () => {
     if (!bookingDraft) return;
+    setSearchError(null);
     setIsSearching(true);
-    await new Promise((resolve) => setTimeout(resolve, 2500));
+    const [result] = await Promise.all([
+      prepare(bookingDraft),
+      new Promise((resolve) => setTimeout(resolve, 2500)),
+    ]);
     setIsSearching(false);
+    if (!result.ok) {
+      setSearchError({ message: result.message, assessmentRequired: result.assessmentRequired });
+      return;
+    }
     navigate('/search');
   };
 
@@ -287,6 +308,28 @@ export default function BookingRequestPage() {
             {step === 2 && <BookingStepDateTime />}
             {step === 3 && <BookingStepLocation />}
             {step === 4 && <BookingStepPatient />}
+            {step === 5 && searchError && (
+              <div role="alert" className="bg-[#FEF2F2] border border-red-200 rounded-2xl p-4 flex items-start gap-3">
+                <span className="material-icons text-red-400 text-[20px]">error_outline</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-[#DC2626] font-semibold leading-snug break-words">
+                    {searchError.message}
+                  </p>
+                  {searchError.assessmentRequired && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = bookingAssessmentRedirect(bookingDraft?.recipient?.selectedRecipientId);
+                        navigate(target.to, { state: target.state });
+                      }}
+                      className="mt-3 inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-white border border-red-300 text-[#DC2626] text-[13px] font-bold hover:bg-red-50 transition-colors cursor-pointer"
+                    >
+                      {assessmentText.errorRequiredAction}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
             {step === 5 && <BookingStepReview onStartSearch={handleStartSearch} />}
           </div>
 

@@ -19,12 +19,9 @@ export interface CaregiverMatchStrings {
   emptyBody: string;
   editBooking: string;
 
-  // ช่องติดต่อแอดมิน — ข้อความปุ่มตามชนิดช่องทางใน adminContact (ช่องทางยังไม่เคาะ)
+  // ช่องติดต่อแอดมิน — ปุ่มใช้ label จาก adminContact · ค่านี้ใช้เมื่อ label ว่าง
   contact: string;
-  contactLine: string;
-  contactPhone: string;
-  contactForm: string;
-  /** ไม่มี adminContact หรือไม่มีลิงก์ → ข้อความแทนปุ่ม ยังบอกขั้นถัดไป */
+  /** ไม่มี adminContact → ข้อความแทนปุ่ม ยังบอกขั้นถัดไป */
   contactMissing: string;
 
   // โหลดไม่สำเร็จ
@@ -42,6 +39,13 @@ export interface CaregiverMatchStrings {
   notEligibleAction: string;
   notEligibleBanner: (name: string) => string;
   dismiss: string;
+
+  // ยืนยันเลือกผู้ดูแล (selectBookingCaregiver)
+  /** draft ไม่มี booking ที่รอเลือกผู้ดูแล — ต้องกดค้นหาจากขั้นตรวจสอบใหม่ */
+  noMatchingBooking: string;
+  /** BOOKING_NOT_SELECTABLE — เลือกไปแล้ว / ถูกยกเลิก */
+  notSelectable: string;
+  selectFailed: string;
 }
 
 const TH: CaregiverMatchStrings = {
@@ -53,9 +57,6 @@ const TH: CaregiverMatchStrings = {
   editBooking: 'กลับไปแก้รายละเอียดการจอง',
 
   contact: 'ติดต่อทีมงาน Payung',
-  contactLine: 'แชตกับทีมงานทาง LINE',
-  contactPhone: 'โทรหาทีมงาน',
-  contactForm: 'ให้ทีมงานติดต่อกลับ',
   contactMissing: 'ติดต่อทีมงาน Payung ได้ตามช่องทางที่แจ้งไว้ในแอป',
 
   errorTitle: 'โหลดรายชื่อผู้ดูแลไม่สำเร็จ',
@@ -70,6 +71,10 @@ const TH: CaregiverMatchStrings = {
   notEligibleAction: 'เลือกผู้ดูแลคนอื่น',
   notEligibleBanner: (name) => `อัปเดตรายชื่อแล้ว · ${name} รับงานนี้ไม่ได้แล้ว กรุณาเลือกผู้ดูแลคนอื่น`,
   dismiss: 'ปิด',
+
+  noMatchingBooking: 'ข้อมูลการจองไม่ครบ กรุณากลับไปที่หน้าการจองแล้วกด "เริ่มต้นค้นหาผู้ดูแล" อีกครั้ง',
+  notSelectable: 'การจองนี้เลือกผู้ดูแลไปแล้วหรือถูกยกเลิกแล้ว กรุณาตรวจสอบที่หน้า "การจองของฉัน"',
+  selectFailed: 'เลือกผู้ดูแลไม่สำเร็จ กรุณาตรวจสอบที่หน้า "การจองของฉัน" ก่อนลองใหม่ เพื่อไม่ให้จองซ้ำ',
 };
 
 const EN: CaregiverMatchStrings = {
@@ -81,9 +86,6 @@ const EN: CaregiverMatchStrings = {
   editBooking: 'Edit booking details',
 
   contact: 'Contact the Payung team',
-  contactLine: 'Chat with our team on LINE',
-  contactPhone: 'Call our team',
-  contactForm: 'Ask our team to call back',
   contactMissing: 'Contact the Payung team using the channels shown in the app.',
 
   errorTitle: 'Couldn’t load caregivers',
@@ -98,6 +100,10 @@ const EN: CaregiverMatchStrings = {
   notEligibleAction: 'Choose another caregiver',
   notEligibleBanner: (name) => `List updated · ${name} can no longer take this booking. Please choose another caregiver.`,
   dismiss: 'Dismiss',
+
+  noMatchingBooking: 'Your booking details are incomplete. Go back to the booking page and tap "Find caregivers" again.',
+  notSelectable: 'A caregiver has already been chosen for this booking, or it was cancelled. Please check "My bookings".',
+  selectFailed: 'Couldn’t choose this caregiver. Please check "My bookings" before trying again so you don’t book twice.',
 };
 
 export const CAREGIVER_MATCH_STRINGS = { th: TH, en: EN };

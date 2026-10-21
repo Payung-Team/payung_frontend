@@ -129,6 +129,16 @@ export interface BookingRequest {
     groupId: string;
     memberUserId?: string;
   };
+  /**
+   * PYG-648 · S18 — booking แบบ unmatched ที่สร้างตอนกด "เริ่มต้นค้นหาผู้ดูแล"
+   * รายชื่อผู้ดูแลกรองตามระดับ/ทักษะของ booking จริง จึงต้องสร้างก่อน แล้วค่อยเลือกผู้ดูแล
+   * `fingerprint` = payload ตอนสร้าง — draft เปลี่ยนแล้วกดค้นหาใหม่ → ยกเลิกใบเก่า สร้างใบใหม่
+   * ★ ยกเลิก/ใช้ซ้ำเฉพาะเมื่อใบนั้นยัง unmatched (เช็คกับ BE ก่อนทุกครั้ง) — เลือกผู้ดูแลแล้วคือการจองจริง
+   */
+  matchingBooking?: {
+    id: string;
+    fingerprint: string;
+  };
 }
 
 export interface SavedCaregiver {

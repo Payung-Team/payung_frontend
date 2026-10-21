@@ -44,12 +44,19 @@ export function assessmentPath(
  */
 export const BOOKING_RESUME_STEP = 4;
 
+/**
+ * PYG-648: กลับจากหน้ารายชื่อผู้ดูแล → ขั้นตรวจสอบ โดยไม่ล้าง draft
+ * (draft ผูกกับ booking ที่รอเลือกผู้ดูแลอยู่ — ล้างทิ้งแล้วกดค้นหาใหม่จะได้ booking ซ้ำ)
+ */
+export const BOOKING_REVIEW_STEP = 5;
+
 export interface BookingResumeState {
-  resumeStep: typeof BOOKING_RESUME_STEP;
+  resumeStep: typeof BOOKING_RESUME_STEP | typeof BOOKING_REVIEW_STEP;
 }
 
 export function isBookingResumeState(state: unknown): state is BookingResumeState {
-  return (state as { resumeStep?: unknown } | null)?.resumeStep === BOOKING_RESUME_STEP;
+  const step = (state as { resumeStep?: unknown } | null)?.resumeStep;
+  return step === BOOKING_RESUME_STEP || step === BOOKING_REVIEW_STEP;
 }
 
 /**

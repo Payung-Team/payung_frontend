@@ -19,10 +19,9 @@ const CARE_LEVEL_FIELD = "careLevel";
 
 /**
  * PYG-648 · S18: ระดับผู้ดูแลบนการ์ดในหน้ารายชื่อ (ญาติเห็นได้ · เคาะใน PYG-645)
- * ★ CaregiverSummary ยังไม่มี careLevel (BE PYG-647 ยังไม่ลง) — ขอ field ที่ไม่มีจะทำให้ query ทั้งก้อนพัง
- *   จึงเว้นว่างไว้ · BE ขึ้นแล้วเปลี่ยนเป็น "careLevel" ที่เดียว ป้ายระดับบนการ์ดขึ้นเอง
+ * CaregiverSummary.careLevel มาจาก BE แล้ว (PYG-647) — nullable เพราะ generic search ยังมีผู้ดูแล legacy ไม่มีระดับ
  */
-const SUMMARY_CARE_LEVEL_FIELD = "";
+const SUMMARY_CARE_LEVEL_FIELD = "careLevel";
 export const CARE_LEVEL_INFO_FIELDS = `
   caregiverId
   level
@@ -1133,6 +1132,62 @@ export const SEARCH_CAREGIVERS = gql`
         total
         totalPages
       }
+    }
+  }
+`;
+
+/**
+ * PYG-648 · S18: รายชื่อผู้ดูแลที่ผ่านครบ 4 เงื่อนไขของ booking (contract PYG-646)
+ * BE คืนทุกคนที่ผ่านในครั้งเดียว (ไม่มี pagination / ตัวกรอง) — หน้ารายชื่อกรอง เรียง แบ่งหน้าเอง
+ * ★ ไม่มี reasons / จำนวนคนที่ถูกตัดออกใน response โดยตั้งใจ (S18 R9)
+ */
+export const ELIGIBLE_CAREGIVERS = gql`
+  query EligibleCaregivers($bookingId: ID!) {
+    eligibleCaregivers(bookingId: $bookingId) {
+      caregivers {
+        id
+        fullName
+        avatarUrl
+        hourlyRate
+        avgRating
+        reviewCount
+        skills
+        ${CUSTOM_SKILLS_FIELD}
+        ${PROFESSION_FIELD}
+        ${SUMMARY_CARE_LEVEL_FIELD}
+        province
+        district
+        gender
+      }
+      emptyMessage
+      adminContact {
+        label
+        url
+      }
+    }
+  }
+`;
+
+/**
+ * PYG-648 · S18: ผูกผู้ดูแลกับ booking ที่สร้างไว้แบบ unmatched → pending (เจ้าของ booking เท่านั้น)
+ * BE ตรวจเงื่อนไข + ตารางว่างซ้ำใน transaction · ไม่ผ่าน = CAREGIVER_NOT_ELIGIBLE / BOOKING_NOT_SELECTABLE
+ */
+export const SELECT_BOOKING_CAREGIVER = gql`
+  mutation SelectBookingCaregiver($bookingId: ID!, $caregiverId: ID!) {
+    selectBookingCaregiver(bookingId: $bookingId, caregiverId: $caregiverId) {
+      bookingId
+      caregiverId
+      status
+    }
+  }
+`;
+
+/** PYG-648: สถานะล่าสุดของ booking ที่รอเลือกผู้ดูแล — เช็คก่อนยกเลิกใบที่ไม่ใช้แล้ว */
+export const MATCHING_BOOKING_STATUS = gql`
+  query MatchingBookingStatus($id: ID!) {
+    myBooking(id: $id) {
+      id
+      status
     }
   }
 `;

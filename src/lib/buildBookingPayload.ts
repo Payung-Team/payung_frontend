@@ -17,7 +17,11 @@ const SERVICE_TYPE_MAP: Record<string, string> = {
 };
 
 export interface BookingPayload {
-  caregiverId: string;
+  /**
+   * PYG-648 · S18 — ไม่ส่งแล้วในเส้นทางหลัก: สร้าง booking แบบ unmatched ก่อน แล้วเลือกผู้ดูแลด้วย
+   * selectBookingCaregiver (รายชื่อกรองตามระดับ/ทักษะได้ต้องมี booking ก่อน) · คงไว้ให้ type ของ BE ตรงกัน
+   */
+  caregiverId?: string;
   tasks: string[];
   serviceLocations: string[];
   serviceType: string;
@@ -54,7 +58,7 @@ export interface BookingPayload {
  */
 export function buildBookingPayload(
   draft: BookingRequest,
-  caregiverId: string,
+  caregiverId?: string,
 ): BookingPayload {
   const tasksList = [
     ...(draft.jobDetails?.tasks?.map((t) => t.name) ?? []),
@@ -114,5 +118,56 @@ export function buildBookingPayload(
     // POST /care-recipients แยกตอนจอง ไม่งั้นมีช่องที่โปรไฟล์ถูกสร้างสำเร็จแล้ว
     // booking พัง เหลือโปรไฟล์ค้างที่ผู้ใช้ไม่ได้ตั้งใจสร้าง แล้วกดจองใหม่ได้ซ้ำอีกใบ
     saveAsProfile: draft.recipient?.saveAsProfile ?? false,
+  };
+}
+
+/**
+ * PYG-385 — input ของ createBookingOnBehalf (จองแทนสมาชิกในกลุ่ม) จาก payload เดียวกัน
+ * เดิมคัดลอกไว้ทั้ง SearchPage + CaregiverProfilePage · ตอนนี้สร้าง booking ที่เดียว (useMatchingBooking)
+ */
+export function buildOnBehalfInput(
+  draft: BookingRequest,
+  onBehalf: NonNullable<BookingRequest['onBehalf']>,
+  payload: BookingPayload,
+) {
+  const pd = draft.recipient?.patientDetails;
+  const memberDetails = {
+    age: pd?.age,
+    gender: pd?.gender || undefined,
+    weight: pd?.weight,
+    height: pd?.height,
+    supportLevel: pd?.supportLevel || undefined,
+    bloodGroup: pd?.bloodGroup || undefined,
+    conditions: pd?.conditions?.length ? pd.conditions : undefined,
+    medicines: pd?.medicines || undefined,
+    allergies: pd?.allergies || undefined,
+    careInstructions: pd?.careInstructions || undefined,
+    regularHospital: pd?.regularHospital || undefined,
+  };
+  const hasDetails = Object.values(memberDetails).some((v) => v != null);
+  return {
+    groupId: onBehalf.familyGroupId,
+    // PYG-500: โมเดล "สมาชิก = patient" — ส่ง memberUserId (backend หา/สร้างโปรไฟล์ให้)
+    memberUserId: onBehalf.memberUserId,
+    careRecipientId: onBehalf.careRecipientId,
+    // ★ PYG-519: ไม่ส่ง patientName อีกแล้ว — ชื่อ-นามสกุลมาจากบัญชีของสมาชิกเสมอ
+    //   BE ปฏิเสธด้วย 400 PATIENT_NAME_NOT_ALLOWED ถ้าส่งมา (PYG-516)
+    caregiverId: payload.caregiverId,
+    tasks: payload.tasks,
+    activityIds: payload.activityIds,
+    serviceLocations: payload.serviceLocations,
+    serviceType: payload.serviceType,
+    // PYG-525: ส่งเวลาเริ่ม + สิ้นสุด — BE คำนวณ durationHours / timeSlot เอง
+    startTime: payload.startTime,
+    endTime: payload.endTime,
+    locationAddress: payload.locationAddress,
+    lat: payload.lat,
+    lng: payload.lng,
+    bookingDate: payload.bookingDate,
+    notes: payload.notes,
+    dayOfContactName: payload.dayOfContactName,
+    dayOfContactPhone: payload.dayOfContactPhone,
+    dayOfContactRelationship: payload.dayOfContactRelationship,
+    ...(hasDetails ? { memberDetails } : {}),
   };
 }

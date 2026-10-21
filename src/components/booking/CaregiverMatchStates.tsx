@@ -18,11 +18,9 @@ const SECONDARY =
   'inline-flex items-center justify-center h-11 px-[22px] w-full sm:w-auto rounded-xl bg-white border border-[#D5D8DB] ' +
   'hover:bg-gray-50 text-[#1A1A1A] text-[14px] font-bold whitespace-nowrap transition-colors cursor-pointer';
 
-const CONTACT_ICON: Record<string, string> = { LINE: 'chat', PHONE: 'call', FORM: 'edit_note' };
-
 /**
- * ช่องติดต่อแอดมิน — ขับด้วย adminContact จาก API (ช่องทางยังไม่เคาะ)
- * ชนิดที่ไม่รู้จักแต่มีลิงก์ → ปุ่มข้อความกลาง · ไม่มีลิงก์ → ข้อความแทนปุ่ม (ยังบอกขั้นถัดไป ไม่ซ่อนทั้งช่อง)
+ * ช่องติดต่อแอดมิน — ขับด้วย adminContact จาก API (BE ตั้งจาก MATCHING_ADMIN_CONTACT_URL)
+ * ไม่มี adminContact → ข้อความแทนปุ่ม (ยังบอกขั้นถัดไป ไม่ซ่อนทั้งช่อง)
  */
 export function AdminContactAction({ contact }: { contact?: AdminContact | null }) {
   const s = useCaregiverMatchStrings();
@@ -33,29 +31,20 @@ export function AdminContactAction({ contact }: { contact?: AdminContact | null 
       </p>
     );
   }
-  const channel = contact.channel.toUpperCase();
-  const label =
-    { LINE: s.contactLine, PHONE: s.contactPhone, FORM: s.contactForm }[channel] ?? s.contact;
-  const external = /^https?:/i.test(contact.url);
+  // BE รับเฉพาะ https: กับ tel: — tel: เปิดแอปโทรศัพท์ในแท็บเดิม
+  const isPhone = /^tel:/i.test(contact.url);
   return (
-    <span className="inline-flex flex-col items-stretch sm:items-start gap-1 w-full sm:w-auto">
-      <a
-        href={contact.url}
-        {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-        className={PRIMARY}
-        style={FONT}
-      >
-        <span className="material-icons-outlined text-[18px]" aria-hidden="true">
-          {CONTACT_ICON[channel] ?? 'support_agent'}
-        </span>
-        {label}
-      </a>
-      {contact.display && (
-        <span className="text-[12px] text-[#8A8C8E] text-center sm:text-left" style={FONT}>
-          {contact.display}
-        </span>
-      )}
-    </span>
+    <a
+      href={contact.url}
+      {...(isPhone ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+      className={PRIMARY}
+      style={FONT}
+    >
+      <span className="material-icons-outlined text-[18px]" aria-hidden="true">
+        {isPhone ? 'call' : 'support_agent'}
+      </span>
+      {contact.label || s.contact}
+    </a>
   );
 }
 

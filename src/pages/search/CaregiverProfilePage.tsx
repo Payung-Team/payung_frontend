@@ -1,34 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { useQuery, useMutation } from '@apollo/client/react';
+import { useQuery } from '@apollo/client/react';
 import { useBooking } from '../../context/BookingContext';
 import { CAREGIVER_REVIEWS } from '../../graphql/queries';
-import { CREATE_BOOKING_ON_BEHALF } from '../../graphql/familyGroup';
 import { RatingDistribution } from '../../components/ui/RatingDistribution';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 import BookingConfirmModal from '../../components/ui/BookingConfirmModal';
 import CaregiverPhoto from '../../components/ui/CaregiverPhoto';
 import { useSignedUrlRefresh } from '../../hooks/useSignedPhoto';
-import {
-  BOOKING_SESSION_EXPIRED_MESSAGE,
-  BOOKING_UNCONFIRMED_MESSAGE,
-  BOOKING_UNKNOWN_ERROR_MESSAGE,
-  bookingHttpErrorMessage,
-  isAssessmentRequiredError,
-  onBehalfBookingErrorMessage,
-} from '../../lib/bookingSubmitError';
-import { useAssessmentStrings } from '../../lib/assessmentStrings';
-import { bookingAssessmentRedirect } from '../../lib/assessmentNav';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
-import { supabase } from '../../lib/supabase';
-import { useDropRejectedActivities } from '../../hooks/useDropRejectedActivities';
-import { buildBookingPayload } from '../../lib/buildBookingPayload';
+import { useMatchingBooking } from '../../hooks/useMatchingBooking';
 import { formatDisplayPrice, hasDisplayPrice, NO_PRICE_LABEL } from '../../lib/displayPrice';
 import { skillLabel } from '../../lib/skillLabels';
 import { PROFESSIONS, isProfession } from '../../lib/professions';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
-import { isCaregiverNotEligibleError } from '../../lib/caregiverMatch';
 import { useCaregiverMatchStrings } from '../../lib/caregiverMatchStrings';
 import { useDrivingLicenseStrings } from '../../lib/drivingLicenseStrings';
 
@@ -261,19 +247,11 @@ const CaregiverProfilePage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
-  // S08: BE ตอบ ASSESSMENT_REQUIRED (จองปกติ) → modal แสดงปุ่ม "ทำแบบประเมิน"
-  const [assessmentRequired, setAssessmentRequired] = useState(false);
-  const assessmentText = useAssessmentStrings();
   // S18 · E9: ผู้ดูแลคนนี้ไม่ผ่านเงื่อนไขของ booking แล้ว → ปิดปุ่มยืนยัน พากลับไปเลือกจากรายชื่อใหม่
   const [notEligible, setNotEligible] = useState(false);
   const matchText = useCaregiverMatchStrings();
-  // PYG-385: family "จองแทน" path — same flow as SearchPage, only the submit call differs
-  // (GraphQL createBookingOnBehalf instead of the personal REST create). Without this branch a
-  // booking started in a family group and confirmed from the profile page is written with
-  // family_group_id = null, so it never appears in the group feed.
-  const [createOnBehalf] = useMutation(CREATE_BOOKING_ON_BEHALF);
-  // PYG-635: กิจกรรมถูกปิดใช้งานระหว่างจอง → ตัดออกจาก draft ให้กดยืนยันซ้ำได้เลย
-  const dropRejectedActivities = useDropRejectedActivities();
+  // PYG-648: booking (รวม PYG-385 จองแทนในกลุ่ม) ถูกสร้างตอนกดค้นหาแล้ว — หน้านี้แค่เลือกผู้ดูแล เหมือน SearchPage
+  const { select } = useMatchingBooking();
   const [avail, setAvail] = useState<boolean[][]>(EMPTY_AVAIL);
   const [completedBookingCount, setCompletedBookingCount] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -351,134 +329,22 @@ const CaregiverProfilePage: React.FC = () => {
     if (!cg || !bookingDraft) return;
     setIsSubmitting(true);
     setBookingError(null);
-    setAssessmentRequired(false);
     setNotEligible(false);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) {
-        setBookingError(BOOKING_SESSION_EXPIRED_MESSAGE);
+      const result = await select(bookingDraft, cg.id);
+      if (!result.ok) {
+        setNotEligible(result.notEligible);
+        setBookingError(result.message);
         return;
       }
-
-      // PYG-460 — payload สร้างที่ buildBookingPayload ที่เดียว ใช้ร่วมกับ SearchPage
-      // (เดิมโค้ดชุดนี้ถูกคัดลอกไว้สองที่ แก้ที่เดียวก็ยังผิดอีกที่)
-      const payload = buildBookingPayload(bookingDraft, cg.id);
-
-      // ── PYG-385: booking on behalf of a family-group member ──────────────────────
-      // Same payload, different endpoint: createBookingOnBehalf persists family_group_id +
-      // care_recipient_id + memberDetails, then the booker pays via the unchanged flow.
-      if (bookingDraft.onBehalf) {
-        const pd = bookingDraft.recipient?.patientDetails;
-        const memberDetails = {
-          age: pd?.age,
-          gender: pd?.gender || undefined,
-          weight: pd?.weight,
-          height: pd?.height,
-          supportLevel: pd?.supportLevel || undefined,
-          bloodGroup: pd?.bloodGroup || undefined,
-          conditions: pd?.conditions?.length ? pd.conditions : undefined,
-          medicines: pd?.medicines || undefined,
-          allergies: pd?.allergies || undefined,
-          careInstructions: pd?.careInstructions || undefined,
-          regularHospital: pd?.regularHospital || undefined,
-        };
-        const hasDetails = Object.values(memberDetails).some((v) => v != null);
-        try {
-          const { data } = await createOnBehalf({
-            variables: {
-              input: {
-                groupId: bookingDraft.onBehalf.familyGroupId,
-                // PYG-500: ส่ง memberUserId (backend หา/สร้างโปรไฟล์ในกลุ่มให้)
-                memberUserId: bookingDraft.onBehalf.memberUserId,
-                careRecipientId: bookingDraft.onBehalf.careRecipientId,
-                // ★ PYG-519: ไม่ส่ง patientName — ชื่อ-นามสกุลมาจากบัญชีของสมาชิกเสมอ
-                //   BE ปฏิเสธด้วย PATIENT_NAME_NOT_ALLOWED ถ้าส่งมา (PYG-516) · ต้องตรงกับ SearchPage
-                caregiverId: payload.caregiverId,
-                tasks: payload.tasks,
-                activityIds: payload.activityIds,
-                serviceLocations: payload.serviceLocations,
-                serviceType: payload.serviceType,
-                // PYG-525: ส่งเวลาเริ่ม + สิ้นสุด — BE คำนวณ durationHours / timeSlot เอง
-                startTime: payload.startTime,
-                endTime: payload.endTime,
-                locationAddress: payload.locationAddress,
-                lat: payload.lat,
-                lng: payload.lng,
-                bookingDate: payload.bookingDate,
-                notes: payload.notes,
-                dayOfContactName: payload.dayOfContactName,
-                dayOfContactPhone: payload.dayOfContactPhone,
-                dayOfContactRelationship: payload.dayOfContactRelationship,
-                ...(hasDetails ? { memberDetails } : {}),
-              },
-            },
-          });
-          const created = (data as { createBookingOnBehalf?: { id: string } } | null)
-            ?.createBookingOnBehalf;
-          if (!created?.id) {
-            setBookingError(BOOKING_UNCONFIRMED_MESSAGE);
-            return;
-          }
-          setBookingError(null);
-          setShowModal(false);
-          navigate('/booking/success', {
-            state: {
-              ref: created?.id,
-              caregiverName: cg.fullName,
-              onBehalfOf: bookingDraft.onBehalf.recipientName,
-            },
-          });
-        } catch (err) {
-          if (isCaregiverNotEligibleError(err)) {
-            setNotEligible(true);
-            setBookingError(matchText.notEligible);
-            return;
-          }
-          // PYG-540: อ่าน code แบบ Apollo 4 + รองรับ CONSENT_WITHDRAWN (ดู bookingSubmitError.ts)
-          dropRejectedActivities(err);
-          setBookingError(onBehalfBookingErrorMessage(err, bookingDraft.onBehalf.recipientName));
-        }
-        return;
-      }
-
-      const apiBase = import.meta.env.VITE_GRAPHQL_URL?.replace('/graphql', '') ?? '';
-      const res = await fetch(`${apiBase}/api/v1/bookings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => null);
-        if (isCaregiverNotEligibleError(errData)) {
-          setNotEligible(true);
-          setBookingError(matchText.notEligible);
-          return;
-        }
-        setAssessmentRequired(isAssessmentRequiredError(errData));
-        dropRejectedActivities(errData);
-        setBookingError(
-          bookingHttpErrorMessage(res.status, errData, bookingDraft.recipient?.patientDetails?.name),
-        );
-        return;
-      }
-
-      const data = await res.json().catch(() => null) as { id?: string } | null;
-      if (!data?.id) {
-        setBookingError(BOOKING_UNCONFIRMED_MESSAGE);
-        return;
-      }
-      setBookingError(null);
       setShowModal(false);
-      navigate('/booking/success', { state: { ref: data.id, caregiverName: cg.fullName } });
-    } catch (err) {
-      // ห้ามพาไปหน้าสำเร็จ — ไม่มีการยืนยันว่าจองได้จริง
-      console.error('Failed to create booking:', err);
-      setBookingError(BOOKING_UNKNOWN_ERROR_MESSAGE);
+      navigate('/booking/success', {
+        state: {
+          ref: result.bookingId,
+          caregiverName: cg.fullName,
+          ...(bookingDraft.onBehalf ? { onBehalfOf: bookingDraft.onBehalf.recipientName } : {}),
+        },
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -818,19 +684,7 @@ const CaregiverProfilePage: React.FC = () => {
         isSubmitting={isSubmitting}
         errorMessage={bookingError ?? undefined}
         confirmDisabled={notEligible}
-        errorAction={
-          notEligible
-            ? { label: matchText.notEligibleAction, onClick: backToListAfterNotEligible }
-            : assessmentRequired
-            ? {
-                label: assessmentText.errorRequiredAction,
-                onClick: () => {
-                  const target = bookingAssessmentRedirect(bookingDraft?.recipient?.selectedRecipientId);
-                  navigate(target.to, { state: target.state });
-                },
-              }
-            : undefined
-        }
+        errorAction={notEligible ? { label: matchText.notEligibleAction, onClick: backToListAfterNotEligible } : undefined}
         onPhotoExpired={refreshPhoto}
       />
       <ToastContainer
