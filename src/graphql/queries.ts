@@ -408,6 +408,11 @@ export const ADMIN_KYC_DETAIL = gql`
         kycSubmittedAt
         kycVerifiedAt
         resubmitCount
+        rejectionReasons {
+          title
+          detail
+          documentType
+        }
         createdAt
         updatedAt
       }
