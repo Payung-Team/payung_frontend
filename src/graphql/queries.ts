@@ -291,6 +291,19 @@ export const GET_KYC_STATUS = gql`
   }
 `;
 
+export const GET_PAYOUT_BANK_OPTIONS = gql`
+  query GetPayoutBankOptions {
+    payoutBankOptions {
+      code
+      nameTh
+      nameEn
+      minDigits
+      maxDigits
+      exactDigits
+    }
+  }
+`;
+
 export const UPDATE_PAYOUT_ACCOUNT = gql`
   mutation UpdatePayoutAccount($input: PayoutAccountInput!) {
     updatePayoutAccount(input: $input) {

@@ -1,24 +1,53 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery } from '@apollo/client/react';
 import { z } from 'zod';
 import { useKyc } from '../../../context/KycContext';
 import Input from '../../../components/ui/Input';
 import Icon from '../../../components/ui/Icon';
 import KycStepper from '../KycStepper';
-import { OMISE_BANK_OPTIONS, getBankLabel } from '../../../features/kyc/omiseBanks';
+import { GET_PAYOUT_BANK_OPTIONS } from '../../../graphql/queries';
+import {
+  DEFAULT_MAX_DIGITS,
+  DEFAULT_MIN_DIGITS,
+  OMISE_BANK_OPTIONS,
+  fromPayoutBankOptions,
+  getBankLabel,
+  validateAccountNumber,
+  type OmiseBankOption,
+} from '../../../features/kyc/omiseBanks';
 
-// ── Zod schema — ต้องตรงกับ backend PayoutAccountInput (@Matches /^\d{10}$/) ──
-const payoutSchema = z.object({
-  bankCode: z.string().min(1, 'กรุณาเลือกธนาคาร'),
-  accountNumber: z.string().regex(/^\d{10}$/, 'เลขบัญชีต้องเป็นตัวเลข 10 หลัก'),
-  accountName: z
-    .string()
-    .min(2, 'ชื่อบัญชีต้องมีอย่างน้อย 2 ตัวอักษร')
-    .max(100, 'ชื่อบัญชีต้องไม่เกิน 100 ตัวอักษร'),
-});
+type PayoutBankOptionsData = {
+  payoutBankOptions: {
+    code: string;
+    nameTh: string;
+    minDigits: number;
+    maxDigits: number;
+    exactDigits?: number[] | null;
+  }[];
+};
 
-type PayoutForm = z.infer<typeof payoutSchema>;
+// ── Zod schema — กฎความยาวเลขบัญชีขึ้นกับธนาคาร (มาจาก BE payoutBankOptions) ──
+// รับ getter แทน array ตรง ๆ เพราะ resolver ถูกสร้างครั้งเดียว แต่รายการธนาคารโหลดทีหลัง
+const makePayoutSchema = (getBanks: () => OmiseBankOption[]) =>
+  z
+    .object({
+      bankCode: z.string().min(1, 'กรุณาเลือกธนาคาร'),
+      accountNumber: z.string().min(1, 'กรุณากรอกเลขบัญชี'),
+      accountName: z
+        .string()
+        .min(2, 'ชื่อบัญชีต้องมีอย่างน้อย 2 ตัวอักษร')
+        .max(100, 'ชื่อบัญชีต้องไม่เกิน 100 ตัวอักษร'),
+    })
+    .superRefine((data, ctx) => {
+      if (!data.accountNumber) return;
+      const bankOption = getBanks().find((b) => b.code === data.bankCode);
+      const message = validateAccountNumber(bankOption, data.accountNumber);
+      if (message) ctx.addIssue({ code: 'custom', path: ['accountNumber'], message });
+    });
+
+type PayoutForm = z.infer<ReturnType<typeof makePayoutSchema>>;
 
 interface PayoutAccountFormProps {
   mode: 'create' | 'resubmit';
@@ -33,9 +62,20 @@ interface PayoutAccountFormProps {
  */
 export function PayoutAccountForm({ mode, onSubmit, onSkip, onCancelEdit }: PayoutAccountFormProps) {
   const [isConsented, setIsConsented] = useState(mode === 'resubmit');
+  // รายชื่อธนาคาร + กฎความยาวจาก BE · ระหว่างโหลด/ถ้า query ล้ม ใช้รายการสำรองฝั่ง FE
+  const { data: bankData } = useQuery<PayoutBankOptionsData>(GET_PAYOUT_BANK_OPTIONS);
+  const bankOptions = useMemo(
+    () => (bankData?.payoutBankOptions?.length ? fromPayoutBankOptions(bankData.payoutBankOptions) : OMISE_BANK_OPTIONS),
+    [bankData],
+  );
+  const bankOptionsRef = useRef(bankOptions);
+  bankOptionsRef.current = bankOptions;
+  const [payoutSchema] = useState(() => makePayoutSchema(() => bankOptionsRef.current));
+
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<PayoutForm>({
     resolver: zodResolver(payoutSchema),
@@ -45,6 +85,11 @@ export function PayoutAccountForm({ mode, onSubmit, onSkip, onCancelEdit }: Payo
   });
 
   const accountNumberReg = register('accountNumber');
+  const selectedBank = bankOptions.find((b) => b.code === watch('bankCode'));
+  const maxDigits = selectedBank?.maxDigits ?? DEFAULT_MAX_DIGITS;
+  const digitHint = selectedBank?.exactDigits?.length
+    ? `${selectedBank.exactDigits.join(' หรือ ')} หลัก`
+    : `${selectedBank?.minDigits ?? DEFAULT_MIN_DIGITS}–${maxDigits} หลัก`;
   const canSubmit = mode === 'resubmit' || isConsented;
 
   const submit = (data: PayoutForm) => {
@@ -68,7 +113,7 @@ export function PayoutAccountForm({ mode, onSubmit, onSkip, onCancelEdit }: Payo
             style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
           >
             <option value="" disabled>เลือกธนาคาร</option>
-            {OMISE_BANK_OPTIONS.map((bank) => (
+            {bankOptions.map((bank) => (
               <option key={bank.code} value={bank.code}>{bank.label}</option>
             ))}
           </select>
@@ -83,14 +128,14 @@ export function PayoutAccountForm({ mode, onSubmit, onSkip, onCancelEdit }: Payo
 
       {/* เลขบัญชี */}
       <Input
-        label="เลขบัญชีธนาคาร (10 หลัก)"
+        label={`เลขบัญชีธนาคาร (${digitHint})`}
         placeholder="1234567890"
         inputMode="numeric"
-        maxLength={10}
+        maxLength={maxDigits}
         error={errors.accountNumber?.message}
         {...accountNumberReg}
         onChange={(e) => {
-          e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+          e.target.value = e.target.value.replace(/\D/g, '').slice(0, maxDigits);
           accountNumberReg.onChange(e);
         }}
       />
