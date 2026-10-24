@@ -32,6 +32,7 @@ import {
 } from '../../graphql/consent';
 import { extractGraphQLErrorCode } from '../../lib/apolloErrors';
 import { SELF_RECIPIENT_ALIAS, assessmentPath } from '../../lib/assessmentNav';
+import { formatThaiPhone } from '../../lib/phone';
 
 const PhoneIcon = <Icon name="phone" size="small" color="currentColor" />;
 const LocationIcon = <Icon name="location_on" size="small" color="currentColor" />;
@@ -84,12 +85,9 @@ const PHONE_DIGITS_REGEX = /^0[0-9]{9}$/;
 const POSTAL_CODE_REGEX = /^[0-9]{5}$/;
 // const ADDRESS_MAX_LENGTH = 200;
 
-function formatPhone(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 10);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
-  return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`;
-}
+// PYG-688: ใช้รูปแบบเดียวกับหน้าล็อกอินด้วยเบอร์ (xxx-xxx-xxxx) — เดิมจัดเป็น 0x-xxxx-xxxx
+// formatThaiPhone แปลง +66 นำหน้าเป็น 0 ให้ด้วย (me.phone ของบัญชีที่สมัครด้วยเบอร์เป็น E.164)
+const formatPhone = formatThaiPhone;
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
@@ -436,8 +434,9 @@ export default function OnboardingPage() {
           inputMode="tel"
           value={phone}
           onChange={(e) => setPhone(formatPhone(e.target.value))}
-          placeholder="0X-XXXX-XXXX"
-          maxLength={12}
+          placeholder="0XX-XXX-XXXX"
+          // ยาวกว่ารูปแบบที่จัดแล้ว ให้วาง "+66 81-234-5678" ได้ทั้งก้อน (เหมือน PhoneInput)
+          maxLength={18}
           required
           error={submitted ? errors.phone : undefined}
           disabled={isSubmitting}
