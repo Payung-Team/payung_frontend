@@ -16,7 +16,7 @@ export interface ShiftStatusCardProps {
   recipientAvatarUrl?: string | null;
   /** PYG-460 — ใช้เฉพาะดึง "ประวัติแพ้ยา" ขึ้นมาโชว์ในการ์ด · รายละเอียดเต็มอยู่ในป๊อปอัปโปรไฟล์ */
   patientProfile?: PatientProfile | null;
-  /** รายได้สุทธิหลังหักค่าธรรมเนียม (ข้อความจัดรูปแล้ว) — ไม่ส่งมา = งานนี้ไม่มียอด */
+  /** รายได้ของงานนี้ (ข้อความจัดรูปแล้ว) — ไม่ส่งมา = งานนี้ไม่มียอด */
   netEarningsText?: string;
   /** true = ยอดโอนจริง · false = ประมาณการ (จะต่อท้ายว่า "ประมาณ") */
   netIsActual?: boolean;
@@ -163,7 +163,7 @@ export default function ShiftStatusCard({
               <>
                 <span aria-hidden="true" className="h-8 w-px bg-[#F0F1F3]" />
                 <Stat
-                  label={netIsActual ? 'รายได้สุทธิ' : 'รายได้สุทธิ (ประมาณ)'}
+                  label={netIsActual ? 'รายได้' : 'รายได้ (ประมาณ)'}
                   value={netEarningsText}
                   tone="money"
                 />
