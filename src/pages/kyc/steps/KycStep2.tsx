@@ -565,6 +565,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                       style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                     >
                       {title}
+                      {doc.required && <span className="text-red-600" aria-hidden="true"> *</span>}
                     </p>
                     <p
                       className={`text-[13px] leading-[16px] truncate ${

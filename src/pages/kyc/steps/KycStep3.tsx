@@ -102,11 +102,12 @@ export function PayoutAccountForm({ mode, onSubmit, onSkip, onCancelEdit }: Payo
       {/* ธนาคาร */}
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-          ธนาคาร
+          ธนาคาร <span className="text-red-600" aria-hidden="true">*</span>
         </label>
         <div className="relative flex items-center">
           <select
             {...register('bankCode')}
+            aria-required="true"
             className={`w-full px-3 py-2 border rounded-lg outline-none transition-colors text-sm appearance-none pr-10 ${
               errors.bankCode ? 'border-red-500' : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58]'
             }`}
@@ -128,7 +129,8 @@ export function PayoutAccountForm({ mode, onSubmit, onSkip, onCancelEdit }: Payo
 
       {/* เลขบัญชี */}
       <Input
-        label={`เลขบัญชีธนาคาร (${digitHint})`}
+        label={<>{`เลขบัญชีธนาคาร (${digitHint})`} <span className="text-red-600" aria-hidden="true">*</span></>}
+        aria-required="true"
         placeholder="1234567890"
         inputMode="numeric"
         maxLength={maxDigits}
@@ -143,9 +145,10 @@ export function PayoutAccountForm({ mode, onSubmit, onSkip, onCancelEdit }: Payo
       {/* ชื่อบัญชี */}
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-          ชื่อบัญชี
+          ชื่อบัญชี <span className="text-red-600" aria-hidden="true">*</span>
         </label>
         <Input
+          aria-required="true"
           placeholder="สมชาย ใจดี"
           error={errors.accountName?.message}
           {...register('accountName')}

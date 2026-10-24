@@ -36,8 +36,23 @@ function isValidThaiId(id: string): boolean {
   return (11 - (sum % 11)) % 10 === parseInt(id[12], 10);
 }
 
+// มือถือ 06/08/09 = 10 หลัก · กทม. 02 = 9 หลัก · ต่างจังหวัด 9–10 หลัก (BE รับ 9–10 หลัก)
 function isValidThaiPhone(phone: string): boolean {
-  return /^0[0-9]{8,9}$/.test(phone.replace(/-/g, ''));
+  const digits = phone.replace(/-/g, '');
+  if (/^0[689]/.test(digits)) return /^0[0-9]{9}$/.test(digits);
+  if (digits.startsWith('02')) return /^0[0-9]{8}$/.test(digits);
+  return /^0[0-9]{8,9}$/.test(digits);
+}
+
+/** จัดรูปแบบขณะพิมพ์: 081-234-5678 / 02-123-4567 / 053-123-456 */
+function formatThaiPhone(raw: string): string {
+  const all = raw.replace(/\D/g, '');
+  const isBangkok = all.startsWith('02');
+  const digits = all.slice(0, isBangkok ? 9 : 10);
+  const head = isBangkok ? 2 : 3;
+  return [digits.slice(0, head), digits.slice(head, head + 3), digits.slice(head + 3)]
+    .filter(Boolean)
+    .join('-');
 }
 
 // ── Zod schema ────────────────────────────────────────────────────────────
@@ -268,14 +283,16 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
           {/* ชื่อจริง - นามสกุล */}
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="ชื่อจริง"
+              label={<>ชื่อจริง <span className="text-red-600" aria-hidden="true">*</span></>}
+              aria-required="true"
               placeholder={mode === 'resubmit' ? initialStep1Data?.firstName : "สมชาย"}
               error={errors.firstName?.message}
               {...getFieldProps('firstName')}
               {...register('firstName')}
             />
             <Input
-              label="นามสกุล"
+              label={<>นามสกุล <span className="text-red-600" aria-hidden="true">*</span></>}
+              aria-required="true"
               placeholder={mode === 'resubmit' ? initialStep1Data?.lastName : "ใจดี"}
               error={errors.lastName?.message}
               {...getFieldProps('lastName')}
@@ -286,7 +303,8 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
           {/* เลขบัตรประชาชน — ตัวเลขเท่านั้น 13 หลัก */}
           <div>
             <Input
-              label="เลขบัตรประชาชน 13 หลัก"
+              label={<>เลขบัตรประชาชน 13 หลัก <span className="text-red-600" aria-hidden="true">*</span></>}
+              aria-required="true"
               placeholder={mode === 'resubmit' ? initialStep1Data?.idCardNumber : "1-2345-67890-12-3"}
               inputMode="numeric"
               maxLength={13}
@@ -305,12 +323,13 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
             <Input
               label={
                 <div className="flex justify-between items-center w-full">
-                  <span>วันเกิด</span>
+                  <span>วันเกิด <span className="text-red-600" aria-hidden="true">*</span></span>
                   {age !== null && age >= 0 && (
                     <span className="text-xs font-medium text-[#2D6A58]">อายุ {age} ปี</span>
                   )}
                 </div>
               }
+              aria-required="true"
               type="date"
               error={errors.birthDate?.message}
               {...getFieldProps('birthDate')}
@@ -318,10 +337,13 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
             />
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>เพศ</label>
+              <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                เพศ <span className="text-red-600" aria-hidden="true">*</span>
+              </label>
               <div className="relative flex items-center">
                 <select
                   {...register('gender')}
+                  aria-required="true"
                   className={`w-full px-3 py-2 border rounded-lg outline-none transition-colors text-sm appearance-none pr-10 ${
                     mode === 'resubmit'
                       ? checkEdited('gender')
@@ -352,22 +374,33 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
           <div className="grid grid-cols-2 gap-4">
             {/* เบอร์โทร — ตัวเลขและขีด */}
             <Input
-              label="เบอร์โทรศัพท์"
-              placeholder={mode === 'resubmit' ? initialStep1Data?.phone : "+66 81-234-5678"}
+              label={<>เบอร์โทรศัพท์ <span className="text-red-600" aria-hidden="true">*</span></>}
+              aria-required="true"
+              placeholder={mode === 'resubmit' ? initialStep1Data?.phone : "081-234-5678"}
               inputMode="tel"
               maxLength={12}
               error={errors.phone?.message}
               {...getFieldProps('phone')}
               {...phoneReg}
               onChange={(e) => {
-                e.target.value = e.target.value.replace(/[^0-9-]/g, '').slice(0, 12);
+                const input = e.target;
+                // คง caret ไว้หลังตัวเลขตัวเดิม — ไม่ให้กระโดดไปท้ายเมื่อแก้กลางเบอร์
+                const digitsBeforeCaret = input.value.slice(0, input.selectionStart ?? input.value.length).replace(/\D/g, '').length;
+                const formatted = formatThaiPhone(input.value);
+                input.value = formatted;
+                let caret = 0;
+                for (let seen = 0; caret < formatted.length && seen < digitsBeforeCaret; caret++) {
+                  if (/\d/.test(formatted[caret])) seen++;
+                }
+                input.setSelectionRange(caret, caret);
                 phoneReg.onChange(e);
               }}
             />
 
             {/* ประสบการณ์ — ตัวเลขเท่านั้น ไม่มี spinner */}
             <Input
-              label="ประสบการณ์ (ปี)"
+              label={<>ประสบการณ์ (ปี) <span className="text-red-600" aria-hidden="true">*</span></>}
+              aria-required="true"
               type="text"
               inputMode="numeric"
               placeholder={mode === 'resubmit' ? String(initialStep1Data?.experienceYears || 0) : "0"}
