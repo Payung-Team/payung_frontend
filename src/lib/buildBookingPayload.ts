@@ -7,14 +7,7 @@
 import type { BookingRequest } from '../context/BookingContext';
 import { toPatientProfilePayload } from './patientProfile';
 import type { PatientProfile } from './patientProfile';
-
-const SERVICE_TYPE_MAP: Record<string, string> = {
-  'ดูแลทั่วไป': 'general_care',
-  'ดูแลผู้ป่วยติดเตียง': 'bedridden_care',
-  'กายภาพบำบัด': 'physiotherapy',
-  'ช่วยจัดการยา': 'medication',
-  'เป็นเพื่อน/พูดคุย': 'companion',
-};
+import { bookingServiceType } from './bookingServiceType';
 
 export interface BookingPayload {
   /**
@@ -88,7 +81,8 @@ export function buildBookingPayload(
     caregiverId,
     tasks: tasksList.length > 0 ? tasksList : ['ดูแลทั่วไป'],
     serviceLocations: serviceLocs.length > 0 ? serviceLocs : ['at_home'],
-    serviceType: SERVICE_TYPE_MAP[draft.serviceTypes?.[0] ?? ''] ?? 'general_care',
+    // PYG-694: ตัวเดียวกับที่ฟอร์มจองใช้คิดราคาประมาณการ (bookingPrice) — ห้ามคิดแยก
+    serviceType: bookingServiceType(draft.serviceTypes),
     // ★ ไม่เติมค่าเริ่มต้นเอง (เดิม '09:00:00' / 4 ชม.) — ขั้นวันเวลาบังคับเลือกครบก่อนไปต่อแล้ว
     //   ถ้ายังว่างอยู่ให้ BE ปฏิเสธพร้อมข้อความ ดีกว่าจองเวลาที่ผู้ใช้ไม่ได้เลือกไปเงียบ ๆ
     startTime: draft.dateTime?.startTime ?? '',

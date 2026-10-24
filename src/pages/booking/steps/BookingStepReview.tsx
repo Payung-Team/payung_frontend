@@ -5,6 +5,7 @@ import {
   ESTIMATED_PLATFORM_FEE_PERCENT as PLATFORM_FEE_PERCENT,
   estimateBookingCost,
 } from '../../../lib/bookingPrice';
+import { bookingServiceType } from '../../../lib/bookingServiceType';
 import { useCareActivityStrings } from '../../../lib/careActivityStrings';
 import BookingActivitiesList from '../../../components/booking/BookingActivitiesList';
 
@@ -140,7 +141,7 @@ export default function BookingStepReview({ onStartSearch }: Props) {
     serviceCost: caregiverCost,
     platformFee,
     total: totalCost,
-  } = estimateBookingCost(durationVal);
+  } = estimateBookingCost(durationVal, bookingServiceType(bookingDraft?.serviceTypes));
 
   return (
     <div className="space-y-4">
