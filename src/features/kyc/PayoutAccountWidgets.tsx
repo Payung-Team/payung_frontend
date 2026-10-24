@@ -109,7 +109,7 @@ export function PayoutAccountModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
       <div className="fixed inset-0 -z-10" onClick={onClose} />
-      <div className="w-full max-w-[520px] bg-white rounded-2xl shadow-2xl p-8" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+      <div className="w-full max-w-[520px] max-h-[calc(100vh-32px)] overflow-y-auto bg-white rounded-2xl shadow-2xl p-5 sm:p-8" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
         <h2 className="text-xl font-bold text-[#0F172A] mb-1">บัญชีรับเงิน</h2>
         <p className="text-sm text-[#64748B] mb-6">ใช้สำหรับโอนค่าตอบแทนหลังทำงานเสร็จ</p>
         {errorMsg && (

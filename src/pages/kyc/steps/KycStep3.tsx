@@ -102,11 +102,12 @@ export function PayoutAccountForm({ mode, onSubmit, onSkip, onCancelEdit }: Payo
       {/* ธนาคาร */}
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-          ธนาคาร
+          ธนาคาร <span className="text-red-600" aria-hidden="true">*</span>
         </label>
         <div className="relative flex items-center">
           <select
             {...register('bankCode')}
+            aria-required="true"
             className={`w-full px-3 py-2 border rounded-lg outline-none transition-colors text-sm appearance-none pr-10 ${
               errors.bankCode ? 'border-red-500' : 'border-gray-300 focus:border-[#2D6A58] focus:ring-1 focus:ring-[#2D6A58]'
             }`}
@@ -128,7 +129,8 @@ export function PayoutAccountForm({ mode, onSubmit, onSkip, onCancelEdit }: Payo
 
       {/* เลขบัญชี */}
       <Input
-        label={`เลขบัญชีธนาคาร (${digitHint})`}
+        label={<>{`เลขบัญชีธนาคาร (${digitHint})`} <span className="text-red-600" aria-hidden="true">*</span></>}
+        aria-required="true"
         placeholder="1234567890"
         inputMode="numeric"
         maxLength={maxDigits}
@@ -143,9 +145,10 @@ export function PayoutAccountForm({ mode, onSubmit, onSkip, onCancelEdit }: Payo
       {/* ชื่อบัญชี */}
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-gray-700" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
-          ชื่อบัญชี
+          ชื่อบัญชี <span className="text-red-600" aria-hidden="true">*</span>
         </label>
         <Input
+          aria-required="true"
           placeholder="สมชาย ใจดี"
           error={errors.accountName?.message}
           {...register('accountName')}
@@ -179,9 +182,9 @@ export function PayoutAccountForm({ mode, onSubmit, onSkip, onCancelEdit }: Payo
         </button>
       )}
 
-      {/* Actions */}
-      <div className="flex justify-between items-center pt-2">
-        <div className="flex items-center gap-3">
+      {/* Actions — มือถือ: ปุ่มบันทึกเต็มความกว้างอยู่บน ปุ่มรองอยู่ล่าง */}
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between sm:items-center pt-2">
+        <div className="flex items-center justify-center sm:justify-start gap-3">
           {onCancelEdit && (
             <button
               type="button"
@@ -206,7 +209,7 @@ export function PayoutAccountForm({ mode, onSubmit, onSkip, onCancelEdit }: Payo
         <button
           type="submit"
           disabled={!canSubmit}
-          className={`px-8 py-2.5 rounded-lg text-white text-sm font-bold active:scale-[0.98] transition-all duration-150 ${
+          className={`w-full sm:w-auto px-8 py-2.5 rounded-lg text-white text-sm font-bold active:scale-[0.98] transition-all duration-150 ${
             canSubmit ? 'bg-[#2D6A58] hover:bg-[#255a4a] cursor-pointer' : 'bg-gray-400 cursor-not-allowed'
           }`}
           style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
@@ -241,26 +244,26 @@ export default function KycStep3({ mode = 'create' }: { mode?: 'create' | 'resub
   };
 
   return (
-    <div className={mode === 'resubmit' ? '' : 'min-h-[calc(100vh-64px)] bg-[#F2F4F6] flex items-center justify-center px-4 py-10'}>
+    <div className={mode === 'resubmit' ? '' : 'min-h-[calc(100vh-64px)] bg-[#F2F4F6] flex items-center justify-center px-4 py-6 sm:py-10'}>
       <div
-        className={mode === 'resubmit' ? 'w-full flex flex-col gap-5' : 'w-full max-w-[780px] bg-white rounded-3xl border border-[#F1F5F9] px-12 py-10'}
+        className={mode === 'resubmit' ? 'w-full flex flex-col gap-5' : 'w-full max-w-[780px] bg-white rounded-2xl sm:rounded-3xl border border-[#F1F5F9] px-5 py-6 sm:px-12 sm:py-10'}
         style={mode === 'resubmit' ? {} : {
           boxShadow: '0 12px 28px -6px rgba(15,23,43,0.06), 0 1px 2px 0 rgba(15,23,43,0.04)',
         }}
       >
         <KycStepper current={3} />
 
-        <h2 className="text-2xl font-bold text-[#0A0A0A] mb-1" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+        <h2 className="text-xl sm:text-2xl font-bold text-[#0A0A0A] mb-1" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           บัญชีรับเงิน
         </h2>
-        <p className="text-sm text-[#717182] mb-8" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+        <p className="text-sm text-[#717182] mb-6 sm:mb-8" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           ใช้สำหรับโอนค่าตอบแทนหลังทำงานเสร็จ (ไม่บังคับ — เพิ่มทีหลังได้)
         </p>
 
         {!isEditing && initialPayoutData ? (
           <div className="flex flex-col gap-4">
-            <div className="border border-[#E2E8F0] rounded-xl p-5 flex justify-between items-center">
-              <div>
+            <div className="border border-[#E2E8F0] rounded-xl p-4 sm:p-5 flex flex-wrap justify-between items-center gap-3">
+              <div className="min-w-0">
                 <p className="text-[15px] font-semibold text-[#0F172A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
                   {getBankLabel(initialPayoutData.bankCode)} •••• {initialPayoutData.accountNumberLast4}
                 </p>

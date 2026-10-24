@@ -12,9 +12,9 @@ export default function KycSuccess() {
   }).replace(' พ.ศ.', '');
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-[#F8F9FB] flex items-center justify-center p-12">
+    <div className="min-h-[calc(100vh-64px)] bg-[#F8F9FB] flex items-center justify-center p-4 sm:p-12">
       <div
-        className="w-full max-w-[720px] bg-white rounded-[24px] border border-[#F1F5F9] p-16 flex flex-col items-center justify-center gap-8"
+        className="w-full max-w-[720px] bg-white rounded-[20px] sm:rounded-[24px] border border-[#F1F5F9] px-5 py-10 sm:p-16 flex flex-col items-center justify-center gap-8"
         style={{
           boxShadow: '0px 12px 28px -6px rgba(15, 23, 43, 0.06), 0px 1px 2px rgba(15, 23, 43, 0.04)',
         }}
@@ -28,8 +28,8 @@ export default function KycSuccess() {
         </div>
 
         {/* Text Coverage */}
-        <div className="flex flex-col items-center gap-2.5 text-center px-8">
-          <h1 className="text-[32px] font-bold text-[#0F172A] leading-[42px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+        <div className="flex flex-col items-center gap-2.5 text-center sm:px-8">
+          <h1 className="text-[26px] leading-[34px] sm:text-[32px] sm:leading-[42px] font-bold text-[#0F172A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
             ส่งข้อมูลเรียบร้อย
           </h1>
           <p className="text-[16px] text-[#64748B] leading-[24px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
@@ -38,7 +38,7 @@ export default function KycSuccess() {
         </div>
 
         {/* Status Badge */}
-        <div className="bg-[#FFEDD5] border border-[#F97316] rounded-xl px-5 py-3.5 flex items-center gap-3">
+        <div className="bg-[#FFEDD5] border border-[#F97316] rounded-xl px-4 sm:px-5 py-3.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
           <div className="w-2.5 h-2.5 bg-[#F97316] rounded-full" />
           <span className="text-[14px] font-semibold text-[#9A4311]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
             สถานะ: รอยันยืน

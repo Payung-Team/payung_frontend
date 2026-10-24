@@ -7,6 +7,7 @@ import {
   defaultBookingEndTime,
 } from '../../../lib/bookingTime';
 import { estimateBookingCost } from '../../../lib/bookingPrice';
+import { bookingServiceType } from '../../../lib/bookingServiceType';
 
 // PYG-525 (การ์ดแม่ PYG-490): เลือกแค่ "วันที่ + เวลาเริ่ม + เวลาสิ้นสุด"
 //   เลิกให้เลือกช่วงเช้า/บ่าย/เย็น และจำนวนชั่วโมงเอง — BE อนุมาน timeSlot และคำนวณ durationHours
@@ -113,7 +114,7 @@ export default function BookingStepDateTime() {
   const startValid = startOptions.includes(startTime);
   const endValid = startValid && endOptions.includes(endTime);
   const duration = endValid ? bookingDurationHours(startTime, endTime) : 0;
-  const cost = estimateBookingCost(duration);
+  const cost = estimateBookingCost(duration, bookingServiceType(bookingDraft?.serviceTypes));
 
   // Auto-save — duration เก็บเฉพาะเมื่อเวลาครบและถูกกฎ (sidebar ใช้แสดงราคา)
   useEffect(() => {
