@@ -9,6 +9,7 @@ import {
   UPDATE_EMAIL_PREFERENCE,
 } from '../../graphql/queries';
 import { supabase } from '../../lib/supabase';
+import { logGraphQLError } from '../../lib/logGraphQLError';
 import { useNavigate } from 'react-router-dom';
 import type {
   NotificationItem,
@@ -108,7 +109,7 @@ export default function NotificationsPage({
         setHasMore(next.length === PAGE_SIZE);
       } catch (err) {
         // Stop paging so the load-more observer doesn't retry a failing query forever.
-        console.error('Failed to load notifications', err);
+        logGraphQLError('LoadNotifications', err);
         setHasMore(false);
       } finally {
         loadingRef.current = false;

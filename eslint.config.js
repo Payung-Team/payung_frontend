@@ -19,5 +19,9 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // PYG-700: debug log ห้ามเข้า repo — เหลือได้แค่ warn/error ที่ช่วยตรวจปัญหา (ห้ามใส่ token/ข้อมูลส่วนบุคคล)
+      'no-console': ['error', { allow: ['warn', 'error'] }],
+    },
   },
 ])
