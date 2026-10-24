@@ -5,6 +5,7 @@ import AuthLayout from '../../components/layout/AuthLayout';
 import AuthInput from '../../components/ui/AuthInput';
 import { Icon } from '../../components/ui/Icon';
 import { REQUEST_PASSWORD_RESET } from '../../graphql/queries';
+import { emailError as getEmailError, normalizeEmail } from '../../lib/email';
 
 const MailIcon = <Icon name="mail" size="small" color="currentColor" />;
 
@@ -41,9 +42,8 @@ export default function ForgotPassword() {
   });
 
   const validateEmail = useCallback((): string => {
-    if (!email.trim()) return 'กรุณากรอกอีเมล';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'กรุณากรอกอีเมลให้ถูกต้อง';
-    return '';
+    // PYG-708: กติกาเดียวกับ BE @ValidAppEmail — src/lib/email.ts
+    return getEmailError(email);
   }, [email]);
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function ForgotPassword() {
     setEmailError(err);
     setSubmitted(true);
     if (err) return;
-    await requestReset({ variables: { email } });
+    await requestReset({ variables: { email: normalizeEmail(email) } });
   };
 
   return (

@@ -12,6 +12,7 @@ import PhoneOtpStep from '../../components/auth/PhoneOtpStep';
 import { PHONE_AUTH_ERROR } from '../../graphql/phoneAuth';
 import { usePhoneAuth } from '../../hooks/usePhoneAuth';
 import { PHONE_AUTH_ENABLED } from '../../lib/phone';
+import { emailError, normalizeEmail } from '../../lib/email';
 import { usePhoneAuthStrings } from '../../lib/phoneAuthStrings';
 import { Icon } from '../../components/ui/Icon';
 import { supabase } from '../../lib/supabase';
@@ -267,11 +268,9 @@ export default function Register() {
 
   const validate = useCallback((): FormErrors => {
     const errs: FormErrors = {};
-    if (!email.trim()) {
-      errs.email = 'กรุณากรอกอีเมล';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errs.email = 'กรุณากรอกอีเมลที่ถูกต้อง';
-    }
+    // PYG-708: กติกาเดียวกับ BE @ValidAppEmail — src/lib/email.ts
+    const emailErr = emailError(email);
+    if (emailErr) errs.email = emailErr;
     if (!password) {
       errs.password = 'กรุณากรอกรหัสผ่าน';
     } else if (password.length < 8) {
@@ -329,7 +328,7 @@ export default function Register() {
     setConsentError('');
 
     const result = await registerUser({
-      email,
+      email: normalizeEmail(email),
       password,
       role: ROLE_MAP[selectedRole],
       // ★ ส่งคำตอบของทุกข้อที่แสดง รวมข้อที่ไม่ติ๊ก (granted: false)

@@ -6,6 +6,7 @@ import { GET_MY_BOOKING, CREATE_PAYMENT, GET_PAYMENT_BY_BOOKING } from '../../gr
 import { mapGqlStatus } from '../../utils/bookingStatus';
 import { loadOmiseJs } from '../../lib/omise-loader';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
+import { EMAIL_FORMAT_MESSAGE, isValidEmail } from '../../lib/email';
 import CaregiverPhoto from '../../components/ui/CaregiverPhoto';
 import { useSignedUrlRefresh } from '../../hooks/useSignedPhoto';
 import { formatBookingTimeRange, formatDurationHours } from '../../lib/bookingTime';
@@ -352,6 +353,7 @@ export default function PaymentPage() {
 
     if (method === 'card') {
       if (!email.trim())                              { setPayError('กรุณากรอกอีเมลรับใบเสร็จ'); return; }
+      if (!isValidEmail(email))                       { setPayError(EMAIL_FORMAT_MESSAGE); return; }
       if (cardNumber.replace(/\s/g, '').length < 16) { setPayError('กรุณากรอกหมายเลขบัตรให้ครบ 16 หลัก'); return; }
       if (!cardName.trim())                           { setPayError('กรุณากรอกชื่อบนบัตร'); return; }
       if (expiry.length < 5)                          { setPayError('กรุณากรอกวันหมดอายุในรูปแบบ MM/YY'); return; }
