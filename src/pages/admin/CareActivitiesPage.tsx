@@ -348,6 +348,40 @@ export default function CareActivitiesPage() {
   const [formTarget, setFormTarget] = useState<CareActivity | 'new' | null>(null);
   const [toggleTarget, setToggleTarget] = useState<CareActivity | null>(null);
 
+  // ใช้ทั้งตาราง (md+) และการ์ดมือถือ
+  const statusBadge = (a: CareActivity) => (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold ${
+        a.isActive ? 'bg-[#ECFDF5] text-[#047857]' : 'bg-[#F1F5F9] text-[#64748B]'
+      }`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${a.isActive ? 'bg-[#10B981]' : 'bg-[#94A3B8]'}`} aria-hidden="true" />
+      {a.isActive ? s.statusActive : s.statusInactive}
+    </span>
+  );
+  const rowActions = (a: CareActivity) => (
+    <>
+      <button
+        type="button"
+        onClick={() => setFormTarget(a)}
+        className="mr-2 cursor-pointer rounded border border-[#D1D5DB] px-3 py-1 text-[13px] font-medium text-[#334155] hover:bg-gray-50"
+      >
+        {s.edit}
+      </button>
+      <button
+        type="button"
+        onClick={() => setToggleTarget(a)}
+        className={`cursor-pointer rounded border px-3 py-1 text-[13px] font-medium ${
+          a.isActive
+            ? 'border-[#DC2626] text-[#DC2626] hover:bg-red-50'
+            : 'border-[#059669] text-[#059669] hover:bg-[#ECFDF5]'
+        }`}
+      >
+        {a.isActive ? s.deactivate : s.activate}
+      </button>
+    </>
+  );
+
   const all = useMemo(() => data?.adminCareActivities ?? [], [data]);
   const categories = useMemo(() => [...new Set(all.map((a) => a.category))].sort((a, b) => a.localeCompare(b, 'th')), [all]);
 
@@ -476,7 +510,32 @@ export default function CareActivitiesPage() {
           <p className="text-[15px] font-semibold text-[#334155]">{filtered ? s.emptyFiltered : s.emptyAll}</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+        <div className="@container overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+          {/* กล่องแคบกว่า 48rem (ตารางต้องการ ~760px): การ์ดต่อกิจกรรม — ดูความกว้างกล่อง ไม่ใช่ความกว้างจอ */}
+          <ul className="divide-y divide-[#F1F5F9] @3xl:hidden">
+            {rows.map((a) => (
+              <li key={a.id} className={`space-y-2 px-4 py-3.5 text-[14px] ${a.isActive ? '' : 'bg-[#FAFAFA] text-[#94A3B8]'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className={`font-semibold ${a.isActive ? 'text-[#0F172A]' : ''}`}>{a.nameTh}</div>
+                    {(a.nameEn || a.code) && (
+                      <div className="text-[12px] text-[#94A3B8]">{[a.code, a.nameEn].filter(Boolean).join(' · ')}</div>
+                    )}
+                  </div>
+                  {statusBadge(a)}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[#64748B]">
+                  <span>{a.category}</span>
+                  <CareLevelBadge level={a.careLevel} />
+                  <span className="tabular-nums">
+                    {s.colOrder} {a.sortOrder}
+                  </span>
+                </div>
+                <div className="flex justify-end pt-1">{rowActions(a)}</div>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto @3xl:block">
           <table className="w-full min-w-[760px] text-left text-[14px]">
             <thead className="bg-[#F8FAFC] text-[12.5px] font-semibold text-[#64748B]">
               <tr>
@@ -506,43 +565,13 @@ export default function CareActivitiesPage() {
                     <CareLevelBadge level={a.careLevel} />
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{a.sortOrder}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold ${
-                        a.isActive ? 'bg-[#ECFDF5] text-[#047857]' : 'bg-[#F1F5F9] text-[#64748B]'
-                      }`}
-                    >
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${a.isActive ? 'bg-[#10B981]' : 'bg-[#94A3B8]'}`}
-                        aria-hidden="true"
-                      />
-                      {a.isActive ? s.statusActive : s.statusInactive}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setFormTarget(a)}
-                      className="mr-2 cursor-pointer rounded border border-[#D1D5DB] px-3 py-1 text-[13px] font-medium text-[#334155] hover:bg-gray-50"
-                    >
-                      {s.edit}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setToggleTarget(a)}
-                      className={`cursor-pointer rounded border px-3 py-1 text-[13px] font-medium ${
-                        a.isActive
-                          ? 'border-[#DC2626] text-[#DC2626] hover:bg-red-50'
-                          : 'border-[#059669] text-[#059669] hover:bg-[#ECFDF5]'
-                      }`}
-                    >
-                      {a.isActive ? s.deactivate : s.activate}
-                    </button>
-                  </td>
+                  <td className="px-4 py-3">{statusBadge(a)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right">{rowActions(a)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
           <p className="border-t border-[#F1F5F9] px-4 py-2 text-[12.5px] text-[#64748B]">{s.count(rows.length)}</p>
         </div>
       )}
