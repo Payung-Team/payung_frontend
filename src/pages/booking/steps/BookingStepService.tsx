@@ -7,6 +7,12 @@ import { MY_FAMILY_GROUPS, type FamilyGroup } from '../../../graphql/familyGroup
 import type { ServicePackage } from '../../../graphql/servicePackages';
 import RecommendedPackages from '../../../components/booking/RecommendedPackages';
 import { usePackageTarget } from '../../../components/booking/usePackageTarget';
+import { hourlyRateFor } from '../../../lib/bookingPrice';
+import {
+  PHYSIOTHERAPY_SERVICE_TYPE,
+  SERVICE_TYPE_MAP,
+  bookingServiceType,
+} from '../../../lib/bookingServiceType';
 import BookingMemberPicker from './BookingMemberPicker';
 
 const LOC_OPTIONS = [
@@ -301,6 +307,13 @@ export default function BookingStepService() {
   //   จึงส่งเฉพาะตอนเลือกอยู่บริการเดียว (หลายบริการ = ไม่มี "ประเภทที่เลือก" ค่าเดียว → flag เป็น null)
   const singleSelected = selectedServices.length === 1 ? selectedServices[0] : null;
 
+  // PYG-696: มีกายภาพในบริการที่ติ๊ก → จองเป็นกายภาพทั้งใบ · ใช้ helper เดียวกับ payload/ราคา
+  //   กล่องแจ้งจึงขึ้นตรงกับสิ่งที่ส่งไป BE เสมอ
+  const physioWholeBooking = bookingServiceType(selectedServices) === PHYSIOTHERAPY_SERVICE_TYPE;
+  const servicesInPhysioPrice = selectedServices.filter(
+    (name) => SERVICE_TYPE_MAP[name] !== PHYSIOTHERAPY_SERVICE_TYPE,
+  );
+
   return (
     <div className="space-y-4">
       {/* Error banner */}
@@ -404,6 +417,27 @@ export default function BookingStepService() {
             );
           })}
         </div>
+        {physioWholeBooking && (
+          <div
+            role="status"
+            className="mt-3 flex items-start gap-2.5 p-3 bg-[#F0FAF4] border border-[#BFE0D6] rounded-lg"
+          >
+            <span className="material-icons text-[#52B69A]" style={{ fontSize: 20 }}>
+              info
+            </span>
+            <div className="text-xs text-[#1B5C48] leading-relaxed">
+              <div className="text-sm font-bold">
+                คิดราคากายภาพ {hourlyRateFor(PHYSIOTHERAPY_SERVICE_TYPE).toLocaleString()} ฿/ชม.
+                ทั้งการจอง
+              </div>
+              <div className="mt-0.5">
+                {servicesInPhysioPrice.length > 0
+                  ? `${servicesInPhysioPrice.join(', ')} คิดรวมในราคานี้ และระบบจะจับคู่เฉพาะนักกายภาพบำบัด`
+                  : 'ระบบจะจับคู่เฉพาะนักกายภาพบำบัด'}
+              </div>
+            </div>
+          </div>
+        )}
         {isAccompanyOnly && selectedServices.includes('ดูแลผู้ป่วยติดเตียง') && (
           <p className="mt-3 text-xs text-[#6B5A21] bg-[#FDF6E3] border border-[#E8D9A8] rounded-lg p-3 leading-relaxed">
             "ดูแลผู้ป่วยติดเตียง" ใช้ได้เฉพาะงานที่มีการดูแลที่บ้าน — เลือก "ที่บ้านผู้ป่วย" หรือ
