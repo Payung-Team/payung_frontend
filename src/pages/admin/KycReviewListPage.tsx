@@ -296,11 +296,13 @@ export default function KycReviewListPage() {
     () => [
       {
         key: 'caregiverNumber',
+        mobile: 'subtitle',
         header: 'เลขประจำตัว',
         render: (item) => <div className="text-gray-900">{item.caregiverNumber || item.id.substring(0, 8)}</div>,
       },
       {
         key: 'fullName',
+        mobile: 'title',
         header: 'ชื่อผู้ดูแล',
         render: (item) => (
           <div className="flex min-w-0 items-center gap-3">
@@ -315,24 +317,28 @@ export default function KycReviewListPage() {
       },
       {
         key: 'email',
+        mobile: 'subtitle',
         header: 'อีเมล',
         className: 'truncate text-gray-500',
         render: (item) => item.email || '—',
       },
       {
         key: 'submittedAt',
+        mobile: 'meta',
         header: 'วันที่สมัคร',
         className: 'text-gray-500',
         render: (item) => formatSubmittedDate(item.submittedAt),
       },
       {
         key: 'kycStatus',
+        mobile: 'badge',
         header: 'สถานะ',
         render: (item) => renderKycStatusBadge(item.kycStatus),
       },
       {
         // PYG-557 · S02-E3: แอดมินแยกได้ว่าใครยังได้ค่าเริ่มต้นจาก migration และยังไม่ทบทวน
         key: 'careLevel',
+        mobile: 'badge',
         header: careLevelStrings.listColumn,
         align: 'center',
         render: (item) =>
@@ -351,6 +357,7 @@ export default function KycReviewListPage() {
       },
       {
         key: 'documentCount',
+        mobile: 'meta',
         header: 'จำนวนเอกสาร',
         align: 'center',
         className: 'text-gray-600',
@@ -358,6 +365,7 @@ export default function KycReviewListPage() {
       },
       {
         key: 'actions',
+        mobile: 'action',
         header: 'การจัดการ',
         align: 'center',
         render: (item) => (
@@ -378,11 +386,13 @@ export default function KycReviewListPage() {
     () => [
       {
         key: 'caregiverNumber',
+        mobile: 'subtitle',
         header: 'เลขประจำตัว',
         render: (item) => <div className="text-gray-900">{item.caregiverNumber || item.caregiverId.substring(0, 8)}</div>,
       },
       {
         key: 'fullName',
+        mobile: 'title',
         header: 'ชื่อผู้ดูแล',
         render: (item) => (
           <div className="flex min-w-0 items-center gap-3">
@@ -397,18 +407,21 @@ export default function KycReviewListPage() {
       },
       {
         key: 'email',
+        mobile: 'subtitle',
         header: 'อีเมล',
         className: 'truncate text-gray-500',
         render: (item) => item.email || '—',
       },
       {
         key: 'uploadedAt',
+        mobile: 'meta',
         header: 'อัปโหลดเมื่อ',
         className: 'text-gray-500',
         render: (item) => formatSubmittedDate(item.uploadedAt),
       },
       {
         key: 'requestType',
+        mobile: 'badge',
         header: 'ประเภทคำขอ',
         render: (item) =>
           item.hasApprovedPhoto ? (
@@ -419,11 +432,13 @@ export default function KycReviewListPage() {
       },
       {
         key: 'kycStatus',
+        mobile: 'badge',
         header: 'สถานะ KYC',
         render: (item) => renderKycStatusBadge(item.kycStatus),
       },
       {
         key: 'actions',
+        mobile: 'action',
         header: 'การจัดการ',
         render: (item) => (
           <button
@@ -446,12 +461,14 @@ export default function KycReviewListPage() {
       photoColumns[1],
       {
         key: 'reviewedAt',
+        mobile: 'meta',
         header: 'ตัดสินเมื่อ',
         className: 'text-gray-500',
         render: (item) => formatSubmittedDate(item.reviewedAt),
       },
       {
         key: 'reviewStatus',
+        mobile: 'badge',
         header: 'ผลรีวิว',
         render: (item) => (
           <div className="flex flex-wrap items-center gap-1.5">
@@ -468,12 +485,14 @@ export default function KycReviewListPage() {
       },
       {
         key: 'reviewerName',
+        mobile: 'meta',
         header: 'ผู้ตรวจ',
         className: 'truncate text-gray-600',
         render: (item) => item.reviewerName || '-',
       },
       {
         key: 'reason',
+        mobile: 'meta',
         header: 'เหตุผล',
         render: (item) => (
           <div className="truncate text-gray-600" title={item.reason ?? undefined}>
@@ -483,6 +502,7 @@ export default function KycReviewListPage() {
       },
       {
         key: 'actions',
+        mobile: 'action',
         header: 'การจัดการ',
         render: (item) => (
           <button

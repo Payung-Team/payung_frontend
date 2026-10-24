@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 
 export interface DataTableColumn<TItem> {
@@ -8,6 +8,12 @@ export interface DataTableColumn<TItem> {
   className?: string;
   /** จัดแนวหัวคอลัมน์และเนื้อหาให้ตรงกันเสมอ (default: left) */
   align?: 'left' | 'center' | 'right';
+  /**
+   * บทบาทในมุมมองการ์ด (กล่องแคบกว่าตาราง) — ไม่ระบุ = 'meta'
+   * title: บรรทัดหลัก (ชื่อ) · subtitle: บรรทัดรองสีเทา (รหัส/อีเมล) · badge: แถวป้ายสถานะ
+   * meta: "หัวคอลัมน์ ค่า" ตัวเล็ก · action: ปุ่มเต็มความกว้างท้ายการ์ด · hidden: ไม่แสดงในการ์ด
+   */
+  mobile?: 'title' | 'subtitle' | 'badge' | 'meta' | 'action' | 'hidden';
 }
 
 // badge/ปุ่มในตารางเป็น inline-flex → text-align คุมตำแหน่งได้ทั้ง text และ element
@@ -67,9 +73,6 @@ function useFitsWidth(required: number) {
   return { ref, fits };
 }
 
-function isEmptyHeader(header: ReactNode): boolean {
-  return header == null || header === false || (typeof header === 'string' && header.trim() === '');
-}
 
 export default function DataTable<TItem>({
   columns,
@@ -135,26 +138,12 @@ export default function DataTable<TItem>({
       ) : state !== undefined ? (
         state
       ) : (
-        // กล่องแคบกว่าตาราง: แถวละการ์ด "หัวคอลัมน์ : ค่า" · กล่องกว้าง ≥ 36rem วางเป็น 2 คอลัมน์
-        // คอลัมน์ที่ไม่มีหัว (ปุ่มจัดการ) อยู่ท้ายการ์ดเต็มความกว้าง
-        <ul className="divide-y divide-gray-100">
+        // กล่องแคบกว่าตาราง: การ์ดต่อแถว เรียงตามความสำคัญ (ชื่อ → รหัส/อีเมล → ป้าย → รายละเอียด → ปุ่ม)
+        // กล่องกว้าง ≥ 42rem วางการ์ด 2 ใบต่อแถว
+        <ul className="grid grid-cols-1 gap-3 bg-[#F9FAFB] p-3 @2xl:grid-cols-2">
           {items.map((item, index) => (
-            <li
-              key={getRowKey(item)}
-              className="grid grid-cols-1 gap-x-8 gap-y-2 px-4 py-3.5 text-sm @xl:grid-cols-2 @xl:px-5"
-            >
-              {columns.map((column) =>
-                isEmptyHeader(column.header) ? (
-                  <div key={column.key} className={cn('flex justify-end pt-1 @xl:col-span-2', column.className)}>
-                    {column.render(item, index)}
-                  </div>
-                ) : (
-                  <div key={column.key} className="flex min-w-0 items-start justify-between gap-3">
-                    <span className="shrink-0 pt-0.5 text-xs text-gray-500">{column.header}</span>
-                    <div className={cn('min-w-0 text-right', column.className)}>{column.render(item, index)}</div>
-                  </div>
-                ),
-              )}
+            <li key={getRowKey(item)}>
+              <DataCard columns={columns} item={item} index={index} />
             </li>
           ))}
         </ul>
@@ -162,5 +151,64 @@ export default function DataTable<TItem>({
 
       {footer}
     </div>
+  );
+}
+
+function DataCard<TItem>({ columns, item, index }: { columns: DataTableColumn<TItem>[]; item: TItem; index: number }) {
+  const role = (c: DataTableColumn<TItem>) => c.mobile ?? 'meta';
+  const pick = (r: NonNullable<DataTableColumn<TItem>['mobile']>) => columns.filter((c) => role(c) === r);
+  const titles = pick('title');
+  const subtitles = pick('subtitle');
+  const badges = pick('badge');
+  const metas = pick('meta');
+  const actions = pick('action');
+
+  return (
+    <article className="flex h-full flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      {(titles.length > 0 || subtitles.length > 0) && (
+        <div className="min-w-0 space-y-1">
+          {titles.map((c) => (
+            <div key={c.key} className="min-w-0 text-[15px] font-semibold text-gray-900">
+              {c.render(item, index)}
+            </div>
+          ))}
+          {subtitles.map((c) => (
+            <div
+              key={c.key}
+              className="min-w-0 truncate text-xs text-gray-500 [&_*]:text-xs [&_*]:font-normal [&_*]:text-gray-500"
+            >
+              {c.render(item, index)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {badges.length > 0 && (
+        <div className="flex flex-wrap items-start gap-2">
+          {badges.map((c) => (
+            <div key={c.key}>{c.render(item, index)}</div>
+          ))}
+        </div>
+      )}
+
+      {metas.length > 0 && (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-gray-100 pt-3">
+          {metas.map((c) => (
+            <div key={c.key} className="min-w-0">
+              <dt className="text-[11px] text-gray-400">{c.header}</dt>
+              <dd className="min-w-0 truncate text-sm text-gray-700">{c.render(item, index)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {actions.length > 0 && (
+        <div className="mt-auto flex flex-wrap justify-end gap-2 [&>button]:h-10 [&>button]:w-full [&>button]:justify-center [&>button]:text-sm">
+          {actions.map((c) => (
+            <Fragment key={c.key}>{c.render(item, index)}</Fragment>
+          ))}
+        </div>
+      )}
+    </article>
   );
 }
