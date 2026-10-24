@@ -24,19 +24,22 @@ export function nationalDigits(value: string | null | undefined): string {
   return digits.slice(0, PHONE_DIGITS);
 }
 
-/** "0812345678" → "081 234 5678" (รับค่าที่ยังพิมพ์ไม่ครบได้) */
+/**
+ * "0812345678" → "081-234-5678" (รับค่าที่ยังพิมพ์ไม่ครบได้)
+ * PYG-688: ทั้งแอปใช้รูปแบบ xxx-xxx-xxxx เหมือนกันหมด (หน้า Onboarding, ล็อกอินด้วยเบอร์, โปรไฟล์)
+ */
 export function formatThaiPhone(value: string | null | undefined): string {
   const digits = nationalDigits(value);
   if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)} ${digits.slice(3)}`;
-  return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
-/** "0812345678" → "081 XXX 5678" — ใช้ในหน้ากรอกรหัส ไม่โชว์เบอร์เต็ม */
+/** "0812345678" → "081-XXX-5678" — ใช้ในหน้ากรอกรหัส ไม่โชว์เบอร์เต็ม */
 export function maskThaiPhone(value: string | null | undefined): string {
   const digits = nationalDigits(value);
   if (digits.length < PHONE_DIGITS) return formatThaiPhone(digits);
-  return `${digits.slice(0, 3)} XXX ${digits.slice(-4)}`;
+  return `${digits.slice(0, 3)}-XXX-${digits.slice(-4)}`;
 }
 
 /** "0812345678" → "+66812345678" — รูปแบบที่ส่งให้ API */
