@@ -235,10 +235,10 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
       : null;
 
   return (
-    <div className={mode === 'resubmit' ? '' : 'min-h-[calc(100vh-64px)] bg-[#F8F9FB] flex flex-col items-center py-12 px-4 gap-10'}>
+    <div className={mode === 'resubmit' ? '' : 'min-h-[calc(100vh-64px)] bg-[#F8F9FB] flex flex-col items-center py-6 sm:py-12 px-4 gap-10'}>
 
       <div
-        className={mode === 'resubmit' ? 'w-full flex flex-col gap-6' : 'w-full max-w-[720px] bg-white rounded-[20px] border border-[#F1F5F9] p-12 flex flex-col gap-6'}
+        className={mode === 'resubmit' ? 'w-full flex flex-col gap-6' : 'w-full max-w-[720px] bg-white rounded-[20px] border border-[#F1F5F9] px-5 py-6 sm:p-12 flex flex-col gap-5 sm:gap-6'}
         style={mode === 'resubmit' ? {} : {
           boxShadow: '0px 12px 28px -6px rgba(15, 23, 43, 0.06), 0px 1px 2px rgba(15, 23, 43, 0.04)',
         }}
@@ -249,7 +249,7 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
           {mode !== 'resubmit' && (
             <>
               <h2
-                className="text-2xl font-bold text-[#0F172A] leading-[30px]"
+                className="text-xl sm:text-2xl font-bold text-[#0F172A] leading-[30px]"
                 style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
               >
                 ตรวจสอบข้อมูล
@@ -558,7 +558,7 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
               type="button"
               disabled={(mode !== 'resubmit' && !isConsented) || loading}
               onClick={handleSubmit}
-              className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-150 flex items-center justify-center gap-2 ${(mode === 'resubmit' || isConsented) && !loading
+              className={`px-6 sm:px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-150 flex items-center justify-center gap-2 ${(mode === 'resubmit' || isConsented) && !loading
                   ? 'bg-[#2D6A58] text-white hover:bg-[#255a4a] active:scale-[0.98] cursor-pointer'
                   : 'bg-[#CBD5E1] text-white cursor-not-allowed'
                 }`}
@@ -580,11 +580,11 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
 
 function InfoRow({ label, value, border = true }: { label: string; value: string; border?: boolean }) {
   return (
-    <div className={`flex justify-between items-center py-2.5 ${border ? 'border-b border-[#F1F5F9]' : ''}`}>
-      <span className="text-[13px] font-medium text-[#64748B]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+    <div className={`flex justify-between items-center gap-4 py-2.5 ${border ? 'border-b border-[#F1F5F9]' : ''}`}>
+      <span className="shrink-0 text-[13px] font-medium text-[#64748B]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
         {label}
       </span>
-      <span className="text-[14px] font-semibold text-[#1E293B]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+      <span className="min-w-0 text-right break-words text-[14px] font-semibold text-[#1E293B]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
         {value}
       </span>
     </div>
@@ -620,11 +620,11 @@ function DocRow({ label, file, border = true }: { label: string; file?: { fileNa
   const isImage = file?.fileName.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i) || file?.previewUrl.includes('token=') || file?.previewUrl.includes('signedURL=');
 
   return (
-    <div className={`flex justify-between items-center py-2.5 ${border ? 'border-b border-[#F1F5F9]' : ''}`}>
-      <span className="text-[13px] font-medium text-[#64748B]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+    <div className={`flex justify-between items-center gap-3 py-2.5 ${border ? 'border-b border-[#F1F5F9]' : ''}`}>
+      <span className="min-w-0 text-[13px] font-medium text-[#64748B]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
         {label}
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         {file ? (
           <div className="flex items-center gap-2 overflow-hidden bg-[#F1F5F9] rounded-lg px-2.5 py-1.5 min-w-[102px]">
             {isImage ? (
@@ -634,7 +634,7 @@ function DocRow({ label, file, border = true }: { label: string; file?: { fileNa
                 <Icon name="check" color="white" style={{ fontSize: '14px' }} />
               </div>
             )}
-            <span className="text-[13px] font-medium text-[#334055] truncate max-w-[150px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+            <span className="text-[13px] font-medium text-[#334055] truncate max-w-[110px] sm:max-w-[150px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
               {file.fileName}
             </span>
           </div>

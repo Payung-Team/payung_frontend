@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { GET_KYC_STATUS } from '../../../graphql/queries';
@@ -50,8 +50,8 @@ function DocumentItem({ doc, onPreview }: DocumentItemProps) {
   };
 
   return (
-    <div className="flex items-center justify-between p-4 bg-white border border-[#F1F5F9] rounded-xl hover:shadow-sm transition-shadow">
-      <div className="flex items-center gap-3">
+    <div className="flex items-center justify-between gap-3 p-3 sm:p-4 bg-white border border-[#F1F5F9] rounded-xl hover:shadow-sm transition-shadow">
+      <div className="flex items-center gap-3 min-w-0">
         {/* Thumbnail or Icon */}
         <div className="w-10 h-10 rounded-lg bg-[#F8FAFC] flex items-center justify-center flex-shrink-0 overflow-hidden border border-[#E2E8F0]">
           {isPdf ? (
@@ -75,10 +75,10 @@ function DocumentItem({ doc, onPreview }: DocumentItemProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={handleView}
-          className="flex items-center gap-2 px-4 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-[13px] font-semibold text-[#475569] hover:bg-[#F8FAFC] hover:border-[#CBD5E1] transition-all cursor-pointer group"
+          className="flex items-center gap-2 px-3 sm:px-4 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-[13px] font-semibold text-[#475569] hover:bg-[#F8FAFC] hover:border-[#CBD5E1] transition-all cursor-pointer group"
           title={isPdf ? "เปิด PDF" : "ดูรูปภาพ"}
         >
           <Icon name="visibility" size="small" color="#64748B" className="group-hover:text-[#0F172A] transition-colors" />
@@ -104,6 +104,27 @@ function BenefitItem({ text }: { text: string }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────
 
+const SIGNED_URL_REFRESH_MS = 30 * 60 * 1000;
+const MIN_REFRESH_VISIBLE_MS = 600;
+
+/** คลุมการ์ดสถานะระหว่างดึงข้อมูลใหม่ — เนื้อหาเดิมยังเห็นจาง ๆ ด้านหลัง */
+function RefreshingOverlay() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="absolute inset-0 z-20 flex justify-center rounded-[inherit] bg-white/75 backdrop-blur-[2px]"
+    >
+      <div className="mt-24 flex h-fit flex-col items-center gap-3 rounded-2xl bg-white px-6 py-5 shadow-[0px_12px_28px_-6px_rgba(15,23,43,0.12)] border border-[#F1F5F9]">
+        <div className="h-11 w-11 animate-spin rounded-full border-4 border-[#E0F6F1] border-t-[#0F766E]" />
+        <span className="text-[14px] font-semibold text-[#334055]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+          กำลังอัปเดตสถานะ...
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function KycStatusPage() {
   const navigate = useNavigate();
   const { data, loading, error, refetch } = useQuery<any>(GET_KYC_STATUS, {
@@ -111,13 +132,41 @@ export default function KycStatusPage() {
     notifyOnNetworkStatusChange: true,
   });
 
-  // Refetch signed URLs ทุกครั้งที่ผู้ใช้กลับมาที่ tab/window นี้
-  // (ป้องกัน signed URL หมดอายุเมื่อเปิด tab ทิ้งไว้นาน)
+  // กลับมาที่ tab/window หลังทิ้งไว้นาน → ดึงใหม่เงียบ ๆ ให้ signed URL ไม่หมดอายุ (FE เซ็นใหม่อายุ 1 ชม.)
+  // ไม่ดึงทุกครั้งที่ focus — สลับแอป/ปิดจอแป๊บเดียวแล้วหน้ากระพริบเป็น skeleton
+  const lastFetchedAt = useRef(Date.now());
   useEffect(() => {
-    const handleFocus = () => refetch();
+    if (data) lastFetchedAt.current = Date.now();
+  }, [data]);
+  useEffect(() => {
+    const handleFocus = () => {
+      if (Date.now() - lastFetchedAt.current <= SIGNED_URL_REFRESH_MS) return;
+      // ตั้งเวลาเองด้วย — ข้อมูลไม่เปลี่ยน Apollo อาจคืน object เดิม effect ด้านบนจะไม่ทำงาน
+      lastFetchedAt.current = Date.now();
+      refetch();
+    };
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [refetch]);
+
+  // overlay ระหว่างดึงใหม่ (มีข้อมูลเดิมอยู่แล้ว) · ค้างไว้อย่างน้อย MIN_REFRESH_VISIBLE_MS ไม่ให้แวบหายจนมองไม่ทัน
+  const refreshing = loading && !!data;
+  const [showRefreshing, setShowRefreshing] = useState(false);
+  const refreshStartedAt = useRef(0);
+  useEffect(() => {
+    if (refreshing) {
+      refreshStartedAt.current = Date.now();
+      setShowRefreshing(true);
+      return;
+    }
+    const remaining = MIN_REFRESH_VISIBLE_MS - (Date.now() - refreshStartedAt.current);
+    if (remaining <= 0) {
+      setShowRefreshing(false);
+      return;
+    }
+    const t = setTimeout(() => setShowRefreshing(false), remaining);
+    return () => clearTimeout(t);
+  }, [refreshing]);
 
   // Preview State
   const [preview, setPreview] = useState<{ isOpen: boolean; url: string; name: string }>({
@@ -221,7 +270,8 @@ export default function KycStatusPage() {
     return `${day} ${month} ${year} • ${time}`;
   };
 
-  if (loading) {
+  // skeleton เฉพาะโหลดครั้งแรก — refetch ภายหลังคงหน้าเดิมไว้ระหว่างรอ
+  if (loading && !data) {
     return (
       <div className="min-h-[calc(100vh-64px)] bg-[#F8F9FB] px-4 py-8" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
         <div className="max-w-2xl mx-auto space-y-5">
@@ -282,11 +332,12 @@ export default function KycStatusPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-[#F8F9FB] flex flex-col items-center py-12 px-4 md:px-0">
+    <div className="min-h-[calc(100vh-64px)] bg-[#F8F9FB] flex flex-col items-center py-6 sm:py-12 px-4 md:px-0">
 
       {/* PENDING STATE */}
       {status === 'pending' && (
-        <div className="w-full max-w-[720px] bg-white rounded-[20px] border border-[#F1F5F9] p-8 md:p-12 flex flex-col items-center gap-8 shadow-[0px_12px_28px_-6px_rgba(15,23,43,0.06),0px_1px_2px_rgba(15,23,43,0.04)]">
+        <div className="relative w-full max-w-[720px] bg-white rounded-[20px] border border-[#F1F5F9] px-5 py-8 sm:p-8 md:p-12 flex flex-col items-center gap-6 sm:gap-8 shadow-[0px_12px_28px_-6px_rgba(15,23,43,0.06),0px_1px_2px_rgba(15,23,43,0.04)]">
+          {showRefreshing && <RefreshingOverlay />}
           {/* Status Icon */}
           <div className="relative w-24 h-24 flex items-center justify-center">
             <div className="absolute inset-0 bg-[#FFF5DC] rounded-full"></div>
@@ -297,10 +348,10 @@ export default function KycStatusPage() {
 
           {/* Title & Desc */}
           <div className="text-center space-y-2.5">
-            <h1 className="text-[30px] font-bold text-[#0F172A] leading-tight" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+            <h1 className="text-[24px] sm:text-[30px] font-bold text-[#0F172A] leading-tight" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
               กำลังตรวจสอบข้อมูล
             </h1>
-            <p className="max-w-[560px] text-[16px] text-[#64748B] leading-relaxed" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+            <p className="max-w-[560px] text-[14px] sm:text-[16px] text-[#64748B] leading-relaxed" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
               เราได้รับข้อมูลเรียบร้อย ทีมงานจะใช้เวลาประมาณ 1–2 วันทำการ <br /> เราจะแจ้งผลผ่านอีเมลทันทีที่ตรวจสอบเสร็จ
             </p>
           </div>
@@ -376,11 +427,16 @@ export default function KycStatusPage() {
           {/* Actions */}
           <div className="pt-4">
             <button
-              onClick={() => refetch()}
-              className="flex items-center justify-center gap-2 px-7 py-3 bg-white border border-[#CBD5E1] rounded-xl text-[#334055] font-semibold hover:bg-[#F8FAFC] transition-colors w-full sm:w-[180px] cursor-pointer"
+              onClick={() => {
+                // ผลใหม่อยู่ที่หัวการ์ด (สถานะ/ไทม์ไลน์) — พาขึ้นไปดูทันที
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                refetch();
+              }}
+              disabled={showRefreshing}
+              className="flex items-center justify-center gap-2 px-7 py-3 bg-white border border-[#CBD5E1] rounded-xl text-[#334055] font-semibold hover:bg-[#F8FAFC] transition-colors w-full sm:w-[180px] cursor-pointer disabled:cursor-wait disabled:opacity-70"
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
             >
-              <Icon name="refresh" color="currentColor" style={{ fontSize: '18px' }} />
+              <Icon name="refresh" color="currentColor" className={showRefreshing ? 'animate-spin' : ''} style={{ fontSize: '18px' }} />
               รีเฟรชสถานะ
             </button>
           </div>
@@ -397,7 +453,8 @@ export default function KycStatusPage() {
 
       {/* VERIFIED STATE */}
       {status === 'verified' && (
-        <div className="w-full max-w-[520px] bg-white rounded-[24px] p-10 flex flex-col items-center shadow-[0px_20px_40px_rgba(0,0,0,0.1)] relative">
+        <div className="w-full max-w-[520px] bg-white rounded-[20px] sm:rounded-[24px] px-5 py-8 sm:p-10 flex flex-col items-center shadow-[0px_20px_40px_rgba(0,0,0,0.1)] relative">
+          {showRefreshing && <RefreshingOverlay />}
 
           {/* Icon Halo */}
           <div className="relative mb-8">
@@ -448,7 +505,7 @@ export default function KycStatusPage() {
           </div>
 
           {/* Status Pill */}
-          <div className="flex items-center gap-2.5 bg-[#FEF2F2] border border-[#DCFCE7] rounded-xl px-3.5 py-2.5 mb-8">
+          <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 bg-[#FEF2F2] border border-[#DCFCE7] rounded-xl px-3.5 py-2.5 mb-8">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 bg-[#16A34A] rounded-full"></span>
               <span className="text-[12px] font-bold text-[#16A34A]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>สถานะ: ยืนยันแล้ว</span>
@@ -474,7 +531,7 @@ export default function KycStatusPage() {
           {/* Actions */}
           <div className="w-full space-y-4">
             <button
-              onClick={() => navigate('/caregiver/availability')}
+              onClick={() => navigate('/caregiver/settings/job-reception')}
               className="w-full h-[52px] bg-[#0D9488] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-[#0B7A70] transition-all cursor-pointer"
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
             >
@@ -496,7 +553,8 @@ export default function KycStatusPage() {
 
       {/* REJECTED STATE */}
       {status === 'rejected' && (
-        <div className="w-full max-w-[520px] bg-white rounded-[24px] p-10 flex flex-col items-center shadow-[0px_20px_40px_rgba(0,0,0,0.1)] relative">
+        <div className="w-full max-w-[520px] bg-white rounded-[20px] sm:rounded-[24px] px-5 py-8 sm:p-10 flex flex-col items-center shadow-[0px_20px_40px_rgba(0,0,0,0.1)] relative">
+          {showRefreshing && <RefreshingOverlay />}
 
           {/* Icon Halo (Pencil/Edit) */}
           <div className="relative mb-10 mt-2">
@@ -538,7 +596,7 @@ export default function KycStatusPage() {
           />
 
           {/* Actions */}
-          <div className="w-full flex gap-3">
+          <div className="w-full flex flex-col-reverse sm:flex-row gap-3">
             <button
               onClick={() => window.open('_blank')}
               className="flex-1 h-[52px] bg-white border border-[#0D9488] text-[#0D9488] text-[15px] font-bold rounded-[14px] flex items-center justify-center hover:bg-[#F0FDFA] transition-all cursor-pointer"

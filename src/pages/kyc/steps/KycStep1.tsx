@@ -260,9 +260,9 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
   const expReg = register('experienceYears');
 
   return (
-    <div className={mode === 'resubmit' ? '' : 'min-h-[calc(100vh-64px)] bg-[#F2F4F6] flex items-center justify-center px-4 py-10'}>
+    <div className={mode === 'resubmit' ? '' : 'min-h-[calc(100vh-64px)] bg-[#F2F4F6] flex items-center justify-center px-4 py-6 sm:py-10'}>
       <div
-        className={mode === 'resubmit' ? 'w-full flex flex-col gap-5' : 'w-full max-w-[780px] bg-white rounded-3xl border border-[#F1F5F9] px-12 py-10'}
+        className={mode === 'resubmit' ? 'w-full flex flex-col gap-5' : 'w-full max-w-[780px] bg-white rounded-2xl sm:rounded-3xl border border-[#F1F5F9] px-5 py-6 sm:px-12 sm:py-10'}
         style={mode === 'resubmit' ? {} : {
           boxShadow: '0 12px 28px -6px rgba(15,23,43,0.06), 0 1px 2px 0 rgba(15,23,43,0.04)',
         }}
@@ -270,18 +270,18 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
         <KycStepper current={1} />
 
         <h2
-          className="text-2xl font-bold text-[#0A0A0A] mb-1"
+          className="text-xl sm:text-2xl font-bold text-[#0A0A0A] mb-1"
           style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
         >
           ข้อมูลส่วนตัว
         </h2>
-        <p className="text-sm text-[#717182] mb-8" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+        <p className="text-sm text-[#717182] mb-6 sm:mb-8" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
           กรอกข้อมูลให้ตรงกับบัตรประชาชนของคุณ
         </p>
 
         <form onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate className="flex flex-col gap-5">
           {/* ชื่อจริง - นามสกุล */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-4">
             <Input
               label={<>ชื่อจริง <span className="text-red-600" aria-hidden="true">*</span></>}
               aria-required="true"
@@ -319,7 +319,7 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
           </div>
 
           {/* วันเกิด - เพศ */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-4">
             <Input
               label={
                 <div className="flex justify-between items-center w-full">
@@ -371,7 +371,7 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
           </div>
 
           {/* เบอร์โทร + ประสบการณ์ — ไม่มีช่องค่าบริการแล้ว (PYG-536) ราคามาจากระบบ */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-4">
             {/* เบอร์โทร — ตัวเลขและขีด */}
             <Input
               label={<>เบอร์โทรศัพท์ <span className="text-red-600" aria-hidden="true">*</span></>}

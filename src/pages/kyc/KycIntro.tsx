@@ -23,9 +23,9 @@ export default function KycIntro() {
   const { goToStep } = useKyc();
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-[#F2F4F6] flex items-center justify-center px-4 py-10">
+    <div className="min-h-[calc(100vh-64px)] bg-[#F2F4F6] flex items-center justify-center px-4 py-6 sm:py-10">
       <div
-        className="w-full max-w-[1248px] min-h-[736px] bg-white rounded-3xl border border-[#F1F5F9] flex flex-col items-center justify-center gap-8 px-16 py-14"
+        className="w-full max-w-[1248px] sm:min-h-[736px] bg-white rounded-2xl sm:rounded-3xl border border-[#F1F5F9] flex flex-col items-center justify-center gap-6 sm:gap-8 px-5 py-8 sm:px-16 sm:py-14"
         style={{
           boxShadow: '0 12px 28px -6px rgba(15,23,43,0.06), 0 1px 2px 0 rgba(15,23,43,0.04)',
         }}
@@ -57,13 +57,13 @@ export default function KycIntro() {
         {/* Heading */}
         <div className="text-center">
           <h1
-            className="text-4xl font-bold text-[#0A0A0A]"
+            className="text-2xl sm:text-4xl font-bold text-[#0A0A0A]"
             style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
           >
             ยืนยันตัวตนเพื่อเริ่มรับงาน
           </h1>
           <p
-            className="mt-3 text-base text-[#717182]"
+            className="mt-3 text-sm sm:text-base text-[#717182]"
             style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
           >
             ใช้เวลาประมาณ 5 นาที ทีมงานจะตรวจสอบภายใน 1–2 วันทำการ
@@ -71,13 +71,13 @@ export default function KycIntro() {
         </div>
 
         {/* Step Cards */}
-        <div className="flex gap-4 w-full max-w-[720px]">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full max-w-[720px]">
           {STEPS.map((s) => (
             <div
               key={s.num}
-              className="flex-1 rounded-2xl border border-[#E2E8F0] bg-white px-6 py-5 flex flex-col items-center gap-3 text-center"
+              className="flex-1 rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3.5 sm:px-6 sm:py-5 flex flex-row sm:flex-col items-center gap-3 text-left sm:text-center"
             >
-              <div className="w-9 h-9 rounded-full bg-[#2D6A58] flex items-center justify-center">
+              <div className="w-9 h-9 shrink-0 rounded-full bg-[#2D6A58] flex items-center justify-center">
                 <span
                   className="text-white text-sm font-bold"
                   style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
