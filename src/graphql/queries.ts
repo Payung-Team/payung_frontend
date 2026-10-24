@@ -982,6 +982,8 @@ export const GET_MY_BOOKING = gql`
       locationLng
       notes
       estimatedCost
+      platformFee
+      totalCost
       careRecipientName
       # ข้อมูลผู้รับบริการที่กรอกตอนจอง — แสดงครบในหน้ารายละเอียดฝั่งผู้จอง
       patientName
@@ -1076,6 +1078,8 @@ export const GET_MY_BOOKING_HISTORY = gql`
         bookingDate
         locationAddress
         estimatedCost
+        platformFee
+        totalCost
         careRecipientName
         confirmedAt
         createdAt

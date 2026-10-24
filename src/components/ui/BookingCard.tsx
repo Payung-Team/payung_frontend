@@ -136,7 +136,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                   </span>
                   {booking.payoutAmount != null && (
                     <span className="font-semibold text-[#059669]">
-                      ยอดรับสุทธิ ฿{booking.payoutAmount.toLocaleString()}
+                      ยอดรับ ฿{booking.payoutAmount.toLocaleString()}
                     </span>
                   )}
                 </div>
