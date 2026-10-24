@@ -119,9 +119,6 @@ const steps = [
   },
 ];
 
-const footerServiceLinks = ['ดูแลผู้สูงอายุ', 'ดูแลผู้ป่วยติดเตียง', 'กายภาพบำบัด', 'พาไปโรงพยาบาล'];
-const footerHelpLinks = ['คำถามที่พบบ่อย', 'ติดต่อเรา', 'เงื่อนไขการใช้บริการ', 'นโยบายความเป็นส่วนตัว'];
-
 interface HomePageProps {
   /** Guest view: hides the signed-in-only quick actions and shows the sign-up CTA. */
   readonly isPublic?: boolean;
@@ -288,42 +285,20 @@ const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
       </section>
       )}
 
-      {/* ═══ FOOTER ═══ */}
+      {/* ═══ FOOTER ═══ PYG-701: เหลือแค่คำอธิบาย Payung — เมนูบริการ/ช่วยเหลือ และอีเมล/เบอร์ติดต่อ
+          เป็นข้อมูลสมมติ (ยังไม่มีหน้าปลายทางและช่องทางติดต่อจริง) จึงเอาออก */}
       <footer className="mt-16 bg-[#005C3E] text-white">
-        <div className="max-w-[1200px] mx-auto px-6 py-16">
-          <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-10">
-            <div>
-              <div className="flex items-center gap-1">
-                <span className="text-[22px] font-bold leading-8 tracking-[-0.55px] text-white">payung</span>
-                <Icon name="eco" color="#52B69A" />
-              </div>
-              <p className="mt-3 max-w-[380px] text-[13px] leading-6 text-white/70">
-                แพลตฟอร์มจัดหาผู้ดูแลถึงบ้าน ผู้ดูแลผ่านการตรวจสอบประวัติ พร้อมระบบชำระเงินที่ปลอดภัย
-              </p>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-bold text-white">บริการ</h3>
-              <ul className="mt-4 flex flex-col gap-2.5">
-                {footerServiceLinks.map(label => (
-                  <li key={label} className="text-[13px] leading-5 text-white/70">{label}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-bold text-white">ช่วยเหลือ</h3>
-              <ul className="mt-4 flex flex-col gap-2.5">
-                {footerHelpLinks.map(label => (
-                  <li key={label} className="text-[13px] leading-5 text-white/70">{label}</li>
-                ))}
-              </ul>
-            </div>
+        <div className="max-w-[1200px] mx-auto px-6 py-12">
+          <div className="flex items-center gap-1">
+            <span className="text-[22px] font-bold leading-8 tracking-[-0.55px] text-white">payung</span>
+            <Icon name="eco" color="#52B69A" />
           </div>
+          <p className="mt-3 max-w-[380px] text-[13px] leading-6 text-white/70">
+            แพลตฟอร์มจัดหาผู้ดูแลถึงบ้าน ผู้ดูแลผ่านการตรวจสอบประวัติ พร้อมระบบชำระเงินที่ปลอดภัย
+          </p>
 
-          <div className="mt-12 pt-6 border-t border-white/15 flex flex-col sm:flex-row justify-between gap-2 text-xs text-white/60">
-            <span>© 2569 Payung · แพลตฟอร์มจัดหาผู้ดูแลที่บ้าน</span>
-            <span>contact@payung.app · 02-123-4567</span>
+          <div className="mt-8 pt-6 border-t border-white/15 text-xs text-white/60">
+            © 2569 Payung · แพลตฟอร์มจัดหาผู้ดูแลที่บ้าน
           </div>
         </div>
       </footer>
