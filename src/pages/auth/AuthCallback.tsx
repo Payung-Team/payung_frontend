@@ -29,11 +29,7 @@ export default function AuthCallback() {
   useEffect(() => {
     const run = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      // ไม่ log session object — มี access token อยู่ในนั้น
-      console.log('[AuthCallback] session:', session ? 'present' : 'none');
-
       if (!session) {
-        console.log('[AuthCallback] no session → /login');
         navigate('/login', { replace: true });
         return;
       }
@@ -84,11 +80,7 @@ export default function AuthCallback() {
         }
       }
 
-      // ไม่ log userData ทั้งก้อน — มี phone/email อยู่ในนั้น
-      console.log('[AuthCallback] user role:', userData?.role ?? 'unknown');
-
       if (!userData) {
-        console.log('[AuthCallback] could not fetch user after retries → /login');
         navigate('/login', { replace: true });
         return;
       }
@@ -109,7 +101,6 @@ export default function AuthCallback() {
           takePendingJoinPath() ?? getPostLoginRedirect({ role, mustChangePassword: false });
       }
 
-      console.log('[AuthCallback] navigating to:', targetPath);
       navigate(targetPath, { replace: true });
     };
 

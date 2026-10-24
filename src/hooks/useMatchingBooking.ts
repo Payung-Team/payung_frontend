@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useApolloClient } from '@apollo/client/react';
 import { useBooking, type BookingRequest } from '../context/BookingContext';
 import { supabase } from '../lib/supabase';
+import { logGraphQLError } from '../lib/logGraphQLError';
 import { buildBookingPayload, buildOnBehalfInput } from '../lib/buildBookingPayload';
 import { CREATE_BOOKING_ON_BEHALF } from '../graphql/familyGroup';
 import { MATCHING_BOOKING_STATUS, SELECT_BOOKING_CAREGIVER } from '../graphql/queries';
@@ -154,7 +155,8 @@ export function useMatchingBooking() {
         return { ok: true, bookingId: created };
       } catch (err) {
         // ไม่รู้ว่าคำขอไปถึงหรือไม่ — ข้อความบอกให้ตรวจ "การจองของฉัน" ก่อนลองใหม่
-        console.error('Failed to create booking:', err);
+        // PYG-700: error ของการจองสะท้อนค่าที่ส่ง (ชื่อ เบอร์ ที่อยู่) — log ผ่านตัว redact เท่านั้น
+        logGraphQLError('CreateMatchingBooking', err);
         return { ok: false, message: BOOKING_UNKNOWN_ERROR_MESSAGE, assessmentRequired: false };
       }
     },
@@ -182,7 +184,7 @@ export function useMatchingBooking() {
           // เลือกไปแล้ว (เช่น กดซ้ำ / อีกแท็บ) หรือถูกยกเลิก — กดค้นหาใหม่ prepare จะเห็นว่าไม่ใช่ unmatched แล้วสร้างใบใหม่
           return { ok: false, message: matchText.notSelectable, notEligible: false };
         }
-        console.error('Failed to select caregiver:', err);
+        logGraphQLError('SelectBookingCaregiver', err);
         return { ok: false, message: matchText.selectFailed, notEligible: false };
       }
     },
