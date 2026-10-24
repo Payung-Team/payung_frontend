@@ -510,32 +510,37 @@ export default function CareActivitiesPage() {
           <p className="text-[15px] font-semibold text-[#334155]">{filtered ? s.emptyFiltered : s.emptyAll}</p>
         </div>
       ) : (
-        <div className="@container overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
-          {/* กล่องแคบกว่า 48rem (ตารางต้องการ ~760px): การ์ดต่อกิจกรรม — ดูความกว้างกล่อง ไม่ใช่ความกว้างจอ */}
-          <ul className="divide-y divide-[#F1F5F9] @3xl:hidden">
+        <div className="lg:overflow-hidden lg:rounded-xl lg:border lg:border-[#E2E8F0] lg:bg-white lg:shadow-sm">
+          {/* < lg (มือถือ / แท็บเล็ต): การ์ดต่อกิจกรรม · md วาง 2 ใบต่อแถว — breakpoint เดียวกับ DataTable */}
+          <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:hidden">
             {rows.map((a) => (
-              <li key={a.id} className={`space-y-2 px-4 py-3.5 text-[14px] ${a.isActive ? '' : 'bg-[#FAFAFA] text-[#94A3B8]'}`}>
+              <li
+                key={a.id}
+                className={`flex flex-col gap-3 rounded-2xl border border-[#E7F3EE] p-4 text-[14px] shadow-[0_2px_12px_rgba(6,78,59,0.06)] ${
+                  a.isActive ? 'bg-white' : 'bg-[#FAFAFA] text-[#94A3B8]'
+                }`}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className={`font-semibold ${a.isActive ? 'text-[#0F172A]' : ''}`}>{a.nameTh}</div>
+                    <div className={`text-[15px] font-semibold ${a.isActive ? 'text-[#0F172A]' : ''}`}>{a.nameTh}</div>
                     {(a.nameEn || a.code) && (
                       <div className="text-[12px] text-[#94A3B8]">{[a.code, a.nameEn].filter(Boolean).join(' · ')}</div>
                     )}
                   </div>
                   {statusBadge(a)}
                 </div>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[#64748B]">
-                  <span>{a.category}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-xl bg-[#F3FAF7] px-3 py-1 text-[12px] text-[#5B8A7B]">{a.category}</span>
                   <CareLevelBadge level={a.careLevel} />
-                  <span className="tabular-nums">
+                  <span className="rounded-xl bg-[#F3FAF7] px-3 py-1 text-[12px] tabular-nums text-[#5B8A7B]">
                     {s.colOrder} {a.sortOrder}
                   </span>
                 </div>
-                <div className="flex justify-end pt-1">{rowActions(a)}</div>
+                <div className="mt-auto flex justify-end">{rowActions(a)}</div>
               </li>
             ))}
           </ul>
-          <div className="hidden overflow-x-auto @3xl:block">
+          <div className="hidden overflow-x-auto lg:block">
           <table className="w-full min-w-[760px] text-left text-[14px]">
             <thead className="bg-[#F8FAFC] text-[12.5px] font-semibold text-[#64748B]">
               <tr>
@@ -572,7 +577,7 @@ export default function CareActivitiesPage() {
             </tbody>
           </table>
           </div>
-          <p className="border-t border-[#F1F5F9] px-4 py-2 text-[12.5px] text-[#64748B]">{s.count(rows.length)}</p>
+          <p className="mt-3 px-1 text-[12.5px] text-[#64748B] lg:mt-0 lg:border-t lg:border-[#F1F5F9] lg:px-4 lg:py-2">{s.count(rows.length)}</p>
         </div>
       )}
 
