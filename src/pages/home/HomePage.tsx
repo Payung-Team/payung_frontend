@@ -6,9 +6,10 @@ import { Icon } from '../../components/ui/Icon';
 // PYG-712: ภาพนี้คือ LCP ของหน้าแรก — ใช้ WebP (เดิม PNG 1.7 MB) + ขนาดมือถือแยก
 import heroImage from '../../assets/banner.webp';
 import heroImageMobile from '../../assets/banner-828.webp';
-import appScreenshot1 from '../../assets/step_1.png';
-import appScreenshot2 from '../../assets/step_2.png';
-import appScreenshot3 from '../../assets/step_3.png';
+// ภาพโทรศัพท์ 3 เครื่องในส่วน "ใช้งานง่ายใน 3 ขั้นตอน" — ภาพเดียวที่จัดองค์ประกอบมาแล้ว (สร้างด้วย AI จากหน้าจอแอปจริง)
+// แทนกรอบโทรศัพท์ CSS + ภาพหน้าจอ 3 ใบเดิม · ต้นฉบับ PNG 1536×1024 1.4 MB → WebP
+import appMockup from '../../assets/app-mockup.webp';
+import appMockupSmall from '../../assets/app-mockup-720.webp';
 import {
   BedCareArt,
   DoctorVisitArt,
@@ -16,43 +17,6 @@ import {
   FamilyCareArt,
   PhysioArt,
 } from './LandingIllustrations';
-
-/**
- * Phone mockup frame for the app screenshots. Drop a screenshot into `image`
- * and it fills the screen; without one the dashed placeholder shows instead.
- */
-const PhoneFrame: React.FC<{ label: string; image?: string; className?: string }> = ({ label, image, className = '' }) => (
-  <div
-    className={`w-full max-w-[168px] rounded-[28px] bg-[#1A1A1A] p-2 shadow-[0_12px_32px_rgba(0,0,0,0.14)] ${className}`}
-  >
-    <div className="relative aspect-[9/19] overflow-hidden rounded-[22px] bg-[#F1F5F4]">
-      {/* notch */}
-      <span className="absolute top-1.5 left-1/2 z-10 h-1.5 w-12 -translate-x-1/2 rounded-full bg-[#1A1A1A]" />
-      {image ? (
-        <img src={image} alt={label} className="h-full w-full object-cover" />
-      ) : (
-        <div className="flex h-full w-full flex-col items-center justify-center px-3 text-center">
-          <Icon name="image" size="large" color="#9AA5A1" />
-          <span className="mt-1.5 text-[11px] font-semibold leading-4 tracking-[0.275px] text-[#9AA5A1]">{label}</span>
-        </div>
-      )}
-    </div>
-  </div>
-);
-
-/** Per-phone tilt + depth, applied by position in the fan. */
-const phoneAngles = [
-  'z-10 [transform:rotateY(22deg)_rotateZ(-7deg)_scale(0.9)_translateY(16px)]',
-  'z-30 [transform:rotateY(6deg)_rotateZ(-4deg)]',
-  'z-20 [transform:rotateY(-18deg)_rotateZ(5deg)_scale(0.92)_translateY(22px)]',
-];
-
-/** Screenshots for the "how it works" phone mockups — add `image` when the artwork is ready. */
-const appScreens: { label: string; image?: string }[] = [
-  { label: 'หน้าจอ 1', image: appScreenshot1 },
-  { label: 'หน้าจอ 2', image: appScreenshot2 },
-  { label: 'หน้าจอ 3', image: appScreenshot3 },
-];
 
 const heroHighlights = [
   { icon: 'verified_user', label: 'ผู้ดูแลทุกคนยืนยันตัวตนแล้ว' },
@@ -238,17 +202,19 @@ const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
       {/* ═══ HOW IT WORKS ═══ */}
       <section className="mt-20 bg-white border-y border-[#F3F4F6] py-16">
         <div className="max-w-[1200px] mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Phones fanned out in 3D — back two tilted away, middle one in front */}
-          <div className="flex justify-center items-center py-8 [perspective:1400px]">
-            {appScreens.map((screen, index) => (
-              <PhoneFrame
-                key={screen.label}
-                label={screen.label}
-                image={screen.image}
-                className={`${phoneAngles[index] ?? ''} ${index > 0 ? '-ml-10 sm:-ml-12' : ''}`}
-              />
-            ))}
-          </div>
+          {/* พื้นหลังภาพโปร่งใส (เงาโทรศัพท์ติดมาในภาพ) — วางลอยบนพื้นขาวตรง ๆ ไม่ใส่กรอบ
+              width/height กันหน้าเลื่อน (CLS) ระหว่างโหลด · อยู่ใต้ fold จึง lazy */}
+          <img
+            src={appMockup}
+            srcSet={`${appMockupSmall} 720w, ${appMockup} 1200w`}
+            sizes="(min-width: 1024px) 576px, calc(100vw - 48px)"
+            width={1200}
+            height={800}
+            loading="lazy"
+            decoding="async"
+            alt="หน้าจอแอป Payung: เลือกบริการ ยืนยันคำขอจอง และติดตามงาน"
+            className="w-full h-auto"
+          />
 
           <div>
             <p className="text-[13px] font-bold tracking-[1.2px] uppercase text-[#009265]">ใช้งานง่ายใน 3 ขั้นตอน</p>
