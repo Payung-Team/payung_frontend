@@ -31,6 +31,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
     if (userRole === 3 || userRole === 4) return '/admin';
     return '/patient-home';
   })();
+  // ผู้ดูแลดูการแจ้งเตือนในหน้าตั้งค่า (RoleRoute 2) — role อื่นไปหน้า /notifications กลาง
+  // ไม่งั้นผู้รับบริการกดกระดิ่งบนมือถือแล้วโดน RoleRoute เด้งกลับ /patient-home
+  const notificationsPath = userRole === 2 ? '/caregiver/settings/notifications' : '/notifications';
   const { navItems, isLoading: menuLoading, error: menuError } = useFilteredMenu(menuName, userRole);
   const { data: userData } = useQuery<{ me: { id: string; role: number; displayName?: string; firstName?: string; lastName?: string; phone?: string; address?: string; bio?: string; avatarUrl?: string | null } } | undefined>(GET_USER);
   
@@ -130,6 +133,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           isLoading={menuLoading}
           currentUserId={userData?.me?.id}
           homeRoute={homeRoute}
+          notificationsPath={notificationsPath}
           profileDropdown={
             currentRole === 2 ? (
               <CaregiverProfileDropdown

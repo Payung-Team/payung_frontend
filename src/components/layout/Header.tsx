@@ -12,6 +12,8 @@ interface HeaderProps {
   readonly isLoading?: boolean;
   readonly currentUserId?: string;
   readonly homeRoute?: string;
+  /** หน้ารวมการแจ้งเตือนของ role นี้ (มือถือกดกระดิ่งแล้วไปหน้านี้ / ลิงก์ "ดูทั้งหมด") */
+  readonly notificationsPath?: string;
   /** Replaces the whole signed-in right section (messages/notifications/profile). */
   readonly rightSlot?: React.ReactNode;
 }
@@ -22,6 +24,7 @@ export default function Header({
   isLoading = false,
   currentUserId,
   homeRoute = '/',
+  notificationsPath,
   rightSlot,
 }: HeaderProps) {
   const location = useLocation();
@@ -89,6 +92,7 @@ export default function Header({
                 {/* Notification Icon */}
                 <NotificationBell
                   currentUserId={currentUserId}
+                  viewAllPath={notificationsPath}
                 />
 
                 {/* Profile Dropdown */}
