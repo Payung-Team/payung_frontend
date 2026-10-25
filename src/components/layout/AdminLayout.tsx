@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
 import { Outlet, useLocation, useNavigate, NavLink } from 'react-router-dom';
 import PageSkeleton from '../ui/PageSkeleton';
+import { prefetchAdminPages } from '../../pages/admin/adminPageChunks';
 import { useQuery } from '@apollo/client/react';
 import { useAuth } from '../../context/AuthContext';
 import { GET_USER, ADMIN_PENDING_COUNT, ADMIN_DISPUTE_PENDING_COUNT } from '../../graphql/queries';
@@ -62,6 +63,14 @@ export default function AdminLayout() {
   );
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  // PYG-715 INP: โหลดโค้ดของหน้าแอดมินอื่น ๆ ไว้ตอนเบราว์เซอร์ว่าง — กดเมนูครั้งแรกไม่ต้องรอดาวน์โหลด (ดู adminPageChunks.ts)
+  useEffect(() => {
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1500));
+    const cancel = window.cancelIdleCallback ?? window.clearTimeout;
+    const handle = idle(() => prefetchAdminPages());
+    return () => cancel(handle);
+  }, []);
 
   useEffect(() => {
     if (!profileOpen) return;
