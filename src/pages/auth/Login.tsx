@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { logGraphQLError } from '../../lib/logGraphQLError';
+import { CONNECTION_ERROR_MESSAGE, isConnectionError } from '../../lib/apolloErrors';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@apollo/client/react';
 import AuthLayout from '../../components/layout/AuthLayout';
@@ -107,7 +108,8 @@ export default function Login() {
     onError: (error) => {
       // ห้าม log error object / graphQLErrors — message สะท้อน variables (อีเมล+รหัสผ่าน) กลับมาได้
       logGraphQLError('Login', error);
-      setFormError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+      // PYG-717: ติดต่อ API ไม่ได้ ≠ รหัสผ่านผิด (เดิมขึ้น "รหัสผ่านไม่ถูกต้อง" แม้ API ล่ม — ผู้ใช้ไปรีเซ็ตรหัสผ่านเปล่า ๆ)
+      setFormError(isConnectionError(error) ? CONNECTION_ERROR_MESSAGE : 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
       setErrorCount(prev => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
