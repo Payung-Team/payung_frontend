@@ -168,12 +168,13 @@ export default function LicenseSection({
       )}
 
       {/* ไฟล์ใบอนุญาต */}
-      <div className="flex flex-col gap-1.5">
+      <div className="flex min-w-0 flex-col gap-1.5">
         <span id="kyc-license-file-label" className="text-[14px] font-semibold text-[#0F172A]">
           {s.fileLabel} <span className="text-[#DC2626]" aria-hidden="true">*</span>
         </span>
+        {/* มือถือ: ปุ่มขึ้นบรรทัดใหม่ใต้ชื่อไฟล์ — จอกว้างอยู่บรรทัดเดียว */}
         <div
-          className={`flex min-h-[72px] items-center gap-4 rounded-[16px] px-4 py-3 transition-colors ${
+          className={`flex min-h-[72px] flex-wrap items-center gap-x-4 gap-y-3 rounded-[16px] px-4 py-3 transition-colors sm:flex-nowrap ${
             fileError
               ? 'border border-[#DC2626] bg-[#FEF2F2]'
               : draft.file && upload.status !== 'uploading'
@@ -196,9 +197,9 @@ export default function LicenseSection({
               style={{ fontSize: 20 }}
             />
           </span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-[calc(100%-3.5rem)] sm:basis-0">
             <p className={`text-[15px] font-semibold leading-5 ${fileError ? 'text-[#B91C1C]' : 'text-[#0F172A]'}`}>{s.fileTitle}</p>
-            <p className={`truncate text-[13px] leading-5 ${fileError ? 'text-[#DC2626]' : 'text-[#64748B]'}`}>
+            <p className={`break-words text-[13px] leading-5 sm:truncate ${fileError ? 'text-[#DC2626]' : 'text-[#64748B]'}`}>
               {upload.status === 'uploading'
                 ? upload.replacing
                   ? s.fileReplacing(upload.fileName, upload.replacing)
@@ -210,7 +211,7 @@ export default function LicenseSection({
                     : s.fileHint}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-2 empty:hidden max-sm:w-full">
             {upload.status !== 'uploading' && draft.file && (
               <>
                 {draft.file.previewUrl && (
@@ -249,7 +250,7 @@ export default function LicenseSection({
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E2E8F0] bg-white px-3 text-[13px] font-semibold text-[#334155] hover:border-[#2D6A58] cursor-pointer"
+                className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[#E2E8F0] bg-white px-3 text-[13px] font-semibold text-[#334155] hover:border-[#2D6A58] cursor-pointer max-sm:w-full"
               >
                 <Icon name={upload.status === 'error' && upload.kind === 'network' ? 'refresh' : 'upload'} color="currentColor" style={{ fontSize: 18 }} />
                 {upload.status === 'error'
@@ -274,7 +275,7 @@ export default function LicenseSection({
         <FieldMessage id="kyc-license-file-msg" error={upload.status === 'error' ? undefined : errorFor('file')} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {/* เลขที่ใบอนุญาต */}
         <div className="flex flex-col gap-1.5">
           <label htmlFor="kyc-license-number" className="text-[14px] font-semibold text-[#0F172A]">
