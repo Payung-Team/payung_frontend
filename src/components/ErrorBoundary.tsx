@@ -51,11 +51,16 @@ class ErrorBoundary extends React.Component<Props, State> {
           <p className="text-sm text-[#8A8C8E] mt-2"
             style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
             ระบบแสดงหน้านี้ไม่สำเร็จ ข้อมูลการจองของคุณยังอยู่ ลองโหลดหน้าใหม่อีกครั้ง
-            ถ้ายังไม่หาย กรุณาแจ้งทีมงานพร้อมข้อความด้านล่าง
+            {import.meta.env.DEV
+              ? ' ถ้ายังไม่หาย กรุณาแจ้งทีมงานพร้อมข้อความด้านล่าง'
+              : ' ถ้ายังไม่หาย กรุณาติดต่อทีมงาน'}
           </p>
-          <p className="text-[11px] text-[#8A8C8E] bg-[#F6FAF9] border border-[#E0E2E5] rounded-lg px-3 py-2 mt-3 break-words text-left">
-            {error.message || String(error)}
-          </p>
+          {/* ข้อความ error ดิบเป็นข้อมูลภายในระบบ — แสดงเฉพาะตอนพัฒนา */}
+          {import.meta.env.DEV && (
+            <p className="text-[11px] text-[#8A8C8E] bg-[#F6FAF9] border border-[#E0E2E5] rounded-lg px-3 py-2 mt-3 break-words text-left">
+              {error.message || String(error)}
+            </p>
+          )}
           <div className="flex gap-2 mt-5">
             <button
               type="button"

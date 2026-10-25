@@ -12,7 +12,7 @@ import {
 import { PROFESSIONS, isProfession, professionErrorMessage } from '../../lib/professions';
 import { daysUntilBangkok, licenseErrorCodes, normalizeLicenseStatus, toBangkokYmd } from '../../lib/license';
 import { useLicenseStrings } from '../../lib/licenseStrings';
-import { extractGraphQLErrorCode, extractGraphQLErrorMessage } from '../../lib/apolloErrors';
+import { extractGraphQLErrorCode, extractGraphQLErrorMessage, userFacingErrorMessage } from '../../lib/apolloErrors';
 import { logGraphQLError } from '../../lib/logGraphQLError';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
 import ConfirmModal from '../../components/ui/ConfirmModal';
@@ -273,7 +273,7 @@ export default function ProfessionChangeRequestsPage() {
 
       {error && !data ? (
         <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700">
-          โหลดคำขอเปลี่ยนวิชาชีพไม่สำเร็จ · {error.message}
+          โหลดคำขอเปลี่ยนวิชาชีพไม่สำเร็จ · {userFacingErrorMessage(error, 'กรุณาลองใหม่อีกครั้ง')}
         </div>
       ) : loading && !data ? (
         <div className="flex flex-col gap-3" aria-busy="true">

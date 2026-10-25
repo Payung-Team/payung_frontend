@@ -110,6 +110,7 @@ export default function NotificationsPage({
 
         setHasMore(next.length === limit);
       } catch (err) {
+        // Stop paging so the load-more observer doesn't retry a failing query forever.
         logGraphQLError('LoadNotifications', err);
         setHasMore(false);
       } finally {

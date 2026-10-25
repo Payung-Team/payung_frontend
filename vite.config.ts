@@ -20,6 +20,12 @@ export default defineConfig({
     exclude: [],
     force: true,
   },
+  build: {
+    rolldownOptions: {
+      // production: console เงียบทั้งหมด (log/warn/error) และตัด debugger — dev ไม่ได้รับผลกระทบ
+      output: { minify: { compress: { dropConsole: true, dropDebugger: true } } },
+    },
+  },
   ssr: {
     noExternal: ['@apollo/client', 'graphql'],
   },

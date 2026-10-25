@@ -59,7 +59,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   // Redirect immediately when caregiver data is available
   useEffect(() => {
-
     if (currentRole === 2 && !caregiverLoading) {
       // If error occurred or no data, skip redirect (user might not have profile yet)
       if (caregiverError || !caregiverData?.myCaregiverProfile) {

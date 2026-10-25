@@ -56,5 +56,7 @@ function extractMessage(error: unknown): string {
  * @param error error ที่ catch มา (Apollo error, Error, หรืออะไรก็ได้)
  */
 export function logGraphQLError(operationName: string, error: unknown): void {
+  // production ไม่พิมพ์อะไรลง console — รายละเอียด error เป็นข้อมูลภายในที่ผู้ใช้ไม่ควรเห็น
+  if (!import.meta.env.DEV) return;
   console.error(`[GraphQL] ${operationName} failed: ${redactSensitive(extractMessage(error))}`);
 }

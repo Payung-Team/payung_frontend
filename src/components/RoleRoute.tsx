@@ -56,7 +56,7 @@ const RoleRoute: React.FC<RoleRouteProps> = ({ children, requiredRole }) => {
   //   วนไม่จบ ยิง API รัว ๆ ตอน API ล่ม (25 ต.ค. ซ้ำเติม Worker จน 1102) — ตอนนี้หยุดที่หน้านี้ ไม่ render children
   //   (ยังปฏิเสธการเข้าถึงเหมือนเดิม) ให้ผู้ใช้กดลองใหม่เอง
   if (queryError) {
-    console.warn('Failed to fetch user role, denying access:', queryError.message);
+    if (import.meta.env.DEV) console.warn('Failed to fetch user role, denying access:', queryError.message);
     return (
       <RoleCheckFailed
         connection={isConnectionError(queryError)}
