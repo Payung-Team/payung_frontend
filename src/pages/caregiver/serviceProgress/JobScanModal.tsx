@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../../../components/ui/Icon';
 import QrTokenFallback, { ScanResultBox } from '../QrTokenFallback';
+import { QR_TEST_TOOLS_ENABLED } from '../../../lib/qrTestTools';
 import { useJobQrScan, type JobScanResult } from '../useJobQrScan';
 
 const FONT = { fontFamily: "'Bai Jamjuree', sans-serif" } as const;
@@ -299,7 +300,8 @@ export default function JobScanModal({ isOpen, onClose, bookingId, onScanned, pu
         </div>
 
         {/* ── สลับโหมด ── */}
-        {!succeeded && (
+        {/* โหมดทดสอบ (ป้อนโทเค็นแทนกล้อง) เปิดเฉพาะ dev/staging — production ต้องสแกนด้วยกล้องเท่านั้น */}
+        {!succeeded && QR_TEST_TOOLS_ENABLED && (
           <div className="border-t border-[#F0F1F3] px-5 py-3.5">
             <button
               type="button"

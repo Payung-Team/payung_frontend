@@ -30,7 +30,6 @@ export default function ProfileDropdown({
   const phoneStrings = usePhoneAuthStrings();
 
   const displayUserName = displayName || user?.email?.split('@')[0] || 'User';
-  console.log('[ProfileDropdown] avatarUrl:', avatarUrl);
 
   const handleLogout = async () => {
     const result = await logout();

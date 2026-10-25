@@ -43,9 +43,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, currentSession: Session | null) => {
-        // ไม่ log user object — มี email/phone/user_metadata อยู่ในนั้น
-        console.log('[AuthContext] event:', event, '| session:', currentSession ? 'present' : 'none');
-
         if (event === 'PASSWORD_RECOVERY') {
           setPasswordRecoveryPending(true);
         }
@@ -66,7 +63,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
 
-        console.log('[AuthContext] userRole (from state):', userRole);
       }
     );
 

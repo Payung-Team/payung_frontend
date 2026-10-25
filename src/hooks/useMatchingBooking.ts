@@ -154,7 +154,7 @@ export function useMatchingBooking() {
         return { ok: true, bookingId: created };
       } catch (err) {
         // ไม่รู้ว่าคำขอไปถึงหรือไม่ — ข้อความบอกให้ตรวจ "การจองของฉัน" ก่อนลองใหม่
-        console.error('Failed to create booking:', err);
+        if (import.meta.env.DEV) console.error('Failed to create booking:', err);
         return { ok: false, message: BOOKING_UNKNOWN_ERROR_MESSAGE, assessmentRequired: false };
       }
     },
@@ -182,7 +182,7 @@ export function useMatchingBooking() {
           // เลือกไปแล้ว (เช่น กดซ้ำ / อีกแท็บ) หรือถูกยกเลิก — กดค้นหาใหม่ prepare จะเห็นว่าไม่ใช่ unmatched แล้วสร้างใบใหม่
           return { ok: false, message: matchText.notSelectable, notEligible: false };
         }
-        console.error('Failed to select caregiver:', err);
+        if (import.meta.env.DEV) console.error('Failed to select caregiver:', err);
         return { ok: false, message: matchText.selectFailed, notEligible: false };
       }
     },

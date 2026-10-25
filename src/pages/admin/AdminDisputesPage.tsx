@@ -13,6 +13,7 @@ import SlaBadge from '../../components/features/dispute/SlaBadge';
 import DisputeStatusBadge from '../../components/features/dispute/DisputeStatusBadge';
 import FiledByBadge from '../../components/features/dispute/FiledByBadge';
 import { formatTHB, formatThaiDate, toSortBy, type DisputeFiledBy } from '../../components/features/dispute/disputeMeta';
+import { userFacingErrorMessage } from '../../lib/apolloErrors';
 
 // ─── Types (ตรงกับ ADMIN_DISPUTE_QUEUE) ──────────────────────────────────────
 
@@ -190,7 +191,7 @@ export default function AdminDisputesPage() {
                 <Icon name="error_outline" variant="outlined" />
               </div>
               <h2 className="mt-4 text-base font-semibold text-gray-900">โหลดคำร้องไม่สำเร็จ</h2>
-              <p className="mt-1 max-w-md text-sm text-gray-500">{err.message}</p>
+              <p className="mt-1 max-w-md text-sm text-gray-500">{userFacingErrorMessage(err, 'กรุณาลองใหม่อีกครั้ง')}</p>
             </div>
           )}
           renderEmpty={

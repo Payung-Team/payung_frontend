@@ -52,7 +52,7 @@ const RoleRoute: React.FC<RoleRouteProps> = ({ children, requiredRole }) => {
 
   // Query errored — don't fall back to localStorage to prevent tampered-role bypass
   if (queryError) {
-    console.warn('Failed to fetch user role, denying access:', queryError.message);
+    if (import.meta.env.DEV) console.warn('Failed to fetch user role, denying access:', queryError.message);
     return <Navigate to="/" replace />;
   }
 

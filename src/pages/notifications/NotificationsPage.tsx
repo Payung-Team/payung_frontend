@@ -108,7 +108,7 @@ export default function NotificationsPage({
         setHasMore(next.length === PAGE_SIZE);
       } catch (err) {
         // Stop paging so the load-more observer doesn't retry a failing query forever.
-        console.error('Failed to load notifications', err);
+        if (import.meta.env.DEV) console.error('Failed to load notifications', err);
         setHasMore(false);
       } finally {
         loadingRef.current = false;

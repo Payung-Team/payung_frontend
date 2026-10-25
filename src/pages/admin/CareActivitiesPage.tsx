@@ -18,7 +18,7 @@ import {
   useCareActivityStrings,
 } from '../../lib/careActivityStrings';
 import { CARE_LEVELS, useCareLevelStrings } from '../../lib/careLevels';
-import { extractGraphQLErrorExtensions } from '../../lib/apolloErrors';
+import { extractGraphQLErrorExtensions, userFacingErrorMessage } from '../../lib/apolloErrors';
 import { logGraphQLError } from '../../lib/logGraphQLError';
 import CareLevelBadge from '../../components/ui/CareLevelBadge';
 import ConfirmModal from '../../components/ui/ConfirmModal';
@@ -460,7 +460,7 @@ export default function CareActivitiesPage() {
 
       {error && !data ? (
         <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700">
-          {s.loadFailed} · {error.message}
+          {s.loadFailed} · {userFacingErrorMessage(error, 'กรุณาลองใหม่อีกครั้ง')}
         </div>
       ) : loading && !data ? (
         <div className="flex flex-col gap-2" aria-busy="true">

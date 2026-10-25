@@ -95,7 +95,7 @@ function useNeedsOnboarding() {
   const { data, loading, error } = useQuery<OnboardingStatusData>(GET_ONBOARDING_STATUS);
 
   if (error) {
-    console.warn('Failed to fetch onboarding status, skipping redirect:', error.message);
+    if (import.meta.env.DEV) console.warn('Failed to fetch onboarding status, skipping redirect:', error.message);
   }
 
   const me = data?.me;
@@ -251,9 +251,14 @@ function App() {
             not-yet-signed-in invitee. The page handles both signed-in and signed-out. */}
         <Route path="/join" element={<JoinGroupPage />} />
 
-        {/* Preview only: the dashboard against an in-memory mock backend (no login). */}
-        <Route path="/family-demo" element={<FamilyGroupDemo />} />
-        <Route path="/family-demo/members" element={<MembersPageDemo />} />
+        {/* Preview only: the dashboard against an in-memory mock backend (no login).
+            Dev build only — production falls through to the 404 route. */}
+        {import.meta.env.DEV && (
+          <>
+            <Route path="/family-demo" element={<FamilyGroupDemo />} />
+            <Route path="/family-demo/members" element={<MembersPageDemo />} />
+          </>
+        )}
 
         {/* Change password — session required แต่ไม่ผ่าน MustChangePasswordGuard */}
         <Route path="/change-password" element={<ProtectedRoute><ChangePasswordPage /></ProtectedRoute>} />

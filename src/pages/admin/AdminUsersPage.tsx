@@ -20,6 +20,7 @@ import FilterTabs, { type FilterTabItem } from '../../components/ui/FilterTabs';
 import SearchInput from '../../components/ui/SearchInput';
 import Pagination from '../../components/ui/Pagination';
 import { accountContact } from '../../lib/phone';
+import { userFacingErrorMessage } from '../../lib/apolloErrors';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -209,7 +210,7 @@ function InviteAdminModal({ onClose, onSuccess }: Readonly<InviteModalProps>) {
 
   const [inviteAdmin, { loading }] = useMutation(INVITE_ADMIN, {
     onCompleted: () => { onSuccess(); },
-    onError: (err) => { setSubmitError(err.message); },
+    onError: (err) => { setSubmitError(userFacingErrorMessage(err, 'ดำเนินการไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')); },
   });
 
   function validate() {
@@ -483,7 +484,7 @@ function EditAdminModal({ user, onClose, onSuccess }: Readonly<EditAdminModalPro
 
   const [updateAdmin, { loading }] = useMutation(UPDATE_ADMIN_USER, {
     onCompleted: () => { onSuccess(); },
-    onError: (err) => { setSubmitError(err.message); },
+    onError: (err) => { setSubmitError(userFacingErrorMessage(err, 'ดำเนินการไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')); },
   });
 
   function validate() {
@@ -1344,7 +1345,7 @@ export default function AdminUsersPage() {
                 <Icon name="error" variant="outlined" />
               </div>
               <h2 className="mt-4 text-base font-semibold text-gray-900">โหลดรายการผู้ใช้ไม่สำเร็จ</h2>
-              <p className="mt-1 max-w-md text-sm text-gray-500">{err.message}</p>
+              <p className="mt-1 max-w-md text-sm text-gray-500">{userFacingErrorMessage(err, 'กรุณาลองใหม่อีกครั้ง')}</p>
             </div>
           )}
           renderEmpty={

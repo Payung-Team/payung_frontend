@@ -55,15 +55,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   // Redirect immediately when caregiver data is available
   useEffect(() => {
-    console.log('AppLayout: Checking KYC/Onboarding redirect', {
-      currentRole,
-      caregiverLoading,
-      caregiverError: caregiverError?.message,
-      hasData: !!caregiverData?.myCaregiverProfile,
-      kycStatus: caregiverData?.myCaregiverProfile?.kycStatus,
-      currentPath: location.pathname,
-    });
-
     if (currentRole === 2 && !caregiverLoading) {
       // If error occurred or no data, skip redirect (user might not have profile yet)
       if (caregiverError || !caregiverData?.myCaregiverProfile) {
@@ -95,11 +86,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
       // Redirect based on KYC status
       if (kycStatus === 'none' && !isAllowedPath) {
         // Not started - go to KYC form
-        console.log('Redirecting caregiver to /kyc (KYC not started)');
         navigate('/kyc', { replace: true });
       } else if (kycStatus === 'pending' && !isAllowedPath) {
         // Pending verification - go to KYC status page
-        console.log('Redirecting caregiver to /kyc/status (KYC pending)');
         navigate('/kyc/status', { replace: true });
       }
     }
