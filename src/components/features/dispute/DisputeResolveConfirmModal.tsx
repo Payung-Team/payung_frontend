@@ -13,6 +13,7 @@ interface DisputeResolveConfirmModalProps {
 }
 
 // TODO: แทนที่ด้วยค่าธรรมเนียมจริงจาก Omise/ระบบบัญชีเมื่อ backend พร้อม (PYG-320)
+const MOCK_PLATFORM_FEE_RATE = 0.15;
 
 const KIND_CONFIG: Record<ResolutionKind, {
   title: string;
@@ -62,8 +63,8 @@ export default function DisputeResolveConfirmModal({ dispute, payload, onCancel,
   const recipientMeta = FILED_BY_META[recipient.role];
 
   const holdRemaining = Math.max(dispute.amount - payload.amount, 0);
-  // ค่าธรรมเนียมแพลตฟอร์มลูกค้าเป็นผู้จ่าย ไม่หักจากผู้ดูแล — ไม่มีการหักฝั่งผู้ดูแลที่นี่
-  const caregiverNet = holdRemaining;
+  const platformFee = isNoRefund ? Math.round(dispute.amount * MOCK_PLATFORM_FEE_RATE) : 0;
+  const caregiverNet = isNoRefund ? dispute.amount - platformFee : holdRemaining;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(14,25,20,0.5)] px-4" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
@@ -133,8 +134,14 @@ export default function DisputeResolveConfirmModal({ dispute, payload, onCancel,
                   </div>
                 </>
               )}
+              {isNoRefund && (
+                <div className="flex items-center justify-between">
+                  <dt className="text-[#8A8C8E]">หักค่าบริการ+ค่าธรรมเนียม</dt>
+                  <dd className="font-[Inter] font-bold text-[#575859]">-{formatTHB(platformFee)}</dd>
+                </div>
+              )}
               <div className="flex items-center justify-between">
-                <dt className="text-[#8A8C8E]">ผู้ดูแลจะได้รับ</dt>
+                <dt className="text-[#8A8C8E]">ผู้ดูแลจะได้รับสุทธิ</dt>
                 <dd className="font-[Inter] font-bold text-[#1A1A1A]">{formatTHB(caregiverNet)}</dd>
               </div>
             </dl>

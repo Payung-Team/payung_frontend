@@ -15,7 +15,7 @@ interface CheckOutSuccessProps {
   bookingDateText: string;
   /** ยอดค่าบริการก่อนหักค่าธรรมเนียม */
   grossAmount: number;
-  /** ยอดโอนจริงเมื่อ payout ถูกสร้างแล้ว */
+  /** ยอดโอนสุทธิจริงเมื่อ payout ถูกสร้างแล้ว */
   payoutAmount?: number | null;
   proof: ProofOfWorkSummary;
   onBack: () => void;
@@ -86,7 +86,7 @@ export default function CheckOutSuccess({
           </span>
           <div>
             <p className="text-[13px] text-[#8A8C8E]">
-              {earnings.isActual ? 'ยอดเงินที่ได้รับ' : 'ยอดเงินที่คาดว่าจะได้รับ'}
+              {earnings.isActual ? 'ยอดเงินสุทธิที่ได้รับ' : 'ยอดเงินสุทธิที่คาดว่าจะได้รับ'}
             </p>
             <p
               className="text-[22px] font-bold leading-8 text-[#3AA981]"
@@ -96,8 +96,8 @@ export default function CheckOutSuccess({
             </p>
             <p className="mt-0.5 text-[11px] text-[#8A8C8E]">
               {earnings.isActual
-                ? 'ยอดโอนจริงที่ระบบบันทึกไว้แล้ว'
-                : 'ราคาบริการเต็มจำนวน'}
+                ? 'ยอดโอนจริงหลังหักค่าบริการแล้ว'
+                : `ประมาณการหลังหักค่าธรรมเนียมแพลตฟอร์ม ${earnings.feePercent}%`}
             </p>
           </div>
         </div>

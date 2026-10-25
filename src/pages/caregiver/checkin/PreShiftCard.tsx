@@ -137,7 +137,7 @@ export default function PreShiftCard({
             {price > 0 && (
               <>
                 <span aria-hidden="true" className="h-8 w-px bg-[#F0F1F3]" />
-                <Stat label="รายได้ (ประมาณ)" value={formatBaht(earnings.net)} tone="money" />
+                <Stat label="รายได้สุทธิ (ประมาณ)" value={formatBaht(earnings.net)} tone="money" />
               </>
             )}
           </div>

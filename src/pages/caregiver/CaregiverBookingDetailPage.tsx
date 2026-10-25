@@ -461,7 +461,7 @@ export default function CaregiverBookingDetailPage() {
                   <p className="m-0 font-['Bai_Jamjuree'] text-xs font-semibold text-[#575859]">สถานะการรับเงิน</p>
                   {booking.payoutAmount != null && (
                     <p className="m-0 mt-0.5 font-['Bai_Jamjuree'] text-xs text-[#8A8C8E]">
-                      ยอดรับ ฿{booking.payoutAmount.toLocaleString()}
+                      ยอดรับสุทธิ ฿{booking.payoutAmount.toLocaleString()}
                     </p>
                   )}
                 </div>
