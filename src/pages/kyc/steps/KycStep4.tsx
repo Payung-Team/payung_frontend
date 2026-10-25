@@ -25,8 +25,9 @@ import {
 import { useDrivingLicenseStrings } from '../../../lib/drivingLicenseStrings';
 import { isDrivingLicenseRegistered } from '../../../features/kyc/drivingLicenseDraft';
 import { formatLicenseDate, useLicenseStrings } from '../../../lib/licenseStrings';
-import { isDraftRegistered, storagePathFromUrl } from '../../../features/kyc/licenseDraft';
+import { isDraftRegistered, storagePathFromUrl, validateLicenseDraft } from '../../../features/kyc/licenseDraft';
 import { kycDate } from '../../../features/kyc/kycDate';
+import { uploadCroppedProfilePhoto } from '../../../lib/profilePhoto';
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
@@ -43,6 +44,8 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
     licenseDraft,
     transportChoice,
     drivingLicenseDraft,
+    profilePhoto,
+    saveProfilePhoto,
   } = useKyc();
   const ls = useLicenseStrings();
   // PYG-588: ใบประกอบฯ เฉพาะพยาบาล / นักกายภาพฯ — วิชาชีพอื่นไม่ส่งใบที่ค้างอยู่ไปกับ KYC (E1)
@@ -56,6 +59,19 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
   const [drivingLicenseError, setDrivingLicenseError] = useState('');
   const [licenseError, setLicenseError] = useState('');
   const [professionError, setProfessionError] = useState('');
+  const [photoError, setPhotoError] = useState('');
+  /** ส่ง KYC สำเร็จแล้วแต่รูปโปรไฟล์ยังอัปไม่ผ่าน — กดส่งซ้ำจะอัปรูปอย่างเดียว */
+  const [kycSent, setKycSent] = useState(false);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!profilePhoto) {
+      setPhotoPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(profilePhoto);
+    setPhotoPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [profilePhoto]);
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isConsented, setIsConsented] = useState(false);
@@ -125,14 +141,37 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
     goToStep(3);
   };
 
+  // รูปโปรไฟล์บังคับ แต่อัปโหลดได้หลังส่ง KYC เท่านั้น (ต้องมีแถว caregiver) → ล้ม = ถือว่าส่งไม่สำเร็จ ไม่ไปหน้าถัดไป
+  // คืน true เมื่อไม่มีรูปค้าง/อัปโหลดสำเร็จ
+  const uploadPendingProfilePhoto = async (): Promise<boolean> => {
+    if (!profilePhoto) return true;
+    try {
+      await uploadCroppedProfilePhoto(profilePhoto);
+      saveProfilePhoto(null);
+      return true;
+    } catch (err) {
+      console.warn('Profile photo upload after KYC failed:', err instanceof Error ? err.message : err);
+      alert('ส่งข้อมูลไม่สำเร็จ เนื่องจากอัปโหลดรูปโปรไฟล์ไม่สำเร็จ กรุณากด "ส่ง" อีกครั้งเพื่ออัปโหลดรูปใหม่');
+      return false;
+    }
+  };
+
   const handleSubmit = async () => {
     if (!step1Data) return;
+    setPhotoError('');
+    // ส่งข้อมูล KYC ไปแล้วแต่รูปล้ม → กดซ้ำอัปโหลดรูปอย่างเดียว ไม่ส่ง KYC ซ้ำ
+    if (mode !== 'resubmit' && !kycSent && !profilePhoto) {
+      setPhotoError('กรุณาอัปโหลดรูปโปรไฟล์เพื่อยืนยันตัวตน');
+      return;
+    }
     setLicenseError('');
     setProfessionError('');
     setDrivingLicenseError('');
     // R1: ใบประกอบฯ ต้องครบและบันทึกแล้วที่ขั้น 2 — กันซ้ำตอนกดส่ง (E3: วันหมดอายุตรวจอีกรอบที่ BE)
     if (needsLicense && !isDraftRegistered(licenseDraft)) {
-      setLicenseError(ls.submitLicenseError);
+      // บอกสาเหตุจริง: ช่องที่ขาด/ผิด หรือกรอกครบแต่ยังไม่ได้บันทึกกับระบบ (ต้องกด "ถัดไป" ที่ขั้นเอกสาร)
+      const missing = Object.values(validateLicenseDraft(licenseDraft, ls));
+      setLicenseError(`${ls.submitLicenseError} (${missing.length > 0 ? missing.join(' · ') : 'ยังไม่ได้บันทึกใบประกอบวิชาชีพ'})`);
       return;
     }
     // PYG-598: ต้องตอบเรื่องการรับส่ง และ "ขับเอง" ต้องบันทึกใบขับขี่แล้วที่ขั้น 2
@@ -173,9 +212,12 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
       }
 
       if (mode === 'resubmit') {
-        await resubmitKyc({
-          variables: { input: kycInput },
-        });
+        if (!kycSent) {
+          await resubmitKyc({
+            variables: { input: kycInput },
+          });
+          setKycSent(true);
+        }
 
         // Delete old docs from storage + DB (permanent cleanup on submit)
         if (pendingDeleteDocs.length > 0) {
@@ -191,19 +233,26 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
           clearPendingDeleteDocs();
         }
 
+        if (!(await uploadPendingProfilePhoto())) return;
         navigate('/kyc/status');
       } else {
-        await submitKyc({
-          variables: { input: kycInput },
-        });
+        if (!kycSent) {
+          await submitKyc({
+            variables: { input: kycInput },
+          });
+          setKycSent(true);
+        }
+        if (!(await uploadPendingProfilePhoto())) return;
         navigate('/kyc/success');
       }
     } catch (err) {
       // ห้าม log err ดิบ ๆ — message ของ GraphQL สะท้อน $input ที่มีเลขบัตร/เลขบัญชีกลับมาด้วย
       logGraphQLError(mode === 'resubmit' ? 'ResubmitKyc' : 'SubmitKyc', err);
       // PYG-588: BE ตรวจใบประกอบฯ ซ้ำตอนส่ง (เช่น วันหมดอายุผ่านไประหว่างกรอก) → พาไปแก้ที่ขั้น 2
-      if (licenseErrorCodes(err).length > 0) {
-        setLicenseError(ls.submitLicenseError);
+      const licenseCodes = licenseErrorCodes(err);
+      if (licenseCodes.length > 0) {
+        console.warn('KYC license error codes:', licenseCodes);
+        setLicenseError(`${ls.submitLicenseError} (${licenseCodes.map((c) => ls.apiError[c]).join(' · ')})`);
         return;
       }
       // PYG-598: ใบขับขี่ไม่ครบ / หมดอายุระหว่างกรอก → พาไปแก้ที่ขั้น 2
@@ -280,6 +329,18 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
             </button>
           </div>
           <div className="px-5 py-2 flex flex-col">
+            <div className="flex justify-between items-center py-2.5 border-b border-[#F1F5F9]">
+              <span className="text-[13px] font-medium text-[#64748B]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                รูปโปรไฟล์
+              </span>
+              {photoPreviewUrl ? (
+                <img src={photoPreviewUrl} alt="รูปโปรไฟล์" className="w-16 h-16 rounded-full object-cover border border-[#E2E8F0]" />
+              ) : (
+                <span className="text-[#94A3B8] text-[13px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+                  {mode === 'resubmit' ? 'ใช้รูปเดิม' : '-'}
+                </span>
+              )}
+            </div>
             <InfoRow label="ชื่อจริง" value={step1Data?.firstName || '-'} />
             <InfoRow label="นามสกุล" value={step1Data?.lastName || '-'} />
             <InfoRow label="เลขบัตรประชาชน" value={step1Data?.idCardNumber || '-'} />
@@ -492,6 +553,23 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
             >
               {ds.reviewEdit}
+            </button>
+          </div>
+        )}
+
+        {photoError && (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3">
+            <p className="flex items-start gap-2 text-[14px] text-[#B91C1C]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+              <Icon name="error" color="currentColor" style={{ fontSize: '18px' }} />
+              {photoError}
+            </p>
+            <button
+              type="button"
+              onClick={handleEditPersonalInfo}
+              className="text-[13px] font-semibold text-[#B91C1C] underline cursor-pointer"
+              style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
+            >
+              แก้ไข
             </button>
           </div>
         )}
