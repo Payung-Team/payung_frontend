@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../../components/ui/Icon';
 // ภาพ hero สร้างด้วย AI (มี metadata OpenAI/C2PA ในไฟล์) — ส่วนภาพบริการและภาพชวนสมัคร
 // วาดเองเป็น SVG ใน LandingIllustrations (PYG-687: เลิกใช้รูปที่ไม่รู้ที่มาเพื่อเลี่ยงปัญหาลิขสิทธิ์)
-import heroImage from '../../assets/banner.png';
+// PYG-712: ภาพนี้คือ LCP ของหน้าแรก — ใช้ WebP (เดิม PNG 1.7 MB) + ขนาดมือถือแยก
+import heroImage from '../../assets/banner.webp';
+import heroImageMobile from '../../assets/banner-828.webp';
 import appScreenshot1 from '../../assets/step_1.png';
 import appScreenshot2 from '../../assets/step_2.png';
 import appScreenshot3 from '../../assets/step_3.png';
@@ -131,7 +133,15 @@ const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
       {/* ═══ HERO ═══ */}
       <section className="relative isolate">
         <div className="relative min-h-[620px] bg-[#EAF4F0] overflow-hidden">
-          <img src={heroImage} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover object-right" />
+          <img
+            src={heroImage}
+            srcSet={`${heroImageMobile} 828w, ${heroImage} 1415w`}
+            sizes="100vw"
+            fetchPriority="high"
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover object-right"
+          />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,#FFFFFF_0%,rgba(255,255,255,0.7)_50%,rgba(255,255,255,0)_100%)]" />
 
           <div className="relative max-w-[1200px] mx-auto px-6">

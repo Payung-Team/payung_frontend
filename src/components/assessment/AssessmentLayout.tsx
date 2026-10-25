@@ -3,7 +3,7 @@ import { AssessmentSelfContext } from './assessmentForm';
 import { useAssessmentStrings } from '../../lib/assessmentStrings';
 import type { AssessmentEntry } from '../../lib/assessmentNav';
 import { ArrowLeftIcon, CheckIcon, InfoIcon } from './assessmentIcons';
-import logoImg from '../../assets/logo_5.png';
+import logoImg from '../../assets/logo_5.webp'; // PYG-712: เดิม PNG 1399px 406 KB · แสดงสูงสุด 100px
 
 export type AssessmentStepKey = 'adl' | 'flags' | 'summary' | 'done';
 
