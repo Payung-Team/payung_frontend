@@ -105,9 +105,8 @@ function mapGqlBooking(api: any): ConfirmedBooking {
     jobDetails: { tasks, notes: api.notes ?? '' },
     estimatedCost: (() => {
       const base = api.estimatedCost ?? 0;
-      // BE คืน platformFee/totalCost ที่ตรงกับยอดที่ตัดบัตรจริง — fallback 10% เฉพาะ API เก่าที่ยังไม่ส่งมา
-      const fee = api.platformFee ?? Math.round(base * 0.1 * 100) / 100;
-      return { hourlyRate: api.caregiver?.hourlyRate ?? 0, hours: durationHours, platformFee: fee, total: api.totalCost ?? base + fee };
+      const fee = Math.round(base * 0.1);
+      return { hourlyRate: api.caregiver?.hourlyRate ?? 0, hours: durationHours, platformFee: fee, total: base + fee };
     })(),
     // null จาก GraphQL → undefined เพื่อให้ "ไม่ได้กรอก" แยกจากค่าจริง (เช่น อายุ 0)
     recipient: resolvedPatientName || hasAnyProfileData(api.patientProfile)
