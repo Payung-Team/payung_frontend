@@ -113,10 +113,11 @@ export default function AdminDisputesPage() {
   };
 
   const columns: DataTableColumn<DisputeRow>[] = [
-    { key: 'id', header: 'Dispute ID', className: 'text-sm font-semibold text-[#2563EB] truncate', render: (r) => r.id },
-    { key: 'bookingId', header: 'Booking', className: 'text-xs text-gray-500 truncate', render: (r) => r.bookingId },
+    { key: 'id', mobile: 'subtitle', header: 'Dispute ID', className: 'text-sm font-semibold text-[#2563EB] truncate', render: (r) => r.id },
+    { key: 'bookingId', mobile: 'subtitle', header: 'Booking', className: 'text-xs text-gray-500 truncate', render: (r) => r.bookingId },
     {
       key: 'filer',
+      mobile: 'title',
       header: 'ผู้แจ้ง',
       render: (r) => (
         <div className="flex items-center gap-2">
@@ -127,15 +128,17 @@ export default function AdminDisputesPage() {
     },
     {
       key: 'amount',
+      mobile: 'meta',
       header: 'จำนวนเงิน',
       className: 'text-sm font-bold text-gray-900',
       render: (r) => formatTHB(r.amount),
     },
-    { key: 'filedAt', header: 'วันที่ยื่น', className: 'text-xs text-gray-500', render: (r) => formatThaiDate(r.filedAt) },
-    { key: 'sla', header: 'SLA คงเหลือ', render: (r) => <SlaBadge slaDueAt={r.slaDueAt} status={r.status} /> },
-    { key: 'status', header: 'สถานะ', render: (r) => <DisputeStatusBadge status={r.status} /> },
+    { key: 'filedAt', mobile: 'meta', header: 'วันที่ยื่น', className: 'text-xs text-gray-500', render: (r) => formatThaiDate(r.filedAt) },
+    { key: 'sla', mobile: 'badge', header: 'SLA คงเหลือ', render: (r) => <SlaBadge slaDueAt={r.slaDueAt} status={r.status} /> },
+    { key: 'status', mobile: 'badge', header: 'สถานะ', render: (r) => <DisputeStatusBadge status={r.status} /> },
     {
       key: 'actions',
+      mobile: 'action',
       header: 'การดำเนินการ',
       align: 'center',
       render: (r) => (

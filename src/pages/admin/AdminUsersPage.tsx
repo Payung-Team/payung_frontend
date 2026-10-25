@@ -20,6 +20,7 @@ import FilterTabs, { type FilterTabItem } from '../../components/ui/FilterTabs';
 import SearchInput from '../../components/ui/SearchInput';
 import Pagination from '../../components/ui/Pagination';
 import { accountContact } from '../../lib/phone';
+import { emailError, normalizeEmail } from '../../lib/email';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -216,8 +217,8 @@ function InviteAdminModal({ onClose, onSuccess }: Readonly<InviteModalProps>) {
     const errs: Record<string, string> = {};
     if (!form.firstName.trim()) errs.firstName = 'กรุณากรอกชื่อ';
     if (!form.lastName.trim()) errs.lastName = 'กรุณากรอกนามสกุล';
-    if (!form.email.trim()) errs.email = 'กรุณากรอกอีเมล';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'รูปแบบอีเมลไม่ถูกต้อง';
+    const emailErr = emailError(form.email);
+    if (emailErr) errs.email = emailErr;
     if (!form.role) errs.role = 'กรุณาเลือกบทบาท';
     return errs;
   }
@@ -230,7 +231,7 @@ function InviteAdminModal({ onClose, onSuccess }: Readonly<InviteModalProps>) {
     setFieldErrors({});
     inviteAdmin({
       variables: {
-        email: form.email.trim(),
+        email: normalizeEmail(form.email),
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         role: Number.parseInt(form.role, 10),
@@ -491,9 +492,8 @@ function EditAdminModal({ user, onClose, onSuccess }: Readonly<EditAdminModalPro
     if (!form.firstName.trim()) errs.firstName = 'กรุณากรอกชื่อ';
     if (!form.lastName.trim()) errs.lastName = 'กรุณากรอกนามสกุล';
     // บัญชีที่สมัครด้วยเบอร์ไม่มีอีเมล (PYG-604) — ปล่อยว่างได้ ส่วนบัญชีที่มีอีเมลอยู่แล้วห้ามลบทิ้ง
-    if (!form.email.trim()) {
-      if (user.email) errs.email = 'กรุณากรอกอีเมล';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'รูปแบบอีเมลไม่ถูกต้อง';
+    const emailErr = emailError(form.email, { required: !!user.email });
+    if (emailErr) errs.email = emailErr;
     if (!form.role) errs.role = 'กรุณาเลือกบทบาท';
     return errs;
   }
@@ -510,7 +510,7 @@ function EditAdminModal({ user, onClose, onSuccess }: Readonly<EditAdminModalPro
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         // ไม่ส่ง email = ไม่เปลี่ยน (BE: editAdminInfo รับ email แบบ optional)
-        email: form.email.trim() || undefined,
+        email: normalizeEmail(form.email) || undefined,
         role: Number.parseInt(form.role, 10),
       },
     });
@@ -1041,6 +1041,7 @@ export default function AdminUsersPage() {
   const columns = useMemo<DataTableColumn<UserSummary>[]>(() => [
     {
       key: 'displayName',
+      mobile: 'title',
       header: 'ชื่อ',
       render: (item) => (
         <div className="flex min-w-0 items-center gap-3">
@@ -1055,6 +1056,7 @@ export default function AdminUsersPage() {
     },
     {
       key: 'email',
+      mobile: 'subtitle',
       header: 'อีเมล / เบอร์โทร',
       className: 'truncate text-sm text-gray-500',
       // บัญชีที่สมัครด้วยเบอร์ไม่มีอีเมล → แสดงเบอร์ · ไม่มีทั้งคู่ → "—" (PYG-604)
@@ -1062,6 +1064,7 @@ export default function AdminUsersPage() {
     },
     {
       key: 'role',
+      mobile: 'badge',
       header: 'บทบาท',
       render: (item) => {
         const meta = ROLE_LABELS[item.role];
@@ -1078,17 +1081,20 @@ export default function AdminUsersPage() {
     },
     {
       key: 'status',
+      mobile: 'badge',
       header: 'สถานะ',
       render: (item) => <AccountStatusCell item={item} />,
     },
     {
       key: 'createdAt',
+      mobile: 'meta',
       header: 'วันที่สร้าง',
       className: 'text-sm text-gray-500',
       render: (item) => formatDate(item.createdAt),
     },
     {
       key: 'actions',
+      mobile: 'action',
       header: 'จัดการ',
       render: (item) => {
         const action = getActionType(viewerRole, item.role);
@@ -1153,12 +1159,14 @@ export default function AdminUsersPage() {
   const caregiverColumns = useMemo<DataTableColumn<UserSummary>[]>(() => [
     {
       key: 'caregiverNumber',
+      mobile: 'subtitle',
       header: 'รหัสประจำตัวผู้ดูแล',
       className: 'text-sm text-gray-700',
       render: (item) => item.caregiverNumber || '-',
     },
     {
       key: 'displayName',
+      mobile: 'title',
       header: 'ชื่อผู้ดูแล',
       render: (item) => (
         <div className="flex min-w-0 items-center gap-3">
@@ -1173,6 +1181,7 @@ export default function AdminUsersPage() {
     },
     {
       key: 'email',
+      mobile: 'subtitle',
       header: 'อีเมล / เบอร์โทร',
       className: 'truncate text-sm text-gray-500',
       // บัญชีที่สมัครด้วยเบอร์ไม่มีอีเมล → แสดงเบอร์ · ไม่มีทั้งคู่ → "—" (PYG-604)
@@ -1180,6 +1189,7 @@ export default function AdminUsersPage() {
     },
     {
       key: 'role',
+      mobile: 'badge',
       header: 'บทบาท',
       render: (item) => {
         const meta = ROLE_LABELS[item.role];
@@ -1196,6 +1206,7 @@ export default function AdminUsersPage() {
     },
     {
       key: 'kycStatus',
+      mobile: 'badge',
       header: 'สถานะ KYC',
       render: (item) => {
         const meta = KYC_STATUS_META[item.kycStatus ?? 'none'] ?? KYC_STATUS_META.none;
@@ -1212,11 +1223,13 @@ export default function AdminUsersPage() {
     },
     {
       key: 'status',
+      mobile: 'badge',
       header: 'สถานะ',
       render: (item) => <AccountStatusCell item={item} />,
     },
     {
       key: 'actions',
+      mobile: 'action',
       header: 'จัดการ',
       render: (item) => {
         const action = getActionType(viewerRole, item.role);

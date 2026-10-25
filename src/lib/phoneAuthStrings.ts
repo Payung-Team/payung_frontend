@@ -17,7 +17,7 @@ const TH = {
   registerLead: 'เลือกวิธีสมัครเพื่อเริ่มต้นใช้งาน Payung',
 
   phoneLabel: 'เบอร์โทรศัพท์',
-  phonePlaceholder: '081 234 5678',
+  phonePlaceholder: '081-234-5678',
   phoneHintLogin: 'เราจะส่งรหัสยืนยัน 6 หลักทาง SMS ไปที่เบอร์นี้',
   phoneHintSignup: 'เราจะส่งรหัสยืนยัน 6 หลักทาง SMS ไปที่เบอร์นี้ ไม่ต้องใช้อีเมลหรือรหัสผ่าน',
   phoneHintLinkExisting: 'นี่คือเบอร์ที่อยู่ในบัญชีของคุณ ตรวจสอบให้ถูกต้องแล้วกดส่งรหัสยืนยัน',
@@ -54,7 +54,7 @@ const TH = {
   goRegister: 'สมัครสมาชิก',
   goLogin: 'เข้าสู่ระบบ',
 
-  errPhoneInvalidFormat: 'เบอร์โทรศัพท์ไม่ถูกต้อง กรุณากรอกเบอร์มือถือ 10 หลัก เช่น 081 234 5678',
+  errPhoneInvalidFormat: 'เบอร์โทรศัพท์ไม่ถูกต้อง กรุณากรอกเบอร์มือถือ 10 หลัก เช่น 081-234-5678',
   errPhoneInUseSignup: 'เบอร์นี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบด้วยเบอร์นี้แทน',
   errPhoneInUseLink: 'เบอร์นี้ผูกกับบัญชีอื่นอยู่แล้ว กรุณาใช้เบอร์อื่น',
   errPhoneNotRegistered: 'ไม่พบบัญชีที่ใช้เบอร์โทรนี้',
@@ -91,7 +91,7 @@ const EN: PhoneAuthStrings = {
   registerLead: 'Choose how you would like to sign up for Payung',
 
   phoneLabel: 'Phone number',
-  phonePlaceholder: '081 234 5678',
+  phonePlaceholder: '081-234-5678',
   phoneHintLogin: 'We will text a 6-digit verification code to this number',
   phoneHintSignup: 'We will text a 6-digit verification code to this number. No email or password needed',
   phoneHintLinkExisting: 'This is the number on your account. Check that it is correct, then send the code',
@@ -128,7 +128,7 @@ const EN: PhoneAuthStrings = {
   goRegister: 'Sign up',
   goLogin: 'Sign in',
 
-  errPhoneInvalidFormat: 'That phone number is not valid. Enter a 10-digit mobile number, e.g. 081 234 5678',
+  errPhoneInvalidFormat: 'That phone number is not valid. Enter a 10-digit mobile number, e.g. 081-234-5678',
   errPhoneInUseSignup: 'This number already has an account. Please sign in with it instead',
   errPhoneInUseLink: 'This number is linked to another account. Please use a different number',
   errPhoneNotRegistered: 'No account uses this phone number',

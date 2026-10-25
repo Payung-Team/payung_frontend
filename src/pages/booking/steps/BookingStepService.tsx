@@ -7,6 +7,12 @@ import { MY_FAMILY_GROUPS, type FamilyGroup } from '../../../graphql/familyGroup
 import type { ServicePackage } from '../../../graphql/servicePackages';
 import RecommendedPackages from '../../../components/booking/RecommendedPackages';
 import { usePackageTarget } from '../../../components/booking/usePackageTarget';
+import { hourlyRateFor } from '../../../lib/bookingPrice';
+import {
+  PHYSIOTHERAPY_SERVICE_TYPE,
+  SERVICE_TYPE_MAP,
+  bookingServiceType,
+} from '../../../lib/bookingServiceType';
 import BookingMemberPicker from './BookingMemberPicker';
 
 const LOC_OPTIONS = [
@@ -42,7 +48,8 @@ const SERVICE_OPTIONS = [
     desc: 'พลิกตัว ป้องกันแผลกดทับ ดูแลสายให้อาหาร',
     homeOnly: true,
   },
-  { id: 'กายภาพบำบัด', code: 'physiotherapy', desc: 'พาเดิน ออกกำลังกายฟื้นฟูกล้ามเนื้อ' },
+  // PYG-698: id ภาษาไทยใช้เป็น key (SERVICE_TYPE_MAP ฯลฯ) ห้ามแก้ — แก้แค่ desc
+  { id: 'กายภาพบำบัด', code: 'physiotherapy', desc: 'ฟื้นฟูร่างกายและการเคลื่อนไหว โดยนักกายภาพบำบัด' },
   { id: 'ช่วยจัดการยา', code: 'medication', desc: 'จัดยา เตือนเวลาทานตามแพทย์สั่ง' },
   { id: 'เป็นเพื่อน/พูดคุย', code: 'companion', desc: 'พูดคุย ทำกิจกรรม ลดความเหงา' },
 ];
@@ -61,7 +68,11 @@ const TASK_MAP: Record<string, string[]> = {
     'เช็ดตัวทำความสะอาดบนเตียง',
     'ดูแลสายให้อาหาร / สายปัสสาวะ',
   ],
-  'กายภาพบำบัด': ['กายภาพบำบัดเบื้องต้นบนเตียง', 'พาเดินออกกำลังกายเบาๆ'],
+  'กายภาพบำบัด': [
+    'ประเมินร่างกายและการเคลื่อนไหวก่อนเริ่ม',
+    'ทำกายภาพฟื้นฟูตามสภาพร่างกาย (บนเตียงหรือนอกเตียง)',
+    'แนะนำท่าบริหารให้ญาติทำต่อที่บ้าน',
+  ],
   'ช่วยจัดการยา': ['จัดยาตามมื้อที่แพทย์สั่ง', 'เตือนและดูแลการทานยาให้ครบ'],
   'เป็นเพื่อน/พูดคุย': ['พูดคุยเป็นเพื่อน คลายเหงา', 'ทำกิจกรรมยามว่าง เช่น อ่านหนังสือ'],
 };
@@ -301,6 +312,13 @@ export default function BookingStepService() {
   //   จึงส่งเฉพาะตอนเลือกอยู่บริการเดียว (หลายบริการ = ไม่มี "ประเภทที่เลือก" ค่าเดียว → flag เป็น null)
   const singleSelected = selectedServices.length === 1 ? selectedServices[0] : null;
 
+  // PYG-696: มีกายภาพในบริการที่ติ๊ก → จองเป็นกายภาพทั้งใบ · ใช้ helper เดียวกับ payload/ราคา
+  //   กล่องแจ้งจึงขึ้นตรงกับสิ่งที่ส่งไป BE เสมอ
+  const physioWholeBooking = bookingServiceType(selectedServices) === PHYSIOTHERAPY_SERVICE_TYPE;
+  const servicesInPhysioPrice = selectedServices.filter(
+    (name) => SERVICE_TYPE_MAP[name] !== PHYSIOTHERAPY_SERVICE_TYPE,
+  );
+
   return (
     <div className="space-y-4">
       {/* Error banner */}
@@ -404,6 +422,27 @@ export default function BookingStepService() {
             );
           })}
         </div>
+        {physioWholeBooking && (
+          <div
+            role="status"
+            className="mt-3 flex items-start gap-2.5 p-3 bg-[#F0FAF4] border border-[#BFE0D6] rounded-lg"
+          >
+            <span className="material-icons text-[#52B69A]" style={{ fontSize: 20 }}>
+              info
+            </span>
+            <div className="text-xs text-[#1B5C48] leading-relaxed">
+              <div className="text-sm font-bold">
+                คิดราคากายภาพ {hourlyRateFor(PHYSIOTHERAPY_SERVICE_TYPE).toLocaleString()} ฿/ชม.
+                ทั้งการจอง
+              </div>
+              <div className="mt-0.5">
+                {servicesInPhysioPrice.length > 0
+                  ? `${servicesInPhysioPrice.join(', ')} คิดรวมในราคานี้ และระบบจะจับคู่เฉพาะนักกายภาพบำบัด`
+                  : 'ระบบจะจับคู่เฉพาะนักกายภาพบำบัด'}
+              </div>
+            </div>
+          </div>
+        )}
         {isAccompanyOnly && selectedServices.includes('ดูแลผู้ป่วยติดเตียง') && (
           <p className="mt-3 text-xs text-[#6B5A21] bg-[#FDF6E3] border border-[#E8D9A8] rounded-lg p-3 leading-relaxed">
             "ดูแลผู้ป่วยติดเตียง" ใช้ได้เฉพาะงานที่มีการดูแลที่บ้าน — เลือก "ที่บ้านผู้ป่วย" หรือ
@@ -520,7 +559,11 @@ export default function BookingStepService() {
               value={notes}
               onChange={(e) => setNotes(e.target.value.slice(0, 500))}
               rows={3}
-              placeholder="เช่น ระวังเรื่องการลุกนั่งจากเก้าอี้กระทันหัน, ผู้สูงอายุมีปัญหาการทรงตัว"
+              placeholder={
+                physioWholeBooking
+                  ? 'เช่น เพิ่งผ่าตัดสะโพก 2 สัปดาห์ ปวดเข่าขวา อยากกลับมาเดินเองได้'
+                  : 'เช่น ระวังเรื่องการลุกนั่งจากเก้าอี้กระทันหัน, ผู้สูงอายุมีปัญหาการทรงตัว'
+              }
               className="mt-2 w-full p-3 border border-[#E0E2E5] rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#52B69A] resize-none"
               maxLength={500}
             />

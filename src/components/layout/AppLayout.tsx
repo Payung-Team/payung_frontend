@@ -12,6 +12,7 @@ import MobileNavigation from './Navigation';
 import ViewProfileModal from './ViewProfileModal';
 import EditProfileModal from './EditProfileModal';
 import { ToastContainer } from '../ui/Toast';
+import { logGraphQLError } from '../../lib/logGraphQLError';
 
 interface AppLayoutProps {
   readonly children: React.ReactNode;
@@ -55,19 +56,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   // Redirect immediately when caregiver data is available
   useEffect(() => {
-    console.log('AppLayout: Checking KYC/Onboarding redirect', {
-      currentRole,
-      caregiverLoading,
-      caregiverError: caregiverError?.message,
-      hasData: !!caregiverData?.myCaregiverProfile,
-      kycStatus: caregiverData?.myCaregiverProfile?.kycStatus,
-      currentPath: location.pathname,
-    });
 
     if (currentRole === 2 && !caregiverLoading) {
       // If error occurred or no data, skip redirect (user might not have profile yet)
       if (caregiverError || !caregiverData?.myCaregiverProfile) {
-        console.warn('Caregiver profile not found or error:', caregiverError);
+        if (caregiverError) logGraphQLError('MyCaregiverProfile', caregiverError);
         return;
       }
 
@@ -95,11 +88,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
       // Redirect based on KYC status
       if (kycStatus === 'none' && !isAllowedPath) {
         // Not started - go to KYC form
-        console.log('Redirecting caregiver to /kyc (KYC not started)');
         navigate('/kyc', { replace: true });
       } else if (kycStatus === 'pending' && !isAllowedPath) {
         // Pending verification - go to KYC status page
-        console.log('Redirecting caregiver to /kyc/status (KYC pending)');
         navigate('/kyc/status', { replace: true });
       }
     }

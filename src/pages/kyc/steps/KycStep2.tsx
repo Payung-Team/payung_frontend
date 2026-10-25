@@ -454,9 +454,9 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
   }
 
   return (
-    <div className={mode === 'resubmit' ? '' : 'min-h-[calc(100vh-64px)] bg-[#F2F4F6] flex items-center justify-center px-4 py-10'}>
+    <div className={mode === 'resubmit' ? '' : 'min-h-[calc(100vh-64px)] bg-[#F2F4F6] flex items-center justify-center px-4 py-6 sm:py-10'}>
       <div
-        className={mode === 'resubmit' ? 'w-full flex flex-col gap-[28px]' : 'w-[720px] bg-white rounded-[20px] border border-[#F1F5F9] px-14 py-12 flex flex-col gap-[28px]'}
+        className={mode === 'resubmit' ? 'w-full flex flex-col gap-[28px]' : 'w-full max-w-[720px] bg-white rounded-[20px] border border-[#F1F5F9] px-5 py-6 sm:px-14 sm:py-12 flex flex-col gap-6 sm:gap-[28px]'}
         style={mode === 'resubmit' ? {} : {
           boxShadow: '0px 12px 28px -6px rgba(15, 23, 43, 0.06), 0px 1px 2px rgba(15, 23, 43, 0.04)',
         }}
@@ -466,7 +466,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
         {mode !== 'resubmit' && (
           <div className="flex flex-col gap-1.5">
             <h2
-              className="text-2xl font-bold text-[#0F172A] leading-[30px]"
+              className="text-xl sm:text-2xl font-bold text-[#0F172A] leading-[30px]"
               style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
             >
               อัปโหลดเอกสาร
@@ -539,9 +539,10 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                     {ls.extraDocsTitle}
                   </p>
                 )}
+                {/* minHeight แทน height — มือถือชื่อเอกสารตัดเป็น 2 บรรทัดได้โดยไม่ล้นกรอบ */}
                 <div
-                  className={`flex items-center gap-4 px-5 py-4 rounded-[20px] transition-all ${containerClass}`}
-                  style={{ height: '72px' }}
+                  className={`flex items-center gap-3 sm:gap-4 px-3.5 py-3 sm:px-5 sm:py-4 rounded-[16px] sm:rounded-[20px] transition-all ${containerClass}`}
+                  style={{ minHeight: '72px' }}
                 >
                   {/* Doc Icon Box */}
                   <div 
@@ -557,7 +558,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                   {/* Text Information */}
                   <div className="flex-1 min-w-0">
                     <p
-                      className={`text-[15px] font-semibold leading-[19px] ${
+                      className={`text-[14px] sm:text-[15px] font-semibold leading-[19px] ${
                         mode === 'resubmit' && !isEdited
                           ? 'text-[#4B5563]'
                           : isError ? 'text-[#C62828]' : 'text-[#0F172A]'
@@ -565,6 +566,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                       style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
                     >
                       {title}
+                      {doc.required && <span className="text-red-600" aria-hidden="true"> *</span>}
                     </p>
                     <p
                       className={`text-[13px] leading-[16px] truncate ${
@@ -585,7 +587,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     {/* Uploading spinner */}
                     {isUploading && (
                       <button type="button" disabled className="w-9 h-9 opacity-40 cursor-not-allowed flex items-center justify-center">
@@ -625,7 +627,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
                       <button
                         type="button"
                         onClick={() => fileRefs.current[doc.type]?.click()}
-                        className="w-[61px] h-9 bg-white border border-[#951E1E] rounded-lg flex items-center justify-center cursor-pointer"
+                        className="w-9 sm:w-[61px] h-9 bg-white border border-[#951E1E] rounded-lg flex items-center justify-center cursor-pointer"
                       >
                         <Icon name="file_upload" color="#C62828" style={{ fontSize: '18px' }} />
                       </button>
@@ -729,7 +731,7 @@ export default function KycStep2({ mode = 'create' }: { mode?: 'create' | 'resub
             type="button"
             disabled={!canProceed}
             onClick={() => void handleNext()}
-            className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-150 ${
+            className={`px-6 sm:px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-150 ${
               canProceed
                 ? 'bg-[#2D6A58] text-white hover:bg-[#255a4a] active:scale-[0.98] cursor-pointer'
                 : 'bg-[#CBD5E1] text-white cursor-not-allowed shadow-none'

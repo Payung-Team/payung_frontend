@@ -20,6 +20,7 @@ import Icon from '../../components/ui/Icon';
 import Skeleton from '../../components/ui/Skeleton';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import ImageModal from '../../components/ui/ImageModal';
+import { kycDateTime } from '../../features/kyc/kycDate';
 
 interface IdCardDocument {
   id: string;
@@ -87,16 +88,7 @@ const REVIEW_ACTION_META: Record<string, { label: string; dot: string }> = {
 };
 
 function formatThaiDateTime(value?: string | null) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('th-TH-u-ca-gregory', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  return kycDateTime(value);
 }
 
 /** 1509966392215 → 1-5099-66392-21-5 (รูปแบบเดียวกับบนบัตร) */

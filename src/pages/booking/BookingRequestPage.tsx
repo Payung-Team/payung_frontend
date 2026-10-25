@@ -6,6 +6,7 @@ import { useMatchingBooking } from '../../hooks/useMatchingBooking';
 import { useAssessmentStrings } from '../../lib/assessmentStrings';
 import { formatBookingTimeRange } from '../../lib/bookingTime';
 import { estimateBookingCost } from '../../lib/bookingPrice';
+import { bookingServiceType } from '../../lib/bookingServiceType';
 import BookingStepService from './steps/BookingStepService';
 import BookingStepDateTime from './steps/BookingStepDateTime';
 import BookingStepLocation from './steps/BookingStepLocation';
@@ -196,12 +197,13 @@ export default function BookingRequestPage() {
   // PYG-525: duration มีค่าเมื่อเลือกเวลาเริ่ม + เวลาสิ้นสุดครบในขั้นวันเวลา (คำนวณจากสองเวลานั้น)
   const selectedDuration = bookingDraft?.dateTime?.duration || 0;
   const duration = selectedDuration;
+  // PYG-694: เรตตามบริการที่ booking จะถูกส่งไปจริง (กายภาพบำบัด 800 / อื่น ๆ 300)
   const {
     hourlyRate: averageHourlyRate,
     serviceCost: rawCost,
     platformFee,
     total: totalEstimated,
-  } = estimateBookingCost(duration);
+  } = estimateBookingCost(duration, bookingServiceType(bookingDraft?.serviceTypes));
 
   const locs = bookingDraft?.serviceLocation || [];
   const locName =

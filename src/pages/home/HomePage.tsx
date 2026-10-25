@@ -1,26 +1,19 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '../../components/ui/Icon';
+// ภาพ hero สร้างด้วย AI (มี metadata OpenAI/C2PA ในไฟล์) — ส่วนภาพบริการและภาพชวนสมัคร
+// วาดเองเป็น SVG ใน LandingIllustrations (PYG-687: เลิกใช้รูปที่ไม่รู้ที่มาเพื่อเลี่ยงปัญหาลิขสิทธิ์)
 import heroImage from '../../assets/banner.png';
-import cardImage from '../../assets/caregiver_2.png';
-import careService1 from '../../assets/careservice_1.jpg';
-import careService2 from '../../assets/careservice_2.jpg';
-import careService3 from '../../assets/careservice_3.jpg';
-import careService4 from '../../assets/careservice_4.jpg';
 import appScreenshot1 from '../../assets/step_1.png';
 import appScreenshot2 from '../../assets/step_2.png';
 import appScreenshot3 from '../../assets/step_3.png';
-
-
-/** Dashed grey box standing in for artwork that has not been supplied yet. */
-const ImagePlaceholder: React.FC<{ label: string; className?: string }> = ({ label, className = '' }) => (
-  <div
-    className={`flex flex-col items-center justify-center rounded-xl bg-[#F1F5F4] border-[1.6px] border-dashed border-[#CBD5D1] ${className}`}
-  >
-    <Icon name="image" size="large" color="#9AA5A1" />
-    <span className="mt-1.5 text-[11px] font-semibold tracking-[0.275px] text-[#9AA5A1]">{label}</span>
-  </div>
-);
+import {
+  BedCareArt,
+  DoctorVisitArt,
+  ElderCareArt,
+  FamilyCareArt,
+  PhysioArt,
+} from './LandingIllustrations';
 
 /**
  * Phone mockup frame for the app screenshots. Drop a screenshot into `image`
@@ -60,9 +53,8 @@ const appScreens: { label: string; image?: string }[] = [
 ];
 
 const heroHighlights = [
-  { icon: 'verified_user', label: 'ผู้ดูแลผ่าน KYC ทุกคน' },
-  { icon: 'lock', label: 'ชำระเงินปลอดภัย' },
-  { icon: 'support_agent', label: 'ทีมงานดูแลตลอดงาน' },
+  { icon: 'verified_user', label: 'ผู้ดูแลทุกคนยืนยันตัวตนแล้ว' },
+  { icon: 'lock', label: 'ชำระเงินปลอดภัยผ่านระบบ' },
 ];
 
 const quickActions = [
@@ -89,51 +81,43 @@ const quickActions = [
   },
 ];
 
-/** `image` wins when supplied; otherwise the dashed `placeholder` box is shown. */
-const services: { title: string; description: string; placeholder: string; image?: string }[] = [
+const services: { title: string; description: string; Art: React.FC<{ label: string }> }[] = [
   {
     title: 'ดูแลผู้สูงอายุ',
-    description: 'ช่วยเหลือกิจวัตรประจำวัน เตรียมอาหาร และเป็นเพื่อนพูดคุย',
-    placeholder: 'รูปบริการ 1',
-    image: careService1,
+    description: 'ช่วยเรื่องกิจวัตรประจำวัน เตรียมอาหาร และอยู่เป็นเพื่อนพูดคุยไม่ให้เหงา',
+    Art: ElderCareArt,
   },
   {
     title: 'ดูแลผู้ป่วยติดเตียง',
-    description: 'พลิกตัว ทำความสะอาด ป้อนอาหาร และดูแลแผลกดทับ',
-    placeholder: 'รูปบริการ 2',
-    image: careService2,
+    description: 'ช่วยพลิกตัว เช็ดตัว ป้อนอาหาร และดูแลผิวเพื่อป้องกันแผลกดทับ',
+    Art: BedCareArt,
   },
   {
     title: 'กายภาพบำบัด',
-    description: 'ฟื้นฟูการเคลื่อนไหวโดยนักกายภาพบำบัดวิชาชีพ',
-    placeholder: 'รูปบริการ 3',
-    image: careService3,
+    description: 'ฟื้นฟูการเคลื่อนไหวถึงบ้าน โดยนักกายภาพบำบัดมืออาชีพ',
+    Art: PhysioArt,
   },
   {
-    title: 'พาไปโรงพยาบาล',
-    description: 'รับส่ง ดูแลระหว่างพบแพทย์ และรับยาแทน',
-    placeholder: 'รูปบริการ 4',
-    image: careService4,
+    title: 'ดูแลระหว่างพบแพทย์',
+    description: 'รับ–ส่งโรงพยาบาล อยู่เป็นเพื่อนระหว่างรอตรวจ และช่วยรับยา',
+    Art: DoctorVisitArt,
   },
 ];
 
 const steps = [
   {
-    title: 'บอกความต้องการ',
-    description: 'เลือกบริการ วันเวลา สถานที่ และรายละเอียดผู้รับบริการ',
+    title: 'บอกสิ่งที่ต้องการ',
+    description: 'เลือกบริการ วันเวลา และสถานที่ พร้อมบอกข้อมูลของผู้รับบริการ',
   },
   {
-    title: 'เลือกผู้ดูแล',
-    description: 'ระบบจับคู่ผู้ดูแลในพื้นที่ให้ เลือกจากประวัติและคะแนนรีวิว',
+    title: 'เลือกผู้ดูแลที่ใช่',
+    description: 'ระบบคัดผู้ดูแลในพื้นที่มาให้ เลือกได้จากประวัติและคะแนนรีวิว',
   },
   {
-    title: 'ชำระเงินและติดตาม',
-    description: 'ชำระผ่านระบบ เงินถูกพักไว้จนงานเสร็จ ติดตามสถานะได้ตลอด',
+    title: 'ชำระเงินและติดตามงาน',
+    description: 'ชำระผ่านระบบอย่างปลอดภัย เงินจะถึงผู้ดูแลเมื่องานเสร็จ และติดตามสถานะได้ตลอด',
   },
 ];
-
-const footerServiceLinks = ['ดูแลผู้สูงอายุ', 'ดูแลผู้ป่วยติดเตียง', 'กายภาพบำบัด', 'พาไปโรงพยาบาล'];
-const footerHelpLinks = ['คำถามที่พบบ่อย', 'ติดต่อเรา', 'เงื่อนไขการใช้บริการ', 'นโยบายความเป็นส่วนตัว'];
 
 interface HomePageProps {
   /** Guest view: hides the signed-in-only quick actions and shows the sign-up CTA. */
@@ -166,8 +150,8 @@ const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
               </h1>
 
               <p className="mt-6 max-w-[520px] text-base leading-7 text-[#3F5049]">
-                จองผู้ดูแลที่ผ่านการตรวจสอบประวัติแล้ว เลือกวันเวลาที่สะดวก
-                ติดตามการให้บริการแบบเรียลไทม์ และชำระเงินอย่างปลอดภัยผ่านระบบ
+                เลือกผู้ดูแลที่ผ่านการตรวจสอบประวัติ ในวันและเวลาที่คุณสะดวก
+                ติดตามการดูแลได้ทุกขั้นตอน และชำระเงินอย่างปลอดภัยผ่านระบบ
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-3">
@@ -215,32 +199,26 @@ const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
       <section className="max-w-[1200px] mx-auto px-6 pt-20">
         <div className="max-w-[560px] mx-auto text-center">
           <p className="text-[13px] font-bold tracking-[1.2px] uppercase text-[#009265]">บริการของเรา</p>
-          <h2 className="mt-2 text-[32px] leading-[48px] font-bold text-[#1A1A1A]">เลือกบริการที่ตรงกับความต้องการ</h2>
+          <h2 className="mt-2 text-[32px] leading-[48px] font-bold text-[#1A1A1A]">การดูแลที่เหมาะกับคนที่คุณรัก</h2>
           <p className="mt-3 text-[15px] leading-7 text-[#8A8C8E]">
-            ผู้ดูแลของเราผ่านการอบรมและตรวจสอบประวัติ พร้อมดูแลตั้งแต่งานประจำวันจนถึงการดูแลเฉพาะทาง
+            ผู้ดูแลทุกคนผ่านการตรวจสอบประวัติและยืนยันตัวตน พร้อมดูแลตั้งแต่กิจวัตรประจำวันไปจนถึงการดูแลเฉพาะทาง
           </p>
         </div>
 
         <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {services.map(service => (
+          {services.map(({ title, description, Art }) => (
             <article
-              key={service.title}
+              key={title}
               className="flex flex-col bg-white rounded-xl border border-[#F3F4F6] shadow-[0_1px_2px_rgba(0,0,0,0.05)] overflow-hidden"
             >
               <div className="p-3 pb-0">
-                {service.image ? (
-                  <img
-                    src={service.image}
-                    alt={service.title}
-                    className="h-[150px] w-full rounded-xl object-cover"
-                  />
-                ) : (
-                  <ImagePlaceholder label={service.placeholder} className="h-[150px]" />
-                )}
+                <div className="aspect-[8/5] w-full overflow-hidden rounded-xl">
+                  <Art label={title} />
+                </div>
               </div>
               <div className="p-5">
-                <h3 className="text-base font-bold leading-6 text-[#1A1A1A]">{service.title}</h3>
-                <p className="mt-1.5 text-[13px] leading-6 text-[#8A8C8E]">{service.description}</p>
+                <h3 className="text-base font-bold leading-6 text-[#1A1A1A]">{title}</h3>
+                <p className="mt-1.5 text-[13px] leading-6 text-[#8A8C8E]">{description}</p>
               </div>
             </article>
           ))}
@@ -264,7 +242,7 @@ const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
 
           <div>
             <p className="text-[13px] font-bold tracking-[1.2px] uppercase text-[#009265]">ใช้งานง่ายใน 3 ขั้นตอน</p>
-            <h2 className="mt-2 text-[32px] leading-10 font-bold text-[#1A1A1A]">จองผู้ดูแลได้ในไม่กี่นาที</h2>
+            <h2 className="mt-2 text-[32px] leading-10 font-bold text-[#1A1A1A]">จองผู้ดูแลได้ง่าย ๆ ในไม่กี่นาที</h2>
 
             <ol className="mt-8 flex flex-col gap-7">
               {steps.map((step, index) => (
@@ -290,60 +268,37 @@ const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
           <div>
             <h2 className="text-[32px] leading-10 font-bold text-white">ให้เราช่วยดูแลคนที่คุณรัก</h2>
             <p className="mt-4 text-[15px] leading-7 text-white/80">
-              เริ่มจองผู้ดูแลวันนี้ หรือชวนคนในครอบครัวเข้ากลุ่มเพื่อช่วยกันดูแลและจองแทนกันได้
+              สมัครวันนี้แล้วเริ่มจองผู้ดูแลได้ทันที ชวนคนในครอบครัวเข้ากลุ่มเดียวกัน
+              เพื่อช่วยกันดูแลและจองแทนกันได้
             </p>
             <Link
               to="/register"
               className="mt-8 inline-flex items-center rounded-lg bg-white px-6 py-3 text-sm font-semibold text-[#005C3E] no-underline transition-colors hover:bg-[#EAF4F0]"
             >
-              สร้างโปรไฟล์เพื่อเริ่มการจอง
+              สมัครสมาชิกและเริ่มจอง
             </Link>
           </div>
           <div className="flex justify-center">
-            {/* Square source with wide margins — fill the box height rather than
-                its width, or the figure ends up tiny and letterboxed. */}
-            <img src={cardImage} alt="" aria-hidden="true" className="h-[320px] w-auto max-w-full object-contain" />
+            <FamilyCareArt className="h-[320px] w-auto max-w-full" />
           </div>
         </div>
       </section>
       )}
 
-      {/* ═══ FOOTER ═══ */}
+      {/* ═══ FOOTER ═══ PYG-701: เหลือแค่คำอธิบาย Payung — เมนูบริการ/ช่วยเหลือ และอีเมล/เบอร์ติดต่อ
+          เป็นข้อมูลสมมติ (ยังไม่มีหน้าปลายทางและช่องทางติดต่อจริง) จึงเอาออก */}
       <footer className="mt-16 bg-[#005C3E] text-white">
-        <div className="max-w-[1200px] mx-auto px-6 py-16">
-          <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-10">
-            <div>
-              <div className="flex items-center gap-1">
-                <span className="text-[22px] font-bold leading-8 tracking-[-0.55px] text-white">payung</span>
-                <Icon name="eco" color="#52B69A" />
-              </div>
-              <p className="mt-3 max-w-[380px] text-[13px] leading-6 text-white/70">
-                แพลตฟอร์มจัดหาผู้ดูแลถึงบ้าน ผู้ดูแลผ่านการตรวจสอบประวัติ พร้อมระบบชำระเงินที่ปลอดภัย
-              </p>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-bold text-white">บริการ</h3>
-              <ul className="mt-4 flex flex-col gap-2.5">
-                {footerServiceLinks.map(label => (
-                  <li key={label} className="text-[13px] leading-5 text-white/70">{label}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-bold text-white">ช่วยเหลือ</h3>
-              <ul className="mt-4 flex flex-col gap-2.5">
-                {footerHelpLinks.map(label => (
-                  <li key={label} className="text-[13px] leading-5 text-white/70">{label}</li>
-                ))}
-              </ul>
-            </div>
+        <div className="max-w-[1200px] mx-auto px-6 py-12">
+          <div className="flex items-center gap-1">
+            <span className="text-[22px] font-bold leading-8 tracking-[-0.55px] text-white">payung</span>
+            <Icon name="eco" color="#52B69A" />
           </div>
+          <p className="mt-3 max-w-[380px] text-[13px] leading-6 text-white/70">
+            แพลตฟอร์มจัดหาผู้ดูแลถึงบ้าน ผู้ดูแลผ่านการตรวจสอบประวัติ พร้อมระบบชำระเงินที่ปลอดภัย
+          </p>
 
-          <div className="mt-12 pt-6 border-t border-white/15 flex flex-col sm:flex-row justify-between gap-2 text-xs text-white/60">
-            <span>© 2569 Payung · แพลตฟอร์มจัดหาผู้ดูแลที่บ้าน</span>
-            <span>contact@payung.app · 02-123-4567</span>
+          <div className="mt-8 pt-6 border-t border-white/15 text-xs text-white/60">
+            © 2569 Payung · แพลตฟอร์มจัดหาผู้ดูแลที่บ้าน
           </div>
         </div>
       </footer>

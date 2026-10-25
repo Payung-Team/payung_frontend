@@ -17,6 +17,7 @@ import PhoneEntryForm from '../../components/auth/PhoneEntryForm';
 import PhoneOtpStep from '../../components/auth/PhoneOtpStep';
 import { usePhoneAuth } from '../../hooks/usePhoneAuth';
 import { PHONE_AUTH_ENABLED } from '../../lib/phone';
+import { emailError, normalizeEmail } from '../../lib/email';
 import type { PhoneAuthResult } from '../../lib/phoneAuthErrors';
 import { usePhoneAuthStrings } from '../../lib/phoneAuthStrings';
 
@@ -114,11 +115,9 @@ export default function Login() {
 
   const validate = useCallback((): FormErrors => {
     const errs: FormErrors = {};
-    if (!email.trim()) {
-      errs.email = 'กรุณากรอกอีเมล';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errs.email = 'กรุณากรอกอีเมลที่ถูกต้อง';
-    }
+    // PYG-708: กติกาเดียวกับ BE @ValidAppEmail — src/lib/email.ts
+    const emailErr = emailError(email);
+    if (emailErr) errs.email = emailErr;
     if (!password) {
       errs.password = 'กรุณากรอกรหัสผ่าน';
     }
@@ -142,7 +141,7 @@ export default function Login() {
       try {
         await loginMutation({
           variables: {
-            email,
+            email: normalizeEmail(email),
             password,
           },
         });

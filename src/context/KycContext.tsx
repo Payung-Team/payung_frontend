@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { LicenseStatus } from '../lib/license';
 import type { Profession } from '../lib/professions';
 import { EMPTY_LICENSE_DRAFT } from '../features/kyc/licenseDraftState';
@@ -141,6 +141,11 @@ export function KycProvider({ children }: { children: ReactNode }) {
   const [licenseDraft, setLicenseDraft] = useState<LicenseDraft>(EMPTY_LICENSE_DRAFT);
   const [transportChoice, setTransportChoice] = useState<TransportChoice>('');
   const [drivingLicenseDraft, setDrivingLicenseDraft] = useState<DrivingLicenseDraft>(EMPTY_DRIVING_LICENSE_DRAFT);
+
+  // เปลี่ยนขั้น (ถัดไป / ย้อนกลับ / แก้ไข) = เริ่มดูจากบนสุดของหน้า — ไม่ค้างตำแหน่งปุ่มของขั้นก่อน
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [step]);
 
   function saveDoc(doc: UploadedDoc) {
     setUploadedDocs((prev) => {

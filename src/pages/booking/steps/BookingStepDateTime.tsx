@@ -1,17 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBooking } from '../../../context/BookingContext';
 import {
+  BOOKING_FORM_STEP_MINUTES,
   bookingDurationHours,
   bookingEndOptions,
   bookingStartOptions,
   defaultBookingEndTime,
+  formatDurationHours,
+  timeToMinutes,
 } from '../../../lib/bookingTime';
 import { estimateBookingCost } from '../../../lib/bookingPrice';
+import { bookingServiceType } from '../../../lib/bookingServiceType';
 
 // PYG-525 (การ์ดแม่ PYG-490): เลือกแค่ "วันที่ + เวลาเริ่ม + เวลาสิ้นสุด"
 //   เลิกให้เลือกช่วงเช้า/บ่าย/เย็น และจำนวนชั่วโมงเอง — BE อนุมาน timeSlot และคำนวณ durationHours
 //   ตัวเลือกเวลาทั้งหมดมาจาก lib/bookingTime.ts ซึ่งตรงกับกฎของ BE (booking-time.ts)
 //   ใช้ทั้งจองให้ตัวเองและจองแทนในกลุ่มครอบครัว (ฟอร์มเดียวกัน)
+// PYG-689: เวลาเริ่ม–สิ้นสุดอยู่แถวเดียวกันเป็น dropdown 2 ช่อง และเลือกได้ทีละ 1 ชั่วโมง
+//   (เดิมเป็นปุ่มทีละ 30 นาทีสองตาราง ยาวมากบนมือถือ) — select ของเบราว์เซอร์เปิดตัวเลือกแบบวงล้อบนมือถือให้เอง
 
 const QUICK_DATES = [
   { offset: 0, label: 'วันนี้' },
@@ -57,33 +63,74 @@ function fmtHours(hours: number) {
   return `${Math.round(hours * 100) / 100} ชั่วโมง`;
 }
 
-function TimeButton({
+/** ร่างที่ค้างจากฟอร์มเดิม (ทีละ 30 นาที) ที่ไม่ลงตัวกับรายชั่วโมง — ถือว่ายังไม่ได้เลือก */
+function onFormStep(time?: string | null): string {
+  const minutes = timeToMinutes(time);
+  return minutes !== null && minutes % BOOKING_FORM_STEP_MINUTES === 0 ? (time as string) : '';
+}
+
+function TimeSelect({
+  id,
   label,
-  sub,
-  active,
-  onClick,
+  value,
+  placeholder,
+  options,
+  disabled,
+  invalid,
+  onChange,
 }: {
+  id: string;
   label: string;
-  sub?: string;
-  active: boolean;
-  onClick: () => void;
+  value: string;
+  placeholder: string;
+  options: { value: string; label: string }[];
+  disabled?: boolean;
+  invalid?: boolean;
+  onChange: (value: string) => void;
 }) {
+  const filled = !!value && !disabled;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`flex flex-col items-center justify-center min-h-[52px] px-2 py-2 rounded-xl border transition cursor-pointer ${
-        active
-          ? 'bg-[#52B69A] border-[#52B69A] text-white'
-          : 'bg-white border-[#E0E2E5] text-[#1A1A1A] hover:bg-gray-50'
-      }`}
-    >
-      <span className="text-base font-bold">{label}</span>
-      {sub && (
-        <span className={`text-[11px] ${active ? 'text-white/90' : 'text-[#8A8C8E]'}`}>{sub}</span>
-      )}
-    </button>
+    <div className="min-w-0">
+      <label htmlFor={id} className="block text-sm font-bold text-[#575859]">
+        {label}
+      </label>
+      <div className="relative mt-1.5">
+        <select
+          id={id}
+          value={value}
+          disabled={disabled}
+          aria-invalid={invalid || undefined}
+          onChange={(e) => onChange(e.target.value)}
+          className={`h-[52px] w-full appearance-none truncate rounded-xl border pl-3.5 pr-9 text-[15px] font-semibold outline-none transition sm:pl-4 sm:text-base ${
+            disabled
+              ? 'cursor-not-allowed border-[#E0E2E5] bg-gray-50 text-gray-400'
+              : invalid
+                ? 'cursor-pointer border-[#DC3545] bg-white text-[#1A1A1A]'
+                : filled
+                  ? 'cursor-pointer border-[#52B69A] bg-[#F0FAF4] text-[#1B5C48] focus:ring-2 focus:ring-[#52B69A]/30'
+                  : 'cursor-pointer border-[#E0E2E5] bg-white text-[#8A8C8E] hover:border-[#BFE0D6] focus:border-[#52B69A] focus:ring-2 focus:ring-[#52B69A]/30'
+          }`}
+        >
+          <option value="" disabled>
+            {placeholder}
+          </option>
+          {options.map((o) => (
+            <option key={o.value} value={o.value} className="text-[#1A1A1A]">
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <span
+          aria-hidden="true"
+          className={`material-icons pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 ${
+            disabled ? 'text-gray-300' : 'text-[#52B69A]'
+          }`}
+          style={{ fontSize: 22 }}
+        >
+          expand_more
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -91,8 +138,8 @@ export default function BookingStepDateTime() {
   const { bookingDraft, setBookingDraft, goToStep, setStepSubmit, setStepMissing } = useBooking();
 
   const [date, setDate] = useState(bookingDraft?.dateTime?.date || '');
-  const [startTime, setStartTime] = useState(bookingDraft?.dateTime?.startTime || '');
-  const [endTime, setEndTime] = useState(bookingDraft?.dateTime?.endTime || '');
+  const [startTime, setStartTime] = useState(() => onFormStep(bookingDraft?.dateTime?.startTime));
+  const [endTime, setEndTime] = useState(() => onFormStep(bookingDraft?.dateTime?.endTime));
   const [error, setError] = useState<Record<string, string>>({});
 
   // นาฬิกาเดินทุกนาที — เปิดหน้าค้างไว้แล้วเวลาที่ผ่านไปต้องหายไปเองด้วย
@@ -104,16 +151,17 @@ export default function BookingStepDateTime() {
 
   const todayIso = localIsoDate(now);
   const nowMinute = now.getHours() * 60 + now.getMinutes();
-  const optionsFor = (iso: string) => bookingStartOptions(iso === todayIso ? nowMinute : undefined);
+  const optionsFor = (iso: string) =>
+    bookingStartOptions(iso === todayIso ? nowMinute : undefined, BOOKING_FORM_STEP_MINUTES);
 
   // ร่างที่ค้างใน sessionStorage อาจเป็นวันที่ผ่านไปแล้ว — ถือว่ายังไม่ได้เลือก
   const dateValid = !!date && date >= todayIso;
   const startOptions = dateValid ? optionsFor(date) : [];
-  const endOptions = bookingEndOptions(startTime);
+  const endOptions = bookingEndOptions(startTime, BOOKING_FORM_STEP_MINUTES);
   const startValid = startOptions.includes(startTime);
   const endValid = startValid && endOptions.includes(endTime);
   const duration = endValid ? bookingDurationHours(startTime, endTime) : 0;
-  const cost = estimateBookingCost(duration);
+  const cost = estimateBookingCost(duration, bookingServiceType(bookingDraft?.serviceTypes));
 
   // Auto-save — duration เก็บเฉพาะเมื่อเวลาครบและถูกกฎ (sidebar ใช้แสดงราคา)
   useEffect(() => {
@@ -144,7 +192,9 @@ export default function BookingStepDateTime() {
 
   const selectStart = (t: string) => {
     setStartTime(t);
-    setEndTime(defaultBookingEndTime(t));
+    // เปลี่ยนเวลาเริ่มแล้วเวลาสิ้นสุดเดิมยังใช้ได้ (ยาว 1–12 ชม.) → คงไว้ ไม่ต้องให้เลือกใหม่
+    const keepEnd = bookingEndOptions(t, BOOKING_FORM_STEP_MINUTES).includes(endTime);
+    if (!keepEnd) setEndTime(defaultBookingEndTime(t, BOOKING_FORM_STEP_MINUTES));
     clearError('startTime', 'endTime');
   };
 
@@ -272,55 +322,54 @@ export default function BookingStepDateTime() {
         {error.date && <p className="mt-3 text-xs font-semibold text-red-600">{error.date}</p>}
       </section>
 
-      {/* Time */}
+      {/* Time — เวลาเริ่ม → เวลาสิ้นสุด อยู่แถวเดียวกัน (PYG-689) */}
       <section className="bg-white p-6 rounded-2xl border border-gray-100">
-        <h2 className="text-lg font-bold text-[#1A1A1A]">เวลาเริ่ม</h2>
-        {!dateValid ? (
-          <p className="text-sm text-[#8A8C8E] mt-1">เลือกวันที่ก่อน แล้วจะแสดงเวลาที่จองได้</p>
-        ) : (
-          <>
-            <p className="text-sm text-[#8A8C8E] mt-1">
-              ระบุเวลาเริ่มที่ต้องการให้ผู้ดูแลมาถึง
-            </p>
-            <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-              {startOptions.map((t) => (
-                <TimeButton
-                  key={t}
-                  label={t}
-                  active={startTime === t}
-                  onClick={() => selectStart(t)}
-                />
-              ))}
-            </div>
-          </>
-        )}
+        <h2 className="text-lg font-bold text-[#1A1A1A]">เวลาที่ต้องการ</h2>
+        <p className="text-sm text-[#8A8C8E] mt-1">
+          {dateValid
+            ? 'เลือกเวลาที่ผู้ดูแลมาถึง และเวลาที่จบงาน (เลือกได้ทีละ 1 ชั่วโมง)'
+            : 'เลือกวันที่ก่อน แล้วจะเลือกเวลาได้'}
+        </p>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
+          <TimeSelect
+            id="booking-start-time"
+            label="เวลาเริ่ม"
+            value={startValid ? startTime : ''}
+            placeholder="เลือกเวลา"
+            options={startOptions.map((t) => ({ value: t, label: t }))}
+            disabled={!dateValid || startOptions.length === 0}
+            invalid={!!error.startTime || startPassed}
+            onChange={selectStart}
+          />
+          {/* ห่อไว้ชั้นหนึ่ง: .material-icons ของ Google ตั้ง display เอง ทับคลาส hidden ของ Tailwind */}
+          <span aria-hidden="true" className="hidden h-[52px] items-center text-[#8A8C8E] sm:flex">
+            <span className="material-icons" style={{ fontSize: 20 }}>
+              arrow_forward
+            </span>
+          </span>
+          <TimeSelect
+            id="booking-end-time"
+            label="เวลาสิ้นสุด"
+            value={endValid ? endTime : ''}
+            placeholder="เลือกเวลา"
+            options={endOptions.map((t) => ({
+              value: t,
+              label: `${t} (${formatDurationHours(bookingDurationHours(startTime, t))})`,
+            }))}
+            disabled={!startValid}
+            invalid={!!error.endTime}
+            onChange={selectEnd}
+          />
+        </div>
+
         {(error.startTime || startPassed) && (
           <p className="mt-3 text-xs font-semibold text-red-600">
             {error.startTime || 'เวลาเริ่มที่เลือกไว้ผ่านไปแล้ว กรุณาเลือกใหม่'}
           </p>
         )}
-
-        {startValid && (
-          <>
-            <h2 className="mt-6 text-lg font-bold text-[#1A1A1A]">เวลาสิ้นสุด</h2>
-            <p className="text-sm text-[#8A8C8E] mt-1">
-              กรุณาระบุเวลาสิ้นสุดงาน
-            </p>
-            <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-              {endOptions.map((t) => (
-                <TimeButton
-                  key={t}
-                  label={t}
-                  sub={`${Math.round(bookingDurationHours(startTime, t) * 100) / 100} ชม.`}
-                  active={endTime === t}
-                  onClick={() => selectEnd(t)}
-                />
-              ))}
-            </div>
-            {error.endTime && (
-              <p className="mt-3 text-xs font-semibold text-red-600">{error.endTime}</p>
-            )}
-          </>
+        {error.endTime && !error.startTime && (
+          <p className="mt-3 text-xs font-semibold text-red-600">{error.endTime}</p>
         )}
 
         {/* สรุปอัปเดตทันที: "09:00 – 13:00 · 4 ชั่วโมง · ฿xxx" */}

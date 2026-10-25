@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import Avatar from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
+import ProfileMenuIcon from './ProfileMenuIcon';
 import { PHONE_AUTH_ENABLED, accountContact } from '../../lib/phone';
 import { usePhoneAuthStrings } from '../../lib/phoneAuthStrings';
 
@@ -30,7 +31,6 @@ export default function ProfileDropdown({
   const phoneStrings = usePhoneAuthStrings();
 
   const displayUserName = displayName || user?.email?.split('@')[0] || 'User';
-  console.log('[ProfileDropdown] avatarUrl:', avatarUrl);
 
   const handleLogout = async () => {
     const result = await logout();
@@ -98,9 +98,7 @@ export default function ProfileDropdown({
                 onClick={handleViewProfile}
                 className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
               >
-                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <Icon name="account_box" size="small" />
-                </div>
+                <ProfileMenuIcon name="account_circle" />
                 <div className="flex-1 text-left">
                   <p className="text-sm font-medium text-gray-900">ดูโปรไฟล์</p>
                   <p className="text-xs text-gray-500">โปรไฟล์ส่วนตัวของฉัน</p>
@@ -112,9 +110,7 @@ export default function ProfileDropdown({
               onClick={handlePrivacy}
               className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                <Icon name="privacy_tip" size="small" />
-              </div>
+              <ProfileMenuIcon name="privacy_tip" />
               <div className="flex-1 text-left">
                 <p className="text-sm font-medium text-gray-900">ความเป็นส่วนตัว</p>
                 <p className="text-xs text-gray-500">ความยินยอมและสิทธิ์ของฉัน</p>
@@ -126,9 +122,7 @@ export default function ProfileDropdown({
                 onClick={handlePhone}
                 className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
               >
-                <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
-                  <Icon name="phone_iphone" size="small" />
-                </div>
+                <ProfileMenuIcon name="smartphone" />
                 <div className="flex-1 text-left">
                   <p className="text-sm font-medium text-gray-900">{phoneStrings.settingsMenuTitle}</p>
                   <p className="text-xs text-gray-500">{phoneStrings.settingsMenuSub}</p>
@@ -141,9 +135,7 @@ export default function ProfileDropdown({
             <button
               className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
-                <Icon name="shield" size="small"/>
-              </div>
+              <ProfileMenuIcon name="shield" />
               <div className="flex-1 text-left">
                 <p className="text-sm font-medium text-gray-900">ความปลอดภัย</p>
                 <p className="text-xs text-gray-500">เปลี่ยนรหัสผ่าน, ยืนยันตัวตน</p>
@@ -153,9 +145,7 @@ export default function ProfileDropdown({
             <button
               className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                <Icon name="payment" size="small"/>
-              </div>
+              <ProfileMenuIcon name="credit_card" />
               <div className="flex-1 text-left">
                 <p className="text-sm font-medium text-gray-900">การชำระเงิน</p>
                 <p className="text-xs text-gray-500">บัตรเครดิต, ประวัติการชำระ</p>
@@ -165,9 +155,7 @@ export default function ProfileDropdown({
             <button
               className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                <Icon name="settings" size="small" />
-              </div>
+              <ProfileMenuIcon name="settings" />
               <div className="flex-1 text-left">
                 <p className="text-sm font-medium text-gray-900">ตั้งค่า</p>
                 <p className="text-xs text-gray-500">การแจ้งเตือน, ภาษา, ธีม</p>
@@ -180,14 +168,12 @@ export default function ProfileDropdown({
 
             <button
               onClick={handleLogout}
-              className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
+              className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-3 transition-colors cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
-                <Icon name="logout" size="small" color="currentColor" />
-              </div>
+              <ProfileMenuIcon name="logout" />
               <div className="flex-1 text-left">
-                <p className="text-sm font-medium text-red-600">ออกจากระบบ</p>
-                <p className="text-xs text-red-500">ออกจากบัญชีของฉัน</p>
+                <p className="text-sm font-medium text-gray-900">ออกจากระบบ</p>
+                <p className="text-xs text-gray-500">ออกจากบัญชีของฉัน</p>
               </div>
             </button>
           </div>

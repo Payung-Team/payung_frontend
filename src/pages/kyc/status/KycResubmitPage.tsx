@@ -107,9 +107,9 @@ export default function KycResubmitPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] flex flex-col items-center py-[48px] px-4">
+    <div className="min-h-screen bg-[#F8F9FB] flex flex-col items-center py-6 sm:py-[48px] px-4">
       <div
-        className="w-full max-w-[720px] bg-white border border-[#F1F5F9] rounded-[20px] p-[48px_56px] flex flex-col gap-[28px]"
+        className="w-full max-w-[720px] bg-white border border-[#F1F5F9] rounded-[20px] px-5 py-6 sm:p-[48px_56px] flex flex-col gap-6 sm:gap-[28px]"
         style={{
           boxShadow: '0px 12px 28px -6px rgba(15, 23, 43, 0.06), 0px 1px 2px rgba(15, 23, 43, 0.04)'
         }}
@@ -117,7 +117,7 @@ export default function KycResubmitPage() {
 
         {/* Header Section */}
         <div className="flex flex-col gap-[6px]">
-          <h1 className="text-[30px] font-bold text-[#0F172A] leading-[30px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
+          <h1 className="text-[24px] sm:text-[30px] font-bold text-[#0F172A] leading-[30px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>
             แก้ไขข้อมูลยืนยันตัวตน
           </h1>
           <p className="text-[14px] text-[#64748B] leading-[20px]" style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}>

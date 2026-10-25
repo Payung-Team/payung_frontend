@@ -10,6 +10,7 @@ import { formatLicenseDate } from '../../lib/licenseStrings';
 import { drivingLicenseErrorCode, drivingLicenseStatus, type DrivingLicenseInfo } from '../../lib/drivingLicense';
 import { useDrivingLicenseStrings } from '../../lib/drivingLicenseStrings';
 import { DrivingLicenseStatusPill } from './DrivingLicenseStatusCard';
+import { kycDateTime } from './kycDate';
 
 const REJECT_REASON_MAX = 500;
 
@@ -228,7 +229,7 @@ export default function AdminDrivingLicensePanel({
               <li key={r.id} className="rounded-lg bg-[#F9FAFB] px-3 py-2 text-[13.5px] text-[#374151]">
                 <span className="font-semibold">{s.adminHistoryAction[r.action] ?? r.action}</span>
                 <span className="text-[#6B7280]">
-                  {' · '}{new Date(r.reviewedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}
+                  {' · '}{kycDateTime(r.reviewedAt)}
                   {r.reviewerName ? ` · ${r.reviewerName}` : ''}
                 </span>
                 {r.reason && <p className="mt-0.5 text-[#7F1D1D]">{r.reason}</p>}
