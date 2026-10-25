@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
 import { Outlet, useLocation, useNavigate, NavLink } from 'react-router-dom';
+import PageSkeleton from '../ui/PageSkeleton';
 import { useQuery } from '@apollo/client/react';
 import { useAuth } from '../../context/AuthContext';
 import { GET_USER, ADMIN_PENDING_COUNT, ADMIN_DISPUTE_PENDING_COUNT } from '../../graphql/queries';
@@ -240,7 +241,9 @@ export default function AdminLayout() {
 
         {/* Scrollable page content — pb-16 on mobile to clear bottom nav */}
         <div style={{ flex: 1, overflowY: 'auto', background: '#F9FAFB' }} className="pb-16 lg:pb-0">
-          <Outlet />
+          <Suspense fallback={<PageSkeleton />}>
+            <Outlet />
+          </Suspense>
         </div>
 
       </div>

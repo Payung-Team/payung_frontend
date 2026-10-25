@@ -1,5 +1,5 @@
 import { Routes, Route, Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { GET_CAREGIVER_PROFILE } from './graphql/queries';
 import { GET_ONBOARDING_STATUS, type OnboardingStatusData } from './graphql/onboarding';
@@ -10,59 +10,60 @@ import { useAuth } from './context/AuthContext';
 import { getPostLoginRedirect } from './utils/getRedirectPath';
 import AppLayout from './components/layout/AppLayout';
 import PublicLayout from './components/layout/PublicLayout';
-import CaregiverSearchWrapper from './components/CaregiverSearchWrapper';
+const CaregiverSearchWrapper = lazy(() => import('./components/CaregiverSearchWrapper'));
 import { KycProvider } from './context/KycContext';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
-import KYC from './pages/kyc/KYC';
-import KycSuccess from './pages/kyc/status/SuccessSubmit';
-import KycStatus from './pages/kyc/status/KycStatusPage';
-import KycResubmit from './pages/kyc/status/KycResubmitPage';
-import Admin from './pages/admin/Admin';
-import KycReviewListPage from './pages/admin/KycReviewListPage';
-import KycReviewDetailPage from './pages/admin/KycReviewDetailPage';
-import ProfilePhotoReviewPage from './pages/admin/ProfilePhotoReviewPage';
-import ProfessionChangeRequestsPage from './pages/admin/ProfessionChangeRequestsPage';
-import CareActivitiesPage from './pages/admin/CareActivitiesPage';
-import AdminUsersPage from './pages/admin/AdminUsersPage';
-import AdminCaregiverDetailPage from './pages/admin/AdminCaregiverDetailPage';
-import AdminPaymentsPage from './pages/admin/AdminPaymentsPage';
-import AdminDisputesPage from './pages/admin/AdminDisputesPage';
-import AdminDisputeDetailPage from './pages/admin/AdminDisputeDetailPage';
-import AdminLayout from './components/layout/AdminLayout';
+const KYC = lazy(() => import('./pages/kyc/KYC'));
+const KycSuccess = lazy(() => import('./pages/kyc/status/SuccessSubmit'));
+const KycStatus = lazy(() => import('./pages/kyc/status/KycStatusPage'));
+const KycResubmit = lazy(() => import('./pages/kyc/status/KycResubmitPage'));
+const Admin = lazy(() => import('./pages/admin/Admin'));
+const KycReviewListPage = lazy(() => import('./pages/admin/KycReviewListPage'));
+const KycReviewDetailPage = lazy(() => import('./pages/admin/KycReviewDetailPage'));
+const ProfilePhotoReviewPage = lazy(() => import('./pages/admin/ProfilePhotoReviewPage'));
+const ProfessionChangeRequestsPage = lazy(() => import('./pages/admin/ProfessionChangeRequestsPage'));
+const CareActivitiesPage = lazy(() => import('./pages/admin/CareActivitiesPage'));
+const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
+const AdminCaregiverDetailPage = lazy(() => import('./pages/admin/AdminCaregiverDetailPage'));
+const AdminPaymentsPage = lazy(() => import('./pages/admin/AdminPaymentsPage'));
+const AdminDisputesPage = lazy(() => import('./pages/admin/AdminDisputesPage'));
+const AdminDisputeDetailPage = lazy(() => import('./pages/admin/AdminDisputeDetailPage'));
+const AdminLayout = lazy(() => import('./components/layout/AdminLayout'));
 import { ADMIN_NOTIFICATIONS_PATH, adminNotificationLink } from './components/layout/adminNotifications';
-import NotFound from './pages/error/NotFound';
+const NotFound = lazy(() => import('./pages/error/NotFound'));
 import PayungHome from './pages/home/HomePage';
-import CaregiverHome from './pages/caregiver/CaregiverHome';
-import CaregiverBookings from './pages/caregiver/CaregiverBookings';
-import CaregiverBookingDetailPage from './pages/caregiver/CaregiverBookingDetailPage';
-import CaregiverSettings from './pages/caregiver/CaregiverSettings';
-import CaregiverEditProfile from './pages/caregiver/CaregiverEditProfile';
-import BookingsPage from './pages/profile/BookingsPage';
-import BookingRequestPage from './pages/booking/BookingRequestPage';
-import FamilyGroupPage from './pages/family/FamilyGroupPage';
-import MembersPage from './pages/family/MembersPage';
-import JoinGroupPage from './pages/family/JoinGroupPage';
-import FamilyGroupDemo, { MembersPageDemo } from './pages/family/FamilyGroupDemo';
-import BookingDetailPage from './pages/profile/BookingDetailPage';
+const CaregiverHome = lazy(() => import('./pages/caregiver/CaregiverHome'));
+const CaregiverBookings = lazy(() => import('./pages/caregiver/CaregiverBookings'));
+const CaregiverBookingDetailPage = lazy(() => import('./pages/caregiver/CaregiverBookingDetailPage'));
+const CaregiverSettings = lazy(() => import('./pages/caregiver/CaregiverSettings'));
+const CaregiverEditProfile = lazy(() => import('./pages/caregiver/CaregiverEditProfile'));
+const BookingsPage = lazy(() => import('./pages/profile/BookingsPage'));
+const BookingRequestPage = lazy(() => import('./pages/booking/BookingRequestPage'));
+const FamilyGroupPage = lazy(() => import('./pages/family/FamilyGroupPage'));
+const MembersPage = lazy(() => import('./pages/family/MembersPage'));
+const JoinGroupPage = lazy(() => import('./pages/family/JoinGroupPage'));
+const FamilyGroupDemo = lazy(() => import('./pages/family/FamilyGroupDemo'));
+const MembersPageDemo = lazy(() => import('./pages/family/FamilyGroupDemo').then((m) => ({ default: m.MembersPageDemo })));
+const BookingDetailPage = lazy(() => import('./pages/profile/BookingDetailPage'));
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
 import GuestRoute from './components/GuestRoute';
 import MustChangePasswordGuard from './components/MustChangePasswordGuard';
-import ChangePasswordPage from './pages/auth/ChangePasswordPage';
-import ForgotPassword from './pages/auth/ForgotPassword';
-import ResetPassword from './pages/auth/ResetPassword';
-import AuthCallback from './pages/auth/AuthCallback';
-import NotificationsPage from './pages/notifications/NotificationsPage';
+const ChangePasswordPage = lazy(() => import('./pages/auth/ChangePasswordPage'));
+const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
+const AuthCallback = lazy(() => import('./pages/auth/AuthCallback'));
+const NotificationsPage = lazy(() => import('./pages/notifications/NotificationsPage'));
 // PYG-540: หน้าความเป็นส่วนตัว (ดู/ถอน/ให้ความยินยอม PDPA)
-import PrivacySettingsPage from './pages/settings/PrivacySettingsPage';
-import PhoneSettingsPage from './pages/settings/PhoneSettingsPage';
+const PrivacySettingsPage = lazy(() => import('./pages/settings/PrivacySettingsPage'));
+const PhoneSettingsPage = lazy(() => import('./pages/settings/PhoneSettingsPage'));
 import { PHONE_AUTH_ENABLED } from './lib/phone';
-import CaregiverProfilePage from './pages/search/CaregiverProfilePage';
-import BookingSuccessPage from './pages/booking/BookingSuccessPage';
-import PaymentPage from './pages/booking/PaymentPage';
-import OnboardingPage from './pages/auth/OnboardingPage';
-import AssessmentPage from './pages/assessment/AssessmentPage';
+const CaregiverProfilePage = lazy(() => import('./pages/search/CaregiverProfilePage'));
+const BookingSuccessPage = lazy(() => import('./pages/booking/BookingSuccessPage'));
+const PaymentPage = lazy(() => import('./pages/booking/PaymentPage'));
+const OnboardingPage = lazy(() => import('./pages/auth/OnboardingPage'));
+const AssessmentPage = lazy(() => import('./pages/assessment/AssessmentPage'));
 
 function KycFormGuard({ children }: { children: React.ReactNode }) {
   const { data, loading } = useQuery<{ myCaregiverProfile?: { kycStatus: string } }>(GET_CAREGIVER_PROFILE);
@@ -236,6 +237,9 @@ function App() {
   return (
     <>
       <AuthEffects />
+      {/* PYG-713: หน้าส่วนใหญ่โหลดแบบ lazy (แยก chunk) — หน้าแรก/เข้าสู่ระบบ/สมัคร import ตรงเพื่อไม่ให้ skeleton กระพริบตอนเปิดเว็บ
+          Suspense นี้รับหน้าที่อยู่นอก layout · ใน AppLayout/AdminLayout มี Suspense ของตัวเองรอบ Outlet ให้เมนูค้างอยู่ */}
+      <Suspense fallback={<PageSkeleton />}>
       <Routes>
         {/* Landing page for guests; signed-in users are sent to their role's home */}
         <Route path="/" element={<HomeRedirect />} />
@@ -297,7 +301,9 @@ function App() {
               <MustChangePasswordGuard>
                 <PatientOnboardingGuard>
                   <AppLayout>
-                    <Outlet />
+                    <Suspense fallback={<PageSkeleton />}>
+                      <Outlet />
+                    </Suspense>
                   </AppLayout>
                 </PatientOnboardingGuard>
               </MustChangePasswordGuard>
@@ -530,6 +536,7 @@ function App() {
         {/* 404 - Not Found (must be last) */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </Suspense>
     </>
   );
 }
