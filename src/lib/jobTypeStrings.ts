@@ -15,7 +15,8 @@ const TH = {
   jobTypes: {
     general_care: { label: 'ดูแลทั่วไป', desc: 'พยุง / ทานข้าว / กิจวัตรประจำวัน' },
     bedridden_care: { label: 'ดูแลผู้ป่วยติดเตียง', desc: 'ดูแลผู้ป่วยช่วยเหลือตัวเองไม่ได้' },
-    physiotherapy: { label: 'กายภาพบำบัด', desc: 'ช่วยออกกำลังกาย / กายภาพฟื้นฟู' },
+    // PYG-698: ข้อความเดียวกับการ์ดกายภาพในหน้าจองฝั่งลูกค้า (BookingStepService)
+    physiotherapy: { label: 'กายภาพบำบัด', desc: 'ฟื้นฟูร่างกายและการเคลื่อนไหว โดยนักกายภาพบำบัด' },
     // S04-AC3 (เคาะ 7 ต.ค. 2026): ไม่ผูกวิชาชีพ · ไม่รวมฉีดยา
     medication: { label: 'จัดยาตามแพทย์สั่ง (ไม่รวมฉีดยา)', desc: 'ช่วยเตือนและจัดยาตามที่แพทย์สั่ง' },
     companion: { label: 'เป็นเพื่อน/พูดคุย', desc: 'พูดคุยเป็นเพื่อน ดูแลสภาพจิตใจผู้สูงอายุ' },
@@ -49,7 +50,7 @@ const EN: JobTypeStrings = {
   jobTypes: {
     general_care: { label: 'General care', desc: 'Mobility, meals and daily routines' },
     bedridden_care: { label: 'Bedridden care', desc: 'Care for patients who can’t help themselves' },
-    physiotherapy: { label: 'Physiotherapy', desc: 'Exercise and rehabilitation' },
+    physiotherapy: { label: 'Physiotherapy', desc: 'Physical and mobility rehabilitation by a physiotherapist' },
     medication: { label: 'Medication as prescribed (no injections)', desc: 'Reminders and sorting medicines as the doctor prescribed' },
     companion: { label: 'Companionship', desc: 'Conversation and emotional support' },
   },
