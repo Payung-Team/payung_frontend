@@ -163,6 +163,28 @@ export const GRANT_CONSENT = gql`
   }
 `;
 
+/**
+ * คำตอบหน้าความยินยอมตอนสมัครด้วย Google (source register)
+ *
+ * ★ บัญชี Google ถูกสร้างก่อนกลับมาถึงแอป — AuthCallback เปิดกล่องความยินยอมแล้วส่งมาที่นี่
+ *   ส่งทุกข้อที่แสดงรวมข้อที่ไม่ติ๊ก (granted: false) กติกาเดียวกับ REGISTER
+ */
+export const ACCEPT_SIGNUP_CONSENTS = gql`
+  mutation AcceptSignupConsents($consents: [ConsentAnswerInput!]!) {
+    acceptSignupConsents(consents: $consents) {
+      type
+      granted
+      answered
+      policyVersion
+      answeredAt
+      source
+      isCurrentVersion
+      required
+      withdrawable
+    }
+  }
+`;
+
 // ─── Types (PYG-540) ──────────────────────────────────────────────────────────────────
 
 export interface ConsentStatus {
