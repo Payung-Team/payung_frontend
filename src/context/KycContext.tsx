@@ -112,6 +112,9 @@ interface KycContextType {
   saveDrivingLicenseDraft: (draft: DrivingLicenseDraft) => void;
   goToStep: (step: number) => void;
   saveStep1: (data: KycStep1Data) => void;
+  /** รูปโปรไฟล์ที่ crop แล้ว (JPEG) — อยู่ใน memory เท่านั้น · KycStep4 อัปโหลดหลังส่ง KYC สำเร็จ (ต้องมีแถว caregiver ก่อน) */
+  profilePhoto: Blob | null;
+  saveProfilePhoto: (photo: Blob | null) => void;
   savePayout: (data: PayoutData | null) => void;
   saveDoc: (doc: UploadedDoc) => void;
   removeDoc: (docType: string) => void;
@@ -132,6 +135,7 @@ const KycContext = createContext<KycContextType | undefined>(undefined);
 export function KycProvider({ children }: { children: ReactNode }) {
   const [step, setStep] = useState(0);
   const [step1Data, setStep1Data] = useState<KycStep1Data | null>(null);
+  const [profilePhoto, setProfilePhoto] = useState<Blob | null>(null);
   const [uploadedDocs, setUploadedDocs] = useState<UploadedDoc[]>([]);
   const [payoutData, setPayoutData] = useState<PayoutData | null>(null);
   const [initialStep1Data, setInitialStep1Data] = useState<KycStep1Data | null>(null);
@@ -205,6 +209,8 @@ export function KycProvider({ children }: { children: ReactNode }) {
       saveDrivingLicenseDraft: setDrivingLicenseDraft,
       goToStep: setStep,
       saveStep1: setStep1Data,
+      profilePhoto,
+      saveProfilePhoto: setProfilePhoto,
       savePayout: setPayoutData,
       saveDoc,
       removeDoc,

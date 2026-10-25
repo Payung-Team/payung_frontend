@@ -469,8 +469,8 @@ export default function BookingRequestPage() {
         </div>
       </div>
 
-      {/* Sticky bottom nav */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-[#E0E2E5] z-30">
+      {/* Sticky bottom nav — บนมือถือวางเหนือแถบเมนูล่างของแอป (--mobile-nav-h จาก MobileNavigation) */}
+      <div className="fixed bottom-[var(--mobile-nav-h,0px)] md:bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-[#E0E2E5] z-30">
         <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-3 flex items-center gap-3">
           {step > 1 && (
             <button

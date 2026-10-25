@@ -14,6 +14,19 @@ export function extractGraphQLErrorMessage(err: unknown): string | undefined {
 }
 
 /**
+ * Message that is safe to show on screen: the server-sent (Thai, user-facing) message when
+ * there is one, otherwise `fallback`. Raw `ApolloError.message` (network failures, HTTP
+ * status text, schema/validation errors) is technical and must not reach production users;
+ * the dev build still shows it so problems stay visible while developing.
+ */
+export function userFacingErrorMessage(err: unknown, fallback: string): string {
+  const serverMessage = extractGraphQLErrorMessage(err);
+  if (serverMessage) return serverMessage;
+  if (import.meta.env.DEV && err instanceof Error) return `${fallback} (${err.message})`;
+  return fallback;
+}
+
+/**
  * Extracts the first server-sent `extensions.code` (e.g. the family-group module's
  * `NOT_GROUP_OWNER`, `JOIN_LINK_EXPIRED`, …). FE code branches on this stable contract
  * rather than parsing the human-readable message. Returns undefined for network errors

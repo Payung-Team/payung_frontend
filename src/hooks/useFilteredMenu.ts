@@ -43,7 +43,7 @@ export function useFilteredMenu(
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load menu';
         setError(errorMessage);
-        console.error('Menu loading error:', err);
+        if (import.meta.env.DEV) console.error('Menu loading error:', err);
       } finally {
         setIsLoading(false);
       }

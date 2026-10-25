@@ -13,6 +13,7 @@ import { LICENSE_KYC_ENABLED } from '../../../lib/license';
 import { drivingLicenseDraftFromKycStatus } from '../../../features/kyc/drivingLicenseDraft';
 import { DRIVING_LICENSE_KYC_ENABLED, transportModeToChoice } from '../../../lib/drivingLicense';
 import { isProfession } from '../../../lib/professions';
+import { userFacingErrorMessage } from '../../../lib/apolloErrors';
 
 export default function KycResubmitPage() {
   const navigate = useNavigate();
@@ -85,7 +86,7 @@ export default function KycResubmitPage() {
   }, [data, loading, navigate, location.state, setInitialData, step, goToStep, isReady]);
 
   if (loading || !isReady) return <div className="min-h-screen flex items-center justify-center">กำลังโหลด...</div>;
-  if (error) return <div className="min-h-screen flex items-center justify-center text-red-500">เกิดข้อผิดพลาด: {error.message}</div>;
+  if (error) return <div className="min-h-screen flex items-center justify-center text-red-500">{userFacingErrorMessage(error, 'เกิดข้อผิดพลาด ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง')}</div>;
 
   const kyc = data?.kycStatus;
   const rejectionReasons = kyc?.caregiver?.rejectionReasons || [];

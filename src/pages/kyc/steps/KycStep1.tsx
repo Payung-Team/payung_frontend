@@ -25,6 +25,7 @@ import { formatLicenseDate, useLicenseStrings } from '../../../lib/licenseString
 import { PROFESSIONS } from '../../../lib/professions';
 import CareSkillPicker from '../../../features/kyc/CareSkillPicker';
 import CustomSkillsInput from '../../../features/kyc/CustomSkillsInput';
+import KycProfilePhotoPicker from '../../../features/kyc/KycProfilePhotoPicker';
 
 // ── Validation helpers ────────────────────────────────────────────────────
 function isValidThaiId(id: string): boolean {
@@ -119,7 +120,7 @@ const GENDER_OPTIONS = [
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
-  const { goToStep, step1Data, saveStep1, initialStep1Data, licenseDraft } = useKyc();
+  const { goToStep, step1Data, saveStep1, initialStep1Data, licenseDraft, profilePhoto, saveProfilePhoto } = useKyc();
   const ls = useLicenseStrings();
   const { discard: discardLicense } = useLicenseDraftActions();
   /** PYG-588 E1/E2: วิชาชีพที่รอยืนยันเพราะจะทำให้ข้อมูลใบประกอบฯ ที่กรอกไว้ถูกลบ */
@@ -237,7 +238,15 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
     setDroppedSkills([]);
   }
 
+  // ยื่นครั้งแรกต้องมีรูป · ยื่นใหม่ (resubmit) ผู้ดูแลมีรูปจากรอบแรกอยู่แล้ว จึงไม่บังคับอัปซ้ำ
+  const photoRequired = mode !== 'resubmit';
+  const [photoError, setPhotoError] = useState('');
+
   const onSubmit = (data: Step1Form) => {
+    if (photoRequired && !profilePhoto) {
+      setPhotoError('กรุณาอัปโหลดรูปโปรไฟล์เพื่อยืนยันตัวตน');
+      return;
+    }
     saveStep1({ ...data, bio: data.bio ?? '' });
     goToStep(2);
   };
@@ -280,6 +289,17 @@ export default function KycStep1({ mode = 'create' }: { mode?: 'create' | 'resub
         </p>
 
         <form onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate className="flex flex-col gap-5">
+          {/* รูปโปรไฟล์ — อัปโหลดจริงหลังส่ง KYC (ดู KycStep4) */}
+          <KycProfilePhotoPicker
+            value={profilePhoto}
+            onChange={(blob) => {
+              saveProfilePhoto(blob);
+              if (blob) setPhotoError('');
+            }}
+            error={photoError}
+            required={photoRequired}
+          />
+
           {/* ชื่อจริง - นามสกุล */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-4">
             <Input
