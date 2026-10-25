@@ -6,10 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- PYG-712: ฟอนต์ข้อความโหลดแบบไม่บล็อกการแสดงผล (display=swap แสดงฟอนต์สำรองก่อน แล้วสลับเมื่อโหลดเสร็จ) -->
+    <link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+    <!-- ไอคอนหลักยังบล็อกไว้ — ถ้าไม่บล็อก ช่วงก่อนฟอนต์มาจะเห็นชื่อไอคอนเป็นคำ (เช่น "verified_user") -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Two+Tone" />
+    <!-- Outlined ใช้แค่ในเมนูโปรไฟล์หลังล็อกอิน (ProfileMenuIcon) · Two Tone ไม่มีที่ใช้ (index.css map ทุก variant ไป 'Material Icons') จึงตัดออก -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" media="print" onload="this.media='all'" />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    </noscript>
     <title>Payung</title>
   </head>
   <body>
