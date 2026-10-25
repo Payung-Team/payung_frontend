@@ -9,6 +9,7 @@ import { useLicenseStrings } from '../../lib/licenseStrings';
 import ProfessionBadge from '../../components/ui/ProfessionBadge';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import ProfessionPicker from './ProfessionPicker';
+import { kycDate, kycDateTime } from './kycDate';
 
 /**
  * ขอเปลี่ยนวิชาชีพหลัง KYC อนุมัติแล้ว (PYG-556 · S01-AC6 · R5)
@@ -39,15 +40,7 @@ function todayYmd(offsetDays = 0): string {
 }
 
 function thaiDate(value: string | null | undefined, withTime = false): string {
-  if (!value) return '-';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '-';
-  return d.toLocaleDateString('th-TH', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}),
-  });
+  return withTime ? kycDateTime(value) : kycDate(value);
 }
 
 function Flow({ from, to }: { from: string; to: string }) {

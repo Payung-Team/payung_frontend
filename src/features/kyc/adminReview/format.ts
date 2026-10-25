@@ -1,3 +1,5 @@
+import { kycDate, kycDateTime } from '../kycDate';
+
 export const genderLabel: Record<string, string> = {
   male: 'ชาย',
   female: 'หญิง',
@@ -20,21 +22,13 @@ export function formatPhone(value?: string | null) {
   return value;
 }
 
-export function formatThaiDate(value?: string | null, options?: Intl.DateTimeFormatOptions) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-
-  return new Intl.DateTimeFormat('th-TH-u-ca-gregory', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    ...options,
-  }).format(date);
+/** PYG-711: วันที่ของ KYC ใช้รูปแบบเดียวกันทุกจุด — ดู kycDate.ts */
+export function formatThaiDate(value?: string | null) {
+  return kycDate(value);
 }
 
 export function formatThaiDateTime(value?: string | null) {
-  return formatThaiDate(value, { hour: '2-digit', minute: '2-digit' });
+  return kycDateTime(value);
 }
 
 export function getAge(dateOfBirth?: string | null) {
