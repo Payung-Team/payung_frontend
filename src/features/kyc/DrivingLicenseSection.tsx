@@ -180,7 +180,7 @@ export default function DrivingLicenseSection({
             onExpiryBlur={() => setExpiryTouched(true)}
           />
           <p className="flex items-start gap-2 rounded-[10px] bg-[#F8FAFC] px-3 py-2 text-[13px] text-[#475569]">
-            <Icon name="visibility_lock" color="currentColor" style={{ fontSize: 18 }} />
+            <Icon name="visibility_lock" color="currentColor" className="flex-shrink-0" style={{ fontSize: 18 }} />
             {s.privacy}
           </p>
         </>

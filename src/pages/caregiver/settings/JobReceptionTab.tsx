@@ -738,8 +738,70 @@ export const JobReceptionTab: React.FC = () => {
             </div>
           </div>
 
-          {/* Schedule Grid */}
-          <div className="overflow-x-auto mt-2">
+          {/* Schedule List (mobile/tablet) — 1 แถวต่อวัน ไม่ต้องเลื่อนแนวนอน */}
+          <div className="lg:hidden mt-1 grid grid-cols-[2.75rem_repeat(3,minmax(0,1fr))_minmax(0,1fr)] gap-x-1.5 gap-y-2">
+            <div />
+            {SLOTS.map(slot => (
+              <div key={`m-head-${slot.key}`} className="flex flex-col items-center justify-end text-center">
+                <span className="text-[12px] font-bold text-[#1A1A1A] leading-tight">{slot.label}</span>
+                {/* คอลัมน์แคบ — ย่อ "06:00–12:00" เป็น "06–12 น." */}
+                <span className="text-[10px] text-[#8A8C8E] leading-tight whitespace-nowrap">
+                  {slot.time.split('–').map(t => t.slice(0, 2)).join('–')} น.
+                </span>
+              </div>
+            ))}
+            <div className="flex items-end justify-center text-center text-[11px] font-bold text-[#575859] leading-tight">
+              ทั้งวัน
+            </div>
+
+            {DAYS.map(day => {
+              const open = isDayAllOpen(day.id);
+              return (
+                <React.Fragment key={`m-row-${day.id}`}>
+                  <div className="flex items-center text-[13px] font-bold text-[#1A1A1A]" aria-label={day.label}>
+                    {day.name}
+                  </div>
+                  {SLOTS.map(slot => {
+                    const active = weeklyAvailability[day.id][slot.key];
+                    return (
+                      <button
+                        type="button"
+                        key={`m-${slot.key}-${day.id}`}
+                        onClick={() => toggleSlot(day.id, slot.key)}
+                        aria-pressed={active}
+                        aria-label={`${day.label} ${slot.label}`}
+                        className={`h-10 rounded-xl border transition-all flex items-center justify-center cursor-pointer ${active
+                            ? 'bg-[#E8F5F1] border-[#3A9A7E] text-[#3A9A7E] font-semibold'
+                            : 'bg-white border-[#E0E2E5] text-[#CBCED4]'
+                          }`}
+                      >
+                        {active ? (
+                          <span className="text-[15px] font-bold">✓</span>
+                        ) : (
+                          <span className="text-[13px] text-[#CBCED4] font-medium">-</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => toggleAllDay(day.id)}
+                    aria-pressed={open}
+                    aria-label={`${day.label} ตลอดวัน`}
+                    className={`h-10 rounded-xl border text-[11px] font-bold transition-all flex items-center justify-center cursor-pointer ${open
+                        ? 'bg-[#E8F5F1] border-[#3A9A7E] text-[#3A9A7E]'
+                        : 'bg-[#F0F1F3] border-[#E0E2E5] text-[#8A8C8E]'
+                      }`}
+                  >
+                    ตลอดวัน
+                  </button>
+                </React.Fragment>
+              );
+            })}
+          </div>
+
+          {/* Schedule Grid (desktop) */}
+          <div className="hidden lg:block overflow-x-auto mt-2">
             <div className="min-w-[680px] grid grid-cols-8 gap-y-3.5 gap-x-2 pb-1">
 
               {/* Row Header (Empty corner slot) */}
