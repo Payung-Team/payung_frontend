@@ -40,7 +40,7 @@ interface UnreadQueryResult {
   unreadCount: number;
 }
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 interface NotificationsPageProps {
   /** Where clicking an item navigates. Defaults to resolveDeepLink, whose targets are patient/caregiver pages. */
@@ -55,9 +55,11 @@ export default function NotificationsPage({
 }: NotificationsPageProps = {}) {
   const navigate = useNavigate();
   const client = useApolloClient();
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const [items, setItems] = useState<NotificationItem[]>([]);
+  // จำนวนที่แสดงอยู่ — ให้การรีเฟรช (realtime / อ่านทั้งหมด) โหลดเท่าที่ผู้ใช้กดโหลดเพิ่มไว้ ไม่หดกลับเหลือหน้าแรก
+  const loadedCountRef = useRef(0);
+  loadedCountRef.current = items.length;
   const [loadingPage, setLoadingPage] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
@@ -80,7 +82,7 @@ export default function NotificationsPage({
   const loadingRef = useRef(false);
 
   const loadPage = useCallback(
-    async (offset: number) => {
+    async (offset: number, limit: number = PAGE_SIZE) => {
       if (loadingRef.current) {
         return;
       }
@@ -90,7 +92,7 @@ export default function NotificationsPage({
       try {
         const result = await client.query<NotificationsQueryResult>({
           query: GET_NOTIFICATIONS,
-          variables: { limit: PAGE_SIZE, offset, unreadOnly: false },
+          variables: { limit, offset, unreadOnly: false },
           fetchPolicy: 'network-only',
         });
 
@@ -106,9 +108,8 @@ export default function NotificationsPage({
           return Array.from(map.values());
         });
 
-        setHasMore(next.length === PAGE_SIZE);
+        setHasMore(next.length === limit);
       } catch (err) {
-        // Stop paging so the load-more observer doesn't retry a failing query forever.
         logGraphQLError('LoadNotifications', err);
         setHasMore(false);
       } finally {
@@ -122,6 +123,11 @@ export default function NotificationsPage({
   useEffect(() => {
     loadPage(0);
   }, [loadPage]);
+
+  const reloadLoaded = useCallback(
+    () => loadPage(0, Math.max(loadedCountRef.current, PAGE_SIZE)),
+    [loadPage],
+  );
 
   useEffect(() => {
     if (!userData?.me?.id) {
@@ -139,7 +145,7 @@ export default function NotificationsPage({
           filter: `user_id=eq.${userData.me.id}`,
         },
         () => {
-          loadPage(0);
+          reloadLoaded();
           refetchUnread();
         },
       )
@@ -148,31 +154,11 @@ export default function NotificationsPage({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [loadPage, refetchUnread, userData?.me?.id]);
-
-  useEffect(() => {
-    const target = loadMoreRef.current;
-    if (!target || !hasMore) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const first = entries[0];
-        if (first?.isIntersecting && !loadingPage) {
-          loadPage(items.length);
-        }
-      },
-      { threshold: 0.2 },
-    );
-
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [hasMore, items.length, loadPage, loadingPage]);
+  }, [reloadLoaded, refetchUnread, userData?.me?.id]);
 
   const handleMarkAll = async () => {
     await markAllAsRead();
-    await loadPage(0);
+    await reloadLoaded();
     await refetchUnread();
   };
 
@@ -319,11 +305,24 @@ export default function NotificationsPage({
         })}
       </div>
 
-      <div ref={loadMoreRef} className="h-10 w-full" />
-      {loadingPage && <p className="text-center text-[12px] text-[#8B9591]">กำลังโหลด...</p>}
-      {!hasMore && visibleItems.length > 0 && (
-        <p className="text-center text-[12px] text-[#8B9591]">แสดงครบทั้งหมดแล้ว</p>
-      )}
+      <div className="mt-5 flex justify-center">
+        {hasMore && items.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => loadPage(items.length)}
+            disabled={loadingPage}
+            className="cursor-pointer rounded-lg border border-[#DDE3E0] bg-white px-5 py-2 text-[13px] font-semibold text-[#14554F] hover:bg-[#F0F2F1] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loadingPage ? 'กำลังโหลด...' : 'โหลดเพิ่ม'}
+          </button>
+        ) : loadingPage ? (
+          <p className="text-[12px] text-[#8B9591]">กำลังโหลด...</p>
+        ) : (
+          visibleItems.length > 0 && (
+            <p className="text-[12px] text-[#8B9591]">แสดงครบทั้งหมดแล้ว</p>
+          )
+        )}
+      </div>
     </div>
   );
 }
