@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '../ui/Icon';
-import logoImg from '../../assets/logo_5.png';
+import logoImg from '../../assets/logo_5.webp'; // PYG-712: เดิม PNG 1399px 406 KB · แสดงสูงสุด 100px
 
 interface AuthLayoutProps {
   children: React.ReactNode;

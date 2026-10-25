@@ -22,14 +22,19 @@ function formatPhone(val?: string | null): string {
 }
 
 const addressDb = new ThailandAddressSimple();
-let addressDbReady = false;
-addressDb.init().then(() => { addressDbReady = true; });
+// PYG-712: เดิม init() ระดับ module → ดึง db.json 57 KB จาก github.io ตอนเปิดแอปทุกหน้า (รวมหน้าแรก)
+// ตอนนี้ดึงครั้งแรกที่หน้านี้ต้องใช้ · ล้มแล้วล้าง promise ให้ mount ถัดไปลองใหม่
+let addressDbLoad: Promise<void> | null = null;
+const loadAddressDb = () => (addressDbLoad ??= addressDb.init().catch((e) => {
+  addressDbLoad = null;
+  throw e;
+}));
 
 interface ParsedAddress { province: string; amphoe: string; district: string; zipcode: string }
 
 function parseAddressComponents(raw: string): ParsedAddress {
   const empty = { province: '', amphoe: '', district: '', zipcode: '' };
-  if (!raw || !addressDbReady) return empty;
+  if (!raw) return empty;
   const zipcodeMatch = raw.match(/\b(\d{5})\b/);
   if (zipcodeMatch) {
     const candidates = addressDb.searchByZipCode(zipcodeMatch[1]);
@@ -110,15 +115,17 @@ export const AccountSettingsTab: React.FC = () => {
   useEffect(() => {
     const rawAddress = caregiver?.address || user?.address || '';
     if (!rawAddress) return;
-    const tryParse = () => {
-      const result = parseAddressComponents(rawAddress);
-      if (result.province) {
-        setParsedAddress(result);
-      } else if (!addressDbReady) {
-        setTimeout(tryParse, 300);
-      }
+    let cancelled = false;
+    loadAddressDb()
+      .then(() => {
+        if (cancelled) return;
+        const result = parseAddressComponents(rawAddress);
+        if (result.province) setParsedAddress(result);
+      })
+      .catch((e) => console.warn('Failed to load Thai address database:', e));
+    return () => {
+      cancelled = true;
     };
-    tryParse();
   }, [caregiver?.address, user?.address]);
 
   return (
