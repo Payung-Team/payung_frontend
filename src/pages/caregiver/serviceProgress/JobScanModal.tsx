@@ -300,7 +300,7 @@ export default function JobScanModal({ isOpen, onClose, bookingId, onScanned, pu
         </div>
 
         {/* ── สลับโหมด ── */}
-        {/* โหมดทดสอบ (ป้อนโทเค็นแทนกล้อง) เปิดเฉพาะ dev/staging — production ต้องสแกนด้วยกล้องเท่านั้น */}
+        {/* โหมดทดสอบ (ป้อนโทเค็นแทนกล้อง) เปิดเฉพาะเมื่อ VITE_QR_TEST_TOOLS=true — production ต้องสแกนด้วยกล้องเท่านั้น */}
         {!succeeded && QR_TEST_TOOLS_ENABLED && (
           <div className="border-t border-[#F0F1F3] px-5 py-3.5">
             <button

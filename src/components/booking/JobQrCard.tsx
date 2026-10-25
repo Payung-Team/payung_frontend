@@ -465,7 +465,7 @@ export function JobQrCard({
         )}
 
         {/* ── เครื่องมือทดสอบชั่วคราว (ลบทิ้งเมื่อ scanner กล้อง PYG-438 เสร็จ) ──
-            ปิดอัตโนมัติใน build จริง เว้นแต่ตั้ง VITE_QR_TEST_TOOLS=true
+            ปิดเป็นค่าเริ่มต้นทุก environment (รวม dev) เว้นแต่ตั้ง VITE_QR_TEST_TOOLS=true
             ดูเหตุผลและความเสี่ยงที่ lib/qrTestTools.ts */}
         {QR_TEST_TOOLS_ENABLED && (
           <>

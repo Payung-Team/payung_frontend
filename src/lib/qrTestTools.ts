@@ -19,7 +19,7 @@
  *    ทั้งสองเส้นทำสิ่งเดียวกันคือ "เอาความลับออกจากหน้าจอ" — โทเค็นที่คัดลอกไปแปะในแชต
  *    หรือรูป QR ที่เซฟลงเครื่อง ใครได้ไปก็เช็คอิน/เช็คเอาท์งานใบนั้นได้ในช่วงที่ QR ยังใช้ได้
  *    ซึ่งขัดกับเจตนาของ QR ที่ควรอยู่แค่บนจอและถูกอ่านด้วยกล้องเท่านั้น
- *    → ค่าเริ่มต้นของ flag นี้จึงเปิดเฉพาะตอน dev เท่านั้น
+ *    → flag นี้จึงปิดเป็นค่าเริ่มต้นทุก environment (รวม dev) ต้องตั้ง true เองถึงจะเปิด
  *    → เมื่อ PYG-438 (scanner กล้อง) เสร็จแล้ว ให้ลบทั้งไฟล์นี้และจุดที่เรียกใช้ทิ้ง
  */
 
@@ -30,16 +30,13 @@
 /**
  * เปิดเครื่องมือทดสอบไหม
  *
- *   ไม่ตั้ง VITE_QR_TEST_TOOLS  → เปิดเฉพาะตอน `npm run dev` (build จริงปิด)
- *   VITE_QR_TEST_TOOLS=true     → เปิด (ใช้ตอนอยากทดสอบบน staging ที่ build แล้ว)
- *   VITE_QR_TEST_TOOLS=false    → ปิด แม้อยู่ใน dev
+ *   VITE_QR_TEST_TOOLS=true     → เปิด (ทั้ง `npm run dev` และ build จริง เช่น staging)
+ *   ไม่ตั้ง / ค่าอื่น            → ปิด (รวมตอน `npm run dev`)
  *
- * ตั้งใจให้ "ต้องพิมพ์ true ด้วยมือ" ถึงจะติดไปกับ build — กันเผลอ deploy ขึ้น production
+ * ตั้งใจให้ "ต้องพิมพ์ true ด้วยมือ" ถึงจะเปิด — กันเผลอ deploy ขึ้น production
  */
 function readTestToolsFlag(): boolean {
-  const raw = import.meta.env.VITE_QR_TEST_TOOLS as string | undefined;
-  if (raw === undefined || raw === '') return import.meta.env.DEV;
-  return raw === 'true';
+  return import.meta.env.VITE_QR_TEST_TOOLS === 'true';
 }
 
 export const QR_TEST_TOOLS_ENABLED = readTestToolsFlag();

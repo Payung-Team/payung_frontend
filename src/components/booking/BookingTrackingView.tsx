@@ -623,7 +623,7 @@ function InlineCheckInQr({
         </p>
       )}
 
-      {/* เครื่องมือทดสอบชั่วคราว (คัดลอกโทเค็น / บันทึกรูป) — ปิดเองใน build จริง ดู lib/qrTestTools.ts */}
+      {/* เครื่องมือทดสอบชั่วคราว (คัดลอกโทเค็น / บันทึกรูป) — เปิดเฉพาะเมื่อ VITE_QR_TEST_TOOLS=true ดู lib/qrTestTools.ts */}
       {QR_TEST_TOOLS_ENABLED && (
         <div style={{ marginTop: 8, width: '100%', maxWidth: 480 }}>
           <button
