@@ -19,6 +19,7 @@ import {
   PayoutAccountModal,
   type PayoutAccountSummary,
 } from '../../../features/kyc/PayoutAccountWidgets';
+import { kycDateTime } from '../../../features/kyc/kycDate';
 
 // ── Components ────────────────────────────────────────────────────────────
 
@@ -259,16 +260,7 @@ export default function KycStatusPage() {
     }
   }, [loading, data, navigate]);
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-    const day = date.getDate();
-    const month = months[date.getMonth()];
-    const year = date.getFullYear() + 543;
-    const time = date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-    return `${day} ${month} ${year} • ${time}`;
-  };
+  const formatDate = (dateStr: string) => (dateStr ? kycDateTime(dateStr) : '');
 
   // skeleton เฉพาะโหลดครั้งแรก — refetch ภายหลังคงหน้าเดิมไว้ระหว่างรอ
   if (loading && !data) {

@@ -26,6 +26,7 @@ import { useDrivingLicenseStrings } from '../../../lib/drivingLicenseStrings';
 import { isDrivingLicenseRegistered } from '../../../features/kyc/drivingLicenseDraft';
 import { formatLicenseDate, useLicenseStrings } from '../../../lib/licenseStrings';
 import { isDraftRegistered, storagePathFromUrl } from '../../../features/kyc/licenseDraft';
+import { kycDate } from '../../../features/kyc/kycDate';
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resubmit' }) {
@@ -282,7 +283,7 @@ export default function KycStep4({ mode = 'create' }: { mode?: 'create' | 'resub
             <InfoRow label="ชื่อจริง" value={step1Data?.firstName || '-'} />
             <InfoRow label="นามสกุล" value={step1Data?.lastName || '-'} />
             <InfoRow label="เลขบัตรประชาชน" value={step1Data?.idCardNumber || '-'} />
-            <InfoRow label="วันเกิด" value={step1Data?.birthDate ? new Date(step1Data.birthDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : '-'} />
+            <InfoRow label="วันเกิด" value={kycDate(step1Data?.birthDate)} />
             <InfoRow label="เพศ" value={step1Data?.gender === 'male' ? 'ชาย' : step1Data?.gender === 'female' ? 'หญิง' : step1Data?.gender === 'other' ? 'อื่นๆ' : '-'} />
             <InfoRow label="เบอร์โทรศัพท์" value={step1Data?.phone || '-'} />
             <InfoRow label="อีเมล" value={user?.email || '-'} />

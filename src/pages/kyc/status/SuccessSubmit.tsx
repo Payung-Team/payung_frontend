@@ -1,15 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../../components/ui/Icon';
+import { kycDate } from '../../../features/kyc/kycDate';
 
 export default function KycSuccess() {
   const navigate = useNavigate();
 
   // For demonstration, use current date if not available
-  const submittedDate = new Date().toLocaleDateString('th-TH', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).replace(' พ.ศ.', '');
+  const submittedDate = kycDate(new Date());
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#F8F9FB] flex items-center justify-center p-4 sm:p-12">

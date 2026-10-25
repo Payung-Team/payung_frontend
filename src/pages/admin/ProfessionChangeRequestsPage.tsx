@@ -20,6 +20,7 @@ import FilterTabs, { type FilterTabItem } from '../../components/ui/FilterTabs';
 import Pagination from '../../components/ui/Pagination';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
+import { kycDate, kycDateTime } from '../../features/kyc/kycDate';
 
 /**
  * คิวตรวจคำขอเปลี่ยนวิชาชีพ (PYG-665 · S01-AC6 · BE PYG-575 / PYG-663)
@@ -45,15 +46,7 @@ function parseTab(value: string | null): ProfessionChangeStatus {
 }
 
 function thaiDate(value: string | null | undefined, withTime = false): string {
-  if (!value) return '-';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '-';
-  return d.toLocaleDateString('th-TH', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}),
-  });
+  return withTime ? kycDateTime(value) : kycDate(value);
 }
 
 /** ข้อความ error ของการอนุมัติ/ปฏิเสธ — code วิชาชีพ / ใบประกอบฯ ก่อน แล้วค่อยข้อความจาก BE */

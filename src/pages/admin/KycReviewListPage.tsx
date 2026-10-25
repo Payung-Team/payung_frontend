@@ -12,6 +12,7 @@ import SearchInput from '../../components/ui/SearchInput';
 import StatusBadge, { type StatusBadgeMeta } from '../../components/ui/StatusBadge';
 import CareLevelBadge from '../../components/ui/CareLevelBadge';
 import { CARE_LEVEL_STRINGS } from '../../lib/careLevels';
+import { kycDate } from '../../features/kyc/kycDate';
 
 const careLevelStrings = CARE_LEVEL_STRINGS.th;
 
@@ -172,16 +173,7 @@ const statusMeta: Record<string, StatusBadgeMeta> = {
 };
 
 function formatSubmittedDate(value?: string | null) {
-  if (!value) return '-';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-
-  return new Intl.DateTimeFormat('th-TH-u-ca-gregory', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
+  return kycDate(value);
 }
 
 function renderKycStatusBadge(status: KycStatus) {
