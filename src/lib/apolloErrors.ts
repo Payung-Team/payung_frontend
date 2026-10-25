@@ -63,3 +63,27 @@ export function extractGraphQLErrorExtensions(err: unknown): Record<string, unkn
 export function extractServerErrorBody(err: unknown): string | undefined {
   return ServerError.is(err) ? err.bodyText : undefined;
 }
+
+/**
+ * PYG-717 — ติดต่อ API ไม่ได้ (ต่างจาก "API ตอบว่าผิด")
+ *
+ * true เมื่อ:
+ *   - fetch พังเอง (`TypeError: Failed to fetch` — เน็ตหลุด, CORS, Worker ตายกลางคำขอแล้วไม่มี header)
+ *   - เซิร์ฟเวอร์ตอบ 5xx (เช่น Cloudflare 1101/1102 เป็น HTML ไม่ใช่ GraphQL)
+ *   - ตอบกลับมาอ่านไม่ได้ (ServerParseError)
+ * false เมื่อ API ตอบเป็น GraphQL error ปกติ (รหัสผ่านผิด, ไม่มีสิทธิ์ ฯลฯ)
+ *
+ * ใช้แยกข้อความ: "เชื่อมต่อระบบไม่ได้" ≠ "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
+ */
+export function isConnectionError(err: unknown): boolean {
+  if (!err) return false;
+  if (CombinedGraphQLErrors.is(err)) return false;
+  if (ServerError.is(err)) {
+    // 4xx ที่มี GraphQL errors ใน body (เช่น 422 ของกฎธุรกิจ) = API ตอบจริง ไม่ใช่ติดต่อไม่ได้
+    return err.statusCode >= 500 || !err.bodyText?.includes('"errors"');
+  }
+  return true;
+}
+
+/** ข้อความกลางเมื่อติดต่อ API ไม่ได้ */
+export const CONNECTION_ERROR_MESSAGE = 'เชื่อมต่อระบบไม่ได้ในขณะนี้ กรุณาลองใหม่อีกครั้งในอีกสักครู่';
