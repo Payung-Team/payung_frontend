@@ -78,7 +78,7 @@ const TH = {
   subjectLabelShort: 'ประเมินให้',
   ageSuffix: (age: number) => `${age} ปี`,
   disclaimerTitle: 'ญาติเป็นผู้ประเมิน ไม่ใช่การวินิจฉัยทางการแพทย์',
-  disclaimerBody: 'คำตอบใช้เพื่อหาผู้ดูแลที่เหมาะกับผู้สูงอายุคนนี้',
+  disclaimerBody: 'คำตอบใช้เพื่อหาผู้ดูแลที่เหมาะกับผู้รับบริการคนนี้',
   // ประเมินโปรไฟล์ของตัวเอง (is_self) — ไม่ใช่ญาติเป็นผู้ตอบ ข้อความ AC7 แบบญาติจะทำให้เข้าใจผิด
   disclaimerTitleSelf: 'ประเมินด้วยตัวเอง ไม่ใช่การวินิจฉัยทางการแพทย์',
   disclaimerBodySelf: 'คำตอบใช้เพื่อหาผู้ดูแลที่เหมาะกับคุณ',
@@ -99,7 +99,7 @@ const TH = {
 
   // ขั้น ADL
   adlTitle: 'ช่วยเหลือตัวเองได้แค่ไหน',
-  adlSubtitle: 'ตอบตามที่ทำได้จริงในชีวิตประจำวัน ต้องตอบทุกข้อ ถ้าไม่ทราบให้เลือก “ไม่แน่ใจ”',
+  adlSubtitle: 'ตอบตามที่ทำได้จริงในช่วง 1–2 วันที่ผ่านมา ต้องตอบทุกข้อ ถ้าไม่ทราบให้เลือก “ไม่แน่ใจ”',
   adlProgress: (done: number, total: number) => `ตอบแล้ว ${done} จาก ${total} ข้อ`,
   adlUnsureCount: (n: number) => `ไม่แน่ใจ ${n} ข้อ`,
   adlQuestionOf: (n: number, total: number) => `ข้อ ${n} จาก ${total}`,
@@ -123,7 +123,7 @@ const TH = {
   flagsTitle: 'มีเงื่อนไขพิเศษที่ผู้ดูแลควรรู้ไหม',
   flagsSubtitle: 'เลือกได้หลายข้อ ถ้าไม่มีข้อไหนตรง ให้เลือก “ไม่มีเงื่อนไขพิเศษ”',
   flagsNoneLabel: 'ไม่มีเงื่อนไขพิเศษ',
-  flagsNoneHint: 'ไม่มีข้อไหนด้านล่างตรงกับผู้สูงอายุคนนี้',
+  flagsNoneHint: 'ไม่มีข้อไหนด้านล่างตรงกับผู้รับบริการคนนี้',
   flagsNoneHintSelf: 'ไม่มีข้อไหนด้านล่างตรงกับคุณ',
   flagsDivider: 'หรือเลือกข้อที่ตรง',
   flagsGroupLabel: 'เงื่อนไขพิเศษ เลือกได้หลายข้อ',
@@ -207,7 +207,7 @@ const TH = {
   thisRecipient: 'ผู้รับบริการคนนี้',
 
   // โปรไฟล์
-  profileSectionTitle: 'แบบประเมินผู้สูงอายุ',
+  profileSectionTitle: 'แบบประเมินผู้รับบริการ',
   profileSectionHint: 'คะแนน ADL และเงื่อนไขพิเศษที่ใช้หาผู้ดูแลที่เหมาะสม',
   profileEmpty: 'ยังไม่มีผู้รับบริการที่บันทึกไว้',
   profileLoadFailed: 'โหลดแบบประเมินไม่สำเร็จ',
@@ -229,26 +229,25 @@ const TH = {
       hint: 'เมื่อมีอาหารวางเตรียมไว้ตรงหน้า',
       options: {
         2: { label: 'กินเองได้', desc: 'ตักและกินเองได้ตามปกติ' },
-        1: { label: 'กินเองได้ แต่ต้องมีคนช่วย', desc: 'เช่น ช่วยตัดหรือตักอาหารให้ก่อน' },
+        1: { label: 'กินได้ แต่ต้องมีคนช่วย', desc: 'เช่น ช่วยตัดหรือตักอาหารให้ก่อน' },
         0: { label: 'กินเองไม่ได้', desc: 'ต้องมีคนป้อน' },
       },
     },
     grooming: {
-      title: 'ล้างหน้า หวีผม แปรงฟัน',
-      hint: 'ในช่วง 1–2 วันที่ผ่านมา',
+      title: 'การล้างหน้า หวีผม แปรงฟัน',
       options: {
         1: { label: 'ทำเองได้' },
         0: { label: 'ต้องมีคนช่วย' },
       },
     },
     transfers: {
-      title: 'ลุกจากที่นอนไปนั่งเก้าอี้',
+      title: 'การลุกจากที่นอนไปนั่งเก้าอี้',
       hint: 'รวมการลุกนั่งบนเตียง',
       options: {
-        3: { label: 'ทำได้เอง' },
+        3: { label: 'ทำเองได้' },
         2: { label: 'ต้องมีคนช่วยเล็กน้อย', desc: 'ช่วยพยุง หรือคอยดูให้ปลอดภัย' },
         1: { label: 'ต้องมีคนช่วยมาก', desc: 'นั่งได้เอง แต่ลุกต้องใช้คนช่วย 1–2 คน' },
-        0: { label: 'ทำไม่ได้', desc: 'นั่งทรงตัวเองไม่ได้' },
+        0: { label: 'ทำเองไม่ได้', desc: 'นั่งทรงตัวเองไม่ได้' },
       },
     },
     toilet_use: {
@@ -264,9 +263,9 @@ const TH = {
       title: 'การเดินหรือเคลื่อนที่ในบ้าน',
       hint: 'ภายในห้องหรือภายในบ้าน',
       options: {
-        3: { label: 'เดินได้เอง', desc: 'ใช้ไม้เท้าช่วยได้' },
-        2: { label: 'เดินได้ ถ้ามีคนช่วย', desc: 'ต้องพยุงหรือคอยดู' },
-        1: { label: 'ใช้รถเข็นได้เอง', desc: 'เข็นเลี้ยวหรือผ่านประตูได้' },
+        3: { label: 'เดินเองได้', desc: 'ใช้ไม้เท้าช่วยได้' },
+        2: { label: 'เดินได้ แต่ต้องมีคนช่วย', desc: 'ต้องพยุงหรือคอยดู' },
+        1: { label: 'ใช้รถเข็นเองได้', desc: 'เข็นเลี้ยวหรือผ่านประตูได้' },
         0: { label: 'เคลื่อนที่เองไม่ได้' },
       },
     },
@@ -276,22 +275,22 @@ const TH = {
       options: {
         2: { label: 'ทำเองได้' },
         1: { label: 'ทำเองได้ประมาณครึ่งหนึ่ง', desc: 'ที่เหลือต้องมีคนช่วย' },
-        0: { label: 'ต้องมีคนใส่ให้' },
+        0: { label: 'ต้องมีคนช่วยทั้งหมด', desc: 'ต้องมีคนใส่ให้' },
       },
     },
     stairs: {
       title: 'การขึ้นลงบันได 1 ชั้น',
       options: {
-        2: { label: 'ทำได้เอง' },
+        2: { label: 'ทำเองได้' },
         1: { label: 'ต้องมีคนช่วย' },
-        0: { label: 'ทำไม่ได้' },
+        0: { label: 'ทำเองไม่ได้' },
       },
     },
     bathing: {
       title: 'การอาบน้ำ',
       options: {
         1: { label: 'อาบเองได้' },
-        0: { label: 'ต้องมีคนช่วย หรืออาบให้' },
+        0: { label: 'ต้องมีคนช่วย', desc: 'หรือต้องมีคนอาบให้' },
       },
     },
     bowels: {
@@ -367,7 +366,7 @@ const EN: AssessmentStrings = {
 
   adlTitle: 'How much can they do on their own?',
   adlSubtitle:
-    'Answer based on everyday life. Every question needs an answer — choose “Not sure” if you don\'t know.',
+    'Answer based on the past 1–2 days. Every question needs an answer — choose “Not sure” if you don\'t know.',
   adlProgress: (done, total) => `${done} of ${total} answered`,
   adlUnsureCount: (n) => `${n} not sure`,
   adlQuestionOf: (n, total) => `Question ${n} of ${total}`,
@@ -492,7 +491,6 @@ const EN: AssessmentStrings = {
     },
     grooming: {
       title: 'Washing face, combing hair, brushing teeth',
-      hint: 'In the past 1–2 days',
       options: { 1: { label: 'Independent' }, 0: { label: 'Needs help' } },
     },
     transfers: {
@@ -519,7 +517,7 @@ const EN: AssessmentStrings = {
       hint: 'Within the room or house',
       options: {
         3: { label: 'Walks independently', desc: 'A cane is fine' },
-        2: { label: 'Walks with help', desc: 'Needs support or supervision' },
+        2: { label: 'Walks, but needs help', desc: 'Needs support or supervision' },
         1: { label: 'Uses a wheelchair independently', desc: 'Can turn and go through doors' },
         0: { label: 'Cannot move independently' },
       },
@@ -530,7 +528,7 @@ const EN: AssessmentStrings = {
       options: {
         2: { label: 'Independent' },
         1: { label: 'Does about half', desc: 'Needs help with the rest' },
-        0: { label: 'Needs to be dressed' },
+        0: { label: 'Needs full help', desc: 'Needs to be dressed' },
       },
     },
     stairs: {
@@ -539,7 +537,7 @@ const EN: AssessmentStrings = {
     },
     bathing: {
       title: 'Bathing',
-      options: { 1: { label: 'Bathes independently' }, 0: { label: 'Needs help or is bathed' } },
+      options: { 1: { label: 'Bathes independently' }, 0: { label: 'Needs help', desc: 'Or needs to be bathed' } },
     },
     bowels: {
       title: 'Bowel control',
