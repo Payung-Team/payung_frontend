@@ -351,6 +351,8 @@ function groupOut(g: MockGroup) {
     memberCount: g.members.length,
     createdAt: g.createdAt,
     updatedAt: g.createdAt,
+    // The demo has no Storage — groups always show their initial.
+    avatarUrl: null,
     members: g.members.map((m) => ({
       __typename: 'FamilyGroupMemberItem',
       id: m.id,

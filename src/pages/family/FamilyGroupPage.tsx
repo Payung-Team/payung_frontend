@@ -26,6 +26,7 @@ import {
   LeaveGroupDialog,
 } from './components/GroupModals';
 import { fgErrorMessage } from './familyErrors';
+import { useGroupPhotoEditor } from './components/useGroupPhotoEditor';
 
 type ModalKind =
   | 'create'
@@ -64,6 +65,7 @@ export default function FamilyGroupPage() {
   const selected = groups.find((g) => g.id === selectedId) ?? groups[0] ?? null;
   const isOwner = selected?.myRole === 'OWNER';
   const isSolo = isOwner && selected?.memberCount === 1;
+  const photo = useGroupPhotoEditor(selected, toast);
 
   return (
     <div
@@ -107,12 +109,16 @@ export default function FamilyGroupPage() {
               setModal(selected.myRole === 'OWNER' ? 'lastOwner' : 'leave')
             }
             onDelete={() => setModal('delete')}
+            onChangePhoto={photo.pickPhoto}
+            onRemovePhoto={photo.askRemovePhoto}
+            photoBusy={photo.uploading}
           />
           <MemberAppointments group={selected} />
         </div>
       ) : null}
 
       {/* ── Modals ── */}
+      {photo.dialogs}
       {modal === 'create' && (
         <CreateGroupWizard
           onClose={() => setModal(null)}
@@ -317,6 +323,9 @@ function GroupHeaderCard({
   onTransfer,
   onLeave,
   onDelete,
+  onChangePhoto,
+  onRemovePhoto,
+  photoBusy,
 }: {
   group: FamilyGroup;
   onViewMembers: () => void;
@@ -326,6 +335,9 @@ function GroupHeaderCard({
   onTransfer: () => void;
   onLeave: () => void;
   onDelete: () => void;
+  onChangePhoto: () => void;
+  onRemovePhoto: () => void;
+  photoBusy: boolean;
 }) {
   const s = useStrings();
   const isOwner = group.myRole === 'OWNER';
@@ -335,12 +347,46 @@ function GroupHeaderCard({
   return (
     <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
       <div className="flex flex-wrap items-start gap-4">
-        <GroupAvatar
-          name={group.name}
-          seed={group.id}
-          size={56}
-          className="shadow-[0_4px_16px_rgba(82,182,154,0.2)] ring-[3px] ring-white"
-        />
+        {isOwner ? (
+          // Owner: the picture itself is the "change photo" button (camera badge = affordance).
+          <button
+            type="button"
+            onClick={onChangePhoto}
+            disabled={photoBusy}
+            aria-label={s.changeGroupPhoto}
+            title={s.changeGroupPhoto}
+            className="relative shrink-0 rounded-full transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#009265]"
+          >
+            <GroupAvatar
+              name={group.name}
+              seed={group.id}
+              src={group.avatarUrl}
+              size={56}
+              className="shadow-[0_4px_16px_rgba(82,182,154,0.2)] ring-[3px] ring-white"
+            />
+            {photoBusy && (
+              <span
+                className="absolute inset-0 flex items-center justify-center rounded-full bg-black/45"
+                role="status"
+                aria-label={s.busyUploadingPhoto}
+              >
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              </span>
+            )}
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#009265] ring-2 ring-white shadow-sm">
+              {/* inline size: Google's unlayered .material-icons (24px) beats Tailwind's text-sm */}
+              <Icon name="photo_camera" color="#FFFFFF" style={{ fontSize: 14 }} />
+            </span>
+          </button>
+        ) : (
+          <GroupAvatar
+            name={group.name}
+            seed={group.id}
+            src={group.avatarUrl}
+            size={56}
+            className="shadow-[0_4px_16px_rgba(82,182,154,0.2)] ring-[3px] ring-white"
+          />
+        )}
         <div className="min-w-[200px] flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-[20px] font-bold text-[#064E3B]">{group.name}</h2>
@@ -404,8 +450,11 @@ function GroupHeaderCard({
           )}
           <GroupMenu
             isOwner={isOwner}
+            hasPhoto={Boolean(group.avatarUrl)}
             onActivity={onActivity}
             onRename={onRename}
+            onChangePhoto={onChangePhoto}
+            onRemovePhoto={onRemovePhoto}
             onTransfer={onTransfer}
             onLeave={onLeave}
             onDelete={onDelete}
@@ -427,15 +476,21 @@ function GroupHeaderCard({
 
 function GroupMenu({
   isOwner,
+  hasPhoto,
   onActivity,
   onRename,
+  onChangePhoto,
+  onRemovePhoto,
   onTransfer,
   onLeave,
   onDelete,
 }: {
   isOwner: boolean;
+  hasPhoto: boolean;
   onActivity: () => void;
   onRename: () => void;
+  onChangePhoto: () => void;
+  onRemovePhoto: () => void;
   onTransfer: () => void;
   onLeave: () => void;
   onDelete: () => void;
@@ -490,6 +545,8 @@ function GroupMenu({
           {item('history', s.activityRecentTitle, onActivity)}
           <div className="my-1.5 h-px bg-gray-100" />
           {isOwner && item('edit', s.renameGroup, onRename)}
+          {isOwner && item('photo_camera', s.changeGroupPhoto, onChangePhoto)}
+          {isOwner && hasPhoto && item('hide_image', s.removeGroupPhoto, onRemovePhoto)}
           {isOwner && item('swap_horiz', s.transferOwnership, onTransfer)}
           {item('logout', s.leaveGroup, onLeave)}
           {isOwner && <div className="my-1.5 h-px bg-gray-100" />}
@@ -535,7 +592,7 @@ function GroupSwitcher({
         aria-expanded={open}
         className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white pl-2 pr-2 shadow-sm transition-colors hover:bg-gray-50"
       >
-        <GroupAvatar name={selected.name} seed={selected.id} size={24} />
+        <GroupAvatar name={selected.name} seed={selected.id} src={selected.avatarUrl} size={24} />
         <span className="max-w-[160px] truncate text-[14px] font-semibold text-[#1A1A1A]">
           {selected.name}
         </span>
@@ -565,7 +622,7 @@ function GroupSwitcher({
                   active ? 'bg-[#F0FAF4]' : 'hover:bg-gray-50'
                 }`}
               >
-                <GroupAvatar name={g.name} seed={g.id} size={28} />
+                <GroupAvatar name={g.name} seed={g.id} src={g.avatarUrl} size={28} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14px] font-semibold text-[#1A1A1A]">
                     {g.name}

@@ -135,6 +135,14 @@ export interface Strings {
   myGroups: string;
   createNewGroup: string;
   renameGroup: string;
+  // group picture (owner only)
+  changeGroupPhoto: string;
+  removeGroupPhoto: string;
+  groupPhotoCropTitle: string;
+  removeGroupPhotoTitle: string;
+  removeGroupPhotoBody: string;
+  removeGroupPhotoCta: string;
+  busyUploadingPhoto: string;
   transferOwnership: string;
   leaveGroup: string;
   deleteGroup: string;
@@ -242,6 +250,8 @@ export interface Strings {
   // toasts
   toastCopied: string;
   toastRenamed: string;
+  toastGroupPhotoChanged: string;
+  toastGroupPhotoRemoved: string;
   toastRemoved: (name: string) => string;
   toastTransferred: (name: string) => string;
   toastLeft: (name: string) => string;
@@ -388,6 +398,13 @@ const S: Strings = {
   myGroups: 'กลุ่มของฉัน',
   createNewGroup: 'สร้างกลุ่มใหม่',
   renameGroup: 'เปลี่ยนชื่อกลุ่ม',
+  changeGroupPhoto: 'เปลี่ยนรูปกลุ่ม',
+  removeGroupPhoto: 'ลบรูปกลุ่ม',
+  groupPhotoCropTitle: 'ครอปรูปกลุ่ม',
+  removeGroupPhotoTitle: 'ลบรูปกลุ่มไหม?',
+  removeGroupPhotoBody: 'กลุ่มจะกลับไปแสดงตัวอักษรแรกของชื่อกลุ่มแทนรูป',
+  removeGroupPhotoCta: 'ลบรูป',
+  busyUploadingPhoto: 'กำลังอัปโหลดรูป…',
   transferOwnership: 'โอนสิทธิ์เจ้าของกลุ่ม',
   leaveGroup: 'ออกจากกลุ่ม',
   deleteGroup: 'ลบกลุ่ม',
@@ -500,6 +517,8 @@ const S: Strings = {
   busyJoining: 'กำลังเข้าร่วม…',
   toastCopied: 'คัดลอกลิงก์แล้ว — ส่งให้คนที่ต้องการเชิญได้เลย',
   toastRenamed: 'เปลี่ยนชื่อกลุ่มแล้ว',
+  toastGroupPhotoChanged: 'เปลี่ยนรูปกลุ่มแล้ว',
+  toastGroupPhotoRemoved: 'ลบรูปกลุ่มแล้ว',
   toastRemoved: (name) => `นำ ${name} ออกจากกลุ่มแล้ว`,
   toastTransferred: (name) => `โอนสิทธิ์เจ้าของกลุ่มให้ ${name} แล้ว`,
   toastLeft: (name) => `ออกจากกลุ่ม ${name} แล้ว`,

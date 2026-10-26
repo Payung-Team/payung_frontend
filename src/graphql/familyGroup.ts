@@ -39,11 +39,18 @@ const GROUP_FIELDS = `
 
 // ── Queries ────────────────────────────────────────────────────────────────
 
-/** Every group I'm an ACTIVE member of, newest first. Empty array (not an error) when none. */
+/**
+ * Every group I'm an ACTIVE member of, newest first. Empty array (not an error) when none.
+ *
+ * avatarUrl is asked for only here (the dashboard header + switcher show it) — not in
+ * GROUP_FIELDS, because the BE signs a Storage URL each time the field is requested and
+ * the other group operations never display the picture.
+ */
 export const MY_FAMILY_GROUPS = gql`
   query MyFamilyGroups {
     myFamilyGroups {
       ${GROUP_FIELDS}
+      avatarUrl
     }
   }
 `;
@@ -345,6 +352,19 @@ export const RENAME_FAMILY_GROUP = gql`
   }
 `;
 
+/**
+ * Owner removes the group picture → back to the name's initial. Changing the picture is a
+ * file upload, so it goes through REST instead (src/lib/familyGroupAvatar.ts).
+ */
+export const REMOVE_FAMILY_GROUP_AVATAR = gql`
+  mutation RemoveFamilyGroupAvatar($groupId: ID!) {
+    removeFamilyGroupAvatar(groupId: $groupId) {
+      id
+      avatarUrl
+    }
+  }
+`;
+
 export const DELETE_FAMILY_GROUP = gql`
   mutation DeleteFamilyGroup($groupId: ID!) {
     deleteFamilyGroup(groupId: $groupId) {
@@ -514,6 +534,8 @@ export interface FamilyGroup {
   createdAt: string;
   updatedAt: string;
   members: FamilyGroupMember[];
+  /** Group picture (signed URL, 1 h). Only MY_FAMILY_GROUPS asks for it; null = show the initial. */
+  avatarUrl?: string | null;
 }
 
 export interface GroupCareRecipient {
