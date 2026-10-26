@@ -1101,9 +1101,15 @@ function InProgressView({
         </div>
       </div>
 
-      {/* Fixed action bar — เฉพาะระหว่างทำงาน ปิดงานแล้วไม่มีอะไรให้กด */}
+      {/* Fixed action bar — เฉพาะระหว่างทำงาน ปิดงานแล้วไม่มีอะไรให้กด
+          PYG-730: บนมือถือวางเหนือแถบเมนูล่างของแอป (--mobile-nav-h จาก MobileNavigation)
+          เดิม bottom: 0 เมนูล่าง (z-40) ทับแถบนี้มิด ปุ่ม "จบการดูแล" เลยหายไปบนมือถือ
+          ★ bottom อยู่ใน className เท่านั้น — ใส่ใน style จะทับคลาสจนกลับไปโดนบังอีก */}
       {!finished && (
-      <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, background: '#FFFFFF', borderTop: '0.8px solid #F3F4F6', boxShadow: '0px -4px 16px rgba(0,0,0,0.04)' }}>
+      <div
+        className="bottom-[var(--mobile-nav-h,0px)] md:bottom-0"
+        style={{ position: 'fixed', left: 0, right: 0, zIndex: 30, background: '#FFFFFF', borderTop: '0.8px solid #F3F4F6', boxShadow: '0px -4px 16px rgba(0,0,0,0.04)' }}
+      >
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '12px 24px', boxSizing: 'border-box', display: 'flex', gap: 16, justifyContent: readOnly ? 'flex-end' : undefined }}>
           {/* จบการดูแล = เปิด QR ให้ผู้ดูแลสแกนปิดงาน → ผู้จองเท่านั้น; โทรฉุกเฉินให้ทุกคนที่ดูอยู่ */}
           {!readOnly && (
@@ -1112,13 +1118,16 @@ function InProgressView({
             onClick={() => setShowQr(true)}
             style={{ flex: '1 1 0', minWidth: 0, height: 56, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#DC2626', border: 'none', borderRadius: 12, boxShadow: '0px 6px 18px rgba(220,38,38,0.25)', cursor: 'pointer' }}
           >
-            <span style={{ fontFamily: FONT_TH, fontSize: 16, fontWeight: 700, color: '#FFFFFF', lineHeight: '24px' }}>จบการดูแล</span>
+            <span style={{ fontFamily: FONT_TH, fontSize: 16, fontWeight: 700, color: '#FFFFFF', lineHeight: '24px', whiteSpace: 'nowrap' }}>จบการดูแล</span>
           </button>
           )}
+          {/* PYG-730: มือถือแบ่งครึ่งกับปุ่มจบการดูแล — ถ้าจอง 264px ไว้ ปุ่มจบการดูแลเหลือไม่ถึง 50px
+              เดสก์ท็อปคงขนาด 264px เหมือนเดิม · flex อยู่ใน className เท่านั้น (style จะทับคลาส) */}
           <a
             href={toTelHref(EMERGENCY_PHONE)}
             title={`โทรสายด่วนฉุกเฉิน ${EMERGENCY_PHONE}`}
-            style={{ flex: '0 1 264px', minWidth: 0, height: 56, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#FFFFFF', border: '0.8px solid rgba(220,38,38,0.4)', borderRadius: 12, textDecoration: 'none' }}
+            className="flex-[1_1_0] md:flex-[0_1_264px]"
+            style={{ minWidth: 0, height: 56, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#FFFFFF', border: '0.8px solid rgba(220,38,38,0.4)', borderRadius: 12, textDecoration: 'none' }}
           >
             <span className="material-icons" style={{ fontSize: 20, color: '#DC2626' }}>call</span>
             <span style={{ fontFamily: FONT_TH, fontSize: 16, fontWeight: 700, color: '#DC2626', lineHeight: '24px', whiteSpace: 'nowrap' }}>โทรฉุกเฉิน</span>
