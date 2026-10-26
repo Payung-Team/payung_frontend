@@ -23,6 +23,10 @@ interface PhotoCropModalProps {
   file: File;
   onCancel: () => void;
   onConfirm: (blob: Blob) => void;
+  /** หัวข้อ modal — ค่าเริ่มต้นสำหรับรูปโปรไฟล์ */
+  title?: string;
+  /** คำแนะนำเหนือกรอบครอป — ส่ง [] เพื่อซ่อน (เช่น รูปกลุ่มครอบครัว ไม่ต้องเป็นรูปหน้าตรง) */
+  tips?: readonly string[];
 }
 
 const PHOTO_TIPS = [
@@ -31,7 +35,13 @@ const PHOTO_TIPS = [
   'ไม่ใช่รูปการ์ตูนหรือภาพวาด',
 ];
 
-export default function PhotoCropModal({ file, onCancel, onConfirm }: PhotoCropModalProps) {
+export default function PhotoCropModal({
+  file,
+  onCancel,
+  onConfirm,
+  title = 'ครอปรูปโปรไฟล์',
+  tips = PHOTO_TIPS,
+}: PhotoCropModalProps) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'exporting' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -169,7 +179,7 @@ export default function PhotoCropModal({ file, onCancel, onConfirm }: PhotoCropM
         style={{ fontFamily: "'Bai Jamjuree', sans-serif" }}
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-[#0A0A0A]">ครอปรูปโปรไฟล์</h2>
+          <h2 className="text-lg font-bold text-[#0A0A0A]">{title}</h2>
           <button
             type="button"
             onClick={onCancel}
@@ -181,14 +191,16 @@ export default function PhotoCropModal({ file, onCancel, onConfirm }: PhotoCropM
         </div>
 
         {/* คำแนะนำก่อนถ่าย */}
-        <ul className="mb-4 space-y-1 rounded-lg bg-[#F3F3F5] p-3 text-[12px] text-[#575859]">
-          {PHOTO_TIPS.map((tip) => (
-            <li key={tip} className="flex items-start gap-1.5">
-              <Icon name="check_circle" size="small" color="#52B69A" className="mt-[1px] shrink-0" />
-              <span>{tip}</span>
-            </li>
-          ))}
-        </ul>
+        {tips.length > 0 && (
+          <ul className="mb-4 space-y-1 rounded-lg bg-[#F3F3F5] p-3 text-[12px] text-[#575859]">
+            {tips.map((tip) => (
+              <li key={tip} className="flex items-start gap-1.5">
+                <Icon name="check_circle" size="small" color="#52B69A" className="mt-[1px] shrink-0" />
+                <span>{tip}</span>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {status === 'loading' && (
           <div className="flex items-center justify-center" style={{ height: VIEWPORT_SIZE }}>

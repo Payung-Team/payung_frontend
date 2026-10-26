@@ -36,7 +36,17 @@ export function validateProfilePhoto(file: File): string | null {
   return null;
 }
 
-async function postProfilePhoto(jpeg: Blob): Promise<ProfilePhotoResult> {
+/**
+ * ส่ง JPEG ไป endpoint อัปโหลดรูปของ BE (multipart field 'photo') — ใช้ร่วมกับรูปกลุ่มครอบครัว
+ * @param path เช่น '/api/v1/profile/photo'
+ * @param failMessage ข้อความเมื่อ BE ไม่ได้ส่งข้อความไทยกลับมา
+ */
+export async function postJpegPhoto<T>(
+  path: string,
+  jpeg: Blob,
+  fileName: string,
+  failMessage: string,
+): Promise<T> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -44,9 +54,9 @@ async function postProfilePhoto(jpeg: Blob): Promise<ProfilePhotoResult> {
   if (!token) throw new Error('กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
 
   const body = new FormData();
-  body.append('photo', jpeg, 'profile.jpg');
+  body.append('photo', jpeg, fileName);
 
-  const res = await fetch(`${API_BASE}/api/v1/profile/photo`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body,
@@ -62,10 +72,19 @@ async function postProfilePhoto(jpeg: Blob): Promise<ProfilePhotoResult> {
       .json()
       .then((b: { message?: string }) => b.message)
       .catch(() => undefined);
-    throw new Error(detail ?? 'อัปโหลดรูปโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+    throw new Error(detail ?? failMessage);
   }
 
-  return (await res.json()) as ProfilePhotoResult;
+  return (await res.json()) as T;
+}
+
+function postProfilePhoto(jpeg: Blob): Promise<ProfilePhotoResult> {
+  return postJpegPhoto<ProfilePhotoResult>(
+    '/api/v1/profile/photo',
+    jpeg,
+    'profile.jpg',
+    'อัปโหลดรูปโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+  );
 }
 
 export async function uploadProfilePhoto(file: File): Promise<ProfilePhotoResult> {
