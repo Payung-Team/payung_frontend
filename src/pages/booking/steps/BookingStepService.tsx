@@ -143,6 +143,7 @@ export default function BookingStepService() {
   const bookingForMember = memberMode || (fromGroup && groupsLoading);
   const packageTarget = usePackageTarget({
     memberMode: bookingForMember,
+    groupId: gc?.groupId,
     memberUserId: gc?.memberUserId,
     // โหมดจองแทน selectedRecipientId คือ memberUserId ที่ยืมมาเป็น key ไม่ใช่ id โปรไฟล์
     preferredRecipientId: bookingForMember ? undefined : bookingDraft?.recipient?.selectedRecipientId,

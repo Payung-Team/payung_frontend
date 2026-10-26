@@ -2,13 +2,16 @@ import { useEffect } from 'react';
 import { useQuery } from '@apollo/client/react';
 import {
   RECOMMENDED_SERVICE_PACKAGES,
+  RECOMMENDED_SERVICE_PACKAGES_FOR_MEMBER,
   type RecommendedServicePackagesData,
+  type RecommendedServicePackagesForMemberVars,
   type RecommendedServicePackagesVars,
   type ServicePackage,
 } from '../../graphql/servicePackages';
 import type { PackageTarget } from './usePackageTarget';
 import {
   extractGraphQLErrorCode,
+  extractGraphQLErrorExtensions,
   extractGraphQLErrorMessage,
   extractServerErrorBody,
 } from '../../lib/apolloErrors';
@@ -26,8 +29,11 @@ import { careGroupLabel, useServicePackageStrings } from '../../lib/servicePacka
  * BE ที่ deploy อยู่ยังไม่มี query นี้ (ตอบ 400 GRAPHQL_VALIDATION_FAILED) — จำไว้ทั้ง session
  * ★ ไม่งั้นทุกครั้งที่เปลี่ยนบริการที่เลือก (selectedServiceType เปลี่ยน) จะยิงซ้ำแล้วได้ 400 ซ้ำ
  *   BE ขึ้นแล้วโหลดหน้าใหม่ครั้งเดียวก็กลับมาขอได้ตามปกติ
+ * ★ จำแยกต่อ query — query จองแทนสมาชิกเพิ่มทีหลัง ถ้ายังไม่มีต้องไม่พาของจองเองหายไปด้วย
  */
-let schemaMissingThisSession = false;
+const schemaMissingThisSession = new Set<ListTarget['kind']>();
+
+type ListTarget = Extract<PackageTarget, { kind: 'recipient' | 'member' }>;
 
 interface Props {
   target: PackageTarget;
@@ -53,8 +59,8 @@ export default function RecommendedPackages(props: Props) {
       aria-labelledby="recommended-packages-title"
       className="bg-white p-6 rounded-2xl border border-gray-100"
     >
-      {target.kind === 'recipient' ? (
-        <PackageList key={target.careRecipientId} {...props} target={target} />
+      {target.kind === 'recipient' || target.kind === 'member' ? (
+        <PackageList key={target.key} {...props} target={target} />
       ) : (
         <>
           <h2 id="recommended-packages-title" className="text-lg font-bold text-[#1A1A1A]">
@@ -65,10 +71,7 @@ export default function RecommendedPackages(props: Props) {
           ) : target.kind === 'resolveFailed' ? (
             <ErrorState onRetry={target.retry} />
           ) : (
-            <Notice
-              title={s.unavailableTitle}
-              body={target.kind === 'member' ? s.memberUnavailableBody : s.unavailableBody}
-            />
+            <Notice title={s.unavailableTitle} body={s.unavailableBody} />
           )}
         </>
       )}
@@ -76,7 +79,10 @@ export default function RecommendedPackages(props: Props) {
   );
 }
 
-/** key = careRecipientId → เปลี่ยนคนแล้ว remount ทั้งก้อน ไม่มีทางเห็นชุดของคนเดิมค้างอยู่ (E3) */
+/**
+ * key = target.key → เปลี่ยนคนแล้ว remount ทั้งก้อน ไม่มีทางเห็นชุดของคนเดิมค้างอยู่ (E3)
+ *   ด้วยเหตุนี้ query (จองเอง / จองแทนสมาชิก) จึงคงที่ตลอดอายุของ component หนึ่งตัว
+ */
 function PackageList({
   target,
   selectedServiceType,
@@ -85,38 +91,52 @@ function PackageList({
   picked,
   onPick,
   onUnpick,
-}: Props & { target: Extract<PackageTarget, { kind: 'recipient' }> }) {
+}: Props & { target: ListTarget }) {
   const s = useServicePackageStrings();
 
+  const forMember = target.kind === 'member';
   const { data, previousData, loading, error, refetch } = useQuery<
     RecommendedServicePackagesData,
-    RecommendedServicePackagesVars
-  >(RECOMMENDED_SERVICE_PACKAGES, {
-    variables: { careRecipientId: target.careRecipientId, selectedServiceType },
+    RecommendedServicePackagesVars | RecommendedServicePackagesForMemberVars
+  >(forMember ? RECOMMENDED_SERVICE_PACKAGES_FOR_MEMBER : RECOMMENDED_SERVICE_PACKAGES, {
+    variables: forMember
+      ? { groupId: target.groupId, memberUserId: target.memberUserId, selectedServiceType }
+      : { careRecipientId: target.careRecipientId, selectedServiceType },
     // R5 · AC5: อ่านกลุ่มล่าสุดทุกครั้งที่เปิดหน้า ไม่ใช้ผลที่ cache ไว้
     fetchPolicy: 'network-only',
-    skip: schemaMissingThisSession,
+    skip: schemaMissingThisSession.has(target.kind),
   });
-  const schemaMissing = schemaMissingThisSession || (!!error && isSchemaMissing(error));
+  const schemaMissing =
+    schemaMissingThisSession.has(target.kind) || (!!error && isSchemaMissing(error));
   useEffect(() => {
-    if (schemaMissing) schemaMissingThisSession = true;
-  }, [schemaMissing]);
+    if (schemaMissing) schemaMissingThisSession.add(target.kind);
+  }, [schemaMissing, target.kind]);
+  // จองแทน: สมาชิกยังไม่ยินยอมเปิดเผยข้อมูลให้กลุ่ม ฯลฯ — เป็นสถานะปกติ ไม่ใช่ error ให้กดลองใหม่
+  //   อ่านรหัสได้ทั้งตอบ 200 และ 4xx (ServerError) — แบบเดียวกับ error ธุรกิจตัวอื่น
+  const memberDenied =
+    forMember &&
+    !!error &&
+    extractGraphQLErrorExtensions(error)?.code === 'ASSESSMENT_ACCESS_DENIED';
   // เปลี่ยนประเภทบริการที่เลือก → ขอใหม่เพื่อให้ได้ flag ใหม่ ระหว่างรอแสดงชุดเดิมไว้ไม่ให้กระพริบ
   //   previousData ปลอดภัยเพราะ component นี้ผูกกับผู้สูงอายุคนเดียว (key)
   const result = (data ?? (loading ? previousData : undefined))?.recommendedServicePackages;
 
+  // จองแทน: ชื่อมาจากรายชื่อสมาชิก อาจยังโหลดไม่เสร็จ → หัวข้อแบบไม่มีชื่อ
   const title = (
     <h2 id="recommended-packages-title" className="text-lg font-bold text-[#1A1A1A]">
-      {s.sectionTitle(target.name)}
+      {target.name ? s.sectionTitle(target.name) : s.sectionTitleNoName}
     </h2>
   );
 
   if (!result) {
-    if (schemaMissing) {
+    if (schemaMissing || memberDenied) {
       return (
         <>
           {title}
-          <Notice title={s.unavailableTitle} body={s.unavailableBody} />
+          <Notice
+            title={s.unavailableTitle}
+            body={memberDenied ? s.memberUnavailableBody : s.unavailableBody}
+          />
         </>
       );
     }
@@ -141,7 +161,10 @@ function PackageList({
     return (
       <>
         {title}
-        <Notice title={s.noGroupTitle(target.name)} body={s.noGroupBody} />
+        <Notice
+          title={target.name ? s.noGroupTitle(target.name) : s.noPackagesTitle}
+          body={s.noGroupBody}
+        />
       </>
     );
   }
