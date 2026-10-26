@@ -103,7 +103,13 @@ export const BookingReviewForm: React.FC<BookingReviewFormProps> = ({
 
         <div className="review-card">
           <h3 className="card-title">ประสบการณ์ของคุณเป็นอย่างไร?</h3>
-          <div className="stars-container" role="radiogroup" aria-label="ให้คะแนน">
+          {/* ล้าง hover ตอนออกจาก "ทั้งแถว" ไม่ใช่ทีละดาว — เมาส์ผ่านช่องว่างระหว่างดาวต้องไม่ทำให้ข้อความกระพริบ */}
+          <div
+            className="stars-container"
+            role="radiogroup"
+            aria-label="ให้คะแนน"
+            onMouseLeave={() => setHoverRating(0)}
+          >
             {[1, 2, 3, 4, 5].map((value) => (
               <button
                 key={value}
@@ -114,15 +120,15 @@ export const BookingReviewForm: React.FC<BookingReviewFormProps> = ({
                 aria-label={`${value} ดาว - ${RATING_LABELS[value]}`}
                 onClick={() => setRating(value)}
                 onMouseEnter={() => setHoverRating(value)}
-                onMouseLeave={() => setHoverRating(0)}
               >
                 <StarIcon active={value <= displayRating} />
               </button>
             ))}
           </div>
-          {displayRating > 0 && (
-            <p className="rating-feedback-text">{RATING_LABELS[displayRating]}</p>
-          )}
+          {/* จองพื้นที่ข้อความไว้ตลอด — เดิมโผล่/หายตาม hover ทำให้การ์ดยืด-หดและดูกระพริบ */}
+          <p className="rating-feedback-text">
+            {displayRating > 0 ? RATING_LABELS[displayRating] : ''}
+          </p>
         </div>
 
         <div className="review-card">
