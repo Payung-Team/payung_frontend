@@ -269,7 +269,8 @@ const HomePage: React.FC<HomePageProps> = ({ isPublic = false }) => {
             <span className="text-[22px] font-bold leading-8 tracking-[-0.55px] text-white">payung</span>
             <Icon name="eco" color="#52B69A" />
           </div>
-          <p className="mt-3 max-w-[380px] text-[13px] leading-6 text-white/70">
+          {/* จอกว้างพออยู่บรรทัดเดียว · จอแคบ (มือถือ) ตัดบรรทัดเองตามความกว้าง — ไม่ล็อก max-width */}
+          <p className="mt-3 text-[13px] leading-6 text-white/70">
             แพลตฟอร์มจัดหาผู้ดูแลถึงบ้าน ผู้ดูแลผ่านการตรวจสอบประวัติ พร้อมระบบชำระเงินที่ปลอดภัย
           </p>
 
