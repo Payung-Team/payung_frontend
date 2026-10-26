@@ -8,29 +8,59 @@
  */
 import { gql } from '@apollo/client';
 
+const RECOMMENDED_SERVICE_PACKAGES_FIELDS = gql`
+  fragment RecommendedServicePackagesFields on RecommendedServicePackages {
+    careGroup
+    packages {
+      id
+      code
+      nameTh
+      nameEn
+      descriptionTh
+      descriptionEn
+      containsSelectedServiceType
+      items {
+        serviceType
+        nameTh
+        nameEn
+      }
+    }
+  }
+`;
+
 export const RECOMMENDED_SERVICE_PACKAGES = gql`
   query RecommendedServicePackages($careRecipientId: ID!, $selectedServiceType: String) {
     recommendedServicePackages(
       careRecipientId: $careRecipientId
       selectedServiceType: $selectedServiceType
     ) {
-      careGroup
-      packages {
-        id
-        code
-        nameTh
-        nameEn
-        descriptionTh
-        descriptionEn
-        containsSelectedServiceType
-        items {
-          serviceType
-          nameTh
-          nameEn
-        }
-      }
+      ...RecommendedServicePackagesFields
     }
   }
+  ${RECOMMENDED_SERVICE_PACKAGES_FIELDS}
+`;
+
+/**
+ * จองแทนสมาชิกกลุ่ม — FE มีแค่ memberUserId ไม่มี id โปรไฟล์
+ * BE ใช้โปรไฟล์เดียวกับที่ createBookingOnBehalf(memberUserId) จะผูกจริง
+ * ★ alias เป็น recommendedServicePackages → ผลลัพธ์ใช้ type เดียวกับ query ข้างบน
+ * ไม่ผ่านสิทธิ์ (เช่น สมาชิกยังไม่ยินยอมเปิดเผยให้กลุ่ม) = ASSESSMENT_ACCESS_DENIED
+ */
+export const RECOMMENDED_SERVICE_PACKAGES_FOR_MEMBER = gql`
+  query RecommendedServicePackagesForMember(
+    $groupId: ID!
+    $memberUserId: ID!
+    $selectedServiceType: String
+  ) {
+    recommendedServicePackages: recommendedServicePackagesForMember(
+      groupId: $groupId
+      memberUserId: $memberUserId
+      selectedServiceType: $selectedServiceType
+    ) {
+      ...RecommendedServicePackagesFields
+    }
+  }
+  ${RECOMMENDED_SERVICE_PACKAGES_FIELDS}
 `;
 
 /** ค่าตาม ElderCareGroup ของ S09 — อาจมีค่าใหม่ที่ FE ยังไม่รู้จัก ต้องมี fallback */
@@ -65,5 +95,11 @@ export interface RecommendedServicePackagesData {
 
 export interface RecommendedServicePackagesVars {
   careRecipientId: string;
+  selectedServiceType?: string | null;
+}
+
+export interface RecommendedServicePackagesForMemberVars {
+  groupId: string;
+  memberUserId: string;
   selectedServiceType?: string | null;
 }
