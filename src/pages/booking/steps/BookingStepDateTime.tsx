@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBooking } from '../../../context/BookingContext';
 import {
+  BOOKING_END_OF_DAY_TIME,
   BOOKING_FORM_STEP_MINUTES,
   bookingDurationHours,
   bookingEndOptions,
@@ -63,8 +64,12 @@ function fmtHours(hours: number) {
   return `${Math.round(hours * 100) / 100} ชั่วโมง`;
 }
 
-/** ร่างที่ค้างจากฟอร์มเดิม (ทีละ 30 นาที) ที่ไม่ลงตัวกับรายชั่วโมง — ถือว่ายังไม่ได้เลือก */
-function onFormStep(time?: string | null): string {
+/**
+ * ร่างที่ค้างจากฟอร์มเดิม (ทีละ 30 นาที) ที่ไม่ลงตัวกับรายชั่วโมง — ถือว่ายังไม่ได้เลือก
+ * เวลาสิ้นสุด "23:59" (= เที่ยงคืน) ไม่ลงชั่วโมงแต่เป็นตัวเลือกจริง → ส่ง allowEndOfDay ให้เก็บไว้
+ */
+function onFormStep(time?: string | null, allowEndOfDay = false): string {
+  if (allowEndOfDay && time === BOOKING_END_OF_DAY_TIME) return time;
   const minutes = timeToMinutes(time);
   return minutes !== null && minutes % BOOKING_FORM_STEP_MINUTES === 0 ? (time as string) : '';
 }
@@ -139,7 +144,7 @@ export default function BookingStepDateTime() {
 
   const [date, setDate] = useState(bookingDraft?.dateTime?.date || '');
   const [startTime, setStartTime] = useState(() => onFormStep(bookingDraft?.dateTime?.startTime));
-  const [endTime, setEndTime] = useState(() => onFormStep(bookingDraft?.dateTime?.endTime));
+  const [endTime, setEndTime] = useState(() => onFormStep(bookingDraft?.dateTime?.endTime, true));
   const [error, setError] = useState<Record<string, string>>({});
 
   // นาฬิกาเดินทุกนาที — เปิดหน้าค้างไว้แล้วเวลาที่ผ่านไปต้องหายไปเองด้วย
@@ -249,7 +254,7 @@ export default function BookingStepDateTime() {
 
   const quickPickIsos = QUICK_DATES.map(({ offset }) => localIsoDate(addDays(now, offset)));
   const customDateActive = dateValid && !quickPickIsos.includes(date);
-  // หลัง 21:00 วันนี้ไม่เหลือเวลาเริ่มให้เลือก (เริ่มได้ถึง 21:30 และต้องหลังเวลาปัจจุบัน)
+  // ตั้งแต่ 23:00 วันนี้ไม่เหลือเวลาเริ่มให้เลือก (เริ่มได้ถึง 23:00 และต้องหลังเวลาปัจจุบัน)
   const todayClosed = optionsFor(todayIso).length === 0;
   const startPassed = dateValid && !!startTime && !startValid;
 

@@ -50,10 +50,12 @@ const DAYS = [
   { id: 6, name: 'อา.', label: 'วันอาทิตย์' }
 ];
 
+// ★ ต้องตรงกับ BE TIME_SLOT_RANGES (common/constants/time-slot.constant.ts)
+//   feature/booking-24h: จองได้ทั้งวัน → เช้าเริ่ม 00:00 (เดิม 06:00) · เย็นถึง 24:00 (เดิม 22:00)
 const SLOTS: Array<{ key: SlotType; label: string; time: string }> = [
-  { key: 'morning', label: 'เช้า', time: '06:00–12:00' },
+  { key: 'morning', label: 'เช้า', time: '00:00–12:00' },
   { key: 'afternoon', label: 'บ่าย', time: '12:00–17:00' },
-  { key: 'evening', label: 'เย็น', time: '17:00–22:00' }
+  { key: 'evening', label: 'เย็น', time: '17:00–24:00' }
 ];
 
 const SERVICE_LOCATIONS = [
@@ -744,7 +746,7 @@ export const JobReceptionTab: React.FC = () => {
             {SLOTS.map(slot => (
               <div key={`m-head-${slot.key}`} className="flex flex-col items-center justify-end text-center">
                 <span className="text-[12px] font-bold text-[#1A1A1A] leading-tight">{slot.label}</span>
-                {/* คอลัมน์แคบ — ย่อ "06:00–12:00" เป็น "06–12 น." */}
+                {/* คอลัมน์แคบ — ย่อ "00:00–12:00" เป็น "00–12 น." */}
                 <span className="text-[10px] text-[#8A8C8E] leading-tight whitespace-nowrap">
                   {slot.time.split('–').map(t => t.slice(0, 2)).join('–')} น.
                 </span>
