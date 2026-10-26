@@ -220,10 +220,11 @@ function SummaryRow({ icon, label, value, bold = false }: { icon: string; label:
       <div style={{ paddingTop: 2, flexShrink: 0 }}>
         <span className="material-icons" style={{ fontSize: 14, color: '#B0B3B8', lineHeight: '21px' }}>{icon}</span>
       </div>
-      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#8A8C8E', width: 72, flexShrink: 0, lineHeight: '17px' }}>
+      {/* PYG-724: label กว้างพอให้ "ประเภทบริการ" / "ความสัมพันธ์" อยู่บรรทัดเดียว · ค่ายาว (ที่อยู่) ตัดบรรทัดแทนการล้น */}
+      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#8A8C8E', width: 84, flexShrink: 0, lineHeight: '17px' }}>
         {label}
       </span>
-      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, fontWeight: bold ? 600 : 400, color: bold ? '#1A1A1A' : '#1A1A1A', lineHeight: '17px', flex: 1 }}>
+      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, fontWeight: bold ? 600 : 400, color: bold ? '#1A1A1A' : '#1A1A1A', lineHeight: '17px', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
         {value || '—'}
       </span>
     </div>
@@ -423,7 +424,8 @@ export default function PaymentPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#F6FAF9' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px' }}>
+      {/* PYG-724: มือถือ padding 16px · ตั้งแต่ sm ขึ้นไป 24px เท่าเดิม */}
+      <div className="p-4 sm:p-6" style={{ maxWidth: 1200, margin: '0 auto' }}>
 
         {/* Top banner */}
         <div style={{
@@ -438,16 +440,19 @@ export default function PaymentPage() {
           </span>
         </div>
 
-        {/* Two-column layout */}
-        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* Two-column layout
+            PYG-724: เดิมการ์ดสรุปกว้าง 460px ตายตัว (หดไม่ได้) → บนมือถือหน้ากว้างเกินจอ
+            ตอนนี้ต่ำกว่า lg เรียงต่อกันเต็มความกว้าง · ตั้งแต่ lg วางข้างกัน การ์ดสรุป 460px เท่าเดิม */}
+        <div className="flex flex-col gap-4 sm:gap-6 lg:flex-row lg:items-start">
 
           {/* ── Left Panel: Payment Form ── */}
-          <div style={{
-            flex: '1 1 580px', minWidth: 0,
-            background: '#FFFFFF', border: '0.8px solid #E0E2E5',
-            boxShadow: '0px 4px 16px rgba(0,0,0,0.05)', borderRadius: 20,
-            padding: 32,
-          }}>
+          <div
+            className="min-w-0 p-5 sm:p-8 lg:flex-1"
+            style={{
+              background: '#FFFFFF', border: '0.8px solid #E0E2E5',
+              boxShadow: '0px 4px 16px rgba(0,0,0,0.05)', borderRadius: 20,
+            }}
+          >
 
             {/* Header row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
@@ -541,7 +546,7 @@ export default function PaymentPage() {
 
                 {/* Expiry + CVV */}
                 <div style={{ display: 'flex', gap: 12 }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <FieldLabel>วันหมดอายุ</FieldLabel>
                     <input
                       type="text"
@@ -553,7 +558,7 @@ export default function PaymentPage() {
                       style={{ ...inputStyle, fontFamily: "'Inter', sans-serif" }}
                     />
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <FieldLabel helper="?">CVV / CVC</FieldLabel>
                     <input
                       type="password"
@@ -680,7 +685,7 @@ export default function PaymentPage() {
               )}
 
               {/* Security footer */}
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, paddingTop: 12 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', columnGap: 8, rowGap: 2, paddingTop: 12 }}>
                 <span className="material-icons" style={{ fontSize: 13, color: '#9CA3AF' }}>lock</span>
                 <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#8A8C8E' }}>
                   ข้อมูลบัตรถูกเข้ารหัส 256-bit SSL ·
@@ -695,16 +700,18 @@ export default function PaymentPage() {
           </div>
 
           {/* ── Right Panel: Booking Summary ── */}
-          <div style={{
-            flex: '0 0 460px', minWidth: 300,
-            background: '#FFFFFF', border: '0.8px solid #E0E2E5',
-            boxShadow: '0px 4px 16px rgba(0,0,0,0.05)', borderRadius: 20,
-            overflow: 'hidden',
-          }}>
+          <div
+            className="min-w-0 lg:w-[460px] lg:shrink-0"
+            style={{
+              background: '#FFFFFF', border: '0.8px solid #E0E2E5',
+              boxShadow: '0px 4px 16px rgba(0,0,0,0.05)', borderRadius: 20,
+              overflow: 'hidden',
+            }}
+          >
 
             {/* Summary header */}
-            <div style={{ background: '#F0FAF4', borderBottom: '0.8px solid #C6E8D6', padding: '20px 24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div className="px-5 py-5 sm:px-6" style={{ background: '#F0FAF4', borderBottom: '0.8px solid #C6E8D6' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                 <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 10, fontWeight: 700, color: '#52B69A', letterSpacing: '0.7px', textTransform: 'uppercase' }}>
                   สรุปรายการจอง
                 </span>
@@ -721,7 +728,7 @@ export default function PaymentPage() {
                     <span className="material-icons" style={{ fontSize: 10, color: '#FFFFFF' }}>check</span>
                   </div>
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '21px' }}>
                     {booking.caregiverName}
                   </p>
@@ -737,7 +744,7 @@ export default function PaymentPage() {
             </div>
 
             {/* Patient section */}
-            <div style={{ padding: '16px 24px', borderBottom: '0.8px solid #F0F1F3' }}>
+            <div className="px-5 py-4 sm:px-6" style={{ borderBottom: '0.8px solid #F0F1F3' }}>
               <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 10, fontWeight: 700, color: '#52B69A', letterSpacing: '0.7px', textTransform: 'uppercase', margin: '0 0 12px' }}>
                 ผู้รับบริการ
               </p>
@@ -745,7 +752,7 @@ export default function PaymentPage() {
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <span className="material-icons" style={{ fontSize: 20, color: '#3B82F6' }}>elderly</span>
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '21px' }}>
                     {recipientName}
                   </p>
@@ -782,7 +789,7 @@ export default function PaymentPage() {
 
             {/* Contact person */}
             {contactPerson?.name && (
-              <div style={{ padding: '16px 24px', borderBottom: '0.8px solid #F0F1F3' }}>
+              <div className="px-5 py-4 sm:px-6" style={{ borderBottom: '0.8px solid #F0F1F3' }}>
                 <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 10, fontWeight: 700, color: '#52B69A', letterSpacing: '0.7px', textTransform: 'uppercase', margin: '0 0 12px' }}>
                   ผู้ติดต่อในวันนัดหมาย
                 </p>
@@ -795,7 +802,7 @@ export default function PaymentPage() {
             )}
 
             {/* Appointment details */}
-            <div style={{ padding: '16px 24px', borderBottom: '0.8px solid #F0F1F3' }}>
+            <div className="px-5 py-4 sm:px-6" style={{ borderBottom: '0.8px solid #F0F1F3' }}>
               <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 10, fontWeight: 700, color: '#52B69A', letterSpacing: '0.7px', textTransform: 'uppercase', margin: '0 0 12px' }}>
                 รายละเอียดนัดหมาย
               </p>
@@ -824,33 +831,33 @@ export default function PaymentPage() {
             </div>
 
             {/* Price breakdown */}
-            <div style={{ padding: '16px 24px' }}>
+            <div className="px-5 py-4 sm:px-6">
               <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 10, fontWeight: 700, color: '#52B69A', letterSpacing: '0.7px', textTransform: 'uppercase', margin: '0 0 12px' }}>
                 สรุปยอดชำระ
               </p>
               {hourlyRate > 0 && hours > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                   <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E' }}>
                     ค่าบริการผู้ดูแล (฿{hourlyRate.toLocaleString()} × {hours} ชม.)
                   </span>
-                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 600, color: '#1A1A1A' }}>
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 600, color: '#1A1A1A', whiteSpace: 'nowrap' }}>
                     ฿{serviceCost.toLocaleString()}
                   </span>
                 </div>
               )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingBottom: 12, borderBottom: '0.8px solid #F0F1F3' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8, paddingBottom: 12, borderBottom: '0.8px solid #F0F1F3' }}>
                 <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E' }}>
                   ค่าธรรมเนียมแพลตฟอร์ม (10%)
                 </span>
-                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 600, color: '#1A1A1A' }}>
+                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 600, color: '#1A1A1A', whiteSpace: 'nowrap' }}>
                   ฿{platformFee.toLocaleString()}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 15, fontWeight: 700, color: '#1A1A1A' }}>
                   รวมทั้งสิ้น
                 </span>
-                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, color: '#3B82F6' }}>
+                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, color: '#3B82F6', whiteSpace: 'nowrap' }}>
                   ฿{total.toLocaleString()}
                 </span>
               </div>
