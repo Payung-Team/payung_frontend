@@ -248,13 +248,7 @@ function MemberBookingSection({
                 {selected.name || 'สมาชิกที่ยังไม่ได้กรอกชื่อ'}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => goToStep(1)}
-              className="shrink-0 min-h-[44px] px-4 rounded-xl border border-[#1B5C48] text-sm font-bold text-[#1B5C48] hover:bg-[#F0FAF4] transition cursor-pointer"
-            >
-              เปลี่ยนสมาชิก
-            </button>
+            {/* ไม่มีปุ่มเปลี่ยนสมาชิกที่นี่ — เลือกคนแล้วตั้งแต่ขั้นแรก (BookingMemberPicker) */}
           </div>
         ) : loading ? (
           <div className="h-12 w-full animate-pulse rounded-xl bg-gray-100" />
