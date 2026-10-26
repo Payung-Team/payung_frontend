@@ -219,6 +219,9 @@
   font-weight: 600;
   color: var(--color-warning-text);
   margin-top: 8px;
+  /* แถวนี้แสดงอยู่ตลอด (ว่างเมื่อยังไม่ได้เลือก) — ความสูงคงที่ การ์ดจึงไม่ยืด-หดตาม hover */
+  line-height: 20px;
+  min-height: 20px;
 }
 
 .textarea-review {
