@@ -64,11 +64,20 @@ export function formatBookingTimeRange(
 export const BOOKING_TIME_STEP_MINUTES = 30;
 export const BOOKING_MIN_DURATION_MINUTES = 60;
 export const BOOKING_MAX_DURATION_MINUTES = 12 * 60;
-/** BE อนุมาน timeSlot จากเวลาเริ่ม — นอก 06:00–21:30 ไม่มี slot รองรับ */
-export const BOOKING_EARLIEST_START_MINUTES = 6 * 60;
-export const BOOKING_LATEST_START_MINUTES = 21 * 60 + 30;
-/** BE รับชั่วโมง 00–23 ("24:00" ไม่ผ่าน) และไม่รับข้ามเที่ยงคืน → สิ้นสุดช้าสุด 23:30 */
-export const BOOKING_LATEST_END_MINUTES = 23 * 60 + 30;
+/**
+ * จองได้ทั้งวัน (feature/booking-24h) — BE ขยาย slot ให้ครอบ 00:00–24:00 แล้ว
+ * (เดิมเริ่มได้ 06:00–21:30 · สิ้นสุดช้าสุด 23:30)
+ * เริ่มช้าสุด 23:00 เพราะต้องยาวอย่างน้อย 1 ชม. และไม่ข้ามเที่ยงคืน
+ */
+export const BOOKING_EARLIEST_START_MINUTES = 0;
+export const BOOKING_LATEST_START_MINUTES = 23 * 60;
+/**
+ * สิ้นสุดช้าสุด = เที่ยงคืน (นาทีที่ 1440) แสดงและส่ง BE เป็น "23:59"
+ * BE รับชั่วโมง 00–23 ("24:00" ไม่ผ่าน) จึงใช้ "23:59" แทน แต่คิดระยะเวลา/ราคาเป็นเที่ยงคืน
+ * → 23:00–23:59 = 1 ชม. เต็ม (BE: BOOKING_END_OF_DAY_TIME ใน booking-time.ts)
+ */
+export const BOOKING_LATEST_END_MINUTES = 24 * 60;
+export const BOOKING_END_OF_DAY_TIME = '23:59';
 /** เลือกเวลาเริ่มแล้ว ตั้งเวลาสิ้นสุดให้ก่อนที่ +4 ชม. */
 export const BOOKING_DEFAULT_DURATION_MINUTES = 4 * 60;
 /**
@@ -83,8 +92,18 @@ export function timeToMinutes(time?: string | null): number | null {
   return match ? Number(match[1]) * 60 + Number(match[2]) : null;
 }
 
-/** นาทีนับจากเที่ยงคืน → "HH:mm" */
+/**
+ * เวลาสิ้นสุด "HH:mm" → นาทีนับจากเที่ยงคืน · "23:59" = เที่ยงคืน (1440) ไม่ใช่ 1439
+ * ใช้กับเวลาสิ้นสุดเท่านั้น — เวลาเริ่มใช้ timeToMinutes ตามปกติ
+ */
+export function endTimeToMinutes(time?: string | null): number | null {
+  const minutes = timeToMinutes(time);
+  return minutes === BOOKING_LATEST_END_MINUTES - 1 ? BOOKING_LATEST_END_MINUTES : minutes;
+}
+
+/** นาทีนับจากเที่ยงคืน → "HH:mm" · เที่ยงคืน (1440) แสดงเป็น "23:59" */
 export function minutesToTime(minutes: number): string {
+  if (minutes === BOOKING_LATEST_END_MINUTES) return BOOKING_END_OF_DAY_TIME;
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
 }
@@ -109,7 +128,10 @@ export function bookingStartOptions(
   return options;
 }
 
-/** เวลาสิ้นสุดที่เลือกได้สำหรับเวลาเริ่มนี้ — ตัดตัวที่สั้น/ยาวเกิน และข้ามเที่ยงคืนออก */
+/**
+ * เวลาสิ้นสุดที่เลือกได้สำหรับเวลาเริ่มนี้ — ตัดตัวที่สั้น/ยาวเกิน และข้ามเที่ยงคืนออก
+ * ตัวสุดท้ายถึงเที่ยงคืนได้ แสดงเป็น "23:59" (เช่นเริ่ม 20:00 → 21:00 / 22:00 / 23:00 / 23:59)
+ */
 export function bookingEndOptions(
   startTime: string,
   stepMinutes: number = BOOKING_TIME_STEP_MINUTES,
@@ -129,8 +151,8 @@ export function bookingEndOptions(
 }
 
 /**
- * เวลาสิ้นสุดตั้งต้น = เริ่ม + 4 ชม. · เริ่มดึกจนเกินเวลาปิด ใช้ตัวเลือกสุดท้ายที่ลงตัวกับ step
- * (step 30: 21:30 → 23:30 · step 60: 21:00 → 23:00) · เวลาเริ่มผิดรูปแบบคืน ''
+ * เวลาสิ้นสุดตั้งต้น = เริ่ม + 4 ชม. · เริ่มดึกจนเลยเที่ยงคืน ใช้ตัวเลือกสุดท้ายที่ลงตัวกับ step
+ * (เริ่ม 21:00 / 23:00 → "23:59" = เที่ยงคืน) · เวลาเริ่มผิดรูปแบบคืน ''
  */
 export function defaultBookingEndTime(
   startTime: string,
@@ -143,10 +165,10 @@ export function defaultBookingEndTime(
   return minutesToTime(Math.min(start + BOOKING_DEFAULT_DURATION_MINUTES, latestOnStep));
 }
 
-/** จำนวนชั่วโมงระหว่างสองเวลา — คืน 0 ถ้าไม่ครบหรือสิ้นสุดไม่หลังเริ่ม */
+/** จำนวนชั่วโมงระหว่างสองเวลา — คืน 0 ถ้าไม่ครบหรือสิ้นสุดไม่หลังเริ่ม · สิ้นสุด "23:59" = เที่ยงคืน */
 export function bookingDurationHours(startTime?: string | null, endTime?: string | null): number {
   const start = timeToMinutes(startTime);
-  const end = timeToMinutes(endTime);
+  const end = endTimeToMinutes(endTime);
   if (start === null || end === null || end <= start) return 0;
   return (end - start) / 60;
 }
