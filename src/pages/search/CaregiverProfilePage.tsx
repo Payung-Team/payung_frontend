@@ -365,7 +365,8 @@ const CaregiverProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-screen" style={{ background: '#F6FAF9' }}>
-      <div className="mx-auto px-4 sm:px-6 py-7" style={{ maxWidth: 1040 }}>
+      {/* pb เผื่อแถบปุ่มจองที่ลอยด้านล่างบนจอ < lg */}
+      <div className="mx-auto px-4 sm:px-6 pt-7 pb-[96px] lg:pb-7" style={{ maxWidth: 1040 }}>
         {/* Back link — อยู่เหนือทั้งสองคอลัมน์ เพื่อให้การ์ดซ้าย/ขวาเริ่มที่ระดับเดียวกัน */}
         <button
           type="button"
@@ -389,10 +390,11 @@ const CaregiverProfilePage: React.FC = () => {
               {/* Banner */}
               <div
                 className="relative overflow-hidden flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #3A9A7E 0%, #52B69A 60%, #76C893 100%)', height: 152 }}
+                style={{ background: 'linear-gradient(135deg, #3A9A7E 0%, #52B69A 60%, #76C893 100%)', minHeight: 152 }}
               >
                 <div className="absolute" style={{ width: 180, height: 180, right: -20, top: -40, background: 'rgba(255,255,255,0.08)', borderRadius: '50%' }} />
-                <div className="absolute flex items-center gap-[22px]" style={{ left: 28, top: 32, right: 28, height: 91 }}>
+                {/* ไม่ล็อกความสูง — ให้แบนเนอร์ยืดตามเนื้อหาเมื่อ badge/สถิติขึ้นบรรทัดใหม่ · มือถือ: avatar อยู่บน info */}
+                <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-[22px] px-5 py-6 sm:px-7 sm:py-8">
                   {/* Avatar */}
                   <CaregiverPhoto
                     src={avatarUrl}
@@ -401,7 +403,7 @@ const CaregiverProfilePage: React.FC = () => {
                     frameStyle={{ border: '2.4px solid rgba(255,255,255,0.5)' }}
                   />
                   {/* Info */}
-                  <div className="flex flex-col flex-1 min-w-0">
+                  <div className="flex flex-col flex-1 min-w-0 w-full">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-white font-bold" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 22, lineHeight: '33px' }}>
                         {fullName}
@@ -435,18 +437,12 @@ const CaregiverProfilePage: React.FC = () => {
                       {province && (<><span style={{ opacity: 0.5 }}>·</span><span>{province}</span></>)}
                       {experience != null && (<><span style={{ opacity: 0.5 }}>·</span><span>ประสบการณ์ {experience} ปี</span></>)}
                     </div>
-                    <div className="flex items-center gap-[28px] flex-wrap mt-3">
+                    <div className="flex items-center gap-x-5 sm:gap-x-[28px] gap-y-2 flex-wrap mt-3">
                       {avgRating > 0 && <StarRow rating={avgRating} count={reviewCount} size={15} />}
                       <span className="inline-flex items-center gap-[5px]">
                         <span className="material-icons" style={{ fontSize: 15, color: 'rgba(255,255,255,0.8)' }}>event_available</span>
                         <span className="text-white font-semibold num" style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, lineHeight: '20px' }}>
                           จอง {completedBookingCount ?? 0} ครั้ง
-                        </span>
-                      </span>
-                      <span className="inline-flex items-center gap-[5px]">
-                        <span className="material-icons" style={{ fontSize: 15, color: 'rgba(255,255,255,0.8)' }}>schedule</span>
-                        <span className="text-white font-semibold" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, lineHeight: '20px' }}>
-                          ตอบกลับใน 30 นาที
                         </span>
                       </span>
                     </div>
@@ -571,11 +567,13 @@ const CaregiverProfilePage: React.FC = () => {
           </div>
 
           {/* ── RIGHT COLUMN ── */}
-          <div className="flex flex-col gap-3.5 w-full lg:flex-1">
+          {/* desktop: sticky ให้การ์ดจองตามลงมาขณะเลื่อนดูโปรไฟล์ (header fixed สูง 70px) */}
+          <div className="flex flex-col gap-3.5 w-full lg:flex-1 lg:sticky lg:top-[90px]">
 
             {/* Booking Card */}
             <div className="flex flex-col" style={{ background: '#FFFFFF', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 16, padding: 20 }}>
-              {/* Price */}
+              {/* Price — จอ < lg แสดงในแถบปุ่มลอยด้านล่างแทน */}
+              <div className="hidden lg:block">
               {priceText ? (
                 <div className="flex items-end gap-1">
                   <span className="font-bold num" style={{ fontFamily: "'Inter', sans-serif", fontSize: 26, color: '#1A1A1A', lineHeight: '39px' }}>
@@ -593,12 +591,13 @@ const CaregiverProfilePage: React.FC = () => {
               <p className="mb-3.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#8A8C8E', lineHeight: '18px' }}>
                 {priceText ? 'ราคาเริ่มต้นตามประเภทงาน ไม่มีค่าใช้จ่ายแอบแฝง' : 'ราคาจะแสดงเมื่อเลือกประเภทงานตอนจอง'}
               </p>
+              </div>
 
-              {/* Book button */}
+              {/* Book button — จอ < lg ใช้แถบปุ่มลอยด้านล่างแทน */}
               <button
                 type="button"
                 onClick={() => setShowModal(true)}
-                className="w-full flex items-center justify-center gap-2 font-bold text-white transition-all duration-150 cursor-pointer hover:opacity-90"
+                className="w-full hidden lg:flex items-center justify-center gap-2 font-bold text-white transition-all duration-150 cursor-pointer hover:opacity-90"
                 style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, height: 44, background: '#52B69A', boxShadow: '0px 4px 12px rgba(82,182,154,0.2)', borderRadius: 8, lineHeight: '21px' }}
               >
                 <span className="material-icons" style={{ fontSize: 16 }}>event_available</span>
@@ -606,7 +605,7 @@ const CaregiverProfilePage: React.FC = () => {
               </button>
 
               {/* Secondary button — บันทึก */}
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 lg:mt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -642,10 +641,6 @@ const CaregiverProfilePage: React.FC = () => {
               {/* Stats */}
               <div className="flex flex-col gap-[9px] mt-4 pt-3.5" style={{ borderTop: '0.8px solid #F0F1F3' }}>
                 <div className="flex items-center justify-between">
-                  <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#8A8C8E', lineHeight: '18px' }}>ตอบรับโดยเฉลี่ย</span>
-                  <span className="font-semibold" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#1A1A1A', lineHeight: '18px' }}>ภายใน 30 นาที</span>
-                </div>
-                <div className="flex items-center justify-between">
                   <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#8A8C8E', lineHeight: '18px' }}>ยกเลิกได้</span>
                   <span className="font-semibold" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#1A1A1A', lineHeight: '18px' }}>ก่อน 24 ชม.</span>
                 </div>
@@ -671,6 +666,39 @@ const CaregiverProfilePage: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Floating book bar (จอ < lg) — การ์ดจองไปอยู่ใต้โปรไฟล์ยาวๆ จึงลอยปุ่มไว้ให้กดได้ตลอด
+          บนมือถือวางเหนือแถบเมนูล่างของแอป (--mobile-nav-h จาก MobileNavigation) */}
+      <div className="lg:hidden fixed bottom-[var(--mobile-nav-h,0px)] md:bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-[#E0E2E5]">
+        <div className="mx-auto px-4 sm:px-6 py-3 flex items-center gap-3" style={{ maxWidth: 1040 }}>
+          <div className="flex flex-col min-w-0">
+            {priceText ? (
+              <span className="flex items-end gap-1">
+                <span className="font-bold num" style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, color: '#1A1A1A', lineHeight: '24px' }}>
+                  {priceText}
+                </span>
+                <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#8A8C8E', lineHeight: '20px' }}>/ชม.</span>
+              </span>
+            ) : (
+              <span className="font-bold" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, color: '#8A8C8E', lineHeight: '20px' }}>
+                {NO_PRICE_LABEL}
+              </span>
+            )}
+            <span className="truncate" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E', lineHeight: '16px' }}>
+              {priceText ? 'ราคาเริ่มต้นตามประเภทงาน' : 'แสดงเมื่อเลือกประเภทงาน'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="ml-auto flex-shrink-0 flex items-center justify-center gap-2 font-bold text-white transition-all duration-150 cursor-pointer hover:opacity-90"
+            style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, height: 44, padding: '0 24px', background: '#52B69A', boxShadow: '0px 4px 12px rgba(82,182,154,0.2)', borderRadius: 8, lineHeight: '21px' }}
+          >
+            <span className="material-icons" style={{ fontSize: 16 }}>event_available</span>
+            จองบริการ
+          </button>
         </div>
       </div>
 
