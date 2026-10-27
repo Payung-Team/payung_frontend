@@ -1,17 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { useBooking } from '../../../context/BookingContext';
 import { supabase } from '../../../lib/supabase';
-import { toPatientProfilePayload, type PatientProfile } from '../../../lib/patientProfile';
-import { createCareRecipient } from '../../../lib/careRecipientsApi';
+import { type PatientProfile } from '../../../lib/patientProfile';
 import { assessmentPath } from '../../../lib/assessmentNav';
 import { useAssessmentStrings } from '../../../lib/assessmentStrings';
 import BookingAssessmentGate from '../../../components/assessment/BookingAssessmentGate';
 import InfectionDisclosureEditor from '../../../components/infection/InfectionDisclosureEditor';
 import { readRecipientInfection } from '../../../lib/infectionDisclosure';
 import { useInfectionStrings } from '../../../lib/infectionStrings';
-import ConfirmModal from '../../../components/ui/ConfirmModal';
 import {
   MY_FAMILY_GROUPS,
   GROUP_BOOKING_RECIPIENTS,
@@ -55,82 +53,6 @@ interface SavedRecipient {
   details?: PatientProfile | null;
 }
 
-/** หนึ่งแถวในลิสต์ "ผู้รับบริการคือใคร" — วงกลมเลือก + ชื่อ + ปุ่มลบ */
-function RecipientRow({
-  selected,
-  title,
-  badge,
-  assessed,
-  onSelect,
-  onDelete,
-}: {
-  selected: boolean;
-  title: string;
-  /** ป้ายกำกับข้างชื่อ เช่น "ตัวเอง" (PYG-502) */
-  badge?: string;
-  /** S08: ป้ายสถานะแบบประเมิน — undefined = ไม่รู้ ไม่แสดงป้าย */
-  assessed?: boolean;
-  onSelect: () => void;
-  onDelete?: () => void;
-}) {
-  const s = useAssessmentStrings();
-  const blocked = selected && assessed === false;
-  return (
-    <div
-      className={`flex items-center rounded-xl border-2 transition ${
-        blocked
-          ? 'border-[#D97706] bg-[#FFFBEB]'
-          : selected
-            ? 'border-[#1B5C48] bg-[#F0FAF4]'
-            : 'border-[#E0E2E5] bg-white hover:border-gray-300'
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onSelect}
-        aria-pressed={selected}
-        className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3.5 text-left cursor-pointer"
-      >
-        <span
-          className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center ${
-            selected ? 'border-[#1B5C48]' : 'border-[#C7CDD2]'
-          }`}
-        >
-          {selected && <span className="w-2.5 h-2.5 rounded-full bg-[#1B5C48]" />}
-        </span>
-        <span className="flex-1 min-w-0 text-sm font-bold text-[#1A1A1A] truncate">{title}</span>
-        {badge && (
-          <span className="shrink-0 rounded-full bg-[#F0FAF4] px-2.5 py-1 text-xs font-bold text-[#1B5C48]">
-            {badge}
-          </span>
-        )}
-        {assessed === true && (
-          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#E3F2EA] px-2.5 py-1 text-xs font-semibold text-[#1F5E43]">
-            <span className="material-icons" style={{ fontSize: 14 }} aria-hidden="true">check</span>
-            {s.assessedBadge}
-          </span>
-        )}
-        {assessed === false && (
-          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#FEF3C7] px-2.5 py-1 text-xs font-semibold text-[#78350F]">
-            <span className="material-icons" style={{ fontSize: 14 }} aria-hidden="true">error_outline</span>
-            {s.notAssessedBadge}
-          </span>
-        )}
-      </button>
-      {onDelete && (
-        <button
-          type="button"
-          onClick={onDelete}
-          aria-label={`ลบ ${title}`}
-          title="ลบรายชื่อนี้"
-          className="shrink-0 px-4 py-3.5 text-sm font-semibold text-red-600 hover:text-red-700 hover:underline transition cursor-pointer"
-        >
-          ลบ
-        </button>
-      )}
-    </div>
-  );
-}
 
 
 /**
@@ -463,16 +385,14 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
     initialSavedRecipient?.id ??
       (memberContext ? null : bookingDraft?.recipient?.selectedRecipientId ?? null),
   );
-  // กรอกเองโดยไม่ได้เลือกจากลิสต์ → ถามว่าจะบันทึกโปรไฟล์ไว้ใช้ครั้งหน้าไหม
+  // กรอกเองโดยไม่ได้เลือกจากลิสต์ → ถามว่าจะบันทึกโปรไฟล์ไว้ใช้ครั้งหน้าไหม (เฉพาะจองแทนสมาชิก)
   const [saveAsProfile, setSaveAsProfile] = useState(!!memberContext);
-  // รายชื่อที่กด "ลบ" ไว้ รอยืนยันใน modal
-  const [pendingDelete, setPendingDelete] = useState<SavedRecipient | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [savedRecipients, setSavedRecipients] = useState<SavedRecipient[]>(
     memberContext?.savedRecipients ?? [],
   );
+  // จองให้ตัวเอง: โหลดรายชื่อเสร็จแล้วหรือยัง — แยก "ยังโหลดอยู่" กับ "ไม่พบโปรไฟล์ของตัวเอง"
+  const [recipientsLoaded, setRecipientsLoaded] = useState(isMemberBooking);
   useEffect(() => {
     if (isMemberBooking) return;
     let cancelled = false;
@@ -481,18 +401,18 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
         data: { session },
       } = await supabase.auth.getSession();
       const token = session?.access_token;
-      if (!token) return;
       try {
+        if (!token) return;
         const res = await fetch(`${API_BASE}/api/v1/patient/care-recipients`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return;
         const data: SavedRecipient[] = await res.json();
-        // ตั้งค่าแม้ลิสต์ว่าง — เดิมกันด้วย data.length > 0 เพราะต้องกัน MOCK ไม่ให้หาย
-        // ตอนนี้ไม่มี MOCK แล้ว ถ้ายังกันอยู่ ลบโปรไฟล์ใบสุดท้ายแล้วลิสต์จะไม่อัปเดต
         if (!cancelled) setSavedRecipients(data);
       } catch {
-        // ดึงไม่ได้ก็แค่ไม่แสดงการ์ดโปรไฟล์ที่บันทึกไว้
+        // ดึงไม่ได้ → แสดงข้อความ "ไม่พบข้อมูลของคุณ" ด้านล่าง
+      } finally {
+        if (!cancelled) setRecipientsLoaded(true);
       }
     })();
     return () => {
@@ -572,27 +492,8 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
     isMemberBooking,
   ]);
 
-  /**
-   * PYG-502 — ใบ "ของตัวเอง" อยู่บนสุดเสมอ
-   *
-   * ★ เป็นตัวเลือกที่ผู้ใช้กดบ่อยที่สุด (จองให้ตัวเอง) และข้อมูลครบที่สุดเพราะมาจาก
-   *   Onboarding ที่บังคับกรอก — ปล่อยให้เรียงตามชื่อจะทำให้จมอยู่กลางลิสต์
-   * ★ เรียงแบบคงที่: ของตัวเองก่อน ที่เหลือคงลำดับเดิมจาก API (เรียงตามชื่อมาแล้ว)
-   */
-  const orderedRecipients = useMemo(() => {
-    const self = savedRecipients.filter((r) => r.isSelf);
-    const others = savedRecipients.filter((r) => !r.isSelf);
-    return [...self, ...others];
-  }, [savedRecipients]);
-
   // เลือกโปรไฟล์ที่บันทึกไว้ — เติมทุกช่องที่โปรไฟล์นั้นมี ที่เหลือล้างให้ว่าง
-  // กดซ้ำที่ใบเดิม = ยกเลิกการเลือก แล้วกลับไปกรอกเอง
   const handleSelectRecipient = (recipient: SavedRecipient) => {
-    if (selectedRecipientId === recipient.id) {
-      if (isMemberBooking) return;
-      setSelectedRecipientId(null);
-      return;
-    }
     setSelectedRecipientId(recipient.id);
     setSaveAsProfile(false);
     setName(recipient.name);
@@ -619,39 +520,16 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
     setRegularHospital(d?.regularHospital ?? '');
   };
 
-  // ลบรายชื่อที่บันทึกไว้ — ยืนยันผ่าน modal ก่อนเสมอ
-  // BE ใช้ soft delete + snapshot: การจองที่ผ่านมายังอยู่และยังแสดงข้อมูลคนไข้ได้
-  const confirmDeleteRecipient = async () => {
-    if (!pendingDelete) return;
-    const target = pendingDelete;
-
-    setDeleting(true);
-    setDeleteError(null);
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) throw new Error('no session');
-
-      const res = await fetch(`${API_BASE}/api/v1/patient/care-recipients/${target.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // 204 = ลบแล้ว · 404 = หายไปอยู่แล้ว (กดซ้ำ / ลบจากอีกแท็บ) ถือว่าสำเร็จทั้งคู่
-      // เป้าหมายของผู้ใช้คือ "ให้มันหายไป" ซึ่งบรรลุแล้วทั้งสองกรณี
-      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
-    } catch {
-      setDeleteError(`ลบ "${target.name}" ไม่สำเร็จ กรุณาลองอีกครั้ง`);
-      setDeleting(false);
-      return;
-    }
-
-    setSavedRecipients((prev) => prev.filter((r) => r.id !== target.id));
-    if (selectedRecipientId === target.id) setSelectedRecipientId(null);
-    setDeleting(false);
-    setPendingDelete(null);
-  };
+  // ── จองแบบบุคคล (ไม่ได้จองแทนสมาชิกกลุ่ม) — ผู้รับบริการคือ "ตัวเอง" เท่านั้น ──────────
+  //   ไม่มีการ์ดเลือกผู้รับบริการ / เพิ่มชื่อใหม่ / ลบรายชื่อ · ชื่อล็อกไว้
+  //   ใช้โปรไฟล์ของตัวเอง (isSelf — สร้างตอน Onboarding) เติมฟอร์มให้อัตโนมัติ
+  //   ★ draft เลือกใบของตัวเองไว้แล้ว (กลับมาจากแบบประเมิน / ย้อนขั้น) → ไม่เติมทับค่าที่แก้ไว้
+  const selfRecipient = isMemberBooking ? undefined : savedRecipients.find((r) => r.isSelf);
+  useEffect(() => {
+    if (selfRecipient && selectedRecipientId !== selfRecipient.id) handleSelectRecipient(selfRecipient);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selfRecipient?.id]);
+  const selfMissing = !isMemberBooking && recipientsLoaded && !selfRecipient;
 
   // แก้ชื่อเองเมื่อไหร่ = หลุดจากใบที่เลือกไว้
   const handleNameChange = (value: string) => {
@@ -666,13 +544,12 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
   // ── S08 · PYG-610: กันจองเมื่อผู้รับบริการยังไม่มีแบบประเมิน (AC9, AC10) ──────────
   // BE กันซ้ำอีกชั้นตอนส่งคำขอ (ASSESSMENT_REQUIRED) — ที่นี่พาไปประเมินก่อนเสียเวลาเลือกผู้ดูแล
   //   ★ โหมดจองแทน: query ของกลุ่มไม่มี hasAssessment จึงไม่กันที่นี่ (ดู onBehalfBookingErrorMessage)
-  //   ★ กรอกเองโดยไม่เลือกจากลิสต์: BE ไม่ให้จองโดยไม่มีโปรไฟล์ที่ประเมินแล้ว ต้องบันทึกโปรไฟล์ก่อน
+  //   ★ จองให้ตัวเอง: ยังไม่ได้โปรไฟล์ของตัวเอง (กำลังโหลด / ไม่พบ) ก็ยังไปต่อไม่ได้
   const navigate = useNavigate();
   const assessmentText = useAssessmentStrings();
   const selectedRecipient = savedRecipients.find((r) => r.id === selectedRecipientId);
   const needsAssessment = !isMemberBooking && selectedRecipient?.hasAssessment === false;
-  const needsNewProfile = !isMemberBooking && isManualEntry;
-  const assessmentBlocked = needsAssessment || needsNewProfile;
+  const assessmentBlocked = needsAssessment || (!isMemberBooking && !selectedRecipient);
 
   // ── S10 · PYG-620: โรคติดเชื้อที่ผู้ดูแลควรรู้ ────────────────────────────────
   // แก้ได้เฉพาะโปรไฟล์ที่ผู้ใช้เป็นเจ้าของ (BE ตรวจ patientId) → จองแทนสมาชิกไม่มีช่องนี้
@@ -681,9 +558,6 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
   const showInfection = !isMemberBooking && !!selectedRecipient && !assessmentBlocked;
   const infectionMissing =
     showInfection && !!selectedRecipient && readRecipientInfection(selectedRecipient) === null;
-  const [creatingProfile, setCreatingProfile] = useState(false);
-  const [createProfileError, setCreateProfileError] = useState<string | null>(null);
-
   const startAssessment = (recipientId: string) => {
     // เขียน draft ทันที ไม่รอ effect — หน้านี้ถูกถอดออกก่อน effect รอบถัดไปจะทำงาน
     setBookingDraft((prev) =>
@@ -692,58 +566,6 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
         : prev,
     );
     navigate(assessmentPath(recipientId, 'booking'));
-  };
-
-  /**
-   * "เลือกคนอื่น" — ยกเลิกใบที่ยังไม่ประเมินและล้างข้อมูลของคนนั้นออกจากฟอร์ม
-   * ★ ถ้าล้างแค่การเลือก ฟอร์มจะกลายเป็น "กรอกเอง" ด้วยข้อมูลของคนเดิม แล้วกล่องผู้รับบริการรายใหม่
-   *   จะชวนให้บันทึกคนเดิมซ้ำเป็นอีกใบ
-   */
-  const chooseOtherRecipient = () => {
-    setSelectedRecipientId(null);
-    setName('');
-    setNickname('');
-    setAge('');
-    setGender('');
-    setWeight('');
-    setHeight('');
-    setSupportLevel('');
-    setBloodGroup('');
-    setConditions([]);
-    setMedicines('');
-    setAllergies('');
-    setCareInstructions('');
-    setRegularHospital('');
-  };
-
-  const handleCreateAndAssess = async () => {
-    const errs: Record<string, string> = {};
-    if (!name.trim()) errs.name = 'กรุณากรอกชื่อคนไข้';
-    if (!age.trim()) errs.age = 'กรุณากรอกอายุ';
-    if (!gender) errs.gender = 'กรุณาเลือกเพศ';
-    if (!supportLevel) errs.supportLevel = 'กรุณาเลือกระดับการช่วยเหลือตนเอง';
-    if (Object.keys(errs).length > 0) {
-      setError((prev) => ({ ...prev, ...errs }));
-      setCreateProfileError(assessmentText.gateNewFillFirst);
-      return;
-    }
-    setCreatingProfile(true);
-    setCreateProfileError(null);
-    try {
-      const details = buildPatientDetails();
-      const created = await createCareRecipient({
-        name: name.trim(),
-        nickname: details.nickname,
-        details: toPatientProfilePayload(details),
-      });
-      setSavedRecipients((prev) => [...prev, { ...created, hasAssessment: false }]);
-      setSelectedRecipientId(created.id);
-      setSaveAsProfile(false);
-      startAssessment(created.id);
-    } catch {
-      setCreateProfileError(assessmentText.gateNewSaveFailed);
-      setCreatingProfile(false);
-    }
   };
 
   const handleSubmit = () => {
@@ -798,53 +620,22 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
 
   return (
     <div className="space-y-4">
-      {/* เลือกจากโปรไฟล์ที่เคยบันทึกไว้ — ไม่เลือกก็กรอกเองได้ในการ์ดถัดไป
-          ★ จองแทนสมาชิกไม่แสดงการ์ดนี้: ผู้รับบริการคือ "ตัวสมาชิกคนนั้น" เสมอ
-            ข้อมูลของเขาเติมลงฟอร์มให้แล้ว (initialPatient) ไม่มีอะไรให้เลือก */}
-      {!isMemberBooking && savedRecipients.length > 0 && (
-        <section className="bg-white p-6 rounded-2xl border border-gray-100">
-          <h2 className="text-lg font-bold text-[#1A1A1A]">ผู้รับบริการคือใคร</h2>
-          <p className="text-sm text-[#8A8C8E] mt-1">
-            เลือกจากรายชื่อที่บันทึกไว้ หรือกรอกข้อมูลใหม่ด้านล่าง
-          </p>
-          <div className="mt-4 space-y-2">
-            {orderedRecipients.map((r) => (
-              <RecipientRow
-                key={r.id}
-                selected={selectedRecipientId === r.id}
-                title={r.name}
-                // PYG-502: บอกว่าใบไหนคือของตัวเอง ไม่งั้นผู้ใช้ที่มีหลายโปรไฟล์
-                //   แยกไม่ออกจากชื่อเฉย ๆ
-                badge={r.isSelf ? 'ตัวเอง' : undefined}
-                assessed={r.hasAssessment}
-                onSelect={() => handleSelectRecipient(r)}
-                onDelete={
-                  // ★ ห้ามลบใบของตัวเอง — เป็นใบเดียวกับที่ Onboarding สร้าง
-                  //   ลบแล้ว onboardingCompleted กลับเป็น false (PYG-538) ผู้ใช้จะโดนเด้ง
-                  //   ไปกรอก Onboarding ใหม่ทั้งชุดโดยไม่รู้ว่าเกิดจากการกดลบตรงนี้
-                  r.isSelf
-                    ? undefined
-                    : () => {
-                        setDeleteError(null);
-                        setPendingDelete(r);
-                      }
-                }
-              />
-            ))}
+      {/* จองแบบบุคคล — ไม่มีการ์ดเลือกผู้รับบริการ (ผู้รับบริการคือตัวเองเท่านั้น)
+          เหลือแค่: โปรไฟล์ของตัวเองยังไม่ได้ประเมิน → พาไปประเมิน / หาโปรไฟล์ของตัวเองไม่เจอ */}
+      {needsAssessment && selectedRecipient && (
+        <BookingAssessmentGate
+          variant="existing"
+          name={selectedRecipient.name}
+          onStart={() => startAssessment(selectedRecipient.id)}
+        />
+      )}
+      {selfMissing && (
+        <section className="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-5">
+          <span className="material-icons text-red-500" style={{ fontSize: 20 }}>error_outline</span>
+          <div>
+            <p className="m-0 text-sm font-bold text-red-700">ไม่พบข้อมูลผู้รับบริการของคุณ</p>
+            <p className="m-0 mt-0.5 text-xs text-red-600">กรุณาโหลดหน้าใหม่อีกครั้ง หากยังพบปัญหาให้ติดต่อเจ้าหน้าที่</p>
           </div>
-          {deleteError && (
-            <p className="mt-3 text-[11px] font-semibold text-red-500">{deleteError}</p>
-          )}
-          {needsAssessment && selectedRecipient && (
-            <div className="mt-4">
-              <BookingAssessmentGate
-                variant="existing"
-                name={selectedRecipient.name}
-                onStart={() => startAssessment(selectedRecipient.id)}
-                onChooseOther={chooseOtherRecipient}
-              />
-            </div>
-          )}
         </section>
       )}
 
@@ -854,7 +645,8 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
         {/* PYG-500: ฟอร์มชุดนี้ใช้ร่วมกับหน้า Onboarding — แก้ช่อง/ตัวเลือกที่ PatientDetailsFields */}
         <PatientDetailsFields
           nameMode="single"
-          nameReadOnly={memberContext?.nameLocked ?? false}
+          // จองแบบบุคคล: ชื่อล็อกเป็นของตัวเองเสมอ · จองแทนสมาชิก: ตามที่โหมดนั้นกำหนด
+          nameReadOnly={isMemberBooking ? (memberContext?.nameLocked ?? false) : true}
           values={{
             name,
             firstName: '',
@@ -918,20 +710,6 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
           }}
         />
 
-        {/* S08: กรอกเองโดยไม่ได้เลือกจากลิสต์ — เดิมเป็นช่องติ๊ก "บันทึกผู้รับบริการรายนี้ไว้"
-            ตอนนี้ BE ไม่ให้จองโดยไม่มีโปรไฟล์ที่ประเมินแล้ว การบันทึกจึงไม่ใช่ตัวเลือกอีกต่อไป
-            → บันทึกโปรไฟล์แล้วพาไปทำแบบประเมิน กลับมาแล้วใบนี้ถูกเลือกไว้ให้ */}
-        {needsNewProfile && (
-          <div className="mt-5">
-            <BookingAssessmentGate
-              variant="new"
-              name={name.trim()}
-              busy={creatingProfile}
-              error={createProfileError}
-              onStart={handleCreateAndAssess}
-            />
-          </div>
-        )}
         {isManualEntry && isMemberBooking && (
           <div className="mt-5 flex items-start gap-3 rounded-xl border border-[#B7D9CD] bg-[#F0FAF4] p-4">
             <span className="material-icons text-[#009265]" style={{ fontSize: 20 }}>
@@ -975,25 +753,6 @@ function SelfPatientForm({ memberContext }: { memberContext?: MemberPatientConte
         onName={setContactName}
         onPhone={setContactPhone}
         onRel={setContactRel}
-      />
-
-      <ConfirmModal
-        isOpen={pendingDelete !== null}
-        isLoading={deleting}
-        title="ลบรายชื่อนี้?"
-        description={
-          <>
-            <span className="font-semibold text-[#1A1A1A]">{pendingDelete?.name}</span>{' '}
-            จะถูกลบออกจากรายชื่อที่บันทึกไว้ การจองที่ผ่านมาไม่ได้รับผลกระทบ
-          </>
-        }
-        confirmText="ลบ"
-        onClose={() => !deleting && setPendingDelete(null)}
-        onConfirm={confirmDeleteRecipient}
-        iconName="delete"
-        iconBgColor="bg-red-500"
-        confirmBtnBgColor="bg-red-600"
-        confirmBtnHoverBgColor="hover:bg-red-700"
       />
     </div>
   );
