@@ -41,6 +41,8 @@ export interface Booking {
   price: number;
   payoutStatus?: 'scheduled' | 'processing' | 'paid' | 'failed' | 'cancelled' | null;
   payoutAmount?: number | null;
+  /** ยอดที่ลูกค้าจ่ายจริง (payments.amount) · null = ยังไม่ได้ชำระ */
+  paidAmount?: number | null;
   notes?: string;
   status:
     | 'pending'
@@ -134,6 +136,7 @@ export function mapToBooking(summary: any): Booking {
     price: summary.estimatedCost ?? 0,
     payoutStatus: summary.payoutStatus ?? null,
     payoutAmount: summary.payoutAmount ?? null,
+    paidAmount: summary.paidAmount ?? null,
     status: status as any,
     declineReason: summary.rejectionReason ?? undefined,
     createdAt: summary.createdAt,

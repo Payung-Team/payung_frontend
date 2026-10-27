@@ -929,6 +929,7 @@ const CAREGIVER_BOOKING_SUMMARY_FIELDS = `
   estimatedCost
   payoutStatus
   payoutAmount
+  paidAmount
   locationAddress
   locationLat
   locationLng

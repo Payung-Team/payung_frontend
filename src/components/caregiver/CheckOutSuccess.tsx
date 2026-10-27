@@ -13,10 +13,12 @@ interface CheckOutSuccessProps {
   bookingRef: string;
   /** วันที่ให้บริการ แปลงเป็นไทยมาแล้ว เช่น "12 มิ.ย. 2569" */
   bookingDateText: string;
-  /** ยอดค่าบริการก่อนหักค่าธรรมเนียม */
+  /** ราคาบริการของใบจอง (estimatedCost) — ยังไม่รวมค่าธรรมเนียมที่ลูกค้าจ่ายเพิ่ม */
   grossAmount: number;
   /** ยอดโอนสุทธิจริงเมื่อ payout ถูกสร้างแล้ว */
   payoutAmount?: number | null;
+  /** ยอดที่ลูกค้าจ่ายจริง (payments.amount) — ใช้คิด net ด้วยสูตรเดียวกับ backend */
+  paidAmount?: number | null;
   proof: ProofOfWorkSummary;
   onBack: () => void;
 }
@@ -26,10 +28,11 @@ export default function CheckOutSuccess({
   bookingDateText,
   grossAmount,
   payoutAmount,
+  paidAmount,
   proof,
   onBack,
 }: Readonly<CheckOutSuccessProps>) {
-  const earnings = caregiverEarnings(grossAmount, payoutAmount);
+  const earnings = caregiverEarnings(grossAmount, payoutAmount, paidAmount);
   const focusRing =
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#52B69A] focus-visible:ring-offset-2';
 
