@@ -101,6 +101,13 @@ export default function CaregiverBookingDetailPage() {
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const stateBooking = location.state?.booking as Booking | undefined;
+  // มาจากหน้ารายการ (กดการ์ด) → ย้อนประวัติ ได้แท็บ/ตัวกรองเดิมกลับมา (เก็บอยู่ใน URL ของหน้ารายการ)
+  // มาจากที่อื่น (แจ้งเตือน / หน้า home / เปิดลิงก์ตรง) → ไปหน้ารายการตามปกติ
+  const fromList = location.state?.fromList === true;
+  const backToList = () => {
+    if (fromList) navigate(-1);
+    else navigate('/caregiver/bookings');
+  };
 
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -154,7 +161,7 @@ export default function CaregiverBookingDetailPage() {
   const showToast = (message: string, isError = false) => {
     if (isError) showError(message, 3000);
     else showSuccess(message, 3000);
-    setTimeout(() => navigate('/caregiver/bookings'), 2500);
+    setTimeout(backToList, 2500);
   };
 
   if (!booking) {
@@ -173,7 +180,7 @@ export default function CaregiverBookingDetailPage() {
       <div style={{ minHeight: '100vh', background: '#F6FAF9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 16, color: '#8A8C8E' }}>ไม่พบข้อมูลการจอง</p>
-          <button type="button" onClick={() => navigate('/caregiver/bookings')}
+          <button type="button" onClick={backToList}
             style={{ marginTop: 16, padding: '8px 20px', background: '#52B69A', color: '#FFFFFF', border: 'none', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             กลับไปยังงานของฉัน
           </button>
@@ -193,7 +200,7 @@ export default function CaregiverBookingDetailPage() {
         payoutAmount={booking.payoutAmount}
         paidAmount={booking.paidAmount}
         proof={checkedOutProof}
-        onBack={() => navigate('/caregiver/bookings')}
+        onBack={backToList}
       />
     );
   }
@@ -204,7 +211,7 @@ export default function CaregiverBookingDetailPage() {
         <div className="mx-auto max-w-300 px-6 py-6 pb-25">
           <button
             type="button"
-            onClick={() => navigate('/caregiver/bookings')}
+            onClick={backToList}
             className="mb-4 inline-flex items-center gap-1.5 rounded-lg text-[#575859] hover:text-[#52B69A] focus:outline-none focus:ring-2 focus:ring-[#52B69A]"
           >
             <span className="material-icons text-base">arrow_back</span>
@@ -352,7 +359,7 @@ export default function CaregiverBookingDetailPage() {
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: `28px 24px ${booking.status === 'pending' ? 140 : 100}px`, boxSizing: 'border-box' }}>
 
           {/* Back */}
-          <button type="button" onClick={() => navigate('/caregiver/bookings')}
+          <button type="button" onClick={backToList}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginBottom: 18 }}>
             <span className="material-icons" style={{ fontSize: 16, color: '#52B69A' }}>arrow_back</span>
             <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#52B69A', lineHeight: '20px' }}>
