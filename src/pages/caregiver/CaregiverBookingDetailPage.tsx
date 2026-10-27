@@ -14,6 +14,10 @@ import { AcceptBookingModal } from '../../components/ui/AcceptBookingModal';
 import { ToastContainer } from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
 import Skeleton from '../../components/ui/Skeleton';
+import Avatar from '../../components/ui/Avatar';
+import JobInfoModals, { type JobInfoPanel } from './serviceProgress/JobInfoModals';
+import { hasAnyProfileData } from '../../lib/patientProfile';
+import { caregiverEarnings, formatBaht } from '../../lib/caregiverEarnings';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import CaregiverServiceProgressPage from './CaregiverServiceProgressPage';
 import CheckOutSuccess from '../../components/caregiver/CheckOutSuccess';
@@ -64,23 +68,30 @@ const STATUS_BANNER: Record<string, { icon: string; iconColor: string; bg: strin
   in_progress:      { icon: 'directions_run', iconColor: '#059669', bg: '#ECFDF5', border: '#A7F3D0', textColor: '#065F46', message: (n) => `คุณกำลังปฏิบัติงานให้ ${n}` },
 };
 
-function Divider() {
-  return <div style={{ height: '0.8px', background: '#F0F1F3', margin: '18px 0' }} />;
-}
+const CARD = 'bg-white border-[0.8px] border-[#E0E2E5] shadow-[0px_1px_4px_rgba(0,0,0,0.03)] rounded-[20px] p-5 md:p-6';
 
-function SectionTitle({ children }: Readonly<{ children: React.ReactNode }>) {
+function CardTitle({ icon, count, children }: Readonly<{ icon: string; count?: number; children: React.ReactNode }>) {
   return (
-    <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#8A8C8E', margin: '0 0 10px', lineHeight: '20px' }}>
-      {children}
-    </p>
+    <div className="flex items-center gap-2 mb-3">
+      <span className="material-icons" style={{ fontSize: 18, color: '#52B69A' }}>{icon}</span>
+      <h3 className="m-0 text-[15px] font-bold leading-[22px] text-[#1A1A1A]">{children}</h3>
+      {count != null && (
+        <span className="px-2 h-5 rounded-full bg-[#F0F1F3] font-['Inter'] text-[11px] font-semibold text-[#575859] flex items-center">{count}</span>
+      )}
+    </div>
   );
 }
 
-function InfoRow({ label, value, valueFont = 'inter' }: Readonly<{ label: string; value: string; valueFont?: 'inter' | 'thai' }>) {
+/** ข้อมูลหลักแบบป้ายอยู่บน ค่าอยู่ล่าง — อ่านไล่ลงได้ ไม่ต้องกวาดตาซ้าย-ขวาบนจอกว้าง */
+function KeyFact({ icon, label, value, sub }: Readonly<{ icon: string; label: string; value: string; sub?: string }>) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
-      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E', lineHeight: '20px', flexShrink: 0 }}>{label}</span>
-      <span style={{ fontFamily: valueFont === 'inter' ? "'Inter', sans-serif" : "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#1A1A1A', lineHeight: '20px', textAlign: 'right' }}>{value || '—'}</span>
+    <div className="flex items-start gap-3 rounded-xl bg-[#F9FAFB] px-3.5 py-3 h-full">
+      <span className="material-icons flex-shrink-0 mt-0.5" style={{ fontSize: 20, color: '#52B69A' }}>{icon}</span>
+      <div className="min-w-0">
+        <p className="m-0 text-xs text-[#8A8C8E] leading-[18px]">{label}</p>
+        <p className="m-0 text-[15px] font-semibold leading-[22px] text-[#1A1A1A] break-words">{value || '—'}</p>
+        {sub && <p className="m-0 text-xs text-[#575859] leading-[18px]">{sub}</p>}
+      </div>
     </div>
   );
 }
@@ -99,6 +110,7 @@ export default function CaregiverBookingDetailPage() {
   /** เช็คอินสำเร็จ = backend เปลี่ยน status เป็น in_progress ไปแล้วแน่นอน จึงสลับหน้าได้เลย
    *  ไม่ต้องรอ refetch — ไม่งั้นการ์ด "เช็คอินแล้ว" จะค้างอยู่ในหน้าเช็คอินระหว่างรอ network */
   const [justCheckedIn, setJustCheckedIn] = useState(false);
+  const [infoPanel, setInfoPanel] = useState<JobInfoPanel>(null);
 
   const { toasts, removeToast, success: showSuccess, error: showError } = useToast();
   const [declineBooking] = useMutation(DECLINE_BOOKING);
@@ -221,7 +233,26 @@ export default function CaregiverBookingDetailPage() {
   const svcLabel = serviceTypeLabel(booking.serviceType);
   const dateStr = booking.bookingDate ? formatThaiDate(booking.bookingDate) : '—';
   const tasks = booking.tasks ?? [];
-  const tasksText = tasks.length > 0 ? tasks.join(', ') : null;
+  const recipientName = booking.careRecipientName ?? booking.patientName ?? '—';
+  // PYG-460 — snapshot สุขภาพ ณ วันจอง · ข้อมูลเบื้องต้นโชว์ในการ์ด รายละเอียดเต็มอยู่ในป๊อปอัปโปรไฟล์
+  const profile = booking.patientProfile;
+  const hasProfile = hasAnyProfileData(profile);
+  const profileFacts = [
+    { label: 'อายุ', value: profile?.age != null ? `${profile.age} ปี` : null },
+    { label: 'เพศ', value: profile?.gender ?? null },
+    { label: 'น้ำหนัก', value: profile?.weight != null ? `${profile.weight} กก.` : null },
+    { label: 'ส่วนสูง', value: profile?.height != null ? `${profile.height} ซม.` : null },
+    { label: 'กรุ๊ปเลือด', value: profile?.bloodGroup || null },
+  ].filter((f): f is { label: string; value: string } => !!f.value);
+  // คำขอใหม่ (ยังไม่ตอบรับ) — โชว์เท่าที่หน้า home โชว์: เพศ · อายุ · การช่วยเหลือตัวเอง
+  //   ข้อมูลสุขภาพเต็ม / ผู้ติดต่อ / บันทึกจากผู้ป่วย เปิดให้เห็นหลังตอบรับงานแล้วเท่านั้น
+  const isRequest = booking.status === 'pending';
+  const netEarnings = caregiverEarnings(booking.price, booking.payoutAmount, booking.paidAmount).net;
+  const recipientBrief = [
+    profile?.gender,
+    profile?.age != null ? `${profile.age} ปี` : null,
+    profile?.supportLevel,
+  ].filter(Boolean).join(' · ');
 
   // Matches the backend's own gate in checkInBooking (confirmed + payment held + same-day) —
   // payment status isn't exposed on CaregiverBookingSummary, so that half is validated
@@ -238,6 +269,7 @@ export default function CaregiverBookingDetailPage() {
   return (
     <>
       <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />
+      {!isRequest && <JobInfoModals booking={booking} open={infoPanel} onClose={() => setInfoPanel(null)} />}
 
       {/* Modals */}
       <AcceptBookingModal
@@ -314,7 +346,8 @@ export default function CaregiverBookingDetailPage() {
 
       {/* Page */}
       <div style={{ minHeight: '100vh', background: '#F6FAF9' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 24px 100px', boxSizing: 'border-box' }}>
+        {/* คำขอใหม่มีแถบปุ่มลอยด้านล่าง (สูงสุด ~110px บนมือถือเมื่อมีคำใบ้) → เผื่อที่ให้เนื้อหาท้ายหน้า */}
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: `28px 24px ${booking.status === 'pending' ? 140 : 100}px`, boxSizing: 'border-box' }}>
 
           {/* Back */}
           <button type="button" onClick={() => navigate('/caregiver/bookings')}
@@ -355,123 +388,201 @@ export default function CaregiverBookingDetailPage() {
               จัดใหม่เป็นการ์ดก่อนเริ่มงาน + ป๊อปอัป) จึงซ่อนการ์ดนี้ไม่ให้แสดงซ้ำ
               สถานะอื่น (pending/accepted/declined/completed/cancelled) ยังใช้การ์ดนี้ */}
           {booking.status !== 'confirmed' && (
-          <div style={{ background: '#FFFFFF', border: '0.8px solid #E0E2E5', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 20, padding: 24 }}>
+          <div className="flex flex-col gap-4 font-['Bai_Jamjuree']">
 
-            {/* ── Section 1: ผู้จอง ── */}
-            <SectionTitle>ผู้จอง / ผู้ใช้บริการ</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 24, background: 'linear-gradient(135deg, #52B69A 0%, #76C893 100%)', border: '2.4px solid #FFFFFF', boxShadow: '0px 4px 16px rgba(82,182,154,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 18, fontWeight: 700, color: '#FFFFFF' }}>
-                  {booking.patientName?.charAt(0) ?? 'พ'}
-                </span>
-              </div>
-              <div>
-                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '21px' }}>
-                  {booking.patientName}
-                </p>
-                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#8A8C8E', margin: '2px 0 0', lineHeight: '18px' }}>
-                  {booking.careRecipientName
-                    ? `ดูแลให้: ${booking.careRecipientName}`
-                    : 'สำหรับตัวเอง'}
-                </p>
-              </div>
-            </div>
-
-            <Divider />
-
-            {/* ── Section 2: รายละเอียดนัดหมาย ── */}
-            <SectionTitle>รายละเอียดนัดหมาย</SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
-              <InfoRow label="ประเภทงานบริการ" value={svcLabel} valueFont="thai" />
-              <InfoRow label="วันที่ให้บริการ" value={dateStr} />
-              {/* PYG-526: "09:00 – 13:00" — ระยะเวลาอยู่แถวถัดไปแล้ว */}
-              <InfoRow label="เวลาให้บริการ" value={booking.time || '—'} />
-              <InfoRow label="ระยะเวลาบริการ" value={booking.durationText ?? '—'} />
-            </div>
-            <InfoRow label="สถานที่รับบริการ" value={booking.locationName ?? '—'} />
-            {booking.serviceFormat && (
-              <InfoRow label="รูปแบบบริการ" value={booking.serviceFormat} valueFont="thai" />
-            )}
-
-            <Divider />
-
-            {/* ── Section 3: ข้อมูลคนไข้ ── */}
-            <SectionTitle>ข้อมูลคนไข้</SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
-              <InfoRow label="ชื่อผู้รับบริการ" value={booking.careRecipientName ?? booking.patientName ?? '—'} valueFont="thai" />
-            </div>
-
-            {/* ── Section 4: ผู้ติดต่อ ── */}
-            {booking.dayOfContactName && (
-              <>
-                <Divider />
-                <SectionTitle>ผู้ติดต่อในวันนัดหมาย</SectionTitle>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
-                  <InfoRow label="ชื่อผู้ติดต่อ" value={booking.dayOfContactName} valueFont="thai" />
-                  <InfoRow label="เบอร์โทรศัพท์" value={booking.dayOfContactPhone ?? '—'} />
-                  {booking.dayOfContactRelationship && (
-                    <InfoRow label="ความสัมพันธ์" value={booking.dayOfContactRelationship} valueFont="thai" />
-                  )}
-                </div>
-              </>
-            )}
-
-            <Divider />
-
-            {/* PYG-635: กิจกรรมจากรายการกลาง (snapshot ณ วันจอง) */}
-            {activities.length > 0 && (
-              <>
-                <SectionTitle>{cas.detailTitle}</SectionTitle>
-                <div style={{ background: '#F9FAFB', borderRadius: 10, padding: 14, marginBottom: 16 }}>
-                  <BookingActivitiesList activities={activities} />
-                  <p className="mt-3 text-[11px] text-[#8A8C8E]">{cas.detailNote}</p>
-                </div>
-              </>
-            )}
-
-            {/* ── Section 5: รายละเอียดภารกิจ ── */}
-            <SectionTitle>รายละเอียดภารกิจ</SectionTitle>
-            <div style={{ background: '#F9FAFB', borderRadius: 10, padding: 14 }}>
-              <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontStyle: 'italic', fontSize: 13, color: tasksText ? '#575859' : '#B0B3B8', margin: 0, lineHeight: '20px' }}>
-                {tasksText ?? 'ไม่ได้ระบุภารกิจเพิ่มเติม'}
-              </p>
-            </div>
-
-            {booking.notes && (
-              <div style={{ marginTop: 12, background: '#FFF8E7', border: '0.8px solid #FFEAA7', borderRadius: 10, padding: 14 }}>
-                <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#8A6D3B', margin: 0, lineHeight: '20px' }}>
-                  บันทึกจากผู้ป่วย: {booking.notes}
-                </p>
-              </div>
-            )}
-
-            <Divider />
-
-            {/* ── Section 6: ราคา ── */}
-            <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#1A1A1A', margin: 0 }}>
-                รายได้โดยประมาณทั้งสิ้น
-              </p>
-              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, color: '#52B69A', margin: 0, lineHeight: '33px' }}>
-                {booking.price > 0 ? `฿${booking.price.toLocaleString()}` : '—'}
-              </p>
-            </div>
-            {booking.status === 'completed' && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-2.5">
-                <div>
-                  <p className="m-0 font-['Bai_Jamjuree'] text-xs font-semibold text-[#575859]">สถานะการรับเงิน</p>
-                  {booking.payoutAmount != null && (
-                    <p className="m-0 mt-0.5 font-['Bai_Jamjuree'] text-xs text-[#8A8C8E]">
-                      ยอดรับสุทธิ ฿{booking.payoutAmount.toLocaleString()}
+            {/* ── 1. คน — ผู้รับบริการ + ผู้ติดต่อวันนัด (ดูก่อนว่าจะไปดูแลใคร) ── */}
+            <div className={`grid grid-cols-1 gap-4 ${!isRequest && booking.dayOfContactName ? 'md:grid-cols-2' : ''}`}>
+              <section className={CARD}>
+                <CardTitle icon="elderly">ผู้รับบริการ</CardTitle>
+                <div className="flex items-center gap-3">
+                  {/* รูปของผู้รับบริการ (signed URL) · ไม่มีรูป = ตัวอักษรย่อ */}
+                  <Avatar src={booking.recipientAvatarUrl} name={recipientName} size={48} fallbackColor="#E7F5EE" className="!border-0 !text-[#2F8B70] !shadow-none flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="m-0 text-base font-bold leading-6 text-[#1A1A1A] truncate">{recipientName}</p>
+                    <p className="m-0 text-xs text-[#8A8C8E]">
+                      {booking.careRecipientName && booking.careRecipientName !== booking.patientName
+                        ? `จองโดย ${booking.patientName}`
+                        : 'จองให้ตัวเอง'}
                     </p>
+                  </div>
+                </div>
+
+                {/* ข้อมูลเบื้องต้น */}
+                {isRequest ? (
+                  <>
+                    {recipientBrief && (
+                      <p className="m-0 mt-3 text-sm text-[#575859]">{recipientBrief}</p>
+                    )}
+                    <p className="m-0 mt-3 flex items-center gap-1.5 text-xs text-[#8A8C8E]">
+                      <span className="material-icons" style={{ fontSize: 14 }}>lock</span>
+                      ข้อมูลสุขภาพและผู้ติดต่อจะแสดงหลังตอบรับงาน
+                    </p>
+                  </>
+                ) : hasProfile ? (
+                  <div className="mt-4 flex flex-col gap-4">
+                    {/* ข้อมูลร่างกาย — ตารางป้ายบน/ค่าล่าง */}
+                    {profileFacts.length > 0 && (
+                      <dl className="m-0 grid grid-cols-3 gap-x-3 gap-y-3 rounded-xl bg-[#F9FAFB] px-3.5 py-3">
+                        {profileFacts.map((fact) => (
+                          <div key={fact.label} className="min-w-0">
+                            <dt className="text-[11px] leading-4 text-[#8A8C8E]">{fact.label}</dt>
+                            <dd className="m-0 mt-0.5 text-sm font-bold leading-5 text-[#1A1A1A]">{fact.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+
+                    {(profile?.supportLevel || !!profile?.conditions?.length) && (
+                      <dl className="m-0 flex flex-col gap-3">
+                        {profile?.supportLevel && (
+                          <div>
+                            <dt className="text-xs leading-[18px] text-[#8A8C8E]">การช่วยเหลือตัวเอง</dt>
+                            <dd className="m-0 mt-0.5 text-sm font-semibold leading-5 text-[#1A1A1A]">{profile.supportLevel}</dd>
+                          </div>
+                        )}
+                        {!!profile?.conditions?.length && (
+                          <div>
+                            <dt className="text-xs leading-[18px] text-[#8A8C8E]">โรคประจำตัว</dt>
+                            <dd className="m-0 mt-0.5 text-sm font-semibold leading-5 text-[#1A1A1A]">{profile.conditions.join(', ')}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    )}
+
+                    {/* ★ ประวัติแพ้ยาโชว์เด่นเสมอ — ผิดแล้วอันตรายถึงชีวิต (เหมือน RecipientActionRow) */}
+                    {profile?.allergies && (
+                      <div className="flex items-start gap-2 rounded-lg bg-[#FEF2F2] border-[0.8px] border-[#FECACA] px-3 py-2">
+                        <span className="material-icons flex-shrink-0" style={{ fontSize: 16, color: '#DC2626', marginTop: 1 }}>warning</span>
+                        <span className="text-xs font-semibold leading-5 text-[#991B1B] break-words">แพ้: {profile.allergies}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="m-0 mt-3 text-xs text-[#8A8C8E]">ผู้จองไม่ได้กรอกข้อมูลสุขภาพ — สอบถามผู้ติดต่อก่อนเริ่มดูแล</p>
+                )}
+
+                {!isRequest && (
+                  <button
+                    type="button"
+                    onClick={() => setInfoPanel('profile')}
+                    className="mt-4 inline-flex items-center gap-1 text-[13px] font-semibold text-[#3A9A7E] hover:underline cursor-pointer bg-transparent border-0 p-0"
+                  >
+                    ดูโปรไฟล์ทั้งหมด
+                    <span className="material-icons" style={{ fontSize: 16 }}>chevron_right</span>
+                  </button>
+                )}
+              </section>
+
+              {!isRequest && booking.dayOfContactName && (
+                <section className={CARD}>
+                  <CardTitle icon="contact_phone">ผู้ติดต่อในวันนัดหมาย</CardTitle>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="m-0 text-base font-bold leading-6 text-[#1A1A1A] truncate">{booking.dayOfContactName}</p>
+                      <p className="m-0 text-xs text-[#8A8C8E]">
+                        {[booking.dayOfContactRelationship, booking.dayOfContactPhone].filter(Boolean).join(' · ') || '—'}
+                      </p>
+                    </div>
+                    {booking.dayOfContactPhone && (
+                      <a
+                        href={`tel:${booking.dayOfContactPhone}`}
+                        className="flex-shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border-[0.8px] border-[#52B69A] text-[13px] font-semibold text-[#3A9A7E] hover:bg-[#F0FAF4] transition-colors"
+                      >
+                        <span className="material-icons" style={{ fontSize: 16 }}>call</span>
+                        โทร
+                      </a>
+                    )}
+                  </div>
+                </section>
+              )}
+            </div>
+
+            {/* ── 2. สรุปงาน — งานอะไร · เมื่อไร · ที่ไหน · ได้เท่าไร ── */}
+            <section className={CARD}>
+              {/* แถวบน: ประเภทงาน (ซ้าย) · รายได้ (ขวา) — แถวล่าง: วันที่/เวลา/สถานที่ กว้างเท่ากันเต็มการ์ด */}
+              <div className="flex flex-col md:flex-row md:items-stretch gap-4">
+                <div className="flex-1 min-w-0 md:self-center">
+                  <p className="m-0 text-xs font-semibold text-[#52B69A]">ประเภทงาน</p>
+                  <h2 className="m-0 mt-0.5 text-xl md:text-2xl font-bold leading-8 text-[#1A1A1A]">{svcLabel}</h2>
+                  {booking.serviceFormat && (
+                    <p className="m-0 mt-0.5 text-[13px] text-[#575859]">{booking.serviceFormat}</p>
                   )}
                 </div>
-                <span className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-semibold ${payoutBadge.bg} ${payoutBadge.text}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${payoutBadge.dot}`} />
-                  {payoutBadge.label}
-                </span>
+
+                {/* รายได้ — คำขอใหม่แสดงในแถบปุ่มลอยแทน · สถานะอื่นไม่มีแถบลอย จึงแสดงตรงนี้
+                    มือถืออยู่ใต้ชื่องาน, จอกว้างชิดขวาสูงเท่าแถวชื่องาน */}
+                {!isRequest && (
+                <div className="md:w-[260px] flex-shrink-0 flex flex-col justify-center rounded-2xl bg-[#F0FAF4] border-[0.8px] border-[#D1FAE5] px-4 py-3">
+                  <p className="m-0 text-xs font-semibold text-[#059669]">รายได้สุทธิ</p>
+                  <p className="m-0 mt-1 font-['Inter'] text-[28px] font-bold leading-9 text-[#059669]">
+                    {booking.price > 0 ? formatBaht(netEarnings) : '—'}
+                  </p>
+                  {booking.status === 'completed' && (
+                    <div className="mt-3 pt-3 border-t border-[#D1FAE5] flex flex-col gap-1.5">
+                      <span className={`self-start inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold ${payoutBadge.bg} ${payoutBadge.text}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${payoutBadge.dot}`} />
+                        {payoutBadge.label}
+                      </span>
+                      {booking.payoutAmount != null && (
+                        <span className="text-xs font-semibold text-[#1A1A1A]">
+                          ยอดรับสุทธิ ฿{booking.payoutAmount.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                )}
               </div>
-            )}
+
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                <KeyFact icon="event" label="วันที่ให้บริการ" value={dateStr} />
+                {/* PYG-526: "09:00 – 13:00" + ระยะเวลาแยกเป็นบรรทัดรอง */}
+                <KeyFact icon="schedule" label="เวลา" value={booking.time || '—'} sub={booking.durationText} />
+                <div className="sm:col-span-2 md:col-span-1">
+                  <KeyFact icon="place" label="สถานที่รับบริการ" value={booking.locationName ?? '—'} />
+                </div>
+              </div>
+            </section>
+
+            {/* ── 3. สิ่งที่ต้องทำ ── */}
+            <section className={CARD}>
+              {/* PYG-635: กิจกรรมจากรายการกลาง (snapshot ณ วันจอง) */}
+              {activities.length > 0 && (
+                <div className="mb-5">
+                  <CardTitle icon="checklist">{cas.detailTitle}</CardTitle>
+                  <div className="rounded-xl bg-[#F9FAFB] p-3.5">
+                    <BookingActivitiesList activities={activities} />
+                    <p className="mt-3 text-[11px] text-[#8A8C8E]">{cas.detailNote}</p>
+                  </div>
+                </div>
+              )}
+
+              <CardTitle icon="assignment" count={tasks.length || undefined}>รายละเอียดภารกิจ</CardTitle>
+              {tasks.length > 0 ? (
+                <ol className="m-0 p-0 list-none flex flex-col rounded-xl border-[0.8px] border-[#F0F1F3] divide-y divide-[#F0F1F3]">
+                  {tasks.map((task, i) => (
+                    <li key={`${i}-${task}`} className="flex items-start gap-3 px-3.5 py-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#E6F5ED] text-[#3A9A7E] font-['Inter'] text-xs font-bold flex items-center justify-center">
+                        {i + 1}
+                      </span>
+                      <span className="text-sm leading-6 text-[#1A1A1A]">{task}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="m-0 text-[13px] text-[#B0B3B8]">ไม่ได้ระบุภารกิจเพิ่มเติม</p>
+              )}
+
+              {!isRequest && booking.notes && (
+                <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-[#FFF8E7] border-[0.8px] border-[#FFEAA7] p-3.5">
+                  <span className="material-icons flex-shrink-0" style={{ fontSize: 18, color: '#B7791F' }}>sticky_note_2</span>
+                  <div>
+                    <p className="m-0 text-xs font-bold text-[#8A6D3B]">บันทึกจากผู้ป่วย</p>
+                    <p className="m-0 mt-0.5 text-[13px] leading-5 text-[#5C4A1E]">{booking.notes}</p>
+                  </div>
+                </div>
+              )}
+            </section>
           </div>
           )}
 
@@ -492,29 +603,66 @@ export default function CaregiverBookingDetailPage() {
             </div>
           )}
 
-          {/* ── Action buttons ── */}
-          <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-
-            {booking.status === 'pending' && (
-              <>
-                <button type="button" onClick={() => setShowAcceptModal(true)}
-                  disabled={acceptBlocked}
-                  aria-describedby={needsInfectionAck && !infectionAck ? 'accept-infection-hint' : undefined}
-                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 50, padding: '0 40px', background: acceptBlocked ? '#E4E9E7' : '#009265', border: 'none', boxShadow: acceptBlocked ? 'none' : '0px 4px 14px rgba(0,146,101,0.3)', borderRadius: 12, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 15, fontWeight: 700, color: acceptBlocked ? '#5F6662' : '#FFFFFF', cursor: acceptBlocked ? 'not-allowed' : 'pointer' }}>
-                  <span className="material-icons" style={{ fontSize: 18 }}>check_circle</span>
-                  ตอบรับการจอง
-                </button>
+          {/* ── Floating accept / decline bar (คำขอใหม่) ──
+              ลอยไว้ล่างจอให้กดได้ตลอด · บนมือถือวางเหนือแถบเมนูล่างของแอป (--mobile-nav-h จาก MobileNavigation)
+              ยังต้องรับทราบโรคติดเชื้อในหน้าก่อน (ปุ่มปิด + คำใบ้อยู่ในแถบ) */}
+          {booking.status === 'pending' && (
+            <div className="fixed bottom-[var(--mobile-nav-h,0px)] md:bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-[#E0E2E5] shadow-[0px_-4px_16px_rgba(0,0,0,0.04)] font-['Bai_Jamjuree']">
+              <div className="mx-auto max-w-[1200px] px-4 md:px-6 py-3 flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+                {/* รายได้ (แสดงเสมอ) · มือถือ: รายได้ → คำใบ้ → ปุ่ม · จอกว้าง: รายได้ | คำใบ้ชิดซ้ายของปุ่ม | ปุ่ม */}
+                <div className="flex-1 min-w-0">
+                  {/* ระยะเวลา (ซ้าย, ข้อมูลรอง) · รายได้ (ขวา, ตัวหลัก)
+                      ไม่เขียนรวมเป็น "฿300 / 1 ชม." ที่อ่านเป็นเรทรายชั่วโมงได้ */}
+                  <div className="flex items-center justify-between md:justify-start gap-3">
+                    {booking.durationText && (
+                      <span className="flex-shrink-0 inline-flex items-center gap-1 md:mr-2 md:pr-4 md:border-r md:border-[#E0E2E5] text-[13px] text-[#575859]">
+                        <span className="material-icons" style={{ fontSize: 16, color: '#8A8C8E' }}>schedule</span>
+                        ทำงาน <span className="font-semibold text-[#1A1A1A]">{booking.durationText}</span>
+                      </span>
+                    )}
+                    <div className="min-w-0 ml-auto md:ml-0 text-right md:text-left">
+                      <p className="m-0 text-xs leading-4 text-[#575859]">รายได้สุทธิ</p>
+                      <p className="m-0 font-['Inter'] text-2xl font-bold leading-8 text-[#059669]">
+                        {booking.price > 0 ? formatBaht(netEarnings) : '—'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 {needsInfectionAck && !infectionAck && (
-                  <p id="accept-infection-hint" style={{ margin: 0, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#33453D', textAlign: 'center' }}>
+                  <p id="accept-infection-hint" className="m-0 flex items-center gap-1.5 md:max-w-[340px] text-xs md:text-[13px] font-semibold leading-5 text-[#33453D]">
+                    <span className="material-icons flex-shrink-0" style={{ fontSize: 16, color: '#F59E0B' }}>info</span>
                     {infectionText.cgAcceptHint}
                   </p>
                 )}
-                <button type="button" onClick={() => setShowDeclineModal(true)}
-                  style={{ height: 37, padding: '0 28px', background: '#FFFFFF', border: '0.8px solid #FCA5A5', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#DC2626', cursor: 'pointer' }}>
-                  ปฏิเสธการจอง
-                </button>
-              </>
-            )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeclineModal(true)}
+                    className="flex-1 md:flex-none h-11 px-5 rounded-xl bg-white border-[0.8px] border-[#FCA5A5] text-sm font-semibold text-[#DC2626] hover:bg-red-50 cursor-pointer transition-colors"
+                  >
+                    ปฏิเสธ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAcceptModal(true)}
+                    disabled={acceptBlocked}
+                    aria-describedby={needsInfectionAck && !infectionAck ? 'accept-infection-hint' : undefined}
+                    className={`flex-[2] md:flex-none inline-flex items-center justify-center gap-2 h-11 px-7 rounded-xl text-[15px] font-bold transition-colors ${
+                      acceptBlocked
+                        ? 'bg-[#E4E9E7] text-[#5F6662] cursor-not-allowed'
+                        : 'bg-[#009265] hover:bg-[#087C58] text-white shadow-[0px_4px_14px_rgba(0,146,101,0.3)] cursor-pointer'
+                    }`}
+                  >
+                    <span className="material-icons" style={{ fontSize: 18 }}>check_circle</span>
+                    ตอบรับการจอง
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Action buttons ── */}
+          <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
 
             {booking.status === 'accepted' && (
               <button type="button" onClick={() => setShowCancelModal(true)}
