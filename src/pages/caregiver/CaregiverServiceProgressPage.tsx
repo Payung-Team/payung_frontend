@@ -60,7 +60,7 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
     }
   }
 
-  const earnings = caregiverEarnings(booking.price, booking.payoutAmount);
+  const earnings = caregiverEarnings(booking.price, booking.payoutAmount, booking.paidAmount);
 
   return (
     <div className="flex flex-col gap-6">

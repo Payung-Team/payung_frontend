@@ -179,6 +179,7 @@ export default function CaregiverBookingDetailPage() {
         bookingDateText={booking.bookingDate ? formatThaiDate(booking.bookingDate) : '—'}
         grossAmount={booking.price}
         payoutAmount={booking.payoutAmount}
+        paidAmount={booking.paidAmount}
         proof={checkedOutProof}
         onBack={() => navigate('/caregiver/bookings')}
       />

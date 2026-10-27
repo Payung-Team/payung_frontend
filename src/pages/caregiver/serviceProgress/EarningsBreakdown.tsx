@@ -3,10 +3,12 @@ import { caregiverEarnings, formatBaht } from '../../../lib/caregiverEarnings';
 const FONT = { fontFamily: "'Bai Jamjuree', sans-serif" } as const;
 
 export interface EarningsBreakdownProps {
-  /** ยอดที่ผู้รับบริการชำระ (booking.price) */
+  /** ราคาบริการของใบจอง (booking.price = estimatedCost) — ยอดที่ลูกค้าจ่ายคิดเพิ่มค่าธรรมเนียมจากค่านี้ */
   price: number;
   /** ยอดโอนจริงถ้ามีแล้ว — ทำให้ตัวเลขเลิกเป็น "ประมาณการ" */
   payoutAmount?: number | null;
+  /** ยอดที่ลูกค้าจ่ายจริง (payments.amount) — null = ยังไม่ชำระ ใช้ยอดประมาณ */
+  paidAmount?: number | null;
 }
 
 /**
@@ -15,8 +17,8 @@ export interface EarningsBreakdownProps {
  * เดิมทั้งหน้าเช็คอินและหน้าระหว่างทำงานโชว์ booking.price ห้วน ๆ ว่า "รายได้"
  * ซึ่งเป็นยอดที่ผู้รับบริการจ่าย ไม่ใช่ยอดที่ผู้ดูแลได้รับ (ดู lib/caregiverEarnings)
  */
-export default function EarningsBreakdown({ price, payoutAmount }: Readonly<EarningsBreakdownProps>) {
-  const earnings = caregiverEarnings(price, payoutAmount);
+export default function EarningsBreakdown({ price, payoutAmount, paidAmount }: Readonly<EarningsBreakdownProps>) {
+  const earnings = caregiverEarnings(price, payoutAmount, paidAmount);
 
   return (
     <div className="rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] p-3.5">
