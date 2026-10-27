@@ -247,6 +247,8 @@ export default function CaregiverBookingDetailPage() {
   // คำขอใหม่ (ยังไม่ตอบรับ) — โชว์เท่าที่หน้า home โชว์: เพศ · อายุ · การช่วยเหลือตัวเอง
   //   ข้อมูลสุขภาพเต็ม / ผู้ติดต่อ / บันทึกจากผู้ป่วย เปิดให้เห็นหลังตอบรับงานแล้วเท่านั้น
   const isRequest = booking.status === 'pending';
+  // ประวัติงาน — จบไปแล้ว ไม่ต้องเห็นข้อมูลสุขภาพ / ผู้ติดต่อ / บันทึกจากผู้ป่วยอีก
+  const isHistory = booking.status === 'completed' || booking.status === 'declined' || booking.status === 'cancelled';
   const netEarnings = caregiverEarnings(booking.price, booking.payoutAmount, booking.paidAmount).net;
   const recipientBrief = [
     profile?.gender,
@@ -269,7 +271,7 @@ export default function CaregiverBookingDetailPage() {
   return (
     <>
       <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />
-      {!isRequest && <JobInfoModals booking={booking} open={infoPanel} onClose={() => setInfoPanel(null)} />}
+      {!isRequest && !isHistory && <JobInfoModals booking={booking} open={infoPanel} onClose={() => setInfoPanel(null)} />}
 
       {/* Modals */}
       <AcceptBookingModal
@@ -376,13 +378,15 @@ export default function CaregiverBookingDetailPage() {
             </span>
           </div>
 
-          {/* Status banner */}
+          {/* Status banner — งานเสร็จแล้วใช้การ์ดรายได้ด้านล่างแทน (มีข้อความ "เสร็จสิ้น" อยู่ในตัว) */}
+          {booking.status !== 'completed' && (
           <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, background: banner.bg, border: `0.8px solid ${banner.border}`, borderRadius: 12, marginBottom: 18 }}>
             <span className="material-icons" style={{ fontSize: 18, color: banner.iconColor, flexShrink: 0, marginTop: 1 }}>{banner.icon}</span>
             <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: banner.textColor, margin: 0, lineHeight: '20px' }}>
               {banner.message(booking.patientName)}
             </p>
           </div>
+          )}
 
           {/* Main card — สถานะ confirmed มี CheckInView ของตัวเองด้านล่าง (ข้อมูลชุดเดียวกัน
               จัดใหม่เป็นการ์ดก่อนเริ่มงาน + ป๊อปอัป) จึงซ่อนการ์ดนี้ไม่ให้แสดงซ้ำ
@@ -390,7 +394,32 @@ export default function CaregiverBookingDetailPage() {
           {booking.status !== 'confirmed' && (
           <div className="flex flex-col gap-4 font-['Bai_Jamjuree']">
 
-            {/* ── 1. คน — ผู้รับบริการ + ผู้ติดต่อวันนัด (ดูก่อนว่าจะไปดูแลใคร) ── */}
+            {/* ── 0. ประวัติงาน (เสร็จสิ้น) — รายได้คือสิ่งแรกที่อยากรู้ ── */}
+            {booking.status === 'completed' && (
+              <section className="relative overflow-hidden rounded-[20px] bg-gradient-to-br from-[#3A9A7E] via-[#52B69A] to-[#76C893] p-6 md:p-7 text-white shadow-[0px_4px_16px_rgba(58,154,126,0.2)]">
+                <div className="absolute rounded-full bg-white/10" style={{ width: 200, height: 200, right: -40, top: -70 }} />
+                <div className="relative flex flex-col md:flex-row md:items-end md:justify-between gap-5">
+                  <div>
+                    <p className="m-0 flex items-center gap-1.5 text-[13px] font-semibold text-white/90">
+                      <span className="material-icons" style={{ fontSize: 18 }}>task_alt</span>
+                      งานนี้เสร็จสิ้นเรียบร้อยแล้ว
+                    </p>
+                    <p className="m-0 mt-4 text-sm text-white/85">รายได้สุทธิ</p>
+                    <p className="m-0 font-['Inter'] text-[40px] md:text-[44px] font-bold leading-[48px]">
+                      {booking.price > 0 ? formatBaht(netEarnings) : '—'}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1 md:items-end">
+                    <span className="text-xs text-white/80">สถานะการโอนเงิน</span>
+                    <span className="text-base font-bold">{payoutBadge.label}</span>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* ── 1. คน — ผู้รับบริการ + ผู้ติดต่อวันนัด (ดูก่อนว่าจะไปดูแลใคร)
+                ประวัติงาน (เสร็จ/ปฏิเสธ/ยกเลิก) ไม่ต้องเห็นข้อมูลสุขภาพ/ผู้ติดต่ออีก → ย้ายชื่อไปอยู่ในการ์ดสรุปงานแทน ── */}
+            {!isHistory && (
             <div className={`grid grid-cols-1 gap-4 ${!isRequest && booking.dayOfContactName ? 'md:grid-cols-2' : ''}`}>
               <section className={CARD}>
                 <CardTitle icon="elderly">ผู้รับบริการ</CardTitle>
@@ -496,6 +525,7 @@ export default function CaregiverBookingDetailPage() {
                 </section>
               )}
             </div>
+            )}
 
             {/* ── 2. สรุปงาน — งานอะไร · เมื่อไร · ที่ไหน · ได้เท่าไร ── */}
             <section className={CARD}>
@@ -509,27 +539,25 @@ export default function CaregiverBookingDetailPage() {
                   )}
                 </div>
 
-                {/* รายได้ — คำขอใหม่แสดงในแถบปุ่มลอยแทน · สถานะอื่นไม่มีแถบลอย จึงแสดงตรงนี้
-                    มือถืออยู่ใต้ชื่องาน, จอกว้างชิดขวาสูงเท่าแถวชื่องาน */}
-                {!isRequest && (
+                {/* ประวัติงาน — เหลือแค่ชื่อ/รูปผู้รับบริการ ไว้จำได้ว่างานของใคร */}
+                {isHistory && (
+                  <div className="flex items-center gap-3 md:self-center">
+                    <Avatar src={booking.recipientAvatarUrl} name={recipientName} size={40} fallbackColor="#E7F5EE" className="!border-0 !text-[#2F8B70] !shadow-none flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="m-0 text-[11px] text-[#8A8C8E]">ผู้รับบริการ</p>
+                      <p className="m-0 text-[15px] font-bold leading-[22px] text-[#1A1A1A] truncate">{recipientName}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* รายได้ — คำขอใหม่อยู่ในแถบปุ่มลอย · งานเสร็จอยู่การ์ดบนสุด · ปฏิเสธ/ยกเลิกไม่มีรายได้
+                    เหลือแสดงตรงนี้เฉพาะ "รอชำระเงิน" (accepted) */}
+                {booking.status === 'accepted' && (
                 <div className="md:w-[260px] flex-shrink-0 flex flex-col justify-center rounded-2xl bg-[#F0FAF4] border-[0.8px] border-[#D1FAE5] px-4 py-3">
                   <p className="m-0 text-xs font-semibold text-[#059669]">รายได้สุทธิ</p>
                   <p className="m-0 mt-1 font-['Inter'] text-[28px] font-bold leading-9 text-[#059669]">
                     {booking.price > 0 ? formatBaht(netEarnings) : '—'}
                   </p>
-                  {booking.status === 'completed' && (
-                    <div className="mt-3 pt-3 border-t border-[#D1FAE5] flex flex-col gap-1.5">
-                      <span className={`self-start inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold ${payoutBadge.bg} ${payoutBadge.text}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${payoutBadge.dot}`} />
-                        {payoutBadge.label}
-                      </span>
-                      {booking.payoutAmount != null && (
-                        <span className="text-xs font-semibold text-[#1A1A1A]">
-                          ยอดรับสุทธิ ฿{booking.payoutAmount.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                  )}
                 </div>
                 )}
               </div>
@@ -573,7 +601,7 @@ export default function CaregiverBookingDetailPage() {
                 <p className="m-0 text-[13px] text-[#B0B3B8]">ไม่ได้ระบุภารกิจเพิ่มเติม</p>
               )}
 
-              {!isRequest && booking.notes && (
+              {!isRequest && !isHistory && booking.notes && (
                 <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-[#FFF8E7] border-[0.8px] border-[#FFEAA7] p-3.5">
                   <span className="material-icons flex-shrink-0" style={{ fontSize: 18, color: '#B7791F' }}>sticky_note_2</span>
                   <div>
@@ -587,7 +615,8 @@ export default function CaregiverBookingDetailPage() {
           )}
 
           {/* ── S10 · PYG-620: โรคติดเชื้อ — เหนือปุ่มตอบรับ เห็นก่อนกดรับงานเสมอ (R4) ── */}
-          {(infection.disclosure || infection.loading || infection.error) && (
+          {/* ประวัติงานไม่ต้องแสดงข้อมูลสุขภาพของผู้รับบริการอีก */}
+          {!isHistory && (infection.disclosure || infection.loading || infection.error) && (
             <div style={{ marginTop: 24 }}>
               <CaregiverInfectionSection
                 disclosure={infection.disclosure}

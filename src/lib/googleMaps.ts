@@ -168,3 +168,20 @@ export async function reverseGeocode(lat: number, lng: number): Promise<GeoResul
     );
   });
 }
+
+/**
+ * ลิงก์นำทาง Google Maps ของสถานที่ในใบจอง — ใช้หมุดก่อน (แม่นกว่า) ไม่มีหมุดค่อยค้นจากข้อความที่อยู่
+ * null = ไม่มีทั้งหมุดและที่อยู่ (หรือที่อยู่เป็น "-" ที่ buildBookingPayload ใส่ไว้ตอนว่าง) → ไม่ต้องแสดงปุ่ม
+ */
+export function googleMapsUrl(location: {
+  locationLat?: number | null;
+  locationLng?: number | null;
+  locationName?: string | null;
+}): string | null {
+  const { locationLat, locationLng, locationName } = location;
+  const query =
+    locationLat != null && locationLng != null
+      ? `${locationLat},${locationLng}`
+      : locationName && locationName.trim() !== '-' ? locationName.trim() : null;
+  return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : null;
+}

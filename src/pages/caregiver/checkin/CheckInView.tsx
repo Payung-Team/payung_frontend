@@ -5,6 +5,7 @@ import TaskPreviewCard from './TaskPreviewCard';
 import JobScanModal from '../serviceProgress/JobScanModal';
 import JobInfoModals, { type JobInfoPanel } from '../serviceProgress/JobInfoModals';
 import type { Booking } from '../CaregiverBookings';
+import { googleMapsUrl } from '../../../lib/googleMaps';
 
 const FONT = { fontFamily: "'Bai Jamjuree', sans-serif" } as const;
 
@@ -49,6 +50,7 @@ const STEPS: ReadonlyArray<{ icon: string; title: string; detail: string }> = [
 export default function CheckInView({ booking, dateText, canCheckInToday, onCheckedIn }: Readonly<CheckInViewProps>) {
   const [scanOpen, setScanOpen] = useState(false);
   const [infoPanel, setInfoPanel] = useState<JobInfoPanel>(null);
+  const mapsUrl = googleMapsUrl(booking);
 
   return (
     <div className="flex flex-col gap-6">
@@ -100,6 +102,19 @@ export default function CheckInView({ booking, dateText, canCheckInToday, onChec
                     <p className="mt-0.5 text-xs leading-relaxed text-[#8A8C8E]" style={FONT}>
                       {step.detail}
                     </p>
+                    {/* ขั้นแรก "ไปถึงสถานที่" — นำทางได้ทุกวัน ไม่ต้องรอวันนัด (แถบล่างโชว์เฉพาะวันนัด) */}
+                    {index === 0 && mapsUrl && (
+                      <a
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#52B69A] bg-white px-3.5 text-[13px] font-semibold text-[#3A9A7E] transition hover:bg-[#F0FAF4] focus:outline-none focus:ring-2 focus:ring-[#52B69A] focus:ring-offset-2"
+                        style={FONT}
+                      >
+                        <Icon name="map" size="small" color="currentColor" />
+                        นำทางด้วย Google Maps
+                      </a>
+                    )}
                   </div>
                 </li>
               ))}
@@ -131,6 +146,19 @@ export default function CheckInView({ booking, dateText, canCheckInToday, onChec
               <Icon name="qr_code_scanner" color="#FFFFFF" />
               สแกนเริ่มงาน
             </button>
+            {mapsUrl && (
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="นำทางด้วย Google Maps"
+                className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-[15px] font-bold text-[#1A1A1A] transition hover:border-[#52B69A] hover:text-[#3A9A7E] focus:outline-none focus:ring-2 focus:ring-[#52B69A] focus:ring-offset-2"
+                style={FONT}
+              >
+                <Icon name="directions" size="small" color="currentColor" />
+                <span className="hidden sm:inline">นำทาง</span>
+              </a>
+            )}
             {booking.dayOfContactPhone && (
               <a
                 href={`tel:${booking.dayOfContactPhone}`}

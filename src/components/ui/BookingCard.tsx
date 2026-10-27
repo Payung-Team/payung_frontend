@@ -3,6 +3,7 @@ import Icon from './Icon';
 import { getPatientDisplayName, type Booking } from '../../pages/caregiver/CaregiverBookings';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import { getPayoutStatusMeta } from '../../lib/payoutStatus';
+import { googleMapsUrl } from '../../lib/googleMaps';
 
 interface BookingCardProps {
   booking: Booking;
@@ -43,13 +44,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   const payoutBadge = getPayoutStatusMeta(booking.payoutStatus);
   // ยืนยัน (ชำระเงิน) แล้วเท่านั้นจึงเปิดแผนที่ให้ — ใช้หมุดก่อน ไม่มีหมุดค่อยค้นจากข้อความที่อยู่
   const isConfirmedWork = booking.status === 'confirmed' || booking.status === 'in_progress';
-  const mapsQuery =
-    booking.locationLat != null && booking.locationLng != null
-      ? `${booking.locationLat},${booking.locationLng}`
-      : booking.locationName && booking.locationName !== '-' ? booking.locationName : null;
-  const mapsUrl = isConfirmedWork && mapsQuery
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`
-    : null;
+  const mapsUrl = isConfirmedWork ? googleMapsUrl(booking) : null;
   const hasFooter = booking.status === 'pending' || booking.status === 'accepted' || mapsUrl != null;
   // "22 ต.ค. 2569" → ช่องวันที่ด้านซ้ายบนจอกว้าง
   const dateParts = formatThaiDate(booking.bookingDate).split(' ');
