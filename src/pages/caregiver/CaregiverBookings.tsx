@@ -188,7 +188,6 @@ interface CaregiverBookingHistoryData {
 export const CaregiverBookings: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('scheduled');
-  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
 
   // Action Required Sub-filter state
   const [actionSubFilter, setActionSubFilter] = useState<'all' | 'new' | 'waiting'>('all');
@@ -299,10 +298,6 @@ export const CaregiverBookings: React.FC = () => {
       (historyList as Booking[]).find((b: Booking) => b.id === id) ||
       null
     );
-  };
-
-  const handleToggleExpand = (id: string) => {
-    setExpandedCardId(expandedCardId === id ? null : id);
   };
 
   const handleAccept = (id: string) => {
@@ -581,7 +576,6 @@ export const CaregiverBookings: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setActiveTab('scheduled');
-                      setExpandedCardId(null);
                       setScheduledSubTab('due');
                     }}
                     className={`flex flex-row justify-center items-center py-2.5 px-2 sm:py-3 sm:px-4 gap-1.5 h-[38px] sm:h-[45px] flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-200 cursor-pointer ${activeTab === 'scheduled'
@@ -610,7 +604,6 @@ export const CaregiverBookings: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setActiveTab('action_required');
-                      setExpandedCardId(null);
                     }}
                     className={`flex flex-row justify-center items-center py-2.5 px-2 sm:py-3 sm:px-4 gap-1.5 h-[38px] sm:h-[45px] flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-200 cursor-pointer ${activeTab === 'action_required'
                         ? 'bg-[#52B69A] shadow-[0px_4px_12px_rgba(82,182,154,0.25)] text-white'
@@ -638,7 +631,6 @@ export const CaregiverBookings: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setActiveTab('history');
-                      setExpandedCardId(null);
                     }}
                     className={`flex flex-row justify-center items-center py-2.5 px-2 sm:py-3 sm:px-4 gap-1.5 h-[38px] sm:h-[45px] flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-200 cursor-pointer ${activeTab === 'history'
                         ? 'bg-[#52B69A] shadow-[0px_4px_12px_rgba(82,182,154,0.25)] text-white'
@@ -854,8 +846,6 @@ export const CaregiverBookings: React.FC = () => {
                       <BookingCard
                         key={booking.id}
                         booking={booking}
-                        isExpanded={expandedCardId === booking.id}
-                        onToggleExpand={() => handleToggleExpand(booking.id)}
                         onAccept={handleAccept}
                         onDeclineClick={handleDeclineClick}
                         onCancelAcceptanceClick={handleCancelAcceptanceClick}
