@@ -38,6 +38,14 @@ export interface ConsentModalProps {
   submitting?: boolean;
   /** ข้อความผิดพลาดจากการสมัคร แสดงในกล่องโดยไม่ปิด */
   error?: string;
+  /**
+   * false = คลิกนอกกล่อง / กด Esc ไม่ยกเลิก (ยกเลิกได้ทางปุ่มเท่านั้น)
+   * ใช้เมื่อการยกเลิกมีผลแรง เช่น SignupConsentGate ที่ยกเลิก = ออกจากระบบ
+   */
+  dismissible?: boolean;
+  /** ป้ายปุ่มขั้นสุดท้าย — ค่าเริ่มต้นสำหรับหน้าสมัคร (บัญชียังไม่ถูกสร้าง) */
+  acceptLabel?: string;
+  submittingLabel?: string;
   onCancel: () => void;
   onAccept: () => void;
 }
@@ -103,6 +111,9 @@ function ConsentWizard({
   effectiveDate,
   submitting = false,
   error,
+  dismissible = true,
+  acceptLabel = 'ยินยอมและสมัครสมาชิก',
+  submittingLabel = 'กำลังสมัครสมาชิก...',
   onCancel,
   onAccept,
   readDocs,
@@ -136,14 +147,15 @@ function ConsentWizard({
 
   // Esc = ยกเลิก · onCancel มักเป็น arrow ใหม่ทุก render — เก็บใน ref
   // ไม่งั้น effect รันใหม่ทุกครั้งที่ติ๊ก แล้วดึงโฟกัสกลับไปที่กล่อง ผู้ใช้คีย์บอร์ดหลงตำแหน่ง
-  const cancelRef = useRef({ onCancel, submitting });
+  const cancelRef = useRef({ onCancel, submitting, dismissible });
   useEffect(() => {
-    cancelRef.current = { onCancel, submitting };
-  }, [onCancel, submitting]);
+    cancelRef.current = { onCancel, submitting, dismissible };
+  }, [onCancel, submitting, dismissible]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !cancelRef.current.submitting) cancelRef.current.onCancel();
+      const { onCancel, submitting, dismissible } = cancelRef.current;
+      if (e.key === 'Escape' && dismissible && !submitting) onCancel();
     };
     document.addEventListener('keydown', onKeyDown);
 
@@ -172,7 +184,7 @@ function ConsentWizard({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4"
       // คลิกนอกกล่อง = ยกเลิก · ระหว่างสร้างบัญชีห้ามปิด ไม่งั้นผู้ใช้ไม่รู้ว่าสมัครสำเร็จไหม
-      onClick={() => !submitting && onCancel()}
+      onClick={() => dismissible && !submitting && onCancel()}
     >
       <div
         ref={dialogRef}
@@ -262,7 +274,7 @@ function ConsentWizard({
                 }`}
                 style={FONT}
               >
-                {submitting ? 'กำลังสมัครสมาชิก...' : 'ยินยอมและสมัครสมาชิก'}
+                {submitting ? submittingLabel : acceptLabel}
               </button>
             ) : (
               <button

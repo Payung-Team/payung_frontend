@@ -163,6 +163,28 @@ export const GRANT_CONSENT = gql`
   }
 `;
 
+/**
+ * คำตอบหน้าความยินยอมตอนสมัคร (source register) ของบัญชีที่สมัครด้วย Google
+ *
+ * ★ บัญชี Google ถูก trigger สร้างก่อนกลับมาถึงแอป จึงส่ง consents ไปกับการสร้างบัญชีไม่ได้
+ *   SignupConsentGate เปิดกล่องความยินยอมหลังเข้าระบบแล้วส่งคำตอบทุกข้อมาที่นี่แทน
+ */
+export const ACCEPT_SIGNUP_CONSENTS = gql`
+  mutation AcceptSignupConsents($consents: [ConsentAnswerInput!]!) {
+    acceptSignupConsents(consents: $consents) {
+      type
+      granted
+      answered
+      policyVersion
+      answeredAt
+      source
+      isCurrentVersion
+      required
+      withdrawable
+    }
+  }
+`;
+
 // ─── Types (PYG-540) ──────────────────────────────────────────────────────────────────
 
 export interface ConsentStatus {
@@ -200,4 +222,12 @@ export interface GrantConsentData {
 export interface GrantConsentVars {
   type: string;
   policyVersion: string;
+}
+
+export interface AcceptSignupConsentsData {
+  acceptSignupConsents: ConsentStatus[];
+}
+
+export interface AcceptSignupConsentsVars {
+  consents: ConsentAnswer[];
 }
