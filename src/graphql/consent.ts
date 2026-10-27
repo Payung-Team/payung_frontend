@@ -164,10 +164,10 @@ export const GRANT_CONSENT = gql`
 `;
 
 /**
- * คำตอบหน้าความยินยอมตอนสมัครด้วย Google (source register)
+ * คำตอบหน้าความยินยอมตอนสมัคร (source register) ของบัญชีที่สมัครด้วย Google
  *
- * ★ บัญชี Google ถูกสร้างก่อนกลับมาถึงแอป — AuthCallback เปิดกล่องความยินยอมแล้วส่งมาที่นี่
- *   ส่งทุกข้อที่แสดงรวมข้อที่ไม่ติ๊ก (granted: false) กติกาเดียวกับ REGISTER
+ * ★ บัญชี Google ถูก trigger สร้างก่อนกลับมาถึงแอป จึงส่ง consents ไปกับการสร้างบัญชีไม่ได้
+ *   SignupConsentGate เปิดกล่องความยินยอมหลังเข้าระบบแล้วส่งคำตอบทุกข้อมาที่นี่แทน
  */
 export const ACCEPT_SIGNUP_CONSENTS = gql`
   mutation AcceptSignupConsents($consents: [ConsentAnswerInput!]!) {
@@ -222,4 +222,12 @@ export interface GrantConsentData {
 export interface GrantConsentVars {
   type: string;
   policyVersion: string;
+}
+
+export interface AcceptSignupConsentsData {
+  acceptSignupConsents: ConsentStatus[];
+}
+
+export interface AcceptSignupConsentsVars {
+  consents: ConsentAnswer[];
 }

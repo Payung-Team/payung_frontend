@@ -93,7 +93,7 @@ export default function JobInfoModals({ booking, open, onClose }: Readonly<JobIn
         {/* รายได้ — แยกให้เห็นว่าหักอะไรไปเท่าไรและเหลือเท่าไร ไม่ใช่ตัวเลขเดียวกำกวม */}
         {booking.price > 0 && (
           <div className="mt-4">
-            <EarningsBreakdown price={booking.price} payoutAmount={booking.payoutAmount} />
+            <EarningsBreakdown price={booking.price} payoutAmount={booking.payoutAmount} paidAmount={booking.paidAmount} />
           </div>
         )}
 

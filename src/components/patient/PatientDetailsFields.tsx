@@ -71,13 +71,17 @@ export interface PatientDetailsFieldsProps {
   ) => void;
 }
 
-const inputBase =
-  'mt-1.5 w-full p-3 border rounded-xl text-sm bg-white focus:outline-none focus:ring-1';
+// ★ ช่องที่ล็อกได้ (ชื่อ) ใช้ inputShape + inputBg() — ห้ามใช้ inputBase ที่มี bg-white อยู่แล้ว
+//   เดิมใส่ bg-white กับ bg เทาซ้อนกัน class สีพื้นสองตัวชนกัน ตัวไหนชนะขึ้นกับลำดับใน CSS
+//   ไม่ใช่ลำดับใน className → ช่องที่ล็อกยังเป็นสีขาว
+const inputShape = 'mt-1.5 w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-1';
+const inputBase = `${inputShape} bg-white`;
 const inputOk = 'border-[#E0E2E5] focus:ring-[#52B69A]';
 const inputErr = 'border-red-500 focus:ring-red-500';
 
-/** พื้นเทา + เคอร์เซอร์ห้าม — บอกด้วยสายตาว่าช่องนี้แก้ไม่ได้ */
-const inputLocked = 'bg-[#F6F7F8] text-[#575859] cursor-not-allowed';
+/** พื้นเทา + ตัวอักษรเทา + เคอร์เซอร์ห้าม — บอกด้วยสายตาว่าช่องนี้แก้ไม่ได้ */
+const inputLocked = 'bg-[#EEF0F2] text-[#6B6E70] cursor-not-allowed';
+const inputBg = (locked: boolean) => (locked ? inputLocked : 'bg-white');
 
 /**
  * ★ readOnly ไม่ใช่ disabled โดยตั้งใจ — disabled ทำให้ screen reader ข้ามช่องไปเลย
@@ -90,7 +94,7 @@ function LockedHint({ show }: { show: boolean }) {
       <span className="material-icons" style={{ fontSize: 14 }}>
         lock
       </span>
-      ชื่อจากบัญชีของสมาชิก แก้ไขไม่ได้
+      ชื่อผูกกับบัญชีผู้ใช้ แก้ไขไม่ได้
     </p>
   );
 }
@@ -130,9 +134,7 @@ export default function PatientDetailsFields({
               disabled={disabled}
               readOnly={nameReadOnly}
               placeholder="ชื่อจริงตามบัตรประชาชน"
-              className={`${inputBase} ${errors.name ? inputErr : inputOk} ${
-                nameReadOnly ? inputLocked : ''
-              }`}
+              className={`${inputShape} ${errors.name ? inputErr : inputOk} ${inputBg(nameReadOnly)}`}
             />
             <LockedHint show={nameReadOnly} />
             <FieldError message={errors.name} />
@@ -150,9 +152,7 @@ export default function PatientDetailsFields({
                 disabled={disabled}
                 readOnly={nameReadOnly}
                 placeholder="ชื่อจริงตามบัตรประชาชน"
-                className={`${inputBase} ${errors.firstName ? inputErr : inputOk} ${
-                  nameReadOnly ? inputLocked : ''
-                }`}
+                className={`${inputShape} ${errors.firstName ? inputErr : inputOk} ${inputBg(nameReadOnly)}`}
               />
               <FieldError message={errors.firstName} />
             </div>
@@ -167,9 +167,7 @@ export default function PatientDetailsFields({
                 disabled={disabled}
                 readOnly={nameReadOnly}
                 placeholder="นามสกุลตามบัตรประชาชน"
-                className={`${inputBase} ${errors.lastName ? inputErr : inputOk} ${
-                  nameReadOnly ? inputLocked : ''
-                }`}
+                className={`${inputShape} ${errors.lastName ? inputErr : inputOk} ${inputBg(nameReadOnly)}`}
               />
               <FieldError message={errors.lastName} />
             </div>

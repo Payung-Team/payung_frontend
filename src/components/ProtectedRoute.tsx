@@ -2,6 +2,7 @@ import React, { type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import PageSkeleton from './ui/PageSkeleton';
+import SignupConsentGate from './consent/SignupConsentGate';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -21,8 +22,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/" replace />;
   }
 
-  // มี session → render children
-  return <>{children}</>;
+  // มี session → บัญชี Google ต้องผ่านความยินยอมหน้าสมัครก่อน (ดู SignupConsentGate)
+  return <SignupConsentGate session={session}>{children}</SignupConsentGate>;
 };
 
 export default ProtectedRoute;

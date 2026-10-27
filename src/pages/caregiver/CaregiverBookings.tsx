@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import Icon from '../../components/ui/Icon';
 import type { PatientProfile } from '../../lib/patientProfile';
@@ -41,6 +41,8 @@ export interface Booking {
   price: number;
   payoutStatus?: 'scheduled' | 'processing' | 'paid' | 'failed' | 'cancelled' | null;
   payoutAmount?: number | null;
+  /** ยอดที่ลูกค้าจ่ายจริง (payments.amount) · null = ยังไม่ได้ชำระ */
+  paidAmount?: number | null;
   notes?: string;
   status:
     | 'pending'
@@ -134,6 +136,7 @@ export function mapToBooking(summary: any): Booking {
     price: summary.estimatedCost ?? 0,
     payoutStatus: summary.payoutStatus ?? null,
     payoutAmount: summary.payoutAmount ?? null,
+    paidAmount: summary.paidAmount ?? null,
     status: status as any,
     declineReason: summary.rejectionReason ?? undefined,
     createdAt: summary.createdAt,
@@ -184,14 +187,33 @@ interface CaregiverBookingHistoryData {
 
 export const CaregiverBookings: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>('scheduled');
-  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+
+  // แท็บ/ตัวกรองเก็บไว้ใน URL (?tab=&sub=&filter=&hfilter=&sort=) ไม่ใช่ useState
+  //   กดเข้าดูรายละเอียดงานแล้วกดกลับ → กลับมาที่แท็บเดิม (เดิมรีเซ็ตเป็นแท็บแรกทุกครั้ง)
+  //   replace: true — สลับแท็บไม่สร้างประวัติใหม่ ปุ่มย้อนกลับของเบราว์เซอร์จึงไม่ต้องไล่ย้อนทีละแท็บ
+  const [searchParams, setSearchParams] = useSearchParams();
+  const updateParams = (patch: Record<string, string>) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const [key, value] of Object.entries(patch)) next.set(key, value);
+      return next;
+    }, { replace: true });
+  };
+  const pick = <T extends string>(key: string, allowed: readonly T[], fallback: T): T => {
+    const value = searchParams.get(key);
+    return allowed.includes(value as T) ? (value as T) : fallback;
+  };
+
+  const activeTab = pick<TabType>('tab', ['scheduled', 'action_required', 'history'], 'scheduled');
+  const setActiveTab = (tab: TabType) => updateParams({ tab });
 
   // Action Required Sub-filter state
-  const [actionSubFilter, setActionSubFilter] = useState<'all' | 'new' | 'waiting'>('all');
+  const actionSubFilter = pick('filter', ['all', 'new', 'waiting'] as const, 'all');
+  const setActionSubFilter = (filter: 'all' | 'new' | 'waiting') => updateParams({ filter });
 
   // Scheduled tab Sub-filter state (due vs upcoming)
-  const [scheduledSubTab, setScheduledSubTab] = useState<'due' | 'upcoming'>('due');
+  const scheduledSubTab = pick('sub', ['due', 'upcoming'] as const, 'due');
+  const setScheduledSubTab = (sub: 'due' | 'upcoming') => updateParams({ sub });
 
   // Decline Modal state
   const [declineModalId, setDeclineModalId] = useState<string | null>(null);
@@ -200,8 +222,10 @@ export const CaregiverBookings: React.FC = () => {
   const [cancelAcceptanceModalId, setCancelAcceptanceModalId] = useState<string | null>(null);
 
   // History tab filter state
-  const [historySubFilter, setHistorySubFilter] = useState<'all' | 'completed' | 'cancelled' | 'declined'>('all');
-  const [historySortBy, setHistorySortBy] = useState<string>('newest');
+  const historySubFilter = pick('hfilter', ['all', 'completed', 'cancelled', 'declined'] as const, 'all');
+  const setHistorySubFilter = (hfilter: 'all' | 'completed' | 'cancelled' | 'declined') => updateParams({ hfilter });
+  const historySortBy = searchParams.get('sort') ?? 'newest';
+  const setHistorySortBy = (sort: string) => updateParams({ sort });
 
   // Accept Booking Modal state
 
@@ -298,16 +322,12 @@ export const CaregiverBookings: React.FC = () => {
     );
   };
 
-  const handleToggleExpand = (id: string) => {
-    setExpandedCardId(expandedCardId === id ? null : id);
-  };
-
   const handleAccept = (id: string) => {
     const booking = findBookingById(id);
     if (!booking) return;
     // S10 · PYG-620: ต้องเห็นและรับทราบข้อมูลโรคติดเชื้อก่อนรับงาน แต่หน้า List ห้ามแสดงข้อมูลนี้
     //   → พาไปหน้ารายละเอียดคำขอ ซึ่งมีส่วนรับทราบอยู่เหนือปุ่มตอบรับ
-    navigate(`/caregiver/bookings/${booking.id}`, { state: { booking } });
+    navigate(`/caregiver/bookings/${booking.id}`, { state: { booking, fromList: true } });
   };
 
 
@@ -577,9 +597,8 @@ export const CaregiverBookings: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      setActiveTab('scheduled');
-                      setExpandedCardId(null);
-                      setScheduledSubTab('due');
+                      // ตั้งพร้อมกันครั้งเดียว — เรียก setter สองตัวติดกัน ตัวหลังจะทับตัวแรก
+                      updateParams({ tab: 'scheduled', sub: 'due' });
                     }}
                     className={`flex flex-row justify-center items-center py-2.5 px-2 sm:py-3 sm:px-4 gap-1.5 h-[38px] sm:h-[45px] flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-200 cursor-pointer ${activeTab === 'scheduled'
                         ? 'bg-[#52B69A] shadow-[0px_4px_12px_rgba(82,182,154,0.25)] text-white'
@@ -607,7 +626,6 @@ export const CaregiverBookings: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setActiveTab('action_required');
-                      setExpandedCardId(null);
                     }}
                     className={`flex flex-row justify-center items-center py-2.5 px-2 sm:py-3 sm:px-4 gap-1.5 h-[38px] sm:h-[45px] flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-200 cursor-pointer ${activeTab === 'action_required'
                         ? 'bg-[#52B69A] shadow-[0px_4px_12px_rgba(82,182,154,0.25)] text-white'
@@ -635,7 +653,6 @@ export const CaregiverBookings: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setActiveTab('history');
-                      setExpandedCardId(null);
                     }}
                     className={`flex flex-row justify-center items-center py-2.5 px-2 sm:py-3 sm:px-4 gap-1.5 h-[38px] sm:h-[45px] flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-200 cursor-pointer ${activeTab === 'history'
                         ? 'bg-[#52B69A] shadow-[0px_4px_12px_rgba(82,182,154,0.25)] text-white'
@@ -851,12 +868,10 @@ export const CaregiverBookings: React.FC = () => {
                       <BookingCard
                         key={booking.id}
                         booking={booking}
-                        isExpanded={expandedCardId === booking.id}
-                        onToggleExpand={() => handleToggleExpand(booking.id)}
                         onAccept={handleAccept}
                         onDeclineClick={handleDeclineClick}
                         onCancelAcceptanceClick={handleCancelAcceptanceClick}
-                        onViewDetails={(b) => navigate(`/caregiver/bookings/${b.id}`, { state: { booking: b } })}
+                        onViewDetails={(b) => navigate(`/caregiver/bookings/${b.id}`, { state: { booking: b, fromList: true } })}
                         formatThaiDate={formatThaiDate}
                         getDaysUntil={getDaysUntil}
                         getAcceptedTimeText={getAcceptedTimeText}
