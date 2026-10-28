@@ -85,7 +85,7 @@ const FIELD_GRID = {
   gap: '14px 24px',
 } as const;
 
-function CaregiverAvatar({
+export function CaregiverAvatar({
   avatarUrl, size = 56, online = false,
   shadow = '0px 4px 16px rgba(82,182,154,0.2)',
   onPhotoExpired,
@@ -133,7 +133,7 @@ function AwaitingStat({ label, value, divided = false }: Readonly<{ label: strin
  * คะแนน / จำนวนงาน / ประสบการณ์ จากข้อมูลจริง (myBooking.caregiver)
  * ช่องที่ไม่มีข้อมูลถูกซ่อน ไม่แสดงเลขสมมติ — ผู้ใช้ใช้ตัวเลขนี้ตัดสินใจเชื่อใจผู้ดูแล
  */
-function CaregiverStats({ booking, size = 'md' }: Readonly<{ booking: ConfirmedBooking; size?: 'md' | 'sm' }>) {
+export function CaregiverStats({ booking, size = 'md' }: Readonly<{ booking: ConfirmedBooking; size?: 'md' | 'sm' }>) {
   const fs = size === 'md' ? 13 : 11;
   const iconFs = size === 'md' ? 14 : 12;
   const rating = booking.caregiverRating;
@@ -828,6 +828,8 @@ function InProgressView({
   backLabel,
   onReportProblem,
   readOnly,
+  canReportProblem,
+  footer,
   onPhotoExpired,
 }: Readonly<{
   booking: ConfirmedBooking;
@@ -852,6 +854,10 @@ function InProgressView({
   onReportProblem: () => void;
   /** สมาชิกกลุ่มครอบครัวที่ไม่ได้จอง — ดูได้อย่างเดียว ไม่มี QR จบงาน / แจ้งปัญหา / รีวิว */
   readOnly: boolean;
+  /** false = แจ้งปัญหาไปแล้ว → ซ่อนปุ่ม (หน้าแม่แสดงสถานะการตรวจสอบใน footer แทน) */
+  canReportProblem: boolean;
+  /** เนื้อหาต่อท้ายจากหน้าแม่ เช่น ข้อมูลการชำระเงินในประวัติการจอง */
+  footer?: ReactNode;
   onPhotoExpired?: () => void;
 }>) {
   const [showQr, setShowQr] = useState(false);
@@ -889,7 +895,7 @@ function InProgressView({
               ติดตามการทำงานของผู้ดูแล
             </p>
           </div>
-          {!readOnly && <ReportProblemButton onClick={onReportProblem} emphasized={Boolean(finished)} />}
+          {!readOnly && canReportProblem && <ReportProblemButton onClick={onReportProblem} emphasized={Boolean(finished)} />}
         </div>
 
         {readOnly && <FamilyViewerNotice />}
@@ -1099,6 +1105,8 @@ function InProgressView({
             </p>
           )}
         </div>
+
+        {footer}
       </div>
 
       {/* Fixed action bar — เฉพาะระหว่างทำงาน ปิดงานแล้วไม่มีอะไรให้กด
@@ -1169,6 +1177,8 @@ export function BookingTrackingView({
   readOnly = false,
   familyGroupId = null,
   backLabel = 'กลับไปนัดหมายของฉัน',
+  canReportProblem = true,
+  footer,
   onPhotoExpired,
 }: Readonly<{
   booking: ConfirmedBooking;
@@ -1186,6 +1196,9 @@ export function BookingTrackingView({
   /** มีค่า = ดูผ่านกลุ่มครอบครัว → อ่านงานย่อยผ่าน groupBooking (myBooking ไม่คืนคำจองของคนอื่น) */
   familyGroupId?: string | null;
   backLabel?: string;
+  canReportProblem?: boolean;
+  /** เนื้อหาต่อท้ายหน้า (แสดงเฉพาะเมื่อเริ่มงานแล้ว) เช่น ข้อมูลการชำระเงินของงานที่เสร็จแล้ว */
+  footer?: ReactNode;
   /** รูปผู้ดูแล (signed URL) โหลดไม่ขึ้น → ให้หน้าแม่โหลดใบจองใหม่ (PYG-512) */
   onPhotoExpired?: () => void;
 }>) {
@@ -1216,11 +1229,13 @@ export function BookingTrackingView({
   // Trust it while proofOfWork is still in flight — otherwise an in-progress job
   // flashes "ยังไม่เช็คอิน" on first paint, which is exactly the false reassurance
   // this screen exists to prevent.
-  const statusSaysStarted = ACTIVE_JOB_STATUSES.has(booking.status);
+  // งานที่ปิดแล้ว (ประวัติ) ถือว่าเริ่มและจบแล้วตั้งแต่ก่อน proofOfWork โหลดเสร็จ — ไม่ให้แวบเป็นหน้า "รอเช็คอิน"
+  const statusSaysFinished = booking.status === 'completed';
+  const statusSaysStarted = ACTIVE_JOB_STATUSES.has(booking.status) || statusSaysFinished;
   const hasStarted = checkedInAt !== null || statusSaysStarted;
 
   // A real check-out timestamp is the end of the job, whatever the status says.
-  const hasCheckedOut = checkedOutAt !== null || mockState === 'checked_out';
+  const hasCheckedOut = checkedOutAt !== null || statusSaysFinished || mockState === 'checked_out';
 
   let state: TrackingState;
   if (hasCheckedOut) {
@@ -1462,6 +1477,8 @@ export function BookingTrackingView({
       backLabel={backLabel}
       onReportProblem={onReportProblem}
       readOnly={readOnly}
+      canReportProblem={canReportProblem}
+      footer={footer}
       onPhotoExpired={onPhotoExpired}
     />
   );
