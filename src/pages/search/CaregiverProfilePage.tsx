@@ -310,7 +310,10 @@ const CaregiverProfilePage: React.FC = () => {
   const cg = location.state?.caregiver as CaregiverSummary | undefined;
 
   const fullName = cg?.fullName ?? '—';
-  const hourlyRate = publicHourlyRate !== undefined ? publicHourlyRate : cg?.hourlyRate;
+  // เปิดจากหน้า matching (มีใบจองที่กำลังเลือกผู้ดูแล) → ใช้ราคาจากการ์ด matching ซึ่ง BE คิดตามบริการที่จอง
+  // (เช่น กายภาพ 800) ไม่ใช่ราคาเริ่มต้นต่ำสุดของผู้ดูแลจาก /public — ไม่งั้นโปรไฟล์บอก 300 แต่จองจริง 800
+  const matchingRate = bookingDraft?.matchingBooking && hasDisplayPrice(cg?.hourlyRate) ? cg?.hourlyRate : undefined;
+  const hourlyRate = matchingRate ?? (publicHourlyRate !== undefined ? publicHourlyRate : cg?.hourlyRate);
   const priceText = formatDisplayPrice(hourlyRate);
   const avgRating = cg?.avgRating ?? 0;
   const reviewCount = cg?.reviewCount ?? 0;
@@ -589,7 +592,11 @@ const CaregiverProfilePage: React.FC = () => {
                 </span>
               )}
               <p className="mb-3.5" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#8A8C8E', lineHeight: '18px' }}>
-                {priceText ? 'ราคาเริ่มต้นตามประเภทงาน ไม่มีค่าใช้จ่ายแอบแฝง' : 'ราคาจะแสดงเมื่อเลือกประเภทงานตอนจอง'}
+                {!priceText
+                  ? 'ราคาจะแสดงเมื่อเลือกประเภทงานตอนจอง'
+                  : matchingRate !== undefined
+                    ? 'ราคาสำหรับบริการที่คุณเลือก ไม่มีค่าใช้จ่ายแอบแฝง'
+                    : 'ราคาเริ่มต้นตามประเภทงาน ไม่มีค่าใช้จ่ายแอบแฝง'}
               </p>
               </div>
 
@@ -687,7 +694,9 @@ const CaregiverProfilePage: React.FC = () => {
               </span>
             )}
             <span className="truncate" style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 11, color: '#8A8C8E', lineHeight: '16px' }}>
-              {priceText ? 'ราคาเริ่มต้นตามประเภทงาน' : 'แสดงเมื่อเลือกประเภทงาน'}
+              {!priceText
+                ? 'แสดงเมื่อเลือกประเภทงาน'
+                : matchingRate !== undefined ? 'ราคาสำหรับบริการที่คุณเลือก' : 'ราคาเริ่มต้นตามประเภทงาน'}
             </span>
           </div>
           <button

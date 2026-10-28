@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, type ReactNode } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { supabase } from '../../lib/supabase';
@@ -6,7 +6,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import { ToastContainer } from '../../components/ui/Toast';
 import { CompleteServiceModal } from '../../components/ui/CompleteServiceModal';
-import { ReviewPromptCard } from '../../components/ui/ReviewPromptCard';
 import { BookingReviewForm, type BookingReviewData } from '../../components/booking/BookingReviewForm';
 import { SubmittedReviewCard } from '../../components/booking/SubmittedReviewCard';
 import { getBookingReview, saveStoredReview } from '../../utils/bookingReview';
@@ -15,13 +14,12 @@ import { GET_MY_BOOKING, COMPLETE_BOOKING, CREATE_REVIEW, FLAG_BOOKING_DISPUTE }
 import { mapGqlStatus, ACTIVE_JOB_STATUSES } from '../../utils/bookingStatus';
 import { PaymentInfoSection } from '../../components/payment/PaymentInfoSection';
 import type { PaymentInfo } from '../../components/payment/PaymentInfoSection';
-import { Divider, SectionTitle, InfoRow } from '../../components/booking/BookingDetailFields';
-import { BookingTrackingView } from '../../components/booking/BookingTrackingView';
+import { BookingTrackingView, CaregiverAvatar, CaregiverStats } from '../../components/booking/BookingTrackingView';
 import { hasAnyProfileData, type PatientProfile } from '../../lib/patientProfile';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
+import { googleMapsUrl } from '../../lib/googleMaps';
 import { formatBookingTimeRange, formatDurationHours } from '../../lib/bookingTime';
 import { GROUP_BOOKING_DETAIL } from '../../graphql/familyGroup';
-import CaregiverPhoto from '../../components/ui/CaregiverPhoto';
 import { useSignedUrlRefresh } from '../../hooks/useSignedPhoto';
 import BookingActivitiesList from '../../components/booking/BookingActivitiesList';
 import { useBookingActivities } from '../../hooks/useBookingActivities';
@@ -52,20 +50,53 @@ function NoteBlock({ label, text }: Readonly<{ label: string; text: string }>) {
   );
 }
 
+// การ์ดชุดเดียวกับ BookingTrackingView (IN_PROGRESS_CARD) ให้ก่อน/ระหว่าง/หลังงานหน้าตาเป็นชุดเดียวกัน
+const CARD_SHELL = 'bg-white border-[0.8px] border-[#F3F4F6] shadow-[0px_1px_2px_rgba(0,0,0,0.05)]';
+const CARD = `${CARD_SHELL} rounded-xl p-5 md:p-6`;
+
+function CardTitle({ aside, children }: Readonly<{ aside?: string; children: ReactNode }>) {
+  return (
+    <div className="flex items-center justify-between gap-2 mb-4">
+      <h3 className="m-0 text-[17px] font-bold leading-[26px] text-[#1A1A1A]">{children}</h3>
+      {aside && <span className="text-[13px] leading-5 text-[#8A8C8E]">{aside}</span>}
+    </div>
+  );
+}
+
+/** ป้ายอยู่บน ค่าอยู่ล่าง — แบบเดียวกับ DetailField ในแผงรายละเอียดของ BookingTrackingView */
+function DetailField({ label, value }: Readonly<{ label: string; value: string }>) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] leading-4 text-[#8A8C8E]">{label}</dt>
+      <dd className="m-0 mt-0.5 text-sm font-semibold leading-[21px] text-[#1A1A1A] break-words">{value || '—'}</dd>
+    </div>
+  );
+}
+
+/** ตัวเลขบนการ์ดบนช่วงรอวันนัด — แบบ Stat ใน PreShiftCard ฝั่งผู้ดูแล */
+function HeroStat({ label, value, money = false }: Readonly<{ label: string; value: string; money?: boolean }>) {
+  return (
+    <div className="min-w-[88px]">
+      <p className="m-0 text-[11px] text-[#8A8C8E]">{label}</p>
+      <p className={`m-0 mt-0.5 font-['Inter'] text-lg font-bold ${money ? 'text-[#009265]' : 'text-[#1A1A1A]'}`}>{value}</p>
+    </div>
+  );
+}
+
+/** วันที่ / เวลา ในแถวผู้ดูแลของการ์ดบน (แบบ FinishedTime ของหน้าติดตามงาน) */
+function HeadStat({ label, value }: Readonly<{ label: string; value: string }>) {
+  return (
+    <div className="text-right">
+      <p className="m-0 text-[11px] leading-4 text-[#8A8C8E]">{label}</p>
+      <p className="m-0 text-[15px] font-bold leading-[19px] text-[#1A1A1A] whitespace-nowrap">{value}</p>
+    </div>
+  );
+}
+
 // Statuses in which the patient may still write their review.
 const REVIEWABLE_STATUSES = new Set<ConfirmedBooking['status']>([
   'completed',
 ]);
-
-const STATUS_BADGE: Record<ConfirmedBooking['status'], { label: string; dot: string; bg: string; text: string }> = {
-  pending: { label: 'รอตอบรับ', dot: '#F59E0B', bg: '#FFFBEB', text: '#B45309' },
-  accepted: { label: 'รอชำระเงิน', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
-  confirmed: { label: 'ยืนยันแล้ว', dot: '#10B981', bg: '#ECFDF5', text: '#047857' },
-  in_progress: { label: 'กำลังให้บริการ', dot: '#1D4ED8', bg: '#EFF6FF', text: '#1D4ED8' },
-  rejected: { label: 'ปฏิเสธแล้ว', dot: '#EF4444', bg: '#FEF2F2', text: '#991B1B' },
-  cancelled: { label: 'ยกเลิกแล้ว', dot: '#9CA3AF', bg: '#F9FAFB', text: '#6B7280' },
-  completed: { label: 'เสร็จสิ้น', dot: '#3B82F6', bg: '#EFF6FF', text: '#1D4ED8' },
-};
 
 const STATUS_BANNER: Record<ConfirmedBooking['status'], { icon: string; iconColor: string; bg: string; border: string; textColor: string; message: (name: string) => string }> = {
   pending: { icon: 'info', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: (n) => `ส่งคำขอของคุณไปยัง ${n} เรียบร้อยแล้ว ขณะนี้รอการตอบรับ` },
@@ -75,6 +106,16 @@ const STATUS_BANNER: Record<ConfirmedBooking['status'], { icon: string; iconColo
   rejected: { icon: 'cancel', iconColor: '#DC2626', bg: '#FEF2F2', border: '#FECACA', textColor: '#991B1B', message: (n) => `${n} ไม่สามารถรับงานนี้ได้ คุณสามารถค้นหาผู้ดูแลท่านอื่น` },
   cancelled: { icon: 'do_not_disturb_on', iconColor: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', textColor: '#374151', message: () => `การจองนี้ถูกยกเลิกแล้ว` },
   completed: { icon: 'task_alt', iconColor: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', textColor: '#1E40AF', message: () => `การนัดหมายเสร็จสิ้นเรียบร้อยแล้ว` },
+};
+
+const STATUS_TITLE: Record<ConfirmedBooking['status'], string> = {
+  pending: 'รอผู้ดูแลตอบรับ',
+  accepted: 'รอชำระเงิน',
+  confirmed: 'ยืนยันการจองแล้ว',
+  in_progress: 'กำลังให้บริการ',
+  rejected: 'ผู้ดูแลไม่สามารถรับงานได้',
+  cancelled: 'การจองถูกยกเลิก',
+  completed: 'การดูแลเสร็จสิ้น',
 };
 
 // Must match BookingService.cancelBooking: paid/confirmed jobs are no longer cancellable.
@@ -269,7 +310,6 @@ export default function BookingDetailPage() {
     );
   }
 
-  const badge = STATUS_BADGE[booking.status];
   const banner = STATUS_BANNER[booking.status];
   const dt = booking.draft.dateTime;
   const est = booking.draft.estimatedCost;
@@ -283,6 +323,12 @@ export default function BookingDetailPage() {
   const locationStr = booking.draft.locationDetails?.at_home?.address
     || booking.draft.locationDetails?.accompany_outside?.hospitalName
     || '—';
+  // พิกัดไม่ได้อยู่ใน ConfirmedBooking (mapper ตั้ง lat/lng เป็น 0) — อ่านตรงจากผล query
+  const mapsUrl = googleMapsUrl({
+    locationLat: (apiBooking?.locationLat as number | null | undefined) ?? null,
+    locationLng: (apiBooking?.locationLng as number | null | undefined) ?? null,
+    locationName: locationStr === '—' ? null : locationStr,
+  });
   const patient = booking.draft.recipient?.patientDetails;
   const recipientName = patient?.name || 'ตัวเอง';
   // อายุ 0 = "ไม่ได้กรอก" — ขาส่ง (toPatientProfilePayload) ตัด 0 ทิ้งอยู่แล้ว จึงไม่มีทางเป็นค่าจริง
@@ -293,9 +339,39 @@ export default function BookingDetailPage() {
   const contactPerson = booking.draft.contactPerson;
   const total = est?.total ?? 0;
   const tasks = booking.draft.jobDetails?.tasks ?? [];
-  const tasksText = tasks.length > 0 ? tasks.map((t) => t.name).join(', ') : null;
+  const notes = booking.draft.jobDetails?.notes?.trim() ?? '';
   const isCancellable = CANCELLABLE_STATUSES.has(booking.status);
   const caregiverDisplayName = booking.caregiverName === '(รอจับคู่)' ? 'ผู้ดูแล' : booking.caregiverName;
+  const recipientBrief = [patient?.gender, patientAgeStr].filter(Boolean).join(' · ');
+  const bodyFacts = [
+    { label: 'น้ำหนัก', value: patientWeightStr },
+    { label: 'ส่วนสูง', value: patientHeightStr },
+    { label: 'กรุ๊ปเลือด', value: patient?.bloodGroup ?? '' },
+  ].filter((f) => f.value);
+  const healthFacts = [
+    { label: 'ระดับการช่วยเหลือตนเอง', value: patient?.supportLevel ?? '' },
+    { label: 'โรคประจำตัว', value: patient?.conditions?.join(', ') ?? '' },
+    { label: 'โรงพยาบาลประจำ', value: patient?.regularHospital ?? '' },
+  ].filter((f) => f.value);
+  const hasRecipientDetails = bodyFacts.length > 0 || healthFacts.length > 0
+    || !!patient?.allergies || !!patient?.medicines || !!patient?.careInstructions;
+  const platformFee = est?.platformFee ?? 0;
+  const serviceCost = Math.max(total - platformFee, 0);
+  const showPayBar = canManageBooking && booking.status === 'accepted';
+  // ชำระแล้ว รอถึงวันนัด — ถึงวันนัดเมื่อไหร่ isTrackingDue จะสลับไปหน้าติดตามงานเอง
+  const isAwaitingDay = booking.status === 'confirmed';
+  const paidTotal = payment?.amount ?? total;
+  const daysUntilText = (() => {
+    if (!dt?.date) return `วันที่ ${dateStr}`;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const day = new Date(dt.date);
+    day.setHours(0, 0, 0, 0);
+    const days = Math.round((day.getTime() - today.getTime()) / 86_400_000);
+    if (days <= 0) return 'วันนี้';
+    if (days === 1) return 'พรุ่งนี้';
+    return `อีก ${days} วัน`;
+  })();
   const disputeStatus = (gqlData?.myBooking?.disputeStatus ?? 'none') as string;
   const isDisputed = disputeStatus === 'flagged' || disputeStatus === 'resolved' || disputeSubmitted;
 
@@ -321,14 +397,19 @@ export default function BookingDetailPage() {
     return serviceDate <= today;
   })();
 
+  // ชำระแล้วและถึงวันนัดเท่านั้น — ก่อนวันนัดยังไม่มีเหตุให้โทร (ผู้รับบริการถึงวันนัดจะอยู่หน้าติดตามงานซึ่งมีปุ่มโทรของตัวเอง)
+  const canCallCaregiver = canManageBooking && booking.status === 'confirmed' && isServiceDatePassed && !!booking.caregiverPhone;
+
   const canComplete = canManageBooking && booking.status === 'confirmed' && hasHeldPayment && isServiceDatePassed && (isPatient || isCaregiver);
 
   // Patients see the Tracking Service view instead of the static summary (PYG-361).
   // Once the job has actually started the date no longer matters.
   // สมาชิกกลุ่มครอบครัว (ไม่จำกัด role — ผู้ดูแลก็เป็นสมาชิกกลุ่มได้) เห็นหน้านี้เหมือนผู้จอง
   // แต่อ่านอย่างเดียวถ้าไม่ได้จองเอง (trackingReadOnly)
+  // งานที่เสร็จแล้วก็ใช้หน้าเดียวกัน (สิ่งที่ผู้ดูแลทำ + บันทึก) แล้วต่อท้ายด้วยข้อมูลการชำระเงิน
   const isTrackingDue = (isFamilyView || (canManageBooking && isPatient)) && (
     ACTIVE_JOB_STATUSES.has(booking.status) ||
+    booking.status === 'completed' ||
     (booking.status === 'confirmed' && isServiceDatePassed)
   );
 
@@ -525,6 +606,39 @@ export default function BookingDetailPage() {
   );
 
   if (isTrackingDue) {
+    const isFinished = booking.status === 'completed';
+    const trackingFooter = isFinished && (
+      <>
+        {/* แจ้งปัญหาไปแล้ว → ปุ่มแจ้งปัญหาด้านหัวหน้าถูกซ่อน แสดงสถานะการตรวจสอบแทน */}
+        {canManageBooking && isDisputed && (
+          disputeStatus === 'resolved' ? (
+            <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-xl bg-[#F0FDF4] border-[0.8px] border-[#86EFAC] font-['Bai_Jamjuree']">
+              <span className="material-icons" style={{ fontSize: 18, color: '#16A34A' }}>check_circle</span>
+              <p className="m-0 text-[13px] font-semibold text-[#15803D]">ตรวจสอบปัญหาเสร็จสิ้นแล้ว</p>
+            </div>
+          ) : (
+            <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-xl bg-[#FFFBEB] border-[0.8px] border-[#FCD34D] font-['Bai_Jamjuree']">
+              <span className="material-icons" style={{ fontSize: 18, color: '#F08C00' }}>hourglass_top</span>
+              <p className="m-0 text-[13px] font-semibold text-[#B45309]">แจ้งปัญหาแล้ว — ทีมงานกำลังตรวจสอบภายใน 24 ชม.</p>
+            </div>
+          )
+        )}
+
+        {canShowSubmittedReview && existingReview && (
+          <div className="mt-4">
+            <SubmittedReviewCard
+              caregiverName={booking.caregiverName}
+              caregiverAvatarUrl={booking.caregiverAvatarUrl ?? undefined}
+              onPhotoExpired={refreshPhotos}
+              review={existingReview}
+            />
+          </div>
+        )}
+
+        {payment && <PaymentInfoSection payment={payment} />}
+      </>
+    );
+
     return (
       <>
         <BookingTrackingView
@@ -539,6 +653,8 @@ export default function BookingDetailPage() {
           readOnly={!canManageBooking}
           familyGroupId={familyGroupId}
           backLabel={isFamilyView ? 'กลับไปยังกลุ่มครอบครัว' : undefined}
+          canReportProblem={!(isFinished && isDisputed)}
+          footer={trackingFooter || undefined}
           onPhotoExpired={refreshPhotos}
         />
         {disputeModal}
@@ -546,6 +662,71 @@ export default function BookingDetailPage() {
       </>
     );
   }
+
+  // การ์ดผู้รับบริการ — วันรอนัดอยู่คอลัมน์ซ้าย (ขวาเป็นขั้นตอนในวันนัด) สถานะอื่นอยู่คอลัมน์ขวา
+  const recipientCard = (
+    <section className={CARD}>
+      <CardTitle>ผู้รับบริการ</CardTitle>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-11 h-11 rounded-full bg-[#ECFDF5] flex items-center justify-center flex-shrink-0">
+          <span className="material-icons" style={{ fontSize: 24, color: '#52B69A' }}>person</span>
+        </div>
+        <div className="min-w-0">
+          <p className="m-0 text-base font-bold leading-6 text-[#1A1A1A] break-words">{recipientName}</p>
+          {recipientBrief && <p className="m-0 text-[13px] leading-5 text-[#8A8C8E]">{recipientBrief}</p>}
+        </div>
+      </div>
+
+      {/* ประวัติแพ้ยาขึ้นก่อนและเด่นที่สุด — ข้อมูลที่ผิดแล้วอันตรายถึงชีวิต
+          (ลำดับเดียวกับ PatientFullProfile ฝั่งผู้ดูแล) */}
+      {patient?.allergies && (
+        <div className="flex items-start gap-2.5 p-3 rounded-[10px] bg-[#FEF2F2] border-[0.8px] border-[#FCA5A5] mb-4">
+          <span className="material-icons flex-shrink-0" style={{ fontSize: 18, color: '#DC2626' }}>warning</span>
+          <div className="min-w-0">
+            <p className="m-0 text-xs font-bold leading-[18px] text-[#DC2626]">ประวัติแพ้ยา / แพ้อาหาร</p>
+            <p className="m-0 mt-0.5 text-[13px] font-semibold leading-5 text-[#991B1B] break-words whitespace-pre-wrap">{patient.allergies}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ค่าสั้น (น้ำหนัก/ส่วนสูง/กรุ๊ปเลือด) เรียงสามช่องในแถวเดียว · ค่ายาว (ระดับช่วยเหลือ/โรค/โรงพยาบาล)
+          เต็มแถวทีละรายการ — ไม่มีช่องเศษค้างครึ่งแถว */}
+      {bodyFacts.length > 0 && (
+        <dl className="m-0 grid grid-cols-3 gap-x-4 pb-4 mb-4 border-b-[0.8px] border-[#F0F1F3]">
+          {bodyFacts.map((f) => (
+            <DetailField key={f.label} label={f.label} value={f.value} />
+          ))}
+        </dl>
+      )}
+      {healthFacts.length > 0 && (
+        <dl className="m-0 mb-1 flex flex-col gap-y-4">
+          {healthFacts.map((f) => (
+            <DetailField key={f.label} label={f.label} value={f.value} />
+          ))}
+        </dl>
+      )}
+
+      {patient?.medicines && <div className="mt-4"><NoteBlock label="ยาที่ใช้ประจำ" text={patient.medicines} /></div>}
+      {patient?.careInstructions && <NoteBlock label="คำแนะนำการดูแล" text={patient.careInstructions} />}
+
+      {!hasRecipientDetails && (
+        <p className="m-0 text-sm text-[#8A8C8E]">ไม่ได้ระบุข้อมูลสุขภาพเพิ่มเติม</p>
+      )}
+
+      {contactPerson?.name && (
+        <div className="mt-5 pt-4 border-t-[0.8px] border-[#F0F1F3]">
+          <p className="m-0 mb-3 text-[15px] font-bold leading-[22px] text-[#1A1A1A]">ผู้ติดต่อในวันนัดหมาย</p>
+          <dl className="m-0 grid grid-cols-2 gap-x-6 gap-y-4">
+            <DetailField
+              label="ชื่อ"
+              value={contactPerson.relationship ? `${contactPerson.name} (${contactPerson.relationship})` : contactPerson.name}
+            />
+            <DetailField label="เบอร์โทรศัพท์" value={contactPerson.phone} />
+          </dl>
+        </div>
+      )}
+    </section>
+  );
 
   return (
     <>
@@ -618,52 +799,54 @@ export default function BookingDetailPage() {
       {/* Dispute Modal */}
       {disputeModal}
 
-      {/* Page */}
-      <div style={{ minHeight: '100vh', background: '#F6FAF9' }}>
-        <div style={{ maxWidth: 720, margin: '0 auto', padding: '28px 24px 100px' }}>
+      {/* Page — ดีไซน์ชุดเดียวกับ BookingTrackingView (หัวเป็นเลขอ้างอิง · การ์ดบนรวมสถานะ + ผู้ดูแล) */}
+      <div className="min-h-screen bg-[#F6FAF9] font-['Bai_Jamjuree']">
+        <div className={`max-w-[1200px] mx-auto px-4 md:px-6 pt-6 ${showPayBar ? 'pb-[140px] md:pb-[100px]' : 'pb-[100px]'}`}>
 
           {/* Back link */}
           <button
             type="button"
             onClick={() => navigate(backTarget)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginBottom: 18 }}
+            className="inline-flex items-center gap-1.5 bg-transparent border-none p-0 pb-3 cursor-pointer"
           >
-            <span className="material-icons" style={{ fontSize: 16, color: '#52B69A' }}>arrow_back</span>
-            <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#52B69A', lineHeight: '20px' }}>
-              {isFamilyView ? 'กลับไปยังกลุ่มครอบครัว' : 'กลับไปยังนัดหมายทั้งหมด'}
+            <span className="material-icons" style={{ fontSize: 18, color: '#8A8C8E' }}>arrow_back</span>
+            <span className="text-[13px] font-medium leading-5 text-[#8A8C8E]">
+              {isFamilyView ? 'กลับไปยังกลุ่มครอบครัว' : 'กลับไปนัดหมายของฉัน'}
             </span>
           </button>
 
           {/* Header */}
-          <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
-            <div>
-              <h1 style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 20, fontWeight: 700, color: '#1A1A1A', margin: '0 0 4px', lineHeight: '30px' }}>
-                รายละเอียดใบสมัครจองบริการ
-              </h1>
-              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: '#8A8C8E', margin: 0, lineHeight: '18px' }}>
-                Booking Reference: {booking.ref}
-              </p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <h1 className="m-0 text-[28px] font-bold leading-[42px] tracking-[-0.7px] text-[#1A1A1A]">{booking.ref}</h1>
+              <p className="m-0 mt-0.5 text-sm leading-[21px] text-[#8A8C8E]">รายละเอียดการจอง</p>
             </div>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 10px', height: 24, background: badge.bg, borderRadius: 9999, flexShrink: 0, marginTop: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: 3, background: badge.dot, flexShrink: 0 }} />
-              <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, fontWeight: 600, color: badge.text, lineHeight: '18px' }}>
-                {badge.label}
-              </span>
-            </span>
-          </div>
-
-          {/* Status banner */}
-          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, background: banner.bg, border: `0.8px solid ${banner.border}`, borderRadius: 12, marginBottom: 18 }}>
-            <span className="material-icons" style={{ fontSize: 18, color: banner.iconColor, flexShrink: 0, marginTop: 1 }}>{banner.icon}</span>
-            <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: banner.textColor, margin: 0, lineHeight: '20px' }}>
-              {banner.message(caregiverDisplayName)}
-            </p>
+            {canManageBooking && isCancellable && (
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(true)}
+                className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-white border-[0.8px] border-[#FCA5A5] cursor-pointer flex-shrink-0"
+              >
+                <span className="material-icons" style={{ fontSize: 17, color: '#DC2626' }}>cancel</span>
+                <span className="text-[13px] font-semibold leading-5 text-[#DC2626]">ยกเลิกการจอง</span>
+              </button>
+            )}
+            {canManageBooking && booking.status === 'completed' && !isDisputed && (
+              <button
+                type="button"
+                onClick={() => setShowDisputeModal(true)}
+                className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-white border-[0.8px] border-[#FCA5A5] cursor-pointer flex-shrink-0"
+              >
+                <span className="material-icons" style={{ fontSize: 17, color: '#DC2626' }}>flag</span>
+                <span className="text-[13px] font-semibold leading-5 text-[#DC2626]">แจ้งปัญหา</span>
+              </button>
+            )}
           </div>
 
           {isFamilyView && !canManageBooking && (
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 14, background: '#F0F9FF', border: '0.8px solid #BAE6FD', borderRadius: 12, marginBottom: 18 }}>
-              <span className="material-icons" style={{ fontSize: 18, color: '#0284C7', flexShrink: 0, marginTop: 1 }}>visibility</span>
-              <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#075985', margin: 0, lineHeight: '20px' }}>
+            <div className="mt-4 flex items-start gap-2.5 p-3.5 rounded-xl bg-[#F0F9FF] border-[0.8px] border-[#BAE6FD]">
+              <span className="material-icons flex-shrink-0 mt-px" style={{ fontSize: 18, color: '#0284C7' }}>visibility</span>
+              <p className="m-0 text-[13px] font-semibold leading-5 text-[#075985]">
                 คุณกำลังดูนัดหมายของสมาชิกในครอบครัว การชำระเงินและการจัดการคำจองทำได้โดยผู้จองเท่านั้น
               </p>
             </div>
@@ -673,40 +856,97 @@ export default function BookingDetailPage() {
               ของผู้รับบริการ พอถึงวันนัด (isTrackingDue) จะสลับไป BookingTrackingView
               ซึ่งมี JobQrCard อยู่แล้ว การโชว์ล่วงหน้าได้แค่สถานะ "ยังไม่ถึงเวลาใช้ QR" */}
 
-          {/* Main card */}
-          <div style={{ background: '#FFFFFF', border: '0.8px solid #E0E2E5', boxShadow: '0px 1px 4px rgba(0,0,0,0.03)', borderRadius: 20, padding: 24 }}>
-
-            {/* ── Section 1: ข้อมูลผู้ดูแล ── */}
-            <SectionTitle>ข้อมูลผู้ดูแล</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                {/* Avatar + check badge */}
-                <div style={{ position: 'relative', width: 48, height: 48, flexShrink: 0 }}>
-                  <CaregiverPhoto
-                    src={booking.caregiverAvatarUrl}
-                    size={48}
-                    onExpired={refreshPhotos}
-                    frameStyle={{ border: '2.4px solid #FFFFFF', boxShadow: '0px 4px 16px rgba(82,182,154,0.2)' }}
-                  />
-                  <div style={{ position: 'absolute', bottom: -1, right: -1, width: 18, height: 18, borderRadius: 9, background: '#52B69A', border: '1.6px solid #FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span className="material-icons" style={{ fontSize: 11, color: '#FFFFFF' }}>check</span>
+          {/* การ์ดบน: สถานะ (+ สิ่งที่ต้องทำต่อ) แล้วตามด้วยผู้ดูแล */}
+          <div className={`${CARD_SHELL} mt-5 rounded-2xl`}>
+            {isAwaitingDay ? (
+              /* ยืนยันแล้ว รอถึงวันนัด — โครงเดียวกับ PreShiftCard ฝั่งผู้ดูแล: เวลาเด่นสุด + วันที่/ระยะเวลา/ยอดชำระ */
+              <div className="px-5 md:px-6 py-5 border-b-[0.8px] border-[#F3F4F6]">
+                <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+                  <div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold bg-[#EFF6FF] text-[#1D4ED8]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#3B82F6]" aria-hidden="true" />
+                      ยืนยันแล้ว · รอถึงวันนัดหมาย
+                    </span>
+                    <p className="m-0 mt-2 font-['Inter'] text-[30px] font-bold leading-none text-[#1A1A1A]">{timeStr}</p>
+                    <p className="m-0 mt-1.5 text-xs text-[#8A8C8E]">
+                      {svcTypeLabel} · {daysUntilText}
+                    </p>
                   </div>
-                </div>
-
-                <div>
-                  <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#1A1A1A', margin: 0, lineHeight: '21px' }}>
-                    {booking.caregiverName}
-                  </p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                    {booking.caregiverHourlyRate > 0 && (
-                      <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, color: '#575859', lineHeight: '18px' }}>
-                        ฿{booking.caregiverHourlyRate.toLocaleString()}/ชม.
-                      </span>
+                  <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+                    <HeroStat label="วันที่" value={dateStr} />
+                    <span aria-hidden="true" className="h-8 w-px bg-[#F0F1F3]" />
+                    <HeroStat label="ระยะเวลา" value={durationStr} />
+                    {paidTotal > 0 && (
+                      <>
+                        <span aria-hidden="true" className="h-8 w-px bg-[#F0F1F3]" />
+                        <HeroStat label="ชำระแล้ว" value={`฿${paidTotal.toLocaleString()}`} money />
+                      </>
                     )}
                   </div>
                 </div>
               </div>
+            ) : (
+            <div className="flex items-center gap-4 px-5 md:px-6 py-5 border-b-[0.8px] border-[#F3F4F6] flex-wrap">
+              <span className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: banner.bg }}>
+                <span className="material-icons" style={{ fontSize: 22, color: banner.iconColor }}>{banner.icon}</span>
+              </span>
+              <div className="flex-[1_1_220px] min-w-0">
+                <p className="m-0 text-[17px] font-bold leading-[26px] text-[#1A1A1A]">{STATUS_TITLE[booking.status]}</p>
+                <p className="m-0 mt-0.5 text-[13px] leading-5 text-[#8A8C8E]">{banner.message(caregiverDisplayName)}</p>
+              </div>
+              {showPayBar && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/bookings/${booking.id}/payment`, { state: { booking } })}
+                  className="hidden md:inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-[#3B82F6] border-none text-sm font-bold text-white cursor-pointer flex-shrink-0"
+                >
+                  <span className="material-icons" style={{ fontSize: 18 }}>credit_card</span>
+                  ชำระเงิน {total > 0 ? `฿${total.toLocaleString()}` : ''}
+                </button>
+              )}
+              {canShowReviewPrompt && (
+                <button
+                  type="button"
+                  onClick={handleReview}
+                  className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-[#F59E0B] border-none text-sm font-bold text-white cursor-pointer flex-shrink-0"
+                >
+                  <span className="material-icons" style={{ fontSize: 18 }}>star</span>
+                  ให้คะแนนรีวิว
+                </button>
+              )}
+              {canShowSubmittedReview && (
+                <span className="inline-flex items-center gap-2 h-11 px-5 rounded-xl bg-[#ECFDF5] border-[0.8px] border-[rgba(16,185,129,0.3)] flex-shrink-0">
+                  <span className="material-icons" style={{ fontSize: 18, color: '#047857' }}>check_circle</span>
+                  <span className="text-sm font-bold text-[#047857]">คุณรีวิวแล้ว</span>
+                </span>
+              )}
+            </div>
+            )}
 
+            <div className="flex items-center gap-3 px-5 md:px-6 py-4 flex-wrap">
+              <CaregiverAvatar
+                avatarUrl={booking.caregiverAvatarUrl}
+                size={46}
+                shadow="0px 4px 16px rgba(245,158,11,0.25)"
+                onPhotoExpired={refreshPhotos}
+              />
+              <div className="flex-[1_1_240px] min-w-0">
+                <p className="m-0 text-[11px] font-semibold leading-4 tracking-[0.4px] text-[#8A8C8E]">ผู้ดูแล</p>
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  <span className="text-[17px] font-bold leading-[26px] text-[#1A1A1A]">{booking.caregiverName}</span>
+                  <span className="material-icons" style={{ fontSize: 18, color: '#009265' }}>verified</span>
+                </div>
+                <div className="flex items-center gap-3 pt-0.5 flex-wrap">
+                  <CaregiverStats booking={booking} />
+                </div>
+              </div>
+              {!isAwaitingDay && (
+                <div className="flex items-center gap-5 flex-shrink-0">
+                  <HeadStat label="วันที่" value={dateStr} />
+                  <span aria-hidden className="w-px h-8 bg-[#F3F4F6]" />
+                  <HeadStat label="เวลา" value={timeStr} />
+                </div>
+              )}
               {booking.caregiverId && booking.caregiverName !== '(รอจับคู่)' && (
                 <button
                   type="button"
@@ -724,226 +964,192 @@ export default function BookingDetailPage() {
                       },
                     },
                   })}
-                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 32, padding: '0 12px', background: '#FFFFFF', border: '0.8px solid #E0E2E5', borderRadius: 6, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, fontWeight: 600, color: '#575859', cursor: 'pointer', flexShrink: 0 }}
+                  className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-xl bg-white border-[0.8px] border-[#E5E7EB] text-sm font-semibold text-[#1A1A1A] cursor-pointer flex-shrink-0"
                 >
                   ดูโปรไฟล์
+                  <span className="material-icons" style={{ fontSize: 18 }}>chevron_right</span>
                 </button>
               )}
-            </div>
-
-            <Divider />
-
-            {/* ── Section 2: รายละเอียดนัดหมาย ── */}
-            <SectionTitle>รายละเอียดนัดหมาย</SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
-              <InfoRow label="ประเภทงานบริการ" value={svcTypeLabel} valueFont="thai" />
-              <InfoRow label="วันที่ให้บริการ" value={dateStr} />
-              <InfoRow label="เวลาให้บริการ" value={timeStr} />
-              <InfoRow label="ระยะเวลาบริการ" value={durationStr} />
-            </div>
-            <InfoRow label="สถานที่รับบริการ" value={locationStr} />
-
-            <Divider />
-
-            {/* ── Section 3: ข้อมูลคนไข้ ── */}
-            <SectionTitle>ข้อมูลคนไข้</SectionTitle>
-            {/* ประวัติแพ้ยาขึ้นก่อนและเด่นที่สุด — ข้อมูลที่ผิดแล้วอันตรายถึงชีวิต
-                (ลำดับเดียวกับ PatientFullProfile ฝั่งผู้ดูแล) */}
-            {patient?.allergies && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, background: '#FEF2F2', border: '0.8px solid #FCA5A5', borderRadius: 10, marginBottom: 12 }}>
-                <span className="material-icons" style={{ fontSize: 18, color: '#DC2626', flexShrink: 0 }}>warning</span>
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 12, fontWeight: 700, color: '#DC2626', margin: 0, lineHeight: '18px' }}>
-                    ประวัติแพ้ยา / แพ้อาหาร
-                  </p>
-                  <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#991B1B', margin: '2px 0 0', lineHeight: '20px', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                    {patient.allergies}
-                  </p>
-                </div>
-              </div>
-            )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 24px' }}>
-              <InfoRow label="ชื่อผู้รับบริการ" value={recipientName} valueFont="thai" />
-              <InfoRow label="อายุ" value={patientAgeStr} valueFont="thai" />
-              <InfoRow label="เพศ" value={patient?.gender ?? ''} valueFont="thai" />
-              <InfoRow label="กรุ๊ปเลือด" value={patient?.bloodGroup ?? ''} />
-              <InfoRow label="น้ำหนัก" value={patientWeightStr} valueFont="thai" />
-              <InfoRow label="ส่วนสูง" value={patientHeightStr} valueFont="thai" />
-            </div>
-            <InfoRow label="ระดับการช่วยเหลือตนเอง" value={patient?.supportLevel ?? ''} valueFont="thai" />
-            <InfoRow label="โรคประจำตัว" value={patient?.conditions?.join(', ') ?? ''} valueFont="thai" />
-            <InfoRow label="โรงพยาบาลประจำ" value={patient?.regularHospital ?? ''} valueFont="thai" />
-            {patient?.medicines && <NoteBlock label="ยาที่ใช้ประจำ" text={patient.medicines} />}
-            {patient?.careInstructions && <NoteBlock label="คำแนะนำการดูแล" text={patient.careInstructions} />}
-
-            {contactPerson?.name && (
-              <>
-                <Divider />
-                <SectionTitle>ผู้ติดต่อในวันนัดหมาย</SectionTitle>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
-                  <InfoRow label="ชื่อผู้ติดต่อ" value={contactPerson.name} valueFont="thai" />
-                  <InfoRow label="เบอร์โทรศัพท์" value={contactPerson.phone} />
-                  {contactPerson.relationship && (
-                    <InfoRow label="ความสัมพันธ์" value={contactPerson.relationship} valueFont="thai" />
-                  )}
-                </div>
-              </>
-            )}
-
-            <Divider />
-
-            {/* PYG-635: กิจกรรมจากรายการกลาง (snapshot ณ วันจอง) */}
-            {activities.length > 0 && (
-              <>
-                <SectionTitle>{cas.detailTitle}</SectionTitle>
-                <div style={{ background: '#F9FAFB', borderRadius: 10, padding: 14, marginBottom: 16 }}>
-                  <BookingActivitiesList activities={activities} />
-                  <p className="mt-3 text-[11px] text-[#8A8C8E]">{cas.detailNote}</p>
-                </div>
-              </>
-            )}
-
-            {/* ── Section 4: รายละเอียดภารกิจ ── */}
-            <SectionTitle>รายละเอียดภารกิจ</SectionTitle>
-            <div style={{ background: '#F9FAFB', borderRadius: 10, padding: 14 }}>
-              <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontStyle: 'italic', fontSize: 13, color: tasksText ? '#575859' : '#B0B3B8', margin: 0, lineHeight: '20px' }}>
-                {tasksText ?? 'ไม่ได้ระบุภารกิจเพิ่มเติม'}
-              </p>
-            </div>
-
-            <Divider />
-
-            {/* ── Section 5: ราคา ── */}
-            <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 14, fontWeight: 700, color: '#1A1A1A', margin: 0 }}>
-                ราคาค่าบริการประมาณการทั้งสิ้น
-              </p>
-              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, color: '#52B69A', margin: 0, lineHeight: '33px' }}>
-                {total > 0 ? `฿${total.toLocaleString()}` : '—'}
-              </p>
+              {canCallCaregiver && (
+                <a
+                  href={`tel:${booking.caregiverPhone}`}
+                  className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-xl bg-[#009265] text-sm font-bold text-white no-underline flex-shrink-0"
+                >
+                  <span className="material-icons" style={{ fontSize: 18 }}>call</span>
+                  โทรหาผู้ดูแล
+                </a>
+              )}
             </div>
           </div>
 
-          {/* Payment info card */}
-          {payment && (
-            <PaymentInfoSection
-              payment={payment}
-              onRetry={canManageBooking
-                ? () => navigate(`/bookings/${booking.id}/payment`, { state: { booking } })
-                : undefined}
-            />
+          {/* แจ้งปัญหาไปแล้ว → แสดงสถานะการตรวจสอบแทนปุ่ม */}
+          {canManageBooking && booking.status === 'completed' && isDisputed && (
+            disputeStatus === 'resolved' ? (
+              <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-xl bg-[#F0FDF4] border-[0.8px] border-[#86EFAC]">
+                <span className="material-icons" style={{ fontSize: 18, color: '#16A34A' }}>check_circle</span>
+                <p className="m-0 text-[13px] font-semibold text-[#15803D]">ตรวจสอบปัญหาเสร็จสิ้นแล้ว</p>
+              </div>
+            ) : (
+              <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-xl bg-[#FFFBEB] border-[0.8px] border-[#FCD34D]">
+                <span className="material-icons" style={{ fontSize: 18, color: '#F08C00' }}>hourglass_top</span>
+                <p className="m-0 text-[13px] font-semibold text-[#B45309]">แจ้งปัญหาแล้ว — ทีมงานกำลังตรวจสอบภายใน 24 ชม.</p>
+              </div>
+            )
           )}
 
-          {/* Complete Service button */}
-          {canComplete && (
-            <div style={{ marginTop: 24 }}>
-              <button
-                type="button"
-                onClick={() => setShowCompleteModal(true)}
-                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', height: 50, background: '#009265', border: 'none', boxShadow: '0px 4px 12px rgba(0,146,101,0.25)', borderRadius: 12, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 15, fontWeight: 700, color: '#FFFFFF', cursor: 'pointer' }}
-              >
-                <span className="material-icons" style={{ fontSize: 18 }}>task_alt</span>
-                ยืนยันบริการเสร็จสิ้น
-              </button>
-            </div>
-          )}
-
-          {/* Review Prompt Card (patient only, after completion, no review yet) */}
-          {canShowReviewPrompt && (
-            <div style={{ marginTop: 24 }}>
-              <ReviewPromptCard onReview={handleReview} />
-            </div>
-          )}
-
-          {/* Submitted review (read-only) */}
-          {canShowSubmittedReview && existingReview && (
-            <div style={{ marginTop: 24 }}>
-              <SubmittedReviewCard
-                caregiverName={booking.caregiverName}
-                caregiverAvatarUrl={booking.caregiverAvatarUrl ?? undefined}
-                onPhotoExpired={refreshPhotos}
-                review={existingReview}
-              />
-            </div>
-          )}
-
-          {/* Pay button — backend 'accepted' = caregiver said yes, payment still due */}
-          {canManageBooking && booking.status === 'accepted' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 24 }}>
-              <button
-                type="button"
-                onClick={() => navigate(`/bookings/${booking.id}/payment`, { state: { booking } })}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  height: 50, padding: '0 40px',
-                  background: '#3B82F6', border: 'none',
-                  boxShadow: '0px 4px 14px rgba(26,86,219,0.35)',
-                  borderRadius: 12, fontFamily: "'Bai Jamjuree', sans-serif",
-                  fontSize: 15, fontWeight: 700, color: '#FFFFFF', cursor: 'pointer',
-                }}
-              >
-                <span className="material-icons" style={{ fontSize: 18 }}>credit_card</span>
-                ชำระเงิน {total > 0 ? `฿${total.toLocaleString()}` : ''}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowCancelModal(true)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 40, padding: '0 28px', background: '#FFFFFF', border: '1px solid #FCA5A5', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#DC2626', cursor: 'pointer' }}
-              >
-                <span className="material-icons" style={{ fontSize: 16 }}>cancel</span>
-                ยกเลิกการจอง
-              </button>
-            </div>
-          )}
-
-          {/* Cancel button (pending / confirmed — the pay button owns the 'accepted' state) */}
-          {canManageBooking && isCancellable && booking.status !== 'accepted' && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
-              <button
-                type="button"
-                onClick={() => setShowCancelModal(true)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 40, padding: '0 28px', background: '#FFFFFF', border: '1px solid #FCA5A5', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#DC2626', cursor: 'pointer', width: '100%', justifyContent: 'center' }}
-              >
-                <span className="material-icons" style={{ fontSize: 16 }}>cancel</span>
-                ยกเลิกการจอง
-              </button>
-            </div>
-          )}
-
-          {/* Dispute button (completed bookings) */}
-          {canManageBooking && booking.status === 'completed' && (
-            <div style={{ marginTop: 16 }}>
-              {isDisputed ? (
-                disputeStatus === 'resolved' ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#F0FDF4', border: '0.8px solid #86EFAC', borderRadius: 10 }}>
-                    <span className="material-icons" style={{ fontSize: 18, color: '#16A34A' }}>check_circle</span>
-                    <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#15803D', margin: 0 }}>
-                      ตรวจสอบปัญหาเสร็จสิ้นแล้ว
-                    </p>
+          {/* จอกว้าง: นัดหมาย + งาน + ผู้รับบริการซ้าย · ค่าบริการ + การชำระเงินขวา (สั้น จึง sticky ได้) */}
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-4 items-start">
+            <div className="flex flex-col gap-4 min-w-0">
+              {/* ── นัดหมาย ── */}
+              <section className={CARD}>
+                <CardTitle>รายละเอียดนัดหมาย</CardTitle>
+                <dl className="m-0 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
+                  <DetailField label="ประเภทบริการ" value={svcTypeLabel} />
+                  <DetailField label="ระยะเวลา" value={durationStr} />
+                  <DetailField label="วันที่" value={dateStr} />
+                  <DetailField label="เวลา" value={timeStr} />
+                  <div className="col-span-2 sm:col-span-4 flex flex-col sm:flex-row sm:items-end gap-3">
+                    <div className="flex-1 min-w-0">
+                      <DetailField label="สถานที่" value={locationStr} />
+                    </div>
+                    {mapsUrl && (
+                      <a
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-lg bg-white border-[0.8px] border-[#52B69A] text-[13px] font-semibold text-[#2F8F75] no-underline flex-shrink-0"
+                      >
+                        <span className="material-icons" style={{ fontSize: 18 }}>map</span>
+                        ดูใน Google Maps
+                      </a>
+                    )}
                   </div>
+                </dl>
+              </section>
+
+              {/* ── ภารกิจ ── */}
+              <section className={CARD}>
+                <CardTitle aside={tasks.length > 0 ? `${tasks.length} รายการ` : undefined}>สิ่งที่ผู้ดูแลจะทำ</CardTitle>
+
+                {/* PYG-635: กิจกรรมจากรายการกลาง (snapshot ณ วันจอง) */}
+                {activities.length > 0 && (
+                  <div className="rounded-xl bg-[#F9FAFB] p-3.5 mb-3">
+                    <p className="m-0 mb-2 text-[13px] font-bold text-[#575859]">{cas.detailTitle}</p>
+                    <BookingActivitiesList activities={activities} />
+                    <p className="mt-3 mb-0 text-[11px] text-[#8A8C8E]">{cas.detailNote}</p>
+                  </div>
+                )}
+
+                {tasks.length > 0 ? (
+                  <ol className="m-0 p-0 list-none flex flex-col">
+                    {tasks.map((t, i) => (
+                      <li key={t.id} className="flex items-start gap-3 py-2.5 border-b border-[#F0F1F3] last:border-b-0">
+                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#ECFDF5] font-['Inter'] text-xs font-bold text-[#2F8F75] flex items-center justify-center">
+                          {i + 1}
+                        </span>
+                        <span className="text-sm leading-6 text-[#1A1A1A] break-words min-w-0">{t.name}</span>
+                      </li>
+                    ))}
+                  </ol>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#FFFBEB', border: '0.8px solid #FCD34D', borderRadius: 10 }}>
-                    <span className="material-icons" style={{ fontSize: 18, color: '#F08C00' }}>hourglass_top</span>
-                    <p style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 600, color: '#B45309', margin: 0 }}>
-                      แจ้งปัญหาแล้ว — ทีมงานกำลังตรวจสอบภายใน 24 ชม.
-                    </p>
+                  activities.length === 0 && <p className="m-0 text-sm text-[#8A8C8E]">การจองนี้ไม่ได้ระบุรายการงาน</p>
+                )}
+
+                {notes && (
+                  <div className="mt-4 rounded-lg bg-[#FFFBEB] border-[0.8px] border-[rgba(245,158,11,0.3)] px-4 py-3">
+                    <p className="m-0 text-[13px] font-bold leading-5 text-[#B45309]">ข้อควรระวัง / หมายเหตุที่คุณแจ้งไว้</p>
+                    <p className="m-0 mt-1 text-sm leading-[21px] text-[#1A1A1A] whitespace-pre-wrap break-words">{notes}</p>
                   </div>
-                )
-              ) : (
+                )}
+              </section>
+
+              {recipientCard}
+            </div>
+
+            <div className="flex flex-col gap-4 lg:sticky lg:top-[90px]">
+              {/* ── ค่าบริการ ── */}
+              <section className={CARD}>
+                <CardTitle>ค่าบริการ</CardTitle>
+                {total > 0 ? (
+                  <>
+                    <div className="flex justify-between gap-3 py-1.5 text-sm text-[#575859]">
+                      <span>ค่าบริการ{durationStr !== '—' ? ` (${durationStr})` : ''}</span>
+                      <span className="font-['Inter'] font-semibold text-[#1A1A1A]">฿{serviceCost.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between gap-3 py-1.5 text-sm text-[#575859]">
+                      <span>ค่าธรรมเนียมแพลตฟอร์ม</span>
+                      <span className="font-['Inter'] font-semibold text-[#1A1A1A]">฿{platformFee.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 mt-2 pt-3 border-t-[0.8px] border-[#F0F1F3]">
+                      <span className="text-[15px] font-bold text-[#1A1A1A]">รวมทั้งสิ้น</span>
+                      <span className="font-['Inter'] text-[22px] font-bold leading-8 text-[#009265]">฿{total.toLocaleString()}</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="m-0 text-sm text-[#8A8C8E]">—</p>
+                )}
+              </section>
+
+              {/* Payment info card */}
+              {/* PaymentInfoSection มี marginTop ในตัว — หักออกให้ระยะเท่าการ์ดอื่น */}
+              {payment && (
+                <div className="-mt-4">
+                  <PaymentInfoSection
+                    payment={payment}
+                    onRetry={canManageBooking
+                      ? () => navigate(`/bookings/${booking.id}/payment`, { state: { booking } })
+                      : undefined}
+                  />
+                </div>
+              )}
+
+              {canShowSubmittedReview && existingReview && (
+                <SubmittedReviewCard
+                  caregiverName={booking.caregiverName}
+                  caregiverAvatarUrl={booking.caregiverAvatarUrl ?? undefined}
+                  onPhotoExpired={refreshPhotos}
+                  review={existingReview}
+                />
+              )}
+
+              {/* Complete Service button */}
+              {canComplete && (
                 <button
                   type="button"
-                  onClick={() => setShowDisputeModal(true)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 40, padding: '0 28px', background: '#FFFFFF', border: '1px solid #FCD34D', borderRadius: 8, fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, fontWeight: 700, color: '#D97706', cursor: 'pointer', width: '100%', justifyContent: 'center' }}
+                  onClick={() => setShowCompleteModal(true)}
+                  className="inline-flex items-center justify-center gap-2 w-full h-[50px] rounded-xl bg-[#009265] border-none shadow-[0px_4px_12px_rgba(0,146,101,0.25)] text-[15px] font-bold text-white cursor-pointer"
                 >
-                  <span className="material-icons" style={{ fontSize: 16 }}>warning_amber</span>
-                  แจ้งปัญหา
+                  <span className="material-icons" style={{ fontSize: 18 }}>task_alt</span>
+                  ยืนยันบริการเสร็จสิ้น
                 </button>
               )}
             </div>
-          )}
-
+          </div>
         </div>
       </div>
+
+      {/* Pay button — backend 'accepted' = caregiver said yes, payment still due
+          ลอยไว้ล่างจอให้กดได้ตลอด · บนมือถือวางเหนือแถบเมนูล่างของแอป (--mobile-nav-h จาก MobileNavigation) */}
+      {showPayBar && (
+        <div className="md:hidden fixed bottom-[var(--mobile-nav-h,0px)] left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-[#E0E2E5] shadow-[0px_-4px_16px_rgba(0,0,0,0.04)] font-['Bai_Jamjuree']">
+          <div className="mx-auto max-w-[1200px] px-4 md:px-6 py-3 flex items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="m-0 text-xs leading-4 text-[#575859]">ยอดที่ต้องชำระ</p>
+              <p className="m-0 font-['Inter'] text-2xl font-bold leading-8 text-[#1A1A1A]">
+                {total > 0 ? `฿${total.toLocaleString()}` : '—'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate(`/bookings/${booking.id}/payment`, { state: { booking } })}
+              className="inline-flex items-center justify-center gap-2 h-12 px-6 md:px-10 rounded-xl bg-[#3B82F6] border-none text-[15px] font-bold text-white cursor-pointer shadow-[0px_4px_14px_rgba(26,86,219,0.35)] flex-shrink-0"
+            >
+              <span className="material-icons" style={{ fontSize: 18 }}>credit_card</span>
+              ชำระเงิน
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Complete Service Confirm Modal */}
       <CompleteServiceModal
