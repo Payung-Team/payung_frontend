@@ -91,6 +91,20 @@ export function requestPosition(): Promise<GeoResult> {
   });
 }
 
+/**
+ * สถานะสิทธิ์ตำแหน่งโดยไม่เด้ง popup — 'unknown' = เบราว์เซอร์ไม่มี Permissions API
+ * (เช่น Safari เก่ากว่า 16) ไม่ได้แปลว่าถูกปฏิเสธ
+ */
+export async function getGeoPermission(): Promise<PermissionState | 'unknown'> {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.permissions?.query) return 'unknown';
+    const status = await navigator.permissions.query({ name: 'geolocation' });
+    return status.state;
+  } catch {
+    return 'unknown';
+  }
+}
+
 function mapGeoError(error: GeolocationPositionError): GeoFailure {
   switch (error.code) {
     case error.PERMISSION_DENIED:

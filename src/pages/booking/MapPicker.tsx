@@ -6,9 +6,44 @@ import { requestPosition, type GeoFailure } from '../../lib/geolocation';
 const LOCATE_FAILURE_TH: Record<GeoFailure, string> = {
   insecure_context: 'เบราว์เซอร์ไม่อนุญาตให้ใช้ตำแหน่งบนหน้าเว็บที่ไม่ใช่ https — กรุณาปักหมุดเองบนแผนที่',
   unsupported: 'เบราว์เซอร์นี้ไม่รองรับการระบุตำแหน่ง — กรุณาปักหมุดเองบนแผนที่',
-  denied: 'ไม่ได้อนุญาตให้เข้าถึงตำแหน่ง — เปิดสิทธิ์ตำแหน่งในการตั้งค่าเบราว์เซอร์ หรือปักหมุดเองบนแผนที่',
+  denied: 'ไม่ได้อนุญาตให้เข้าถึงตำแหน่ง',
   unavailable: 'หาตำแหน่งไม่ได้ในขณะนี้ — ตรวจสอบว่าเปิด GPS/Location ของเครื่องแล้ว',
   timeout: 'ใช้เวลาหาตำแหน่งนานเกินไป — ลองกดใหม่อีกครั้ง',
+};
+
+type DeviceKind = 'in_app' | 'ios' | 'android' | 'desktop';
+
+function detectDevice(): DeviceKind {
+  const ua = navigator.userAgent;
+  if (/\bLine\/|FBAN|FBAV|Instagram/i.test(ua)) return 'in_app';
+  // iPadOS 13+ แจ้งตัวเป็น Macintosh — แยกด้วยจอสัมผัส
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
+  if (/Android/i.test(ua)) return 'android';
+  return 'desktop';
+}
+
+// เบราว์เซอร์จะไม่เด้ง popup ขอสิทธิ์ซ้ำหลังถูกปฏิเสธ (หน้าเว็บสั่งให้ขึ้นใหม่ไม่ได้)
+// ทางเดียวคือบอกผู้ใช้ให้ไปเปิดเองตามอุปกรณ์ที่ใช้อยู่
+const DENIED_STEPS_TH: Record<DeviceKind, string[]> = {
+  in_app: [
+    'คุณกำลังเปิดผ่านแอป (เช่น LINE, Facebook) ซึ่งไม่อนุญาตให้หน้าเว็บขอตำแหน่ง',
+    'กดปุ่ม ⋯ หรือ ⋮ มุมขวาบน แล้วเลือก "เปิดในเบราว์เซอร์" (Safari/Chrome) แล้วลองใหม่',
+  ],
+  ios: [
+    'ไปที่ การตั้งค่า > ความเป็นส่วนตัวและความปลอดภัย > บริการหาตำแหน่ง ตรวจว่าเปิดอยู่',
+    'ในหน้าเดียวกัน เลือก "เว็บไซต์ Safari" (หรือ Chrome) > "ขณะใช้แอป"',
+    'กลับมาที่ Safari แตะ "aA" ข้างช่อง URL > การตั้งค่าเว็บไซต์ > ตำแหน่ง > "ถาม" หรือ "อนุญาต"',
+    'กดปุ่ม "ใช้ตำแหน่งปัจจุบัน" อีกครั้ง',
+  ],
+  android: [
+    'แตะไอคอนด้านซ้ายของช่อง URL > สิทธิ์ (Permissions) > ตำแหน่ง > "อนุญาต"',
+    'ตรวจว่าเปิดตำแหน่ง (Location) ของเครื่องจากแถบด้านบนแล้ว',
+    'กดปุ่ม "ใช้ตำแหน่งปัจจุบัน" อีกครั้ง',
+  ],
+  desktop: [
+    'คลิกไอคอนด้านซ้ายของช่อง URL > ตำแหน่ง > "อนุญาต"',
+    'กดปุ่ม "ใช้ตำแหน่งปัจจุบัน" อีกครั้ง',
+  ],
 };
 
 export type PinChangeHandler = (
@@ -87,6 +122,7 @@ const MapPicker: React.FC<MapPickerProps> = ({
   const [routeFallback, setRouteFallback] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
+  const [deniedSteps, setDeniedSteps] = useState<string[] | null>(null);
 
   const onChangeARef = useRef(onChangeA);
   const onChangeBRef = useRef(onChangeB);
@@ -260,10 +296,12 @@ const MapPicker: React.FC<MapPickerProps> = ({
     if (locating) return;
     setLocating(true);
     setLocateError(null);
+    setDeniedSteps(null);
     setActivePin('A');
     const result = await requestPosition();
     if (!result.ok) {
       setLocateError(LOCATE_FAILURE_TH[result.reason]);
+      if (result.reason === 'denied') setDeniedSteps(DENIED_STEPS_TH[detectDevice()]);
       setLocating(false);
       return;
     }
@@ -314,7 +352,20 @@ const MapPicker: React.FC<MapPickerProps> = ({
           </button>
         )}
 
-        <span className="text-[11px] text-[#8A8C8E]">
+        {/* ต้องรอ Maps โหลดเสร็จก่อน เพราะ handleLocateMe เรียก reverseGeocode ต่อ */}
+        <button
+          type="button"
+          onClick={handleLocateMe}
+          disabled={!loaded || locating}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#52B69A] bg-[#F0FAF4] text-xs font-semibold text-[#1B5C48] hover:bg-[#E6F5ED] active:bg-[#D9F0E3] transition cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+        >
+          <span className={`material-icons text-[#52B69A] text-base ${locating ? 'animate-spin' : ''}`}>
+            {locating ? 'refresh' : 'my_location'}
+          </span>
+          {locating ? 'กำลังหาตำแหน่ง...' : 'ใช้ตำแหน่งปัจจุบัน'}
+        </button>
+
+        <span className="basis-full text-[11px] text-[#8A8C8E]">
           คลิกแผนที่หรือลากหมุดเพื่อระบุตำแหน่ง
         </span>
       </div>
@@ -339,25 +390,25 @@ const MapPicker: React.FC<MapPickerProps> = ({
             </span>
           </div>
         )}
-
-        {/* มุมซ้ายล่าง — มุมขวาล่างเป็นปุ่มซูมของ Google Maps อยู่แล้ว */}
-        {loaded && (
-          <button
-            type="button"
-            onClick={handleLocateMe}
-            disabled={locating}
-            className="absolute bottom-3 left-3 z-[1] flex items-center gap-1.5 min-h-[44px] px-3 bg-white rounded-xl border border-[#E0E2E5] shadow text-xs font-bold text-[#1B5C48] hover:bg-[#F0FAF4] active:bg-[#E6F5ED] transition cursor-pointer disabled:opacity-70 disabled:cursor-wait"
-          >
-            <span className={`material-icons text-[#52B69A] text-lg ${locating ? 'animate-spin' : ''}`}>
-              {locating ? 'refresh' : 'my_location'}
-            </span>
-            {locating ? 'กำลังหาตำแหน่ง...' : 'ตำแหน่งปัจจุบัน'}
-          </button>
-        )}
       </div>
 
       {locateError && (
-        <p className="text-xs font-semibold text-red-600">{locateError}</p>
+        <div className="p-3 rounded-xl border border-red-200 bg-red-50 space-y-1.5">
+          <p className="text-xs font-semibold text-red-600">{locateError}</p>
+          {deniedSteps && (
+            <>
+              <p className="text-xs text-[#575859]">
+                เบราว์เซอร์จะไม่ถามซ้ำหลังถูกปฏิเสธ วิธีเปิดสิทธิ์:
+              </p>
+              <ol className="list-decimal pl-4 space-y-1 text-xs text-[#575859] leading-relaxed">
+                {deniedSteps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+              <p className="text-xs text-[#8A8C8E]">หรือแตะบนแผนที่เพื่อปักหมุดเองได้เลย</p>
+            </>
+          )}
+        </div>
       )}
     </div>
   );

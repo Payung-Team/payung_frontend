@@ -11,7 +11,7 @@ import {
   reverseGeocode,
   type PlacePrediction,
 } from '../../../lib/googleMaps';
-import { requestPosition } from '../../../lib/geolocation';
+import { getGeoPermission, requestPosition } from '../../../lib/geolocation';
 
 // ที่อยู่ที่เติมให้อัตโนมัติได้ — มาจากการจองครั้งล่าสุด ถ้ายังไม่เคยจองก็ใช้ที่อยู่ในโปรไฟล์
 // (ที่กรอกไว้ตอน onboard) และถ้าไม่มีทั้งสองอย่างจะไม่แสดงปุ่มนี้เลย
@@ -147,10 +147,17 @@ export default function BookingStepLocation() {
   // ได้พิกัดแล้ว reverse-geocode ต่อทันที เพื่อเติมช่องข้อความให้เอง — หมุด A มีสอง
   // ความหมายตาม section ที่แสดง (เหมือน onChangeA): เลือกที่อยู่บ้าน (needHome) หรือ
   // จุดนัดพบ (!needHome && needOutside) ก็เติมช่องนั้นให้ตรงกัน
+  //
+  // ★ ขอเองเฉพาะตอนเคยอนุญาตไว้แล้ว ('granted') หรือเช็คสถานะไม่ได้ ('unknown') เท่านั้น
+  //   ถ้ายังเป็น 'prompt' ให้รอผู้ใช้กดปุ่ม "ตำแหน่งปัจจุบัน" ใน MapPicker แทน — popup ที่เด้ง
+  //   ตอนโหลดหน้าโดยผู้ใช้ไม่ได้กดอะไร มักถูกปิดทิ้งบนมือถือ และ Chrome จะนับครั้งที่ปิด
+  //   จนบล็อกเว็บไปเลย ทำให้กดปุ่มทีหลังก็ไม่มี popup ขึ้นอีก
   useEffect(() => {
     if (needHome && bookingDraft?.locationDetails?.at_home?.lat != null) return;
     let cancelled = false;
-    requestPosition().then(async (result) => {
+    getGeoPermission().then(async (permission) => {
+      if (cancelled || permission === 'prompt' || permission === 'denied') return;
+      const result = await requestPosition();
       if (cancelled || !result.ok) return;
       setLatA(result.fix.lat);
       setLngA(result.fix.lng);
