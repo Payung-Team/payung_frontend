@@ -254,6 +254,9 @@ export default function CaregiverBookingDetailPage() {
   // คำขอใหม่ (ยังไม่ตอบรับ) — โชว์เท่าที่หน้า home โชว์: เพศ · อายุ · การช่วยเหลือตัวเอง
   //   ข้อมูลสุขภาพเต็ม / ผู้ติดต่อ / บันทึกจากผู้ป่วย เปิดให้เห็นหลังตอบรับงานแล้วเท่านั้น
   const isRequest = booking.status === 'pending';
+  // รอชำระเงิน (accepted) ก็ยังไม่ใช่งานที่ยืนยันแล้ว — ปิดข้อมูลสุขภาพ / ผู้ติดต่อ / บันทึกเหมือนคำขอใหม่
+  //   จนผู้ป่วยชำระเงินยืนยันการจอง (ถ้าผู้ป่วยไม่จ่าย งานหลุดได้ ผู้ดูแลไม่ควรได้ข้อมูลไปแล้ว)
+  const isInfoLocked = isRequest || booking.status === 'accepted';
   // ประวัติงาน — จบไปแล้ว ไม่ต้องเห็นข้อมูลสุขภาพ / ผู้ติดต่อ / บันทึกจากผู้ป่วยอีก
   const isHistory = booking.status === 'completed' || booking.status === 'declined' || booking.status === 'cancelled';
   const netEarnings = caregiverEarnings(booking.price, booking.payoutAmount, booking.paidAmount).net;
@@ -278,7 +281,7 @@ export default function CaregiverBookingDetailPage() {
   return (
     <>
       <ToastContainer toasts={toasts} onRemove={removeToast} position="top-right" />
-      {!isRequest && !isHistory && <JobInfoModals booking={booking} open={infoPanel} onClose={() => setInfoPanel(null)} />}
+      {!isInfoLocked && !isHistory && <JobInfoModals booking={booking} open={infoPanel} onClose={() => setInfoPanel(null)} />}
 
       {/* Modals */}
       <AcceptBookingModal
@@ -427,7 +430,7 @@ export default function CaregiverBookingDetailPage() {
             {/* ── 1. คน — ผู้รับบริการ + ผู้ติดต่อวันนัด (ดูก่อนว่าจะไปดูแลใคร)
                 ประวัติงาน (เสร็จ/ปฏิเสธ/ยกเลิก) ไม่ต้องเห็นข้อมูลสุขภาพ/ผู้ติดต่ออีก → ย้ายชื่อไปอยู่ในการ์ดสรุปงานแทน ── */}
             {!isHistory && (
-            <div className={`grid grid-cols-1 gap-4 ${!isRequest && booking.dayOfContactName ? 'md:grid-cols-2' : ''}`}>
+            <div className={`grid grid-cols-1 gap-4 ${!isInfoLocked && booking.dayOfContactName ? 'md:grid-cols-2' : ''}`}>
               <section className={CARD}>
                 <CardTitle icon="elderly">ผู้รับบริการ</CardTitle>
                 <div className="flex items-center gap-3">
@@ -444,14 +447,14 @@ export default function CaregiverBookingDetailPage() {
                 </div>
 
                 {/* ข้อมูลเบื้องต้น */}
-                {isRequest ? (
+                {isInfoLocked ? (
                   <>
                     {recipientBrief && (
                       <p className="m-0 mt-3 text-sm text-[#575859]">{recipientBrief}</p>
                     )}
                     <p className="m-0 mt-3 flex items-center gap-1.5 text-xs text-[#8A8C8E]">
                       <span className="material-icons" style={{ fontSize: 14 }}>lock</span>
-                      ข้อมูลสุขภาพและผู้ติดต่อจะแสดงหลังตอบรับงาน
+                      {isRequest ? 'ข้อมูลสุขภาพและผู้ติดต่อจะแสดงหลังตอบรับงาน' : 'ข้อมูลสุขภาพและผู้ติดต่อจะแสดงหลังผู้รับบริการชำระเงินยืนยันการจอง'}
                     </p>
                   </>
                 ) : hasProfile ? (
@@ -497,7 +500,7 @@ export default function CaregiverBookingDetailPage() {
                   <p className="m-0 mt-3 text-xs text-[#8A8C8E]">ผู้จองไม่ได้กรอกข้อมูลสุขภาพ — สอบถามผู้ติดต่อก่อนเริ่มดูแล</p>
                 )}
 
-                {!isRequest && (
+                {!isInfoLocked && (
                   <button
                     type="button"
                     onClick={() => setInfoPanel('profile')}
@@ -509,7 +512,7 @@ export default function CaregiverBookingDetailPage() {
                 )}
               </section>
 
-              {!isRequest && booking.dayOfContactName && (
+              {!isInfoLocked && booking.dayOfContactName && (
                 <section className={CARD}>
                   <CardTitle icon="contact_phone">ผู้ติดต่อในวันนัดหมาย</CardTitle>
                   <div className="flex items-center justify-between gap-3">
@@ -608,7 +611,7 @@ export default function CaregiverBookingDetailPage() {
                 <p className="m-0 text-[13px] text-[#B0B3B8]">ไม่ได้ระบุภารกิจเพิ่มเติม</p>
               )}
 
-              {!isRequest && !isHistory && booking.notes && (
+              {!isInfoLocked && !isHistory && booking.notes && (
                 <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-[#FFF8E7] border-[0.8px] border-[#FFEAA7] p-3.5">
                   <span className="material-icons flex-shrink-0" style={{ fontSize: 18, color: '#B7791F' }}>sticky_note_2</span>
                   <div>
