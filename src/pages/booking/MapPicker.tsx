@@ -1,5 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { loadGoogleMaps, reverseGeocode } from '../../lib/googleMaps';
+import { requestPosition, type GeoFailure } from '../../lib/geolocation';
+
+// ไม่ใช้ GEO_FAILURE_TH เพราะข้อความชุดนั้นเขียนไว้สำหรับหน้าเช็คอิน/ปิดงานของผู้ดูแล
+const LOCATE_FAILURE_TH: Record<GeoFailure, string> = {
+  insecure_context: 'เบราว์เซอร์ไม่อนุญาตให้ใช้ตำแหน่งบนหน้าเว็บที่ไม่ใช่ https — กรุณาปักหมุดเองบนแผนที่',
+  unsupported: 'เบราว์เซอร์นี้ไม่รองรับการระบุตำแหน่ง — กรุณาปักหมุดเองบนแผนที่',
+  denied: 'ไม่ได้อนุญาตให้เข้าถึงตำแหน่ง — เปิดสิทธิ์ตำแหน่งในการตั้งค่าเบราว์เซอร์ หรือปักหมุดเองบนแผนที่',
+  unavailable: 'หาตำแหน่งไม่ได้ในขณะนี้ — ตรวจสอบว่าเปิด GPS/Location ของเครื่องแล้ว',
+  timeout: 'ใช้เวลาหาตำแหน่งนานเกินไป — ลองกดใหม่อีกครั้ง',
+};
 
 export type PinChangeHandler = (
   lat: number,
@@ -75,6 +85,8 @@ const MapPicker: React.FC<MapPickerProps> = ({
   const [routeDistance, setRouteDistance] = useState<number | null>(null);
   const [routeDuration, setRouteDuration] = useState<string | null>(null);
   const [routeFallback, setRouteFallback] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locateError, setLocateError] = useState<string | null>(null);
 
   const onChangeARef = useRef(onChangeA);
   const onChangeBRef = useRef(onChangeB);
@@ -240,6 +252,29 @@ const MapPicker: React.FC<MapPickerProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, latA, lngA, latB, lngB, showPinB]);
 
+  // ปุ่ม "ตำแหน่งปัจจุบัน" — ย้ายหมุด A (บ้าน/จุดนัดพบ) มาที่ตำแหน่งของผู้ใช้เสมอ
+  // เพราะหมุด B คือปลายทาง ไม่ใช่ที่ที่ผู้ใช้ยืนอยู่ตอนนี้
+  // ส่งผ่าน onChangeA เหมือนการคลิกแผนที่ — ผู้เรียกจะเติมช่องข้อความให้ตามโหมดของตัวเอง
+  // แล้ว main effect ด้านบนจะสร้าง/ย้ายหมุดและเลื่อนกล้องตาม latA/lngA ใหม่เอง
+  async function handleLocateMe() {
+    if (locating) return;
+    setLocating(true);
+    setLocateError(null);
+    setActivePin('A');
+    const result = await requestPosition();
+    if (!result.ok) {
+      setLocateError(LOCATE_FAILURE_TH[result.reason]);
+      setLocating(false);
+      return;
+    }
+    const { lat, lng } = result.fix;
+    // pan เองด้วย — ถ้าพิกัดเท่าเดิม latA/lngA ไม่เปลี่ยน main effect จะไม่รัน กล้องเลยไม่ขยับกลับมา
+    mapRef.current?.panTo({ lat, lng });
+    const { address, province, district, subDistrict, postalCode } = await reverseGeocode(lat, lng);
+    onChangeARef.current(lat, lng, address, province, district, subDistrict, postalCode);
+    setLocating(false);
+  }
+
   useEffect(() => {
     return () => {
       markerARef.current?.setMap?.(null);
@@ -304,7 +339,26 @@ const MapPicker: React.FC<MapPickerProps> = ({
             </span>
           </div>
         )}
+
+        {/* มุมซ้ายล่าง — มุมขวาล่างเป็นปุ่มซูมของ Google Maps อยู่แล้ว */}
+        {loaded && (
+          <button
+            type="button"
+            onClick={handleLocateMe}
+            disabled={locating}
+            className="absolute bottom-3 left-3 z-[1] flex items-center gap-1.5 min-h-[44px] px-3 bg-white rounded-xl border border-[#E0E2E5] shadow text-xs font-bold text-[#1B5C48] hover:bg-[#F0FAF4] active:bg-[#E6F5ED] transition cursor-pointer disabled:opacity-70 disabled:cursor-wait"
+          >
+            <span className={`material-icons text-[#52B69A] text-lg ${locating ? 'animate-spin' : ''}`}>
+              {locating ? 'refresh' : 'my_location'}
+            </span>
+            {locating ? 'กำลังหาตำแหน่ง...' : 'ตำแหน่งปัจจุบัน'}
+          </button>
+        )}
       </div>
+
+      {locateError && (
+        <p className="text-xs font-semibold text-red-600">{locateError}</p>
+      )}
     </div>
   );
 };
