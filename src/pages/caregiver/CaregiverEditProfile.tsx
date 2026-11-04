@@ -298,28 +298,30 @@ const CaregiverEditProfile: React.FC = () => {
       />
 
       {/* ═══ Sub Header ═══ */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-full px-4 sm:px-8 py-4 flex items-center justify-between gap-2">
+      <div className="sticky top-[70px] z-30 bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-full px-4 sm:px-8 py-3 sm:py-4 flex items-center justify-between gap-2">
           <h1 className="text-[18px] sm:text-[24px] font-semibold text-[#0A0A0A]">โปรไฟล์ของฉัน</h1>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <button
-              onClick={handleCancel}
-              className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg text-[13px] sm:text-[14px] font-medium text-[#0A0A0A] hover:bg-gray-50 transition-colors cursor-pointer"
-            >
-              ยกเลิก
-            </button>
-            <button
-              onClick={handleSubmit(onSubmit)}
-              disabled={!isDirty || updateLoading}
-              className={`px-3 sm:px-4 py-2 rounded-lg text-[13px] sm:text-[14px] font-medium text-white transition-colors ${
-                isDirty && !updateLoading
-                  ? 'bg-[#52B69A] hover:bg-[#409E82] cursor-pointer'
-                  : 'bg-gray-400 cursor-not-allowed'
-              }`}
-            >
-              <span className="hidden sm:inline">{updateLoading ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง'}</span>
-              <span className="sm:hidden">{updateLoading ? 'บันทึก...' : 'บันทึก'}</span>
-            </button>
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg text-[13px] sm:text-[14px] font-medium text-[#0A0A0A] hover:bg-gray-50 transition-colors cursor-pointer"
+        >
+          ยกเลิก
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit(onSubmit)}
+          disabled={!isDirty || updateLoading}
+          className={`px-3 sm:px-4 py-2 rounded-lg text-[13px] sm:text-[14px] font-medium text-white transition-colors ${
+            isDirty && !updateLoading
+              ? 'bg-[#52B69A] hover:bg-[#409E82] cursor-pointer shadow-md'
+              : 'bg-gray-400 cursor-not-allowed'
+          }`}
+        >
+          <span className="hidden sm:inline">{updateLoading ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง'}</span>
+          <span className="sm:hidden">{updateLoading ? 'บันทึก...' : 'บันทึก'}</span>
+        </button>
           </div>
         </div>
       </div>
