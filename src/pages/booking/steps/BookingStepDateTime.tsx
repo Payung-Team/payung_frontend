@@ -309,7 +309,8 @@ export default function BookingStepDateTime() {
                 {customDateActive ? fmtThaiShort(date) : 'เปิดปฏิทิน'}
               </span>
             </button>
-            {/* ช่องจริงซ่อนไว้ใต้ปุ่ม — ปฏิทินของเบราว์เซอร์จะเปิดตรงตำแหน่งปุ่ม */}
+            {/* ช่องจริงวางทับปุ่มแบบโปร่งใส — มือถือ (โดยเฉพาะ iOS Safari) เปิด date picker ได้เฉพาะเมื่อผู้ใช้แตะที่ input
+                เองโดยตรง ส่วน showPicker() บน input ที่ pointer-events-none จะไม่ทำงาน ปุ่มด้านล่างยังใช้กับคีย์บอร์ดได้ */}
             <input
               ref={dateInputRef}
               type="date"
@@ -320,7 +321,15 @@ export default function BookingStepDateTime() {
               onChange={(e) => {
                 if (e.target.value && e.target.value >= todayIso) selectDate(e.target.value);
               }}
-              className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
+              onClick={(e) => {
+                // เดสก์ท็อป Chrome คลิกในช่องไม่เปิดปฏิทินเอง → เรียก showPicker (มือถือเปิดเองอยู่แล้ว)
+                try {
+                  e.currentTarget.showPicker();
+                } catch {
+                  /* เปิดอยู่แล้ว หรือเบราว์เซอร์ไม่รองรับ — ปล่อยให้ native ทำงาน */
+                }
+              }}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
             />
           </div>
         </div>
