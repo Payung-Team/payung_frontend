@@ -41,6 +41,7 @@ function getPageInfo(pathname: string): { title: string; breadcrumb: string } {
   if (pathname === '/admin/profession-changes') return { title: 'คำขอเปลี่ยนวิชาชีพ', breadcrumb: 'หน้าหลัก / คำขอเปลี่ยนวิชาชีพ' };
   if (pathname === '/admin/care-activities') return { title: 'กิจกรรมการดูแล', breadcrumb: 'หน้าหลัก / กิจกรรมการดูแล' };
   if (pathname === '/admin/users') return { title: 'จัดการผู้ใช้', breadcrumb: 'หน้าหลัก / จัดการผู้ใช้' };
+  if (pathname.startsWith('/admin/users/patient/')) return { title: 'โปรไฟล์ผู้ใช้', breadcrumb: 'หน้าหลัก / จัดการผู้ใช้ / โปรไฟล์ผู้ใช้' };
   if (pathname.startsWith('/admin/users/')) return { title: 'รายละเอียดผู้ดูแล', breadcrumb: 'หน้าหลัก / จัดการผู้ใช้ / รายละเอียดผู้ดูแล' };
   if (pathname.startsWith('/admin/payments/bookings/')) return { title: 'รายละเอียดการจอง', breadcrumb: 'หน้าหลัก / Payments / รายละเอียดการจอง' };
   if (pathname === '/admin/payments') return { title: 'Payments', breadcrumb: 'หน้าหลัก / Payments' };

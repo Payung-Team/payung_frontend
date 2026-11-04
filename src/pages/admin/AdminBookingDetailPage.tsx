@@ -44,6 +44,7 @@ interface BookingDetail {
   acceptedAt: string | null;
   confirmedAt: string | null;
   completedAt: string | null;
+  patientId: string;
   patientName: string;
   patientPhone: string | null;
   patientEmail: string | null;
@@ -374,6 +375,7 @@ export default function AdminBookingDetailPage() {
           role="ผู้จอง"
           tone="blue"
           name={b.patientName}
+          href={`/admin/users/patient/${b.patientId}`}
           sub={b.bookedByName ? `จองแทนโดย ${b.bookedByName}` : b.careRecipientName && b.careRecipientName !== b.patientName ? `ดูแล: ${b.careRecipientName}` : 'ผู้จองเอง'}
           rows={
             <>

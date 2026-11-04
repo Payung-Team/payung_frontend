@@ -20,6 +20,7 @@ export const adminPageLoaders = {
   AdminDisputesPage: () => import('./AdminDisputesPage'),
   AdminDisputeDetailPage: () => import('./AdminDisputeDetailPage'),
   AdminBookingDetailPage: () => import('./AdminBookingDetailPage'),
+  AdminPatientProfilePage: () => import('./AdminPatientProfilePage'),
 };
 
 let prefetched = false;

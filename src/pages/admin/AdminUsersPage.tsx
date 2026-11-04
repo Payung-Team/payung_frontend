@@ -1110,6 +1110,9 @@ export default function AdminUsersPage() {
               onClick={() => {
                 if (item.role === 2) {
                   navigate(`/admin/users/${item.id}`);
+                } else if (item.role === 1) {
+                  // ผู้ใช้ (ผู้จอง) → หน้าโปรไฟล์ผู้ใช้ + ADL
+                  navigate(`/admin/users/patient/${item.id}`);
                 } else {
                   setEditTarget(item);
                 }
