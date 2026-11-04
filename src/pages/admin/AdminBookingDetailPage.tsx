@@ -56,6 +56,8 @@ interface BookingDetail {
   caregiverName: string | null;
   caregiverNumber: string | null;
   caregiverPhone: string | null;
+  /** users.id — ใช้กับ /admin/users/:id */
+  caregiverUserId: string | null;
   payment: {
     id: string;
     amount: number;
@@ -146,7 +148,19 @@ function PersonCard({
   const toneCls = tone === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700';
   return (
     <section className="flex-1 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">{role}</p>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{role}</p>
+        {name && href && (
+          <Link
+            to={href}
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-700 transition-colors hover:border-[#059669] hover:bg-emerald-50 hover:text-[#047857]"
+          >
+            <Icon name="account_circle" variant="outlined" size="small" color="currentColor" />
+            ดูโปรไฟล์
+            <Icon name="chevron_right" size="small" color="currentColor" />
+          </Link>
+        )}
+      </div>
       {name ? (
         <>
           <div className="flex items-center gap-3">
@@ -355,7 +369,7 @@ export default function AdminBookingDetailPage() {
       </section>
 
       {/* ── คนสองฝั่ง ── */}
-      <div className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center">
+      <div className="flex flex-col items-stretch gap-3 lg:flex-row">
         <PersonCard
           role="ผู้จอง"
           tone="blue"
@@ -374,7 +388,7 @@ export default function AdminBookingDetailPage() {
           }
         />
 
-        <span className="mx-auto flex h-10 w-10 shrink-0 rotate-90 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm lg:rotate-0" aria-hidden="true">
+        <span className="mx-auto flex h-10 w-10 shrink-0 rotate-90 self-center items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm lg:rotate-0" aria-hidden="true">
           <Icon name="arrow_forward" size="small" color="currentColor" />
         </span>
 
@@ -383,7 +397,7 @@ export default function AdminBookingDetailPage() {
           tone="emerald"
           name={b.caregiverName}
           sub={b.caregiverNumber}
-          href={b.caregiverId ? `/admin/users/${b.caregiverId}` : undefined}
+          href={b.caregiverUserId ? `/admin/users/${b.caregiverUserId}` : undefined}
           empty="ยังไม่มีผู้ดูแลรับงานนี้"
           rows={
             <>

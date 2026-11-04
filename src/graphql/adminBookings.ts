@@ -67,6 +67,7 @@ export const ADMIN_BOOKING_DETAIL = gql`
       caregiverName
       caregiverNumber
       caregiverPhone
+      caregiverUserId
       payment {
         id
         amount
