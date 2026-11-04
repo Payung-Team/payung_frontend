@@ -6,6 +6,7 @@ import Icon from '../../components/ui/Icon';
 import Skeleton from '../../components/ui/Skeleton';
 import { userFacingErrorMessage } from '../../lib/apolloErrors';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
+import { formatDurationHours } from '../../lib/bookingTime';
 import { BookingStatusBadge, PaymentStatusText } from '../../components/features/payment/BookingStatusBadges';
 import BookingMatchingCard from '../../components/features/payment/BookingMatchingCard';
 import {
@@ -433,7 +434,7 @@ export default function AdminBookingDetailPage() {
       <Card title="รายละเอียดงาน" icon="event_note">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <InfoTile icon="calendar_month" label="วันที่ดูแล" value={formatThaiDate(b.bookingDate)} />
-          <InfoTile icon="schedule" label="เวลา" value={`${b.startTime} น. · ${b.durationHours} ชม.`} sub={TIME_SLOT_LABEL[b.timeSlot] ?? b.timeSlot} />
+          <InfoTile icon="schedule" label="เวลา" value={`${b.startTime} น. · ${formatDurationHours(b.durationHours)}`} sub={TIME_SLOT_LABEL[b.timeSlot] ?? b.timeSlot} />
           <InfoTile icon="medical_services" label="ประเภทบริการ" value={serviceTypeLabel(b.serviceType)} />
           <InfoTile icon="home" label="สถานที่" value={b.serviceLocations.map((l) => LOCATION_LABEL[l] ?? l).join(', ') || '-'} />
         </div>

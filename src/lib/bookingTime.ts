@@ -25,12 +25,22 @@ export interface BookingTimeParts {
 }
 
 /**
- * จำนวนชั่วโมง → "4 ชม." / "4.5 ชม."
- * ปัดทศนิยม 2 ตำแหน่งกันเลขลอยจากใบจองเก่า — คืน '' ถ้าไม่มีค่าหรือ ≤ 0
+ * จำนวนชั่วโมง → "4 ชม." / "4 ชม. 30 นาที" / "1 ชม. 5 นาที" / "30 นาที"
+ *
+ * ★ แสดงเป็นชั่วโมง + นาที ไม่ใช่ทศนิยม — จองได้ทีละ 5 นาที 65 นาที = 1.08333… ชม.
+ *   ปัดเป็นนาทีที่ใกล้สุด (ใบจองเก่าอย่าง 1.3333 ชม. → "1 ชม. 20 นาที")
+ * ★ ต้องตรงกับ BE formatDurationHours (booking-time-display.ts) ทุกตัวอักษร
+ *
+ * คืน '' ถ้าไม่มีค่า / ≤ 0 / ปัดแล้วไม่ถึง 1 นาที
  */
 export function formatDurationHours(hours?: number | null): string {
   if (hours == null || !Number.isFinite(hours) || hours <= 0) return '';
-  return `${Math.round(hours * 100) / 100} ชม.`;
+  const totalMinutes = Math.round(hours * 60);
+  if (totalMinutes <= 0) return '';
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (m === 0) return `${h} ชม.`;
+  return h === 0 ? `${m} นาที` : `${h} ชม. ${m} นาที`;
 }
 
 /**
@@ -61,7 +71,11 @@ export function formatBookingTimeRange(
 //   ฟอร์มซ่อนตัวเลือกที่ผิดกฎไว้ตั้งแต่ต้น ผู้ใช้จะได้ไม่ต้องเจอ error ตอนกดยืนยัน
 //   ถ้า BE เปลี่ยนกฎแต่ตรงนี้ไม่เปลี่ยน BE ยังปฏิเสธได้ถูก แค่ข้อความจะไปโผล่ตอนยืนยันแทน
 
-export const BOOKING_TIME_STEP_MINUTES = 30;
+/**
+ * นาทีเลือกได้ทีละ 5 (:00 / :05 / … / :55) — ตรงกับ BE (booking-time.ts)
+ * ระยะเวลาจึงเป็นทศนิยมไม่รู้จบได้ (65 นาที = 1.08333… ชม.) → แสดงผลด้วย formatDurationHours เสมอ
+ */
+export const BOOKING_TIME_STEP_MINUTES = 5;
 export const BOOKING_MIN_DURATION_MINUTES = 60;
 export const BOOKING_MAX_DURATION_MINUTES = 12 * 60;
 /**
@@ -81,10 +95,11 @@ export const BOOKING_END_OF_DAY_TIME = '23:59';
 /** เลือกเวลาเริ่มแล้ว ตั้งเวลาสิ้นสุดให้ก่อนที่ +4 ชม. */
 export const BOOKING_DEFAULT_DURATION_MINUTES = 4 * 60;
 /**
- * ฟอร์มจองให้เลือกทีละ 1 ชั่วโมง (PYG-689) — ตัวเลือกทีละ 30 นาทีเยอะเกินไปบนมือถือ
- * BE ยังรับทีละ 30 นาทีเหมือนเดิม (ชุดรายชั่วโมงเป็นส่วนหนึ่งของชุดนั้น) จึงไม่ต้องแก้ฝั่ง BE
+ * ขั้นของฟอร์มจอง — ทีละ 5 นาที เท่ากับกฎ BE
+ * เดิม PYG-689 ให้เลือกทีละ 1 ชม. เพราะ dropdown เดียวทีละ 30 นาทียาวเกินบนมือถือ
+ * ตอนนี้ฟอร์มแยกช่องชั่วโมงกับนาที (ไม่เกิน 24 + 12 ตัวเลือก) จึงละเอียดขึ้นได้โดยรายการไม่ยาว
  */
-export const BOOKING_FORM_STEP_MINUTES = 60;
+export const BOOKING_FORM_STEP_MINUTES = BOOKING_TIME_STEP_MINUTES;
 
 /** "HH:mm" (หรือ "HH:mm:ss") → นาทีนับจากเที่ยงคืน · รูปแบบผิดคืน null */
 export function timeToMinutes(time?: string | null): number | null {
@@ -109,7 +124,7 @@ export function minutesToTime(minutes: number): string {
 }
 
 /**
- * เวลาเริ่มที่เลือกได้ (ค่าเริ่มต้นทีละ 30 นาทีตามกฎ BE)
+ * เวลาเริ่มที่เลือกได้ (ค่าเริ่มต้นทีละ 5 นาทีตามกฎ BE)
  * @param afterMinute ส่งเมื่อเป็น "วันนี้" — ซ่อนเวลาที่ไม่ได้อยู่หลังนาทีนี้ (เวลาที่ผ่านไปแล้ว)
  * @param stepMinutes ระยะห่างของตัวเลือก — ฟอร์มจองส่ง BOOKING_FORM_STEP_MINUTES
  */
@@ -130,7 +145,7 @@ export function bookingStartOptions(
 
 /**
  * เวลาสิ้นสุดที่เลือกได้สำหรับเวลาเริ่มนี้ — ตัดตัวที่สั้น/ยาวเกิน และข้ามเที่ยงคืนออก
- * ตัวสุดท้ายถึงเที่ยงคืนได้ แสดงเป็น "23:59" (เช่นเริ่ม 20:00 → 21:00 / 22:00 / 23:00 / 23:59)
+ * ตัวสุดท้ายถึงเที่ยงคืนได้ แสดงเป็น "23:59" (เช่นเริ่ม 22:00 → 23:00 / 23:05 / … / 23:55 / 23:59)
  */
 export function bookingEndOptions(
   startTime: string,
@@ -152,7 +167,7 @@ export function bookingEndOptions(
 
 /**
  * เวลาสิ้นสุดตั้งต้น = เริ่ม + 4 ชม. · เริ่มดึกจนเลยเที่ยงคืน ใช้ตัวเลือกสุดท้ายที่ลงตัวกับ step
- * (เริ่ม 21:00 / 23:00 → "23:59" = เที่ยงคืน) · เวลาเริ่มผิดรูปแบบคืน ''
+ * (เริ่ม 21:00 / 22:05 / 23:00 → "23:59" = เที่ยงคืน) · เวลาเริ่มผิดรูปแบบคืน ''
  */
 export function defaultBookingEndTime(
   startTime: string,

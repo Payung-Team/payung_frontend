@@ -38,19 +38,29 @@ export function hourlyRateFor(serviceType: string | null | undefined): number {
   return (serviceType ? SERVICE_HOURLY_RATES[serviceType] : undefined) ?? DEFAULT_HOURLY_RATE;
 }
 
+/** ปัดเป็นสตางค์ (ปัดครึ่งขึ้น) — ตรงกับ BE estimatedCostOf / platformFeeOf (ROUND_HALF_UP 2 ตำแหน่ง) */
+function toSatang(baht: number): number {
+  return Math.round(baht * 100) / 100;
+}
+
+/**
+ * ★ ปัดเป็นสตางค์ ไม่ใช่บาทเต็ม — จองได้ทีละ 5 นาที ค่าบริการ/ค่าแพลตฟอร์มจึงมีเศษได้
+ *   (300 บาท × 4 ชม. 15 นาที = 1,275 + ค่าแพลตฟอร์ม 127.50 → BE ตัดจริง 1,402.50 ไม่ใช่ 1,403)
+ *   (800 บาท × 1 ชม. 5 นาที = 866.67 + 86.67 → 953.34)
+ */
 export function estimateBookingCost(
   hours: number,
   serviceType: string | null | undefined,
 ): BookingCostEstimate {
   const hourlyRate = hourlyRateFor(serviceType);
   const safeHours = Number.isFinite(hours) && hours > 0 ? hours : 0;
-  const serviceCost = Math.round(hourlyRate * safeHours);
-  const platformFee = Math.round(serviceCost * (ESTIMATED_PLATFORM_FEE_PERCENT / 100));
+  const serviceCost = toSatang(hourlyRate * safeHours);
+  const platformFee = toSatang((serviceCost * ESTIMATED_PLATFORM_FEE_PERCENT) / 100);
   return {
     hourlyRate,
     hours: safeHours,
     serviceCost,
     platformFee,
-    total: serviceCost + platformFee,
+    total: toSatang(serviceCost + platformFee),
   };
 }

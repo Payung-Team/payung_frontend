@@ -4,7 +4,7 @@ import { bookingAssessmentRedirect, isBookingResumeState } from '../../lib/asses
 import { useBooking } from '../../context/BookingContext';
 import { useMatchingBooking } from '../../hooks/useMatchingBooking';
 import { useAssessmentStrings } from '../../lib/assessmentStrings';
-import { formatBookingTimeRange } from '../../lib/bookingTime';
+import { formatBookingTimeRange, formatDurationHours } from '../../lib/bookingTime';
 import { estimateBookingCost } from '../../lib/bookingPrice';
 import { bookingServiceType } from '../../lib/bookingServiceType';
 import BookingStepService from './steps/BookingStepService';
@@ -438,7 +438,7 @@ export default function BookingRequestPage() {
                 {selectedDuration ? (
                   <>
                     <div className="flex justify-between text-[#575859]">
-                      <span>ค่าดูแล {duration} ชม. × {averageHourlyRate}฿</span>
+                      <span>ค่าดูแล {formatDurationHours(duration)} × {averageHourlyRate}฿</span>
                       <span>{rawCost.toLocaleString()} ฿</span>
                     </div>
                     <div className="flex justify-between text-[#575859]">
