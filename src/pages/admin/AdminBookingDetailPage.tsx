@@ -7,6 +7,7 @@ import Skeleton from '../../components/ui/Skeleton';
 import { userFacingErrorMessage } from '../../lib/apolloErrors';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import { BookingStatusBadge, PaymentStatusText } from '../../components/features/payment/BookingStatusBadges';
+import BookingMatchingCard from '../../components/features/payment/BookingMatchingCard';
 import {
   bookingStatusLabel,
   formatTHB,
@@ -59,6 +60,12 @@ interface BookingDetail {
   caregiverPhone: string | null;
   /** users.id — ใช้กับ /admin/users/:id */
   caregiverUserId: string | null;
+  requiredLevel: string | null;
+  levelFromAdl: string | null;
+  levelFromFlags: string | null;
+  levelFromServices: string | null;
+  levelCalculatedAt: string | null;
+  requiredSkills: { code: string; nameTh: string; sources: string[] }[];
   payment: {
     id: string;
     amount: number;
@@ -409,6 +416,18 @@ export default function AdminBookingDetailPage() {
           }
         />
       </div>
+
+      {/* ── การจับคู่: ระดับ/ทักษะที่ต้องการ + ผู้ดูแลที่เข้าเกณฑ์ (โหลดเมื่อกด) ── */}
+      <BookingMatchingCard
+        bookingId={b.id}
+        requiredLevel={b.requiredLevel}
+        levelFromAdl={b.levelFromAdl}
+        levelFromFlags={b.levelFromFlags}
+        levelFromServices={b.levelFromServices}
+        levelCalculatedAt={b.levelCalculatedAt}
+        requiredSkills={b.requiredSkills}
+        locationAddress={b.locationAddress}
+      />
 
       {/* ── รายละเอียดงาน ── */}
       <Card title="รายละเอียดงาน" icon="event_note">

@@ -68,6 +68,16 @@ export const ADMIN_BOOKING_DETAIL = gql`
       caregiverNumber
       caregiverPhone
       caregiverUserId
+      requiredLevel
+      levelFromAdl
+      levelFromFlags
+      levelFromServices
+      levelCalculatedAt
+      requiredSkills {
+        code
+        nameTh
+        sources
+      }
       payment {
         id
         amount
@@ -86,6 +96,41 @@ export const ADMIN_BOOKING_DETAIL = gql`
         reason
         changedByName
         createdAt
+      }
+    }
+  }
+`;
+
+/**
+ * แอดมินเท่านั้น · ประเมินผู้ดูแลทุกคนกับ booking นี้ ณ ตอนนี้ (live — ไม่ได้บันทึกผล)
+ * หนักกว่า query ทั่วไป (ประเมินทั้งระบบ) → เรียกเมื่อแอดมินกดปุ่มเท่านั้น
+ */
+export const ADMIN_BOOKING_MATCH_REPORT = gql`
+  query AdminBookingMatchReport($bookingId: ID!) {
+    bookingMatchReport(bookingId: $bookingId) {
+      evaluatedAt
+      results {
+        passed
+        checks {
+          level
+          skills
+          profession
+          evidence
+        }
+        reasons {
+          reason
+          skillCode
+        }
+        caregiver {
+          id
+          userId
+          fullName
+          caregiverNumber
+          profession
+          careLevel
+          serviceAreaProvince
+          serviceAreaDistrict
+        }
       }
     }
   }
