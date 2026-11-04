@@ -19,6 +19,7 @@ export const adminPageLoaders = {
   AdminPaymentsPage: () => import('./AdminPaymentsPage'),
   AdminDisputesPage: () => import('./AdminDisputesPage'),
   AdminDisputeDetailPage: () => import('./AdminDisputeDetailPage'),
+  AdminBookingDetailPage: () => import('./AdminBookingDetailPage'),
 };
 
 let prefetched = false;

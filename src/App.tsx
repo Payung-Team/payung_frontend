@@ -31,6 +31,7 @@ const AdminCaregiverDetailPage = lazy(adminPageLoaders.AdminCaregiverDetailPage)
 const AdminPaymentsPage = lazy(adminPageLoaders.AdminPaymentsPage);
 const AdminDisputesPage = lazy(adminPageLoaders.AdminDisputesPage);
 const AdminDisputeDetailPage = lazy(adminPageLoaders.AdminDisputeDetailPage);
+const AdminBookingDetailPage = lazy(adminPageLoaders.AdminBookingDetailPage);
 const AdminLayout = lazy(() => import('./components/layout/AdminLayout'));
 import { ADMIN_NOTIFICATIONS_PATH, adminNotificationLink } from './components/layout/adminNotifications';
 const NotFound = lazy(() => import('./pages/error/NotFound'));
@@ -532,6 +533,7 @@ function App() {
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/users/:caregiverId" element={<AdminCaregiverDetailPage />} />
           <Route path="/admin/payments" element={<AdminPaymentsPage />} />
+          <Route path="/admin/payments/bookings/:id" element={<AdminBookingDetailPage />} />
           <Route path="/admin/disputes" element={<AdminDisputesPage />} />
           <Route path="/admin/disputes/:id" element={<AdminDisputeDetailPage />} />
           <Route
