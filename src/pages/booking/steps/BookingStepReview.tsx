@@ -237,7 +237,7 @@ export default function BookingStepReview({ onStartSearch }: Props) {
         <div className="mt-3 space-y-1.5 text-sm">
           <div className="flex justify-between">
             <span className="text-[#1A1A1A]">
-              ค่าบริการ Caregiver (฿{caregiverRate} × {hours} ชม.)
+              ค่าบริการ Caregiver (฿{caregiverRate} × {formatDurationHours(hours)})
             </span>
             <span className="font-semibold">฿{caregiverCost.toLocaleString()}</span>
           </div>

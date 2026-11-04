@@ -4,6 +4,7 @@
  */
 
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
+import { formatDurationHours } from '../../lib/bookingTime';
 
 /** e.g. "12 ส.ค. 2569" (Buddhist year). */
 export function formatDate(iso: string | Date | null | undefined): string {
@@ -336,7 +337,7 @@ const S: Strings = {
   bookContinue: 'ถัดไป',
   bookedByYou: 'จองโดยคุณ',
   bookedBy: (name) => `จองโดย ${name}`,
-  apptHours: (n) => `${n} ชม.`,
+  apptHours: (n) => formatDurationHours(n),
   bookingStatusLabel: (status) =>
     ({
       unmatched: 'รอจับคู่ผู้ดูแล',

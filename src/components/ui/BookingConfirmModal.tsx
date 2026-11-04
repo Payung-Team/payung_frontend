@@ -2,7 +2,7 @@ import React from 'react';
 import type { BookingRequest } from '../../context/BookingContext';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import CaregiverPhoto from './CaregiverPhoto';
-import { formatBookingTimeRange } from '../../lib/bookingTime';
+import { formatBookingTimeRange, formatDurationHours } from '../../lib/bookingTime';
 import { isBookingTimeErrorMessage } from '../../lib/bookingSubmitError';
 import { displaySkills } from '../../lib/skillLabels';
 
@@ -345,7 +345,7 @@ const BookingConfirmModal: React.FC<BookingConfirmModalProps> = ({
                 style={{ background: '#F6FAF9', border: '0.8px solid #E6F5ED' }}
               >
                 <Row
-                  label={`ค่าบริการ (฿${hourlyRate.toLocaleString()}${duration ? ` × ${duration} ชม.` : '/ชม.'})`}
+                  label={`ค่าบริการ (฿${hourlyRate.toLocaleString()}${duration ? ` × ${formatDurationHours(duration)}` : '/ชม.'})`}
                   value={
                     <span className="num" style={{ fontFamily: "'Inter', sans-serif" }}>
                       ฿{serviceCost.toLocaleString()}

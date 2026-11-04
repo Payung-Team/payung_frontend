@@ -838,7 +838,7 @@ export default function PaymentPage() {
               {hourlyRate > 0 && hours > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                   <span style={{ fontFamily: "'Bai Jamjuree', sans-serif", fontSize: 13, color: '#8A8C8E' }}>
-                    ค่าบริการผู้ดูแล (฿{hourlyRate.toLocaleString()} × {hours} ชม.)
+                    ค่าบริการผู้ดูแล (฿{hourlyRate.toLocaleString()} × {formatDurationHours(hours)})
                   </span>
                   <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 600, color: '#1A1A1A', whiteSpace: 'nowrap' }}>
                     ฿{serviceCost.toLocaleString()}

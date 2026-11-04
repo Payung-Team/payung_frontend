@@ -17,8 +17,11 @@ import { bookingServiceType } from '../../../lib/bookingServiceType';
 //   เลิกให้เลือกช่วงเช้า/บ่าย/เย็น และจำนวนชั่วโมงเอง — BE อนุมาน timeSlot และคำนวณ durationHours
 //   ตัวเลือกเวลาทั้งหมดมาจาก lib/bookingTime.ts ซึ่งตรงกับกฎของ BE (booking-time.ts)
 //   ใช้ทั้งจองให้ตัวเองและจองแทนในกลุ่มครอบครัว (ฟอร์มเดียวกัน)
-// PYG-689: เวลาเริ่ม–สิ้นสุดอยู่แถวเดียวกันเป็น dropdown 2 ช่อง และเลือกได้ทีละ 1 ชั่วโมง
-//   (เดิมเป็นปุ่มทีละ 30 นาทีสองตาราง ยาวมากบนมือถือ) — select ของเบราว์เซอร์เปิดตัวเลือกแบบวงล้อบนมือถือให้เอง
+// PYG-689: เวลาเริ่ม–สิ้นสุดอยู่แถวเดียวกัน (เดิมเป็นปุ่มทีละ 30 นาทีสองตาราง ยาวมากบนมือถือ)
+//   select ของเบราว์เซอร์เปิดตัวเลือกแบบวงล้อบนมือถือให้เอง
+// เลือกระดับนาที: แต่ละเวลาแยกเป็นช่อง "ชั่วโมง : นาที" นาทีทีละ 5 (:00 / :05 / … / :55)
+//   ช่องนาทีแสดงเฉพาะนาทีที่ใช้ได้ในชั่วโมงนั้น (เช่นวันนี้ 10:07 → ชั่วโมง 10 เริ่มที่ :10)
+//   เวลาสิ้นสุดเที่ยงคืนยังเป็น "23:59" ตามกฎเดิม → ชั่วโมง 23 มีนาที :59 เพิ่มมาอีกตัว
 
 const QUICK_DATES = [
   { offset: 0, label: 'วันนี้' },
@@ -60,13 +63,9 @@ function fmtThaiLong(iso: string) {
   });
 }
 
-function fmtHours(hours: number) {
-  return `${Math.round(hours * 100) / 100} ชั่วโมง`;
-}
-
 /**
- * ร่างที่ค้างจากฟอร์มเดิม (ทีละ 30 นาที) ที่ไม่ลงตัวกับรายชั่วโมง — ถือว่ายังไม่ได้เลือก
- * เวลาสิ้นสุด "23:59" (= เที่ยงคืน) ไม่ลงชั่วโมงแต่เป็นตัวเลือกจริง → ส่ง allowEndOfDay ให้เก็บไว้
+ * ร่างที่ค้างในฟอร์มที่ไม่ลงขั้น 5 นาที — ถือว่ายังไม่ได้เลือก
+ * เวลาสิ้นสุด "23:59" (= เที่ยงคืน) ไม่ลงขั้นแต่เป็นตัวเลือกจริง → ส่ง allowEndOfDay ให้เก็บไว้
  */
 function onFormStep(time?: string | null, allowEndOfDay = false): string {
   if (allowEndOfDay && time === BOOKING_END_OF_DAY_TIME) return time;
@@ -74,11 +73,85 @@ function onFormStep(time?: string | null, allowEndOfDay = false): string {
   return minutes !== null && minutes % BOOKING_FORM_STEP_MINUTES === 0 ? (time as string) : '';
 }
 
-function TimeSelect({
+/** ["09:15", "09:30", "10:00"] → { "09": ["15", "30"], "10": ["00"] } (เรียงตามเดิม) */
+function groupByHour(times: string[]): Map<string, string[]> {
+  const groups = new Map<string, string[]>();
+  for (const t of times) {
+    const [hour, minute] = t.split(':');
+    const minutes = groups.get(hour);
+    if (minutes) minutes.push(minute);
+    else groups.set(hour, [minute]);
+  }
+  return groups;
+}
+
+function SelectBox({
+  id,
+  ariaLabel,
+  value,
+  options,
+  disabled,
+  invalid,
+  onChange,
+}: {
+  id: string;
+  ariaLabel: string;
+  value: string;
+  options: string[];
+  disabled?: boolean;
+  invalid?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const filled = !!value && !disabled;
+  return (
+    <div className="relative min-w-0 flex-1">
+      <select
+        id={id}
+        value={value}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        aria-invalid={invalid || undefined}
+        onChange={(e) => onChange(e.target.value)}
+        className={`h-[52px] w-full appearance-none rounded-xl border pl-2.5 pr-6 text-[15px] font-semibold tabular-nums outline-none transition sm:pl-4 sm:pr-9 sm:text-base ${
+          disabled
+            ? 'cursor-not-allowed border-[#E0E2E5] bg-gray-50 text-gray-400'
+            : invalid
+              ? 'cursor-pointer border-[#DC3545] bg-white text-[#1A1A1A]'
+              : filled
+                ? 'cursor-pointer border-[#52B69A] bg-[#F0FAF4] text-[#1B5C48] focus:ring-2 focus:ring-[#52B69A]/30'
+                : 'cursor-pointer border-[#E0E2E5] bg-white text-[#8A8C8E] hover:border-[#BFE0D6] focus:border-[#52B69A] focus:ring-2 focus:ring-[#52B69A]/30'
+        }`}
+      >
+        <option value="" disabled>
+          --
+        </option>
+        {options.map((o) => (
+          <option key={o} value={o} className="text-[#1A1A1A]">
+            {o}
+          </option>
+        ))}
+      </select>
+      <span
+        aria-hidden="true"
+        className={`material-icons pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 sm:right-2.5 ${
+          disabled ? 'text-gray-300' : 'text-[#52B69A]'
+        }`}
+        style={{ fontSize: 20 }}
+      >
+        expand_more
+      </span>
+    </div>
+  );
+}
+
+/**
+ * เวลา "HH:mm" แบบสองช่อง ชั่วโมง : นาที — ค่าที่ส่งออกเป็นเวลาเต็มเสมอ (ไม่มีสถานะเลือกครึ่งเดียว)
+ * เลือกชั่วโมงแล้วคงนาทีเดิมถ้ายังใช้ได้ ไม่งั้นใช้นาทีแรกที่ใช้ได้ในชั่วโมงนั้น
+ */
+function TimePicker({
   id,
   label,
   value,
-  placeholder,
   options,
   disabled,
   invalid,
@@ -86,54 +159,53 @@ function TimeSelect({
 }: {
   id: string;
   label: string;
+  /** "HH:mm" ที่อยู่ใน options หรือ '' */
   value: string;
-  placeholder: string;
-  options: { value: string; label: string }[];
+  /** เวลาที่เลือกได้ทั้งหมด "HH:mm" เรียงจากเช้าไปดึก */
+  options: string[];
   disabled?: boolean;
   invalid?: boolean;
   onChange: (value: string) => void;
 }) {
-  const filled = !!value && !disabled;
+  const groups = groupByHour(options);
+  const [hour = '', minute = ''] = value ? value.split(':') : [];
+  const minuteOptions = groups.get(hour) ?? [];
+
+  const pickHour = (h: string) => {
+    const minutes = groups.get(h) ?? [];
+    onChange(`${h}:${minutes.includes(minute) ? minute : minutes[0]}`);
+  };
+
   return (
-    <div className="min-w-0">
-      <label htmlFor={id} className="block text-sm font-bold text-[#575859]">
+    <div role="group" aria-labelledby={`${id}-label`} className="min-w-0">
+      <div id={`${id}-label`} className="block text-sm font-bold text-[#575859]">
         {label}
-      </label>
-      <div className="relative mt-1.5">
-        <select
-          id={id}
-          value={value}
+      </div>
+      <div className="mt-1.5 flex items-center gap-1 sm:gap-1.5">
+        <SelectBox
+          id={`${id}-hour`}
+          ariaLabel={`${label} ชั่วโมง`}
+          value={hour}
+          options={[...groups.keys()]}
           disabled={disabled}
-          aria-invalid={invalid || undefined}
-          onChange={(e) => onChange(e.target.value)}
-          className={`h-[52px] w-full appearance-none truncate rounded-xl border pl-3.5 pr-9 text-[15px] font-semibold outline-none transition sm:pl-4 sm:text-base ${
-            disabled
-              ? 'cursor-not-allowed border-[#E0E2E5] bg-gray-50 text-gray-400'
-              : invalid
-                ? 'cursor-pointer border-[#DC3545] bg-white text-[#1A1A1A]'
-                : filled
-                  ? 'cursor-pointer border-[#52B69A] bg-[#F0FAF4] text-[#1B5C48] focus:ring-2 focus:ring-[#52B69A]/30'
-                  : 'cursor-pointer border-[#E0E2E5] bg-white text-[#8A8C8E] hover:border-[#BFE0D6] focus:border-[#52B69A] focus:ring-2 focus:ring-[#52B69A]/30'
-          }`}
-        >
-          <option value="" disabled>
-            {placeholder}
-          </option>
-          {options.map((o) => (
-            <option key={o.value} value={o.value} className="text-[#1A1A1A]">
-              {o.label}
-            </option>
-          ))}
-        </select>
+          invalid={invalid}
+          onChange={pickHour}
+        />
         <span
           aria-hidden="true"
-          className={`material-icons pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 ${
-            disabled ? 'text-gray-300' : 'text-[#52B69A]'
-          }`}
-          style={{ fontSize: 22 }}
+          className={`text-lg font-bold ${disabled ? 'text-gray-300' : 'text-[#575859]'}`}
         >
-          expand_more
+          :
         </span>
+        <SelectBox
+          id={`${id}-minute`}
+          ariaLabel={`${label} นาที`}
+          value={minute}
+          options={minuteOptions}
+          disabled={disabled || !hour}
+          invalid={invalid}
+          onChange={(m) => onChange(`${hour}:${m}`)}
+        />
       </div>
     </div>
   );
@@ -341,17 +413,17 @@ export default function BookingStepDateTime() {
         <h2 className="text-lg font-bold text-[#1A1A1A]">เวลาที่ต้องการ</h2>
         <p className="text-sm text-[#8A8C8E] mt-1">
           {dateValid
-            ? 'เลือกเวลาที่ผู้ดูแลมาถึง และเวลาที่จบงาน (เลือกได้ทีละ 1 ชั่วโมง)'
+            ? 'เลือกเวลาที่ผู้ดูแลมาถึง และเวลาที่จบงาน (เลือกนาทีได้ทีละ 5 นาที)'
             : 'เลือกวันที่ก่อน แล้วจะเลือกเวลาได้'}
         </p>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
-          <TimeSelect
+        {/* จอแคบกว่า 360px (เช่น iPhone SE รุ่นแรก) ช่องละ ~50px ตัวเลขโดนตัด → เรียงเริ่ม/สิ้นสุดเป็นสองแถว */}
+        <div className="mt-4 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
+          <TimePicker
             id="booking-start-time"
             label="เวลาเริ่ม"
             value={startValid ? startTime : ''}
-            placeholder="เลือกเวลา"
-            options={startOptions.map((t) => ({ value: t, label: t }))}
+            options={startOptions}
             disabled={!dateValid || startOptions.length === 0}
             invalid={!!error.startTime || startPassed}
             onChange={selectStart}
@@ -362,15 +434,11 @@ export default function BookingStepDateTime() {
               arrow_forward
             </span>
           </span>
-          <TimeSelect
+          <TimePicker
             id="booking-end-time"
             label="เวลาสิ้นสุด"
             value={endValid ? endTime : ''}
-            placeholder="เลือกเวลา"
-            options={endOptions.map((t) => ({
-              value: t,
-              label: `${t} (${formatDurationHours(bookingDurationHours(startTime, t))})`,
-            }))}
+            options={endOptions}
             disabled={!startValid}
             invalid={!!error.endTime}
             onChange={selectEnd}
@@ -395,7 +463,7 @@ export default function BookingStepDateTime() {
             <>
               <div className="text-xs font-semibold text-[#52B69A]">{fmtThaiLong(date)}</div>
               <div className="mt-1 text-base font-bold leading-relaxed">
-                {startTime} – {endTime} | {fmtHours(duration)} | ฿{cost.total.toLocaleString()}
+                {startTime} – {endTime} | {formatDurationHours(duration)} | ฿{cost.total.toLocaleString()}
               </div>
               <div className="mt-1 text-xs text-[#575859]">
                 ราคาประมาณการ

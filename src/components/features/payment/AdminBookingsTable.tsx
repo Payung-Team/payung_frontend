@@ -7,6 +7,7 @@ import Pagination from '../../ui/Pagination';
 import Icon from '../../ui/Icon';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { userFacingErrorMessage } from '../../../lib/apolloErrors';
+import { formatDurationHours } from '../../../lib/bookingTime';
 import { useNavigate } from 'react-router-dom';
 import { BOOKING_STATUS_META as STATUS_META, formatTHB, formatThaiDate as formatDate } from './bookingMeta';
 import { BookingStatusBadge as StatusBadge, PaymentStatusText } from './BookingStatusBadges';
@@ -107,7 +108,7 @@ export default function AdminBookingsTable() {
         <div>
           <p>{formatDate(r.bookingDate)}</p>
           <p className="text-gray-400">
-            {r.startTime} · {r.durationHours} ชม.
+            {r.startTime} · {formatDurationHours(r.durationHours)}
           </p>
         </div>
       ),
