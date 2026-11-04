@@ -520,11 +520,31 @@ function ProfileCard({ profile }: { profile: CaregiverProfile }) {
   );
 }
 
+const QUICK_ACTIONS = [
+  { href: '/caregiver/settings/job-reception', icon: 'tune', title: 'ตั้งค่างาน', detail: 'ตั้งเวลาว่างและพื้นที่รับงาน' },
+  { href: '/caregiver/edit-profile', icon: 'manage_accounts', title: 'แก้ไขโปรไฟล์', detail: 'แก้ไขข้อมูลส่วนตัวและทักษะ' },
+];
+
+/** มือถือ: ปุ่มทางลัดแบบย่อ วางคู่กับการ์ดพร้อมรับงาน */
+function QuickActionsCompact() {
+  return (
+    <nav className="grid grid-cols-2 gap-3 lg:hidden" aria-label="ทางลัด">
+      {QUICK_ACTIONS.map((action) => (
+        <Link
+          key={action.href}
+          to={action.href}
+          className="flex min-h-[56px] items-center gap-2.5 rounded-[16px] border border-[#E1EAE6] bg-white px-3.5 py-3 text-[#2F8B70] no-underline shadow-[0_3px_14px_rgba(27,92,72,0.04)] transition hover:bg-[#F5F9F7]"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EAF7F1]"><Icon name={action.icon} size="small" color="currentColor" /></span>
+          <span className="min-w-0 truncate text-[13px] font-bold text-[#25312D]">{action.title}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 function QuickActions() {
-  const actions = [
-    { href: '/caregiver/settings/job-reception', icon: 'tune', title: 'ตั้งค่างาน', detail: 'ตั้งเวลาว่างและพื้นที่รับงาน' },
-    { href: '/caregiver/edit-profile', icon: 'manage_accounts', title: 'แก้ไขโปรไฟล์', detail: 'แก้ไขข้อมูลส่วนตัวและทักษะ' },
-  ];
+  const actions = QUICK_ACTIONS;
   return (
     <section className="overflow-hidden rounded-[18px] border border-[#E1EAE6] bg-white shadow-[0_3px_14px_rgba(27,92,72,0.04)]" aria-labelledby="quick-title">
       <h2 id="quick-title" className="px-5 pb-2 pt-5 text-[16px] font-bold text-[#25312D]">ทางลัด</h2>
@@ -680,7 +700,10 @@ export default function CaregiverHome() {
         <main className="mx-auto max-w-[1160px] px-4 py-7 sm:px-6 lg:px-8">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
             <Greeting displayName={displayName} avatarUrl={userQuery.data?.me?.avatarUrl} pendingCount={pendingCount} nextJob={upcomingJobs[0]} />
-            <AvailabilityCard isSearchable={isSearchable} isVerified={profile.kycStatus === 'verified'} toggling={togglingAvailability} onToggle={() => void handleToggleAvailability()} />
+            <div className="space-y-3">
+              <AvailabilityCard isSearchable={isSearchable} isVerified={profile.kycStatus === 'verified'} toggling={togglingAvailability} onToggle={() => void handleToggleAvailability()} />
+              <QuickActionsCompact />
+            </div>
           </div>
 
           {hasPartialError && <PartialDataError retrying={retryingPartial} onRetry={() => void retryPartial()} />}
@@ -697,7 +720,7 @@ export default function CaregiverHome() {
             <aside className="contents lg:col-start-2 lg:block lg:space-y-5" aria-label="ข้อมูลสรุปของผู้ดูแล">
               <div className="order-2"><WorkSummary pending={pendingCount} accepted={acceptedCount} confirmed={confirmedCount} unread={unreadCount} /></div>
               <div className="order-4"><ProfileCard profile={profile} /></div>
-              <div className="order-5"><QuickActions /></div>
+              <div className="order-5 hidden lg:block"><QuickActions /></div>
             </aside>
           </div>
         </main>
