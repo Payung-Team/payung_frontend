@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { ADMIN_UPDATE_CAREGIVER_INFO } from '../../graphql/queries';
+import CaregiverWorkPanel from '../../components/features/caregiver-admin/CaregiverWorkPanel';
 import Icon from '../../components/ui/Icon';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Avatar from '../../components/ui/Avatar';
@@ -188,7 +189,7 @@ type LockableField = typeof LOCKABLE_FIELDS[number];
 export default function AdminCaregiverDetailPage() {
   const { caregiverId } = useParams<{ caregiverId: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'general' | 'kyc'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'kyc' | 'work'>('general');
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Lock confirm modal state
@@ -491,24 +492,24 @@ export default function AdminCaregiverDetailPage() {
       />
 
       {/* ─── Breadcrumb Header ─── */}
-      <section className="mx-auto max-w-[1312px] px-4 py-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-4">
+      <section className="mx-auto max-w-[1312px] px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <button
               type="button"
               onClick={() => navigate('/admin/users')}
-              className="inline-flex h-8 items-center gap-1 rounded-md bg-[#F3F4F6] px-3 text-xs font-semibold leading-4 text-[#374151] hover:bg-gray-200 transition-colors cursor-pointer"
+              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md bg-[#F3F4F6] px-3 text-xs font-semibold leading-4 text-[#374151] hover:bg-gray-200 transition-colors cursor-pointer"
             >
               <Icon name="arrow_back" size="small" />
               กลับ
             </button>
-            <div>
-              <h2 className="text-xl font-bold leading-7 text-[#064E3B]">แก้ไขโปรไฟล์</h2>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold leading-7 text-[#064E3B] sm:text-xl">แก้ไขโปรไฟล์</h2>
               <p className="text-xs text-gray-500 mt-0.5">ข้อมูลโปรไฟล์ที่ล็อคบนหน้าโปรไฟล์ของผู้ดูแล</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => navigate(`/admin/kyc/${caregiver.id}`)}
@@ -532,10 +533,11 @@ export default function AdminCaregiverDetailPage() {
       </section>
 
       {/* ─── Main Content Layout ─── */}
-      <main className="mx-auto max-w-[1312px] px-4 sm:px-6 lg:px-8 mt-4 grid gap-6 lg:grid-cols-[340px_1fr]">
+      {/* มือถือ: โปรไฟล์ → แท็บ → ประวัติ (ล่างสุด) · จอใหญ่: ซ้าย = โปรไฟล์+ประวัติ, ขวา = แท็บ */}
+      <main className="mx-auto mt-2 grid max-w-[1312px] grid-cols-1 gap-4 px-4 sm:mt-4 sm:gap-6 sm:px-6 lg:grid-cols-[340px_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:items-start lg:px-8">
 
-        {/* Left Column: Side Card & History */}
-        <aside className="space-y-6">
+        {/* Profile card — ซ้ายบน */}
+        <aside className="min-w-0 lg:col-start-1 lg:row-start-1">
           <div className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col items-center text-center">
             <Avatar
               name={caregiver.fullName}
@@ -586,33 +588,42 @@ export default function AdminCaregiverDetailPage() {
               </div>
             </div>
           </div>
+        </aside>
 
+        {/* ประวัติการแก้ไข — มือถืออยู่ล่างสุด, จอใหญ่อยู่ใต้การ์ดโปรไฟล์ */}
+        <div className="order-last min-w-0 lg:order-none lg:col-start-1 lg:row-start-2">
           <KycHistoryCard
             caregiver={caregiver}
             reviews={reviews}
             editHistory={editLogs}
             onlyKycLogs={false}
           />
-        </aside>
+        </div>
 
         {/* Right Column: Tabbed Content Cards */}
-        <div className="space-y-6">
-          <div className="flex border-b border-gray-200 gap-6">
+        <div className="min-w-0 space-y-4 sm:space-y-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <div className="-mx-4 flex gap-5 overflow-x-auto whitespace-nowrap border-b border-gray-200 px-4 [scrollbar-width:none] sm:mx-0 sm:gap-6 sm:px-0">
             <button
               onClick={() => setActiveTab('general')}
-              className={`pb-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${activeTab === 'general' ? 'border-[#059669] text-[#059669]' : 'border-transparent text-gray-500 hover:text-gray-900'}`}
+              className={`shrink-0 pb-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${activeTab === 'general' ? 'border-[#059669] text-[#059669]' : 'border-transparent text-gray-500 hover:text-gray-900'}`}
             >
               ข้อมูลส่วนตัว
             </button>
             <button
               onClick={() => setActiveTab('kyc')}
-              className={`pb-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${activeTab === 'kyc' ? 'border-[#059669] text-[#059669]' : 'border-transparent text-gray-500 hover:text-gray-900'}`}
+              className={`shrink-0 pb-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${activeTab === 'kyc' ? 'border-[#059669] text-[#059669]' : 'border-transparent text-gray-500 hover:text-gray-900'}`}
             >
               ข้อมูล KYC & เอกสาร
             </button>
+            <button
+              onClick={() => setActiveTab('work')}
+              className={`shrink-0 pb-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${activeTab === 'work' ? 'border-[#059669] text-[#059669]' : 'border-transparent text-gray-500 hover:text-gray-900'}`}
+            >
+              การรับงาน & บัญชี
+            </button>
           </div>
 
-          <div className="rounded-xl border border-[#E5E7EB] bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)] min-h-100">
+          <div className="min-h-100 rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] sm:p-6">
             {activeTab === 'general' && (
               <div className="space-y-8">
                 {/* Card 1: ข้อมูลที่ล็อค */}
@@ -884,6 +895,15 @@ export default function AdminCaregiverDetailPage() {
                   <h4 className="text-base font-bold text-[#064E3B]">ข้อมูล KYC & เอกสาร</h4>
                 </div>
                 <KycDocumentsPreview documents={documents} docTypeLabel={docTypeLabels} variant="plain" layout="split" />
+              </div>
+            )}
+
+            {activeTab === 'work' && caregiverId && (
+              <div className="space-y-6">
+                <div className="border-b border-gray-100 pb-3">
+                  <h4 className="text-base font-bold text-[#064E3B]">การรับงาน & บัญชีรับเงิน</h4>
+                </div>
+                <CaregiverWorkPanel userId={caregiverId} />
               </div>
             )}
           </div>

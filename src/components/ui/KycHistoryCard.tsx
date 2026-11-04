@@ -290,7 +290,7 @@ export default function KycHistoryCard({
   if (!caregiver) return null;
 
   return (
-    <article className="rounded-xl border border-[#E5E7EB] bg-white px-6 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+    <article className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 sm:px-6 sm:py-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
       <h3 className="text-base font-semibold leading-5 text-[#064E3B]">{displayTitle}</h3>
       <div className="mt-4 space-y-4">
         {displayedItems.length > 0 ? (
