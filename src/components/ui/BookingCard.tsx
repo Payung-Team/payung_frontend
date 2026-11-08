@@ -3,6 +3,7 @@ import Icon from './Icon';
 import { getPatientDisplayName, type Booking } from '../../pages/caregiver/CaregiverBookings';
 import { serviceTypeLabel } from '../../lib/serviceTypeLabels';
 import { getPayoutStatusMeta } from '../../lib/payoutStatus';
+import { caregiverEarnings, formatBaht } from '../../lib/caregiverEarnings';
 import { googleMapsUrl } from '../../lib/googleMaps';
 
 interface BookingCardProps {
@@ -49,7 +50,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   // "22 ต.ค. 2569" → ช่องวันที่ด้านซ้ายบนจอกว้าง
   const dateParts = formatThaiDate(booking.bookingDate).split(' ');
   const [dateDay, dateMonth, dateYear] = dateParts.length === 3 ? dateParts : [null, null, null];
-  const showNetPay = booking.status === 'completed' && booking.payoutAmount != null;
+  const netEarnings = caregiverEarnings(booking.price, booking.payoutAmount).net;
 
   return (
     <div
@@ -138,10 +139,10 @@ export const BookingCard: React.FC<BookingCardProps> = ({
           <div className="flex flex-row items-center gap-1 md:gap-3 flex-shrink-0">
             <div className="flex flex-col items-end">
               <span className="text-[10px] md:text-xs leading-[14px] md:leading-4 text-[#8A8C8E]">
-                {showNetPay ? 'รับสุทธิ' : 'รายได้'}
+                รายได้สุทธิ
               </span>
               <span className="font-['Inter'] font-bold text-base leading-6 md:text-2xl md:leading-8 text-[#059669]">
-                ฿{(showNetPay ? booking.payoutAmount! : booking.price).toLocaleString()}
+                {formatBaht(netEarnings)}
               </span>
             </div>
             <Icon name="chevron_right" className="text-[22px] md:text-[26px] text-[#C6C8CB]" />

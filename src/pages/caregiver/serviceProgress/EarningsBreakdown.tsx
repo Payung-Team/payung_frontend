@@ -5,10 +5,8 @@ const FONT = { fontFamily: "'Bai Jamjuree', sans-serif" } as const;
 export interface EarningsBreakdownProps {
   /** ราคาบริการของใบจอง (booking.price = estimatedCost) — ยอดที่ลูกค้าจ่ายคิดเพิ่มค่าธรรมเนียมจากค่านี้ */
   price: number;
-  /** ยอดโอนจริงถ้ามีแล้ว — ทำให้ตัวเลขเลิกเป็น "ประมาณการ" */
+  /** ยอดที่โอนให้ผู้ดูแลแล้ว (ถ้ามี) */
   payoutAmount?: number | null;
-  /** ยอดที่ลูกค้าจ่ายจริง (payments.amount) — null = ยังไม่ชำระ ใช้ยอดประมาณ */
-  paidAmount?: number | null;
 }
 
 /**
@@ -17,8 +15,8 @@ export interface EarningsBreakdownProps {
  * เดิมทั้งหน้าเช็คอินและหน้าระหว่างทำงานโชว์ booking.price ห้วน ๆ ว่า "รายได้"
  * ซึ่งเป็นยอดที่ผู้รับบริการจ่าย ไม่ใช่ยอดที่ผู้ดูแลได้รับ (ดู lib/caregiverEarnings)
  */
-export default function EarningsBreakdown({ price, payoutAmount, paidAmount }: Readonly<EarningsBreakdownProps>) {
-  const earnings = caregiverEarnings(price, payoutAmount, paidAmount);
+export default function EarningsBreakdown({ price, payoutAmount }: Readonly<EarningsBreakdownProps>) {
+  const earnings = caregiverEarnings(price, payoutAmount);
 
   return (
     <div className="rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] p-3.5">
@@ -41,7 +39,7 @@ export default function EarningsBreakdown({ price, payoutAmount, paidAmount }: R
 
       <div className="mt-2.5 flex items-center justify-between gap-3 border-t border-dashed border-[#E0E2E5] pt-2.5">
         <span className="text-sm font-bold text-[#1A1A1A]" style={FONT}>
-          รายได้สุทธิที่คุณได้รับ
+          รายได้สุทธิ
         </span>
         <span className="text-lg font-bold text-[#009265]" style={FONT}>
           {formatBaht(earnings.net)}
@@ -50,8 +48,8 @@ export default function EarningsBreakdown({ price, payoutAmount, paidAmount }: R
 
       <p className="mt-2 text-[11px] leading-relaxed text-[#8A8C8E]" style={FONT}>
         {earnings.isActual
-          ? 'ยอดนี้เป็นยอดโอนจริงที่ระบบบันทึกไว้แล้ว'
-          : 'เป็นยอดประมาณการ — ระบบจะโอนหลังปิดงานและพ้นระยะตรวจสอบ ยอดจริงยืนยันเมื่อโอนเงิน'}
+          ? 'โอนเข้าบัญชีของคุณแล้ว'
+          : 'ค่าธรรมเนียมแพลตฟอร์มเก็บเพิ่มจากผู้รับบริการ ไม่หักจากรายได้ของคุณ ระบบจะโอนเข้าบัญชีหลังปิดงานและพ้นระยะตรวจสอบ'}
       </p>
     </div>
   );

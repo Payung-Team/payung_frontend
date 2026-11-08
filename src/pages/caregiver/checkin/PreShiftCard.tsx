@@ -16,8 +16,6 @@ export interface PreShiftCardProps {
   timeText: string;
   durationText?: string;
   price: number;
-  /** ยอดที่ลูกค้าจ่ายจริง (payments.amount) — ส่งเข้า caregiverEarnings ให้ตรงสูตร backend */
-  paidAmount?: number | null;
   canCheckInToday: boolean;
   patientName: string;
   careRecipientName?: string | null;
@@ -85,7 +83,6 @@ export default function PreShiftCard({
   timeText,
   durationText,
   price,
-  paidAmount,
   canCheckInToday,
   patientName,
   careRecipientName,
@@ -96,7 +93,7 @@ export default function PreShiftCard({
 }: Readonly<PreShiftCardProps>) {
   const startAt = canCheckInToday ? parseStartTime(bookingDate, timeText) : null;
   const minutesUntil = useMinutesUntil(startAt);
-  const earnings = caregiverEarnings(price, null, paidAmount);
+  const earnings = caregiverEarnings(price);
 
   function timingText(): string {
     if (!canCheckInToday) return `เช็คอินได้ในวันที่ ${dateText}`;
@@ -140,7 +137,7 @@ export default function PreShiftCard({
             {price > 0 && (
               <>
                 <span aria-hidden="true" className="h-8 w-px bg-[#F0F1F3]" />
-                <Stat label="รายได้สุทธิ (ประมาณ)" value={formatBaht(earnings.net)} tone="money" />
+                <Stat label="รายได้สุทธิ" value={formatBaht(earnings.net)} tone="money" />
               </>
             )}
           </div>
