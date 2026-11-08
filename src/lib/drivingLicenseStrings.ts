@@ -8,6 +8,7 @@
  * แอปยังไม่มีตัวสลับภาษา useDrivingLicenseStrings จึงคืนภาษาไทยเสมอ (แบบเดียวกับ licenseStrings)
  */
 import type { DrivingLicenseErrorCode, DrivingLicenseStatus } from './drivingLicense';
+import { SUPPORT_EMAIL } from './supportContact';
 
 const TH = {
   // ── ฟอร์ม KYC ขั้น 2 · การรับส่ง ─────────────────────────────────────────
@@ -64,7 +65,7 @@ const TH = {
   rejectedReasonLabel: 'เหตุผลจากทีมงาน',
   expiredBody: (date: string) =>
     `ใบขับขี่หมดอายุเมื่อ ${date} · รับงานที่ต้องขับรถรับส่งไม่ได้จนกว่าใบใหม่จะผ่านการตรวจ`,
-  unknownNote: 'ยังแสดงสถานะนี้ไม่ได้ กรุณารีเฟรชหน้า หรือติดต่อทีมงาน',
+  unknownNote: `ยังแสดงสถานะนี้ไม่ได้ กรุณารีเฟรชหน้า หรือติดต่อทีมงานที่ ${SUPPORT_EMAIL}`,
   expiryMeta: (date: string) => `วันหมดอายุ ${date}`,
   reupload: 'อัปโหลดใหม่',
   uploadNew: 'อัปโหลดใบใหม่',
@@ -194,7 +195,7 @@ const EN: DrivingLicenseStrings = {
   rejectedReasonLabel: 'Reason from our team',
   expiredBody: (date: string) =>
     `Your license expired on ${date} · you can’t accept jobs that need driving until a new one is verified`,
-  unknownNote: 'We can’t show this status yet. Refresh the page or contact us',
+  unknownNote: `We can’t show this status yet. Refresh the page or contact us at ${SUPPORT_EMAIL}`,
   expiryMeta: (date: string) => `Expires ${date}`,
   reupload: 'Upload again',
   uploadNew: 'Upload new license',

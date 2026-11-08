@@ -8,6 +8,7 @@
 import { formatDurationTh, type ProofOfWorkSummary } from '../../lib/monitoring';
 import { caregiverEarnings, formatBaht } from '../../lib/caregiverEarnings';
 import ProofOfWorkPanel from './ProofOfWorkPanel';
+import { SUPPORT_MAILTO } from '../../lib/supportContact';
 
 interface CheckOutSuccessProps {
   bookingRef: string;
@@ -128,7 +129,7 @@ export default function CheckOutSuccess({
             กลับไปหน้างานของฉัน
           </button>
           <a
-            href="mailto:support@payung.co.th"
+            href={SUPPORT_MAILTO}
             className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold text-[#8A8C8E] transition-colors hover:text-[#52B69A] ${focusRing}`}
           >
             <span className="material-icons text-[16px]">help_outline</span>

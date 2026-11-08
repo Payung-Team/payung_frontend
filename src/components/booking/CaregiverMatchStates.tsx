@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { AdminContact } from '../../lib/caregiverMatch';
 import { useCaregiverMatchStrings } from '../../lib/caregiverMatchStrings';
+import { SUPPORT_MAILTO } from '../../lib/supportContact';
 
 /**
  * สถานะของรายชื่อผู้ดูแลตาม booking (S18 · PYG-648) — ตาม Design PYG-645 (D2 · D7 · D9)
@@ -20,15 +21,16 @@ const SECONDARY =
 
 /**
  * ช่องติดต่อแอดมิน — ขับด้วย adminContact จาก API (BE ตั้งจาก MATCHING_ADMIN_CONTACT_URL)
- * ไม่มี adminContact → ข้อความแทนปุ่ม (ยังบอกขั้นถัดไป ไม่ซ่อนทั้งช่อง)
+ * ไม่มี adminContact → ปุ่มส่งอีเมลหาทีมงาน (lib/supportContact) แทน ไม่ซ่อนทั้งช่อง
  */
 export function AdminContactAction({ contact }: { contact?: AdminContact | null }) {
   const s = useCaregiverMatchStrings();
   if (!contact?.url) {
     return (
-      <p className="text-[13px] text-[#575859] leading-5" style={FONT}>
-        {s.contactMissing}
-      </p>
+      <a href={SUPPORT_MAILTO} className={PRIMARY} style={FONT}>
+        <span className="material-icons-outlined text-[18px]" aria-hidden="true">mail</span>
+        {s.contact}
+      </a>
     );
   }
   // BE รับเฉพาะ https: กับ tel: — tel: เปิดแอปโทรศัพท์ในแท็บเดิม
