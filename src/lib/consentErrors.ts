@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL } from './supportContact';
 import { CONSENT_ERROR } from '../graphql/consent';
 import {
   extractGraphQLErrorCode,
@@ -11,8 +12,8 @@ import {
  *   BE เป็นเจ้าของสัญญานี้ FE แค่แยกทางตาม code — ห้ามเดาจากข้อความ (ข้อความเปลี่ยนได้ code ไม่เปลี่ยน)
  */
 
-/** อีเมลช่องทางใช้สิทธิ์ตาม PDPA — ต้องตรงกับ DATA_CONTROLLER.email ฝั่ง BE */
-export const PRIVACY_EMAIL = 'privacy@payung.app';
+/** อีเมลช่องทางใช้สิทธิ์ตาม PDPA — ต้องตรงกับ DATA_CONTROLLER.email ฝั่ง BE (ใช้อีเมลทีมงานเดียวกับ SUPPORT_EMAIL) */
+export const PRIVACY_EMAIL = SUPPORT_EMAIL;
 
 // ข้อความที่ FE อยากพูดเองสำหรับบาง code
 // ★ code ที่ไม่อยู่ในนี้ → ใช้ข้อความจาก BE (เป็นภาษาไทยและตั้งใจให้แสดงตรง ๆ อยู่แล้ว)
