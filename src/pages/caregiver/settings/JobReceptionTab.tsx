@@ -319,7 +319,7 @@ export const JobReceptionTab: React.FC = () => {
 
   const receptionDescription = isKycVerified
     ? isAcceptingJobsDynamic
-      ? 'ผู้ดูแลจะเห็นโปรไฟล์ของคุณและสามารถจองได้'
+      ? 'ผู้สูงอายุจะเห็นโปรไฟล์ของคุณและสามารถจองได้'
       : 'โปรไฟล์จะไม่แสดงในหน้าค้นหา'
     : 'พร้อมใช้งานหลังยืนยันตัวตน';
 
