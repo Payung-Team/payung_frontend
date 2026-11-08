@@ -198,7 +198,6 @@ export default function CaregiverBookingDetailPage() {
         bookingDateText={booking.bookingDate ? formatThaiDate(booking.bookingDate) : '—'}
         grossAmount={booking.price}
         payoutAmount={booking.payoutAmount}
-        paidAmount={booking.paidAmount}
         proof={checkedOutProof}
         onBack={backToList}
       />
@@ -259,7 +258,7 @@ export default function CaregiverBookingDetailPage() {
   const isInfoLocked = isRequest || booking.status === 'accepted';
   // ประวัติงาน — จบไปแล้ว ไม่ต้องเห็นข้อมูลสุขภาพ / ผู้ติดต่อ / บันทึกจากผู้ป่วยอีก
   const isHistory = booking.status === 'completed' || booking.status === 'declined' || booking.status === 'cancelled';
-  const netEarnings = caregiverEarnings(booking.price, booking.payoutAmount, booking.paidAmount).net;
+  const netEarnings = caregiverEarnings(booking.price, booking.payoutAmount).net;
   const recipientBrief = [
     profile?.gender,
     profile?.age != null ? `${profile.age} ปี` : null,

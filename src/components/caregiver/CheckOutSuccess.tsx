@@ -15,10 +15,8 @@ interface CheckOutSuccessProps {
   bookingDateText: string;
   /** ราคาบริการของใบจอง (estimatedCost) — ยังไม่รวมค่าธรรมเนียมที่ลูกค้าจ่ายเพิ่ม */
   grossAmount: number;
-  /** ยอดโอนสุทธิจริงเมื่อ payout ถูกสร้างแล้ว */
+  /** ยอดที่โอนให้ผู้ดูแลแล้ว (ถ้ามี) */
   payoutAmount?: number | null;
-  /** ยอดที่ลูกค้าจ่ายจริง (payments.amount) — ใช้คิด net ด้วยสูตรเดียวกับ backend */
-  paidAmount?: number | null;
   proof: ProofOfWorkSummary;
   onBack: () => void;
 }
@@ -28,11 +26,10 @@ export default function CheckOutSuccess({
   bookingDateText,
   grossAmount,
   payoutAmount,
-  paidAmount,
   proof,
   onBack,
 }: Readonly<CheckOutSuccessProps>) {
-  const earnings = caregiverEarnings(grossAmount, payoutAmount, paidAmount);
+  const earnings = caregiverEarnings(grossAmount, payoutAmount);
   const focusRing =
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#52B69A] focus-visible:ring-offset-2';
 
@@ -89,7 +86,7 @@ export default function CheckOutSuccess({
           </span>
           <div>
             <p className="text-[13px] text-[#8A8C8E]">
-              {earnings.isActual ? 'ยอดเงินสุทธิที่ได้รับ' : 'ยอดเงินสุทธิที่คาดว่าจะได้รับ'}
+              รายได้สุทธิ
             </p>
             <p
               className="text-[22px] font-bold leading-8 text-[#3AA981]"
@@ -99,8 +96,8 @@ export default function CheckOutSuccess({
             </p>
             <p className="mt-0.5 text-[11px] text-[#8A8C8E]">
               {earnings.isActual
-                ? 'ยอดโอนจริงหลังหักค่าบริการแล้ว'
-                : `ประมาณการหลังหักค่าธรรมเนียมแพลตฟอร์ม ${earnings.feePercent}%`}
+                ? 'โอนเข้าบัญชีของคุณแล้ว'
+                : 'ระบบจะโอนเข้าบัญชีของคุณตามกำหนด'}
             </p>
           </div>
         </div>

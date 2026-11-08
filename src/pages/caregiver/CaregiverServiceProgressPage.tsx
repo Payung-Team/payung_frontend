@@ -60,7 +60,7 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
     }
   }
 
-  const earnings = caregiverEarnings(booking.price, booking.payoutAmount, booking.paidAmount);
+  const earnings = caregiverEarnings(booking.price, booking.payoutAmount);
 
   return (
     <div className="flex flex-col gap-6">
@@ -76,7 +76,6 @@ export default function CaregiverServiceProgressPage({ booking, onCheckedOut }: 
           recipientAvatarUrl={booking.recipientAvatarUrl}
           patientProfile={booking.patientProfile}
           netEarningsText={booking.price > 0 ? formatBaht(earnings.net) : undefined}
-          netIsActual={earnings.isActual}
           onViewProfile={() => setInfoPanel('profile')}
           onViewBookingDetails={() => setInfoPanel('details')}
         />
