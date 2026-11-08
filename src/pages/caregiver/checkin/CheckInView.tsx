@@ -60,7 +60,6 @@ export default function CheckInView({ booking, dateText, canCheckInToday, onChec
         timeText={booking.time}
         durationText={booking.durationText}
         price={booking.price}
-        paidAmount={booking.paidAmount}
         canCheckInToday={canCheckInToday}
         patientName={booking.patientName}
         careRecipientName={booking.careRecipientName}

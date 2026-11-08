@@ -1,6 +1,7 @@
 import React from 'react';
 import Icon from './Icon';
 import { getPatientDisplayName, type Booking } from '../../pages/caregiver/CaregiverBookings';
+import { caregiverEarnings, formatBaht } from '../../lib/caregiverEarnings';
 
 interface AcceptBookingModalProps {
   readonly isOpen: boolean;
@@ -57,8 +58,8 @@ export const AcceptBookingModal: React.FC<AcceptBookingModalProps> = ({
           <DetailRow label="เวลา:">
             <span className="font-semibold text-[#1A1A1A]">{booking.timeRangeText}</span>
           </DetailRow>
-          <DetailRow label="รายได้โดยประมาณ:">
-            <span className="font-bold text-[#059669]">฿{booking.price.toLocaleString()}</span>
+          <DetailRow label="รายได้สุทธิ:">
+            <span className="font-bold text-[#059669]">{formatBaht(caregiverEarnings(booking.price).net)}</span>
           </DetailRow>
         </div>
 

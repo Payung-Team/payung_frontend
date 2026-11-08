@@ -1,31 +1,30 @@
 /**
- * รายได้สุทธิของผู้ดูแล — คำนวณให้ตรงกับ backend
+ * รายได้สุทธิของผู้ดูแล — สูตรเดียวที่ทุกหน้าของผู้ดูแลใช้
  *
- * ที่มาของสูตร:
- *   - payment.service.ts → createPayment: ลูกค้าจ่าย = estimated_cost + platformFee
- *     (platformFee = estimated_cost × PLATFORM_FEE_PERCENT / 100 — เก็บเพิ่มจากลูกค้า)
- *   - payout.service.ts → createFromCompletedBooking: fee = max(gross − estimated_cost, 0) · net = gross − fee
- * → ผู้ดูแลได้ "ราคาบริการเต็ม" (bookings.estimated_cost) ไม่ถูกหักค่าธรรมเนียม
- *   ตัวอย่าง: ค่าบริการ 300 → ลูกค้าจ่าย 330 → ผู้ดูแลได้ 300
+ *   ค่าธรรมเนียมแพลตฟอร์ม = ราคาบริการ × PLATFORM_FEE_PERCENT%
+ *   ยอดที่ลูกค้าจ่าย        = ราคาบริการ + ค่าธรรมเนียมแพลตฟอร์ม
+ *   รายได้สุทธิของผู้ดูแล   = ยอดที่ลูกค้าจ่าย − ค่าธรรมเนียมแพลตฟอร์ม (= ราคาบริการ)
+ *   ตัวอย่าง: ค่าบริการ 1,000 → ลูกค้าจ่าย 1,100 → ผู้ดูแลได้ 1,000
  *
- * ⚠️ เดิมสูตรนี้เอา estimated_cost ไป × (1 − 10%) อีกรอบ → ผู้ดูแลเห็น 270 ทั้งที่ได้จริง 300
- *    (ค่าธรรมเนียมถูกคิดซ้ำสองครั้ง) — input ของฟังก์ชันนี้คือราคาบริการ ไม่ใช่ยอดที่ลูกค้าจ่าย
+ * คิดจากราคาบริการของใบจอง (booking.price = estimated_cost) อย่างเดียว ไม่อ่านยอดที่ตัดบัตรผ่าน Omise
+ * (payments.amount) — ยอดนั้นเป็นเรื่องฝั่งผู้สูงอายุ ตัวเลขของผู้ดูแลจึงเท่ากันทุกหน้าตั้งแต่ตอนรับงาน
+ * ตรงกับ backend: payment.service.ts เก็บค่าธรรมเนียมเพิ่มจากลูกค้า และ payout.service.ts
+ * → createFromCompletedBooking โอนให้ผู้ดูแล = gross − (gross − estimated_cost)
  *
  * ⚠️ PLATFORM_FEE_PERCENT เป็น env ฝั่ง backend ไม่ได้ส่งมาทาง GraphQL
- *    ค่าที่ใช้ตรงนี้จึงเป็น "ค่า default เดียวกับ backend" (10) ไม่ใช่ค่าที่อ่านมาจริง
- *    ใช้เฉพาะตอนยังไม่มี paidAmount (ยังไม่ชำระ) — ชำระแล้วใช้ยอดจริงจาก backend
- *    ถ้าวันหนึ่งแก้ค่านี้บน production ต้องส่งลงมาทาง API แล้วเลิกใช้ค่าคงที่นี้
+ *    ค่าที่ใช้ตรงนี้เป็น "ค่า default เดียวกับ backend" (10) ใช้แค่แสดงยอดที่ลูกค้าจ่าย/ค่าธรรมเนียม
+ *    ไม่มีผลกับรายได้สุทธิของผู้ดูแล ถ้าแก้ค่านี้บน production ต้องส่งลงมาทาง API
  */
 export const PLATFORM_FEE_PERCENT = 10;
 
 export interface CaregiverEarnings {
-  /** ยอดที่ผู้รับบริการชำระสำหรับงานนี้ (ค่าบริการ + ค่าธรรมเนียมแพลตฟอร์ม) */
+  /** ยอดที่ผู้รับบริการจ่ายสำหรับงานนี้ (ค่าบริการ + ค่าธรรมเนียมแพลตฟอร์ม) */
   gross: number;
   /** ค่าธรรมเนียมแพลตฟอร์ม (ลูกค้าจ่ายเพิ่ม ไม่ได้หักจากผู้ดูแล) */
   fee: number;
-  /** ยอดที่ผู้ดูแลได้รับจริง = ราคาบริการ */
+  /** รายได้สุทธิของผู้ดูแล = gross − fee */
   net: number;
-  /** true = ตัวเลขจาก payout จริงที่ระบบบันทึกไว้ · false = ประมาณการจากสูตร */
+  /** true = ระบบโอนเงินงานนี้แล้ว (net คือยอดโอนจริง) */
   isActual: boolean;
   feePercent: number;
 }
@@ -36,29 +35,17 @@ function round2(value: number): number {
 }
 
 /**
- * สูตรเดียวกับ backend (payout.service.ts → createFromCompletedBooking):
- *   gross = payments.amount
- *   fee   = max(gross − estimated_cost, 0)
- *   net   = gross − fee                      (= min(estimated_cost, gross))
- *
  * @param servicePrice ราคาบริการของใบจอง (booking.price = estimatedCost) — ยังไม่รวมค่าธรรมเนียม
- * @param payoutAmount ยอดโอนจริงถ้าระบบบันทึกไว้แล้ว — ถ้ามี ใช้เป็น net แทนการคำนวณ
- * @param paidAmount   ยอดที่ลูกค้าจ่ายจริง (payments.amount) — ยังไม่ชำระ (null) จะประมาณ
- *                     ด้วยสูตรตอนตัดบัตร: estimated_cost + estimated_cost × PLATFORM_FEE_PERCENT%
+ * @param payoutAmount ยอดที่โอนให้ผู้ดูแลแล้ว (ถ้ามี) — ใช้เป็นรายได้สุทธิแทนสูตร เพราะเป็นเงินที่ได้จริง
  */
-export function caregiverEarnings(
-  servicePrice: number,
-  payoutAmount?: number | null,
-  paidAmount?: number | null,
-): CaregiverEarnings {
-  const gross = paidAmount ?? round2(servicePrice + round2(servicePrice * (PLATFORM_FEE_PERCENT / 100)));
-  const fee = round2(Math.max(gross - servicePrice, 0));
+export function caregiverEarnings(servicePrice: number, payoutAmount?: number | null): CaregiverEarnings {
+  const fee = round2(servicePrice * (PLATFORM_FEE_PERCENT / 100));
+  const gross = round2(servicePrice + fee);
   const net = payoutAmount ?? round2(gross - fee);
 
   return {
     gross,
-    // payout จริงเป็นตัวตั้ง → ค่าธรรมเนียม = ส่วนต่างกับยอดที่ลูกค้าจ่าย (ตรงกับ payouts.platform_fee)
-    fee: payoutAmount != null ? round2(Math.max(0, gross - payoutAmount)) : fee,
+    fee,
     net,
     isActual: payoutAmount != null,
     feePercent: PLATFORM_FEE_PERCENT,
