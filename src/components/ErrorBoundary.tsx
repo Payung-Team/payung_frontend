@@ -1,4 +1,5 @@
 import React from 'react';
+import { SUPPORT_EMAIL } from '../lib/supportContact';
 
 /**
  * ErrorBoundary — กันหน้าจอขาว
@@ -53,7 +54,7 @@ class ErrorBoundary extends React.Component<Props, State> {
             ระบบแสดงหน้านี้ไม่สำเร็จ ข้อมูลการจองของคุณยังอยู่ ลองโหลดหน้าใหม่อีกครั้ง
             {import.meta.env.DEV
               ? ' ถ้ายังไม่หาย กรุณาแจ้งทีมงานพร้อมข้อความด้านล่าง'
-              : ' ถ้ายังไม่หาย กรุณาติดต่อทีมงาน'}
+              : ` ถ้ายังไม่หาย กรุณาติดต่อทีมงานที่ ${SUPPORT_EMAIL}`}
           </p>
           {/* ข้อความ error ดิบเป็นข้อมูลภายในระบบ — แสดงเฉพาะตอนพัฒนา */}
           {import.meta.env.DEV && (
