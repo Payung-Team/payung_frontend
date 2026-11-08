@@ -19,10 +19,8 @@ export interface CaregiverMatchStrings {
   emptyBody: string;
   editBooking: string;
 
-  // ช่องติดต่อแอดมิน — ปุ่มใช้ label จาก adminContact · ค่านี้ใช้เมื่อ label ว่าง
+  // ช่องติดต่อแอดมิน — ปุ่มใช้ label จาก adminContact · ค่านี้ใช้เมื่อ label ว่าง หรือไม่มี adminContact (ส่งอีเมลหาทีมงาน)
   contact: string;
-  /** ไม่มี adminContact → ข้อความแทนปุ่ม ยังบอกขั้นถัดไป */
-  contactMissing: string;
 
   // โหลดไม่สำเร็จ
   errorTitle: string;
@@ -57,7 +55,6 @@ const TH: CaregiverMatchStrings = {
   editBooking: 'กลับไปแก้รายละเอียดการจอง',
 
   contact: 'ติดต่อทีมงาน Payung',
-  contactMissing: 'ติดต่อทีมงาน Payung ได้ตามช่องทางที่แจ้งไว้ในแอป',
 
   errorTitle: 'โหลดรายชื่อผู้ดูแลไม่สำเร็จ',
   errorBody: 'ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต แล้วลองอีกครั้ง',
@@ -86,7 +83,6 @@ const EN: CaregiverMatchStrings = {
   editBooking: 'Edit booking details',
 
   contact: 'Contact the Payung team',
-  contactMissing: 'Contact the Payung team using the channels shown in the app.',
 
   errorTitle: 'Couldn’t load caregivers',
   errorBody: 'Check your internet connection and try again.',

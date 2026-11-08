@@ -8,6 +8,7 @@
  * ตาราง EN มีไว้ให้พร้อมใช้เมื่อมีตัวสลับ — type บังคับให้ครบทุก key เท่ากับ TH
  */
 import type { LicenseErrorCode, LicenseStatus } from './license';
+import { SUPPORT_EMAIL } from './supportContact';
 
 const TH = {
   // ── ฟอร์ม KYC ขั้น 2 ──────────────────────────────────────────────────
@@ -93,11 +94,11 @@ const TH = {
   rejectedReasonLabel: 'เหตุผลจากทีมงาน',
   expiredNote: (number: string, date: string) =>
     `ใบอนุญาตเลขที่ ${number} หมดอายุเมื่อ ${date} กรุณาอัปโหลดใบที่ต่ออายุแล้วเพื่อให้ทีมงานตรวจอีกครั้ง`,
-  unknownNote: 'ยังแสดงสถานะนี้ไม่ได้ กรุณารีเฟรชหน้า หรือติดต่อทีมงาน',
+  unknownNote: `ยังแสดงสถานะนี้ไม่ได้ กรุณารีเฟรชหน้า หรือติดต่อทีมงานที่ ${SUPPORT_EMAIL}`,
   resubmitAction: 'แก้ไขและส่งใหม่',
   reuploadAction: 'อัปโหลดใบใหม่',
   /** KYC อนุมัติแล้วแต่ใบประกอบฯ ไม่ผ่าน/หมดอายุ — BE ยังไม่มีทางส่งใบใหม่แยกจาก KYC (ดู PR PYG-588) */
-  reuploadUnavailable: 'ยังส่งใบใหม่ทางแอปไม่ได้ กรุณาติดต่อทีมงานเพื่อส่งใบที่ต่ออายุแล้ว',
+  reuploadUnavailable: `ยังส่งใบใหม่ทางแอปไม่ได้ กรุณาส่งใบที่ต่ออายุแล้วมาที่ ${SUPPORT_EMAIL}`,
 
   // ── แอดมิน ─────────────────────────────────────────────────────────────
   adminRequiredType: 'ประเภทใบที่ต้องมี',
@@ -219,10 +220,10 @@ const EN: LicenseStrings = {
   rejectedReasonLabel: 'Reason from our team',
   expiredNote: (number, date) =>
     `License no. ${number} expired on ${date}. Upload a renewed license so our team can review it again`,
-  unknownNote: "We can't show this status yet. Please refresh the page or contact our team",
+  unknownNote: `We can't show this status yet. Please refresh the page or contact our team at ${SUPPORT_EMAIL}`,
   resubmitAction: 'Update and resubmit',
   reuploadAction: 'Upload new license',
-  reuploadUnavailable: "You can't send a new license in the app yet. Please contact our team to send your renewed license",
+  reuploadUnavailable: `You can't send a new license in the app yet. Please email your renewed license to ${SUPPORT_EMAIL}`,
 
   adminRequiredType: 'Required license',
   adminProfession: 'Stated profession',
